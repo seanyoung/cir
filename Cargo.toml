@@ -9,3 +9,6 @@ edition = "2018"
 [dependencies]
 num = "0.2.1"
 clap = "2.33.0"
+toml = "0.5"
+serde = "1.0"
+serde_derive = { version = "1.0" }

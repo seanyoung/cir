@@ -1,6 +1,10 @@
 extern crate clap;
 extern crate num;
+extern crate serde;
+extern crate serde_derive;
+extern crate toml;
 
+mod keymap;
 mod mode2;
 mod pronto;
 mod rawir;

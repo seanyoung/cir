@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Pronto {
     LearnedUnmodulated {
         intro: Vec<f64>,
@@ -89,4 +89,14 @@ fn parse_test() {
             [9040, 2266, 573, 96193]
         );
     }
+
+    assert_eq!(
+        parse("1000 006C 0000 0000 015B 00AD 0016"),
+        Err("inconsistent length".to_string())
+    );
+
+    assert_eq!(
+        parse("1000 006C 0000 015B 00AD"),
+        Err("pronto hex should be at least 6 numbers long".to_string())
+    );
 }
