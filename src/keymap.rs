@@ -1,7 +1,7 @@
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq, Debug)]
 pub struct Protocol {
     name: String,
     protocol: String,
@@ -10,7 +10,7 @@ pub struct Protocol {
     scancodes: Option<HashMap<String, String>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq, Debug)]
 pub struct Raw {
     keycode: String,
     raw: Option<String>,
@@ -18,7 +18,7 @@ pub struct Raw {
     pronto: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq, Debug)]
 pub struct Keymap {
     protocols: Vec<Protocol>,
 }
@@ -45,6 +45,8 @@ pub fn parse(s: &str) -> Result<Keymap, String> {
                                     "raw entry has both pronto hex code and repeat".to_string()
                                 );
                             }
+                        } else if r.raw.is_none() {
+                            return Err("raw entry has neither pronto hex code nor raw".to_string());
                         }
                     }
                 }
@@ -83,4 +85,46 @@ fn parse_test() {
             }
         }
     }
+
+    let s = r#"
+    [[protocols]]
+    name = "hauppauge"
+    protocol = "raw"
+    [protocols.scancodes]
+    0x1e3b = "KEY_SELECT"
+    0x1e3d = "KEY_POWER2"
+    0x1e1c = "KEY_TV"
+    "#;
+
+    assert_eq!(
+        parse(s),
+        Err("raw protocol is misssing raw entries".to_string())
+    );
+
+    let s = r#"
+    [[protocols]]
+    name = "hauppauge"
+    protocol = "raw"
+    [[protocols.raw]]
+    keycode = 'FOO'
+    "#;
+
+    assert_eq!(
+        parse(s),
+        Err("raw entry has neither pronto hex code nor raw".to_string())
+    );
+
+    let s = r#"
+    [[protocols]]
+    name = "hauppauge"
+    protocol = "raw"
+    [[protocols.raw]]
+    keycode = 'FOO'
+    repeat = '+100'
+    "#;
+
+    assert_eq!(
+        parse(s),
+        Err("raw entry has neither pronto hex code nor raw".to_string())
+    );
 }
