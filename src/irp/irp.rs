@@ -1,4 +1,4 @@
-// auto-generated: "lalrpop 0.17.2"
+// auto-generated: "lalrpop 0.18.1"
 // sha256: d09ec9f5ba0bbce34597b4943e63d85becbc54b64bd8958be5435e1f335514
 use std::str::FromStr;
 use crate::irp::ast::*;
@@ -17,7 +17,7 @@ mod __parse__protocol {
     extern crate lalrpop_util as __lalrpop_util;
     #[allow(unused_imports)]
     use self::__lalrpop_util::state_machine as __state_machine;
-    use super::__intern_token::Token;
+    use self::__lalrpop_util::lexer::Token;
     #[allow(dead_code)]
     pub enum __Symbol<'input>
      {
@@ -258,7 +258,7 @@ mod __parse__protocol {
         }
 
         fn simulate_reduce(&self, action: i8) -> __state_machine::SimulatedReduce<Self> {
-            __simulate_reduce(action, ::std::marker::PhantomData::<(&())>)
+            panic!("error recovery not enabled for this grammar")
         }
     }
     fn __token_to_integer<
@@ -291,189 +291,21 @@ mod __parse__protocol {
     ) -> __Symbol<'input>
     {
         match __token_index {
-            0 => match __token {
-                Token(2, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            1 => match __token {
-                Token(3, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            2 => match __token {
-                Token(4, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            3 => match __token {
-                Token(5, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            4 => match __token {
-                Token(6, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            5 => match __token {
-                Token(7, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            6 => match __token {
-                Token(8, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            7 => match __token {
-                Token(9, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            8 => match __token {
-                Token(0, __tok0) => __Symbol::Variant0((__tok0)),
-                _ => unreachable!(),
-            },
-            9 => match __token {
-                Token(1, __tok0) => __Symbol::Variant0((__tok0)),
+            0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 => match __token {
+                Token(2, __tok0) | Token(3, __tok0) | Token(4, __tok0) | Token(5, __tok0) | Token(6, __tok0) | Token(7, __tok0) | Token(8, __tok0) | Token(9, __tok0) | Token(0, __tok0) | Token(1, __tok0) if true => __Symbol::Variant0(__tok0),
                 _ => unreachable!(),
             },
             _ => unreachable!(),
         }
     }
-    fn __simulate_reduce<
-        'input,
-    >(
-        __reduce_index: i8,
-        _: ::std::marker::PhantomData<(&'input ())>,
-    ) -> __state_machine::SimulatedReduce<__StateMachine<'input>>
-    {
-        match __reduce_index {
-            0 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 2,
-                    nonterminal_produced: 0,
-                }
-            }
-            1 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 0,
-                    nonterminal_produced: 1,
-                }
-            }
-            2 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 1,
-                }
-            }
-            3 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 2,
-                    nonterminal_produced: 2,
-                }
-            }
-            4 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 3,
-                    nonterminal_produced: 2,
-                }
-            }
-            5 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 3,
-                }
-            }
-            6 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 0,
-                    nonterminal_produced: 3,
-                }
-            }
-            7 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 2,
-                    nonterminal_produced: 3,
-                }
-            }
-            8 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 3,
-                }
-            }
-            9 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 4,
-                }
-            }
-            10 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 4,
-                }
-            }
-            11 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 2,
-                    nonterminal_produced: 4,
-                }
-            }
-            12 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 4,
-                }
-            }
-            13 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 2,
-                    nonterminal_produced: 4,
-                }
-            }
-            14 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 2,
-                    nonterminal_produced: 4,
-                }
-            }
-            15 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 5,
-                }
-            }
-            16 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 0,
-                    nonterminal_produced: 5,
-                }
-            }
-            17 => __state_machine::SimulatedReduce::Accept,
-            18 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 7,
-                }
-            }
-            19 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 1,
-                    nonterminal_produced: 7,
-                }
-            }
-            20 => {
-                __state_machine::SimulatedReduce::Reduce {
-                    states_to_pop: 3,
-                    nonterminal_produced: 8,
-                }
-            }
-            _ => panic!("invalid reduction index {}", __reduce_index)
-        }
-    }
     pub struct protocolParser {
-        builder: super::__intern_token::__MatcherBuilder,
+        builder: __lalrpop_util::lexer::MatcherBuilder,
         _priv: (),
     }
 
     impl protocolParser {
         pub fn new() -> protocolParser {
-            let __builder = super::__intern_token::__MatcherBuilder::new();
+            let __builder = super::__intern_token::new_builder();
             protocolParser {
                 builder: __builder,
                 _priv: (),
@@ -512,55 +344,55 @@ mod __parse__protocol {
     {
         let (__pop_states, __nonterminal) = match __action {
             0 => {
-                __reduce0(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce0(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             1 => {
-                __reduce1(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce1(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             2 => {
-                __reduce2(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce2(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             3 => {
-                __reduce3(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce3(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             4 => {
-                __reduce4(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce4(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             5 => {
-                __reduce5(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce5(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             6 => {
-                __reduce6(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce6(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             7 => {
-                __reduce7(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce7(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             8 => {
-                __reduce8(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce8(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             9 => {
-                __reduce9(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce9(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             10 => {
-                __reduce10(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce10(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             11 => {
-                __reduce11(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce11(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             12 => {
-                __reduce12(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce12(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             13 => {
-                __reduce13(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce13(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             14 => {
-                __reduce14(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce14(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             15 => {
-                __reduce15(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce15(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             16 => {
-                __reduce16(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce16(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             17 => {
                 // __protocol = protocol => ActionFn(0);
@@ -571,13 +403,13 @@ mod __parse__protocol {
                 return Some(Ok(__nt));
             }
             18 => {
-                __reduce18(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce18(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             19 => {
-                __reduce19(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce19(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             20 => {
-                __reduce20(input, __action, __lookahead_start, __states, __symbols, ::std::marker::PhantomData::<(&())>)
+                __reduce20(input, __lookahead_start, __symbols, ::std::marker::PhantomData::<(&())>)
             }
             _ => panic!("invalid action code {}", __action)
         };
@@ -669,14 +501,13 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
     {
         // (<GeneralItem> ",") = GeneralItem, "," => ActionFn(15);
+        assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant1(__symbols);
         let __start = __sym0.0.clone();
@@ -689,9 +520,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -707,9 +536,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -726,14 +553,13 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
     {
         // (<GeneralItem> ",")+ = GeneralItem, "," => ActionFn(18);
+        assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant1(__symbols);
         let __start = __sym0.0.clone();
@@ -746,14 +572,13 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
     {
         // (<GeneralItem> ",")+ = (<GeneralItem> ",")+, GeneralItem, "," => ActionFn(19);
+        assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant1(__symbols);
         let __sym0 = __pop_Variant2(__symbols);
@@ -767,9 +592,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -786,9 +609,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -804,14 +625,13 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
     {
         // Comma<GeneralItem> = (<GeneralItem> ",")+, GeneralItem => ActionFn(24);
+        assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant1(__symbols);
         let __sym0 = __pop_Variant2(__symbols);
         let __start = __sym0.0.clone();
@@ -824,9 +644,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -843,9 +661,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -862,9 +678,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -881,14 +695,13 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
     {
         // GeneralItem = float_number, "p" => ActionFn(3);
+        assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant6(__symbols);
         let __start = __sym0.0.clone();
@@ -901,9 +714,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -920,14 +731,13 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
     {
         // GeneralItem = float_number, "k" => ActionFn(5);
+        assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant6(__symbols);
         let __start = __sym0.0.clone();
@@ -940,14 +750,13 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
     {
         // GeneralItem = float_number, "%" => ActionFn(6);
+        assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant6(__symbols);
         let __start = __sym0.0.clone();
@@ -960,9 +769,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -979,9 +786,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -997,9 +802,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -1016,9 +819,7 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
@@ -1035,14 +836,13 @@ mod __parse__protocol {
         'input,
     >(
         input: &'input str,
-        __action: i8,
         __lookahead_start: Option<&usize>,
-        __states: &mut ::std::vec::Vec<i8>,
         __symbols: &mut ::std::vec::Vec<(usize,__Symbol<'input>,usize)>,
         _: ::std::marker::PhantomData<(&'input ())>,
     ) -> (usize, usize)
     {
         // protocol = "{", Comma<GeneralItem>, "}" => ActionFn(9);
+        assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant3(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
@@ -1063,110 +863,24 @@ mod __intern_token {
     extern crate lalrpop_util as __lalrpop_util;
     #[allow(unused_imports)]
     use self::__lalrpop_util::state_machine as __state_machine;
-    extern crate regex as __regex;
-    use std::fmt as __fmt;
-
-    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct Token<'input>(pub usize, pub &'input str);
-    impl<'a> __fmt::Display for Token<'a> {
-        fn fmt<'f>(&self, formatter: &mut __fmt::Formatter<'f>) -> Result<(), __fmt::Error> {
-            __fmt::Display::fmt(self.1, formatter)
-        }
-    }
-
-    pub struct __MatcherBuilder {
-        regex_set: __regex::RegexSet,
-        regex_vec: Vec<__regex::Regex>,
-    }
-
-    impl __MatcherBuilder {
-        pub fn new() -> __MatcherBuilder {
-            let __strs: &[&str] = &[
-                "^([0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+)",
-                "^([0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+\\.[0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+)",
-                "^(%)",
-                "^(,)",
-                "^(k)",
-                "^(lsb)",
-                "^(msb)",
-                "^(p)",
-                "^(\\{)",
-                "^(\\})",
-            ];
-            let __regex_set = __regex::RegexSet::new(__strs).unwrap();
-            let __regex_vec = vec![
-                __regex::Regex::new("^([0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+)").unwrap(),
-                __regex::Regex::new("^([0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+\\.[0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+)").unwrap(),
-                __regex::Regex::new("^(%)").unwrap(),
-                __regex::Regex::new("^(,)").unwrap(),
-                __regex::Regex::new("^(k)").unwrap(),
-                __regex::Regex::new("^(lsb)").unwrap(),
-                __regex::Regex::new("^(msb)").unwrap(),
-                __regex::Regex::new("^(p)").unwrap(),
-                __regex::Regex::new("^(\\{)").unwrap(),
-                __regex::Regex::new("^(\\})").unwrap(),
-            ];
-            __MatcherBuilder { regex_set: __regex_set, regex_vec: __regex_vec }
-        }
-        pub fn matcher<'input, 'builder>(&'builder self, s: &'input str) -> __Matcher<'input, 'builder> {
-            __Matcher {
-                text: s,
-                consumed: 0,
-                regex_set: &self.regex_set,
-                regex_vec: &self.regex_vec,
-            }
-        }
-    }
-
-    pub struct __Matcher<'input, 'builder> {
-        text: &'input str,
-        consumed: usize,
-        regex_set: &'builder __regex::RegexSet,
-        regex_vec: &'builder Vec<__regex::Regex>,
-    }
-
-    impl<'input, 'builder> Iterator for __Matcher<'input, 'builder> {
-        type Item = Result<(usize, Token<'input>, usize), __lalrpop_util::ParseError<usize,Token<'input>,&'static str>>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            let __text = self.text.trim_start();
-            let __whitespace = self.text.len() - __text.len();
-            let __start_offset = self.consumed + __whitespace;
-            if __text.is_empty() {
-                self.text = __text;
-                self.consumed = __start_offset;
-                None
-            } else {
-                let __matches = self.regex_set.matches(__text);
-                if !__matches.matched_any() {
-                    Some(Err(__lalrpop_util::ParseError::InvalidToken {
-                        location: __start_offset,
-                    }))
-                } else {
-                    let mut __longest_match = 0;
-                    let mut __index = 0;
-                    for __i in 0 .. 10 {
-                        if __matches.matched(__i) {
-                            let __match = self.regex_vec[__i].find(__text).unwrap();
-                            let __len = __match.end();
-                            if __len >= __longest_match {
-                                __longest_match = __len;
-                                __index = __i;
-                            }
-                        }
-                    }
-                    let __result = &__text[..__longest_match];
-                    let __remaining = &__text[__longest_match..];
-                    let __end_offset = __start_offset + __longest_match;
-                    self.text = __remaining;
-                    self.consumed = __end_offset;
-                    Some(Ok((__start_offset, Token(__index, __result), __end_offset)))
-                }
-            }
-        }
+    pub fn new_builder() -> __lalrpop_util::lexer::MatcherBuilder {
+        let __strs: &[(&str, bool)] = &[
+            ("^([0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+)", false),
+            ("^([0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+\\.[0-9٠-٩۰-۹߀-߉०-९০-৯੦-੯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯෦-෯๐-๙໐-໙༠-༩၀-၉႐-႙០-៩᠐-᠙᥆-᥏᧐-᧙᪀-᪉᪐-᪙᭐-᭙᮰-᮹᱀-᱉᱐-᱙꘠-꘩꣐-꣙꤀-꤉꧐-꧙꧰-꧹꩐-꩙꯰-꯹０-９𐒠-𐒩𐴰-𐴹𑁦-𑁯𑃰-𑃹𑄶-𑄿𑇐-𑇙𑋰-𑋹𑑐-𑑙𑓐-𑓙𑙐-𑙙𑛀-𑛉𑜰-𑜹𑣠-𑣩𑱐-𑱙𑵐-𑵙𑶠-𑶩𖩠-𖩩𖭐-𖭙𝟎-𝟿𞅀-𞅉𞋰-𞋹𞥐-𞥙]+)", false),
+            ("^(%)", false),
+            ("^(,)", false),
+            ("^(k)", false),
+            ("^(lsb)", false),
+            ("^(msb)", false),
+            ("^(p)", false),
+            ("^(\\{)", false),
+            ("^(\\})", false),
+            (r"^(\s*)", true),
+        ];
+        __lalrpop_util::lexer::MatcherBuilder::new(__strs.iter().copied()).unwrap()
     }
 }
-pub use self::__intern_token::Token;
+pub use self::__lalrpop_util::lexer::Token;
 
 #[allow(unused_variables)]
 fn __action0<
@@ -1176,7 +890,7 @@ fn __action0<
     (_, __0, _): (usize, Irp, usize),
 ) -> Irp
 {
-    (__0)
+    __0
 }
 
 #[allow(unused_variables)]
@@ -1357,7 +1071,7 @@ fn __action15<
     (_, _, _): (usize, &'input str, usize),
 ) -> GeneralItem
 {
-    (__0)
+    __0
 }
 
 #[allow(unused_variables)]
