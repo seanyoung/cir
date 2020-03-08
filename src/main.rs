@@ -51,7 +51,10 @@ fn main() {
         }
     }
     if matches.is_present("IRP") {
-        irp::parse(&arg);
+        match irp::parse(&arg) {
+            Ok(ir) => println!("{:?}", ir),
+            Err(s) => eprintln!("error: {}", s),
+        }
     }
     if matches.is_present("KEYMAP") {
         match keymap::parse(&arg) {

@@ -1,9 +1,8 @@
-#[derive(Debug)]
 pub struct Irp {
     pub general_spec: Vec<GeneralItem>,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq)]
 pub enum GeneralItem {
     Frequency(f64),
     DutyCycle(f64),
