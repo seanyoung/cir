@@ -4,6 +4,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate toml;
 
+mod irp;
 mod keymap;
 mod mode2;
 mod pronto;
@@ -19,6 +20,7 @@ fn main() {
         .about("Linux Infrared Control")
         .arg(Arg::with_name("INPUT").help("IR to send"))
         .arg(Arg::with_name("MODE2").long("mode2"))
+        .arg(Arg::with_name("IRP").long("irp"))
         .arg(Arg::with_name("RAWIR").long("rawir"))
         .arg(Arg::with_name("PRONTO").long("pronto"))
         .arg(Arg::with_name("KEYMAP").long("keymap"))
@@ -47,6 +49,9 @@ fn main() {
             Ok(ir) => println!("{:?}", ir),
             Err(s) => eprintln!("error: {}", s),
         }
+    }
+    if matches.is_present("IRP") {
+        irp::parse(&arg);
     }
     if matches.is_present("KEYMAP") {
         match keymap::parse(&arg) {

@@ -1,0 +1,33 @@
+use std::str::FromStr;
+use crate::irp::ast::*;
+
+grammar;
+
+GeneralItem: GeneralItem = {
+    "msb" => GeneralItem::OrderMsb,
+    "lsb" => GeneralItem::OrderLsb,
+    <n:float_number> "p" => GeneralItem::UnitPulse(n),
+    <n:float_number> => GeneralItem::Unit(n),
+    <n:float_number> "k" => GeneralItem::Frequency(n),
+    <n:float_number> "%" => GeneralItem::DutyCycle(n),    
+}
+
+float_number: f64 = {
+    r"\d+"  => f64::from_str(<>).unwrap(),
+    r"\d+\.\d+" => f64::from_str(<>).unwrap(),
+}
+
+pub protocol: Irp = {
+    "{" <v:Comma<GeneralItem>> "}" => Irp { general_spec: v },
+}
+
+Comma<T>: Vec<T> = {
+    <v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};
