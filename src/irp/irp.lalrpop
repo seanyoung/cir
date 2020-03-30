@@ -43,9 +43,12 @@ duration: Duration = {
 irstream_item: IrStreamItem = {
     duration => IrStreamItem::Duration(<>),
     <id:identifier> "=" <e:expression> => IrStreamItem::Assignment(id, e),
-    <b:primary_item> ":" <l:primary_item> => IrStreamItem::BitField(b, l, None),
-    <b:primary_item> ":" <l:primary_item> ":" <r:primary_item> => IrStreamItem::BitField(b, l, Some(r)),
-    <b:primary_item> "::" <l:primary_item> => IrStreamItem::InfiniteBitField(b, l),
+    <c:"~"?> <e:primary_item> ":" <r:"-"?> <b:primary_item> <l:(":" <primary_item>)?> => {
+        IrStreamItem::BitField(c.is_some(), e, r.is_some(), b, l)
+    },
+    <c:"~"?> <e:primary_item> "::" <b:primary_item> => {
+        IrStreamItem::InfiniteBitField(c.is_some(), e, b)
+    }
 }
 
 primary_item: Expression = {
@@ -59,7 +62,9 @@ expression: Expression = {
 }
 
 Precedence14: Expression = {
-    <c:Precedence14> "?" <l:Precedence13> ":" <r:Precedence13> => Expression::Ternary(Box::new(c), Box::new(l), Box::new(r)),
+    <c:Precedence14> "?" <l:Precedence13> ":" <r:Precedence13> => {
+        Expression::Ternary(Box::new(c), Box::new(l), Box::new(r))
+    },
     Precedence13,
 }
 
