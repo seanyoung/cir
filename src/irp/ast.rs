@@ -34,6 +34,8 @@ pub enum Duration {
 pub enum IrStreamItem {
     Duration(Duration),
     Assignment(String, Expression),
+    BitField(Expression, Expression, Option<Expression>),
+    InfiniteBitField(Expression, Expression),
 }
 
 #[derive(PartialEq)]

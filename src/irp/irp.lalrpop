@@ -43,6 +43,15 @@ duration: Duration = {
 irstream_item: IrStreamItem = {
     duration => IrStreamItem::Duration(<>),
     <id:identifier> "=" <e:expression> => IrStreamItem::Assignment(id, e),
+    <b:primary_item> ":" <l:primary_item> => IrStreamItem::BitField(b, l, None),
+    <b:primary_item> ":" <l:primary_item> ":" <r:primary_item> => IrStreamItem::BitField(b, l, Some(r)),
+    <b:primary_item> "::" <l:primary_item> => IrStreamItem::InfiniteBitField(b, l),
+}
+
+primary_item: Expression = {
+    identifier => Expression::Identifier(<>),
+    number => Expression::Number(<>),
+    "(" <e:expression> ")" => e,
 }
 
 expression: Expression = {
