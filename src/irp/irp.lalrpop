@@ -12,6 +12,10 @@ GeneralItem: GeneralItem = {
     <n:float_number> "%" => GeneralItem::DutyCycle(n),    
 }
 
+number: i64 = {
+    r"\d+" => i64::from_str(<>).unwrap(),
+}
+
 float_number: f64 = {
     r"\d+"  => f64::from_str(<>).unwrap(),
     r"\d+\.\d+" => f64::from_str(<>).unwrap(),
@@ -27,6 +31,17 @@ duration: Duration = {
     "^" <n:float_number> "m" => Duration::Extent(n, Unit::Milliseconds),
     "^" <n:float_number> "u" => Duration::Extent(n, Unit::Microseconds),
     "^" <n:float_number> "p" => Duration::Extent(n, Unit::Pulses),
+}
+
+RepeatMarker: RepeatMarker = {
+    "*" => RepeatMarker::Any,
+    "+" => RepeatMarker::OneOrMore,
+    <i:number> => RepeatMarker::Count(i),
+    <i:number> "+" => RepeatMarker::CountOrMore(i),
+}
+
+IrStream: IrStream = {
+    "(" <b:BareIrStream> ")" <r:RepeatMarker?> => IrStream{ stream: b, repeat: r},
 }
 
 BareIrStream: Vec<Duration> = {

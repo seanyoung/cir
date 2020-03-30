@@ -25,3 +25,17 @@ pub enum Duration {
     Gap(f64, Unit),
     Extent(f64, Unit),
 }
+
+#[derive(PartialEq)]
+pub enum RepeatMarker {
+    Any,
+    OneOrMore,
+    Count(i64),
+    CountOrMore(i64),
+}
+
+#[derive(PartialEq)]
+pub struct IrStream {
+    pub stream: Vec<Duration>,
+    pub repeat: Option<RepeatMarker>,
+}
