@@ -6,8 +6,8 @@ grammar;
 GeneralItem: GeneralItem = {
     "msb" => GeneralItem::OrderMsb,
     "lsb" => GeneralItem::OrderLsb,
-    <n:float_number> "p" => GeneralItem::UnitPulse(n),
-    <n:float_number> => GeneralItem::Unit(n),
+    <n:float_number> "p" => GeneralItem::Unit(n, Unit::Pulses),
+    <n:float_number> => GeneralItem::Unit(n, Unit::Microseconds),
     <n:float_number> "k" => GeneralItem::Frequency(n),
     <n:float_number> "%" => GeneralItem::DutyCycle(n),    
 }
@@ -17,17 +17,42 @@ float_number: f64 = {
     r"\d+\.\d+" => f64::from_str(<>).unwrap(),
 }
 
-pub protocol: Irp = {
-    "{" <v:Comma<GeneralItem>> "}" => Irp { general_spec: v },
+duration: Duration = {
+    <n:float_number> "m" => Duration::Flash(n, Unit::Milliseconds),
+    <n:float_number> "u" => Duration::Flash(n, Unit::Microseconds),
+    <n:float_number> "p" => Duration::Flash(n, Unit::Pulses),
+    "-" <n:float_number> "m" => Duration::Gap(n, Unit::Milliseconds),
+    "-" <n:float_number> "u" => Duration::Gap(n, Unit::Microseconds),
+    "-" <n:float_number> "p" => Duration::Gap(n, Unit::Pulses),
+    "^" <n:float_number> "m" => Duration::Extent(n, Unit::Milliseconds),
+    "^" <n:float_number> "u" => Duration::Extent(n, Unit::Microseconds),
+    "^" <n:float_number> "p" => Duration::Extent(n, Unit::Pulses),
 }
 
-Comma<T>: Vec<T> = {
-    <v:(<T> ",")*> <e:T?> => match e {
-        None => v,
-        Some(e) => {
-            let mut v = v;
-            v.push(e);
-            v
-        }
+BareIrStream: Vec<Duration> = {
+    CommaList<duration> => <>,
+}
+
+bit_spec: Vec<Vec<Duration>> = {
+    "<" <b:PipeList<BareIrStream>> ">" => b,
+}
+
+pub protocol: Irp = {
+    "{" <v:CommaList<GeneralItem>> "}" <b:bit_spec> => Irp { general_spec: v, bit_spec: b },
+}
+
+CommaList<T>: Vec<T> = {
+    <v:(<T> ",")*> <e:T> => {
+        let mut v = v;
+        v.push(e);
+        v
+    }
+};
+
+PipeList<T>: Vec<T> = {
+    <v:(<T> "|")*> <e:T> => {
+        let mut v = v;
+        v.push(e);
+        v
     }
 };

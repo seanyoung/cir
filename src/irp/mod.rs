@@ -1,5 +1,7 @@
 pub mod ast;
 
+use ast::*;
+
 #[allow(clippy::all,unused_parens)]
 #[cfg_attr(rustfmt, rustfmt_skip)]
 pub mod irp;
@@ -24,7 +26,6 @@ pub fn parse(input: &str) -> Result<Irp, String> {
                 unit: 1.0,
             };
 
-            let mut punit = None;
             let mut unit = None;
             let mut lsb = None;
 
@@ -57,38 +58,34 @@ pub fn parse(input: &str) -> Result<Irp, String> {
 
                         lsb = Some(i == ast::GeneralItem::OrderLsb);
                     }
-                    ast::GeneralItem::Unit(p) => {
+                    ast::GeneralItem::Unit(p, u) => {
                         if unit.is_some() {
                             return Err("unit specified twice".to_string());
                         }
 
-                        unit = Some(p);
+                        unit = Some((p, u));
                     }
-                    ast::GeneralItem::UnitPulse(p) => {
-                        if punit.is_some() {
-                            return Err("unit specified twice".to_string());
+                }
+            }
+
+            if let Some((p, u)) = unit {
+                res.unit = match u {
+                    Unit::Pulses => {
+                        if let Some(f) = res.carrier {
+                            p * 1000.0 / f
+                        } else {
+                            return Err(
+                                "pulse unit specified without carrier frequency".to_string()
+                            );
                         }
-
-                        punit = Some(p);
                     }
+                    Unit::Milliseconds => p * 1000.0,
+                    Unit::Microseconds => p,
                 }
+            }
 
-                if let Some(p) = punit {
-                    if unit.is_some() {
-                        return Err("unit specified twice".to_string());
-                    }
-                    if let Some(f) = res.carrier {
-                        res.unit = p * 1000.0 / f;
-                    } else {
-                        return Err("pulse unit specified without carrier frequency".to_string());
-                    }
-                } else if let Some(u) = unit {
-                    res.unit = u;
-                }
-
-                if Some(false) == lsb {
-                    res.lsb = false;
-                }
+            if Some(false) == lsb {
+                res.lsb = false;
             }
             Ok(res)
         }
