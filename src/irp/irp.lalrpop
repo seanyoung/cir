@@ -6,10 +6,10 @@ grammar;
 GeneralItem: GeneralItem = {
     "msb" => GeneralItem::OrderMsb,
     "lsb" => GeneralItem::OrderLsb,
-    <n:float_number> "p" => GeneralItem::Unit(n, Unit::Pulses),
-    <n:float_number> => GeneralItem::Unit(n, Unit::Microseconds),
-    <n:float_number> "k" => GeneralItem::Frequency(n),
-    <n:float_number> "%" => GeneralItem::DutyCycle(n),    
+    <float_number> "p" => GeneralItem::Unit(<>, Unit::Pulses),
+    <float_number> => GeneralItem::Unit(<>, Unit::Microseconds),
+    <float_number> "k" => GeneralItem::Frequency(<>),
+    <float_number> "%" => GeneralItem::DutyCycle(<>),
 }
 
 number: i64 = {
@@ -142,14 +142,14 @@ Precedence2: Expression = {
 Precedence1: Expression = {
     number => Expression::Number(<>),
     identifier => Expression::Identifier(<>),
-    "(" <e:expression> ")" => e,
+    "(" <expression> ")" => <>,
 }
 
 RepeatMarker: RepeatMarker = {
     "*" => RepeatMarker::Any,
     "+" => RepeatMarker::OneOrMore,
-    <i:number> => RepeatMarker::Count(i),
-    <i:number> "+" => RepeatMarker::CountOrMore(i),
+    <number> => RepeatMarker::Count(<>),
+    <number> "+" => RepeatMarker::CountOrMore(<>),
 }
 
 IrStream: IrStream = {
@@ -161,7 +161,7 @@ BareIrStream: Vec<Duration> = {
 }
 
 bit_spec: Vec<Vec<Duration>> = {
-    "<" <b:PipeList<BareIrStream>> ">" => b,
+    "<" <PipeList<BareIrStream>> ">" => <>,
 }
 
 pub protocol: Irp = {

@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.18.1"
-// sha256: 3bac88dfea369a9e046ab6ab51352ca57b50e082b6f09357c67a5c5cc6a
+// sha256: a8c2134659414fe8615e2b9a2443cdb8799eaca8daa3d0cff0eaafb4e45c23
 use std::str::FromStr;
 use crate::irp::ast::*;
 #[allow(unused_extern_crates)]
@@ -4362,11 +4362,11 @@ fn __action3<
     'input,
 >(
     input: &'input str,
-    (_, n, _): (usize, f64, usize),
+    (_, __0, _): (usize, f64, usize),
     (_, _, _): (usize, &'input str, usize),
 ) -> GeneralItem
 {
-    GeneralItem::Unit(n, Unit::Pulses)
+    GeneralItem::Unit(__0, Unit::Pulses)
 }
 
 #[allow(unused_variables)]
@@ -4374,10 +4374,10 @@ fn __action4<
     'input,
 >(
     input: &'input str,
-    (_, n, _): (usize, f64, usize),
+    (_, __0, _): (usize, f64, usize),
 ) -> GeneralItem
 {
-    GeneralItem::Unit(n, Unit::Microseconds)
+    GeneralItem::Unit(__0, Unit::Microseconds)
 }
 
 #[allow(unused_variables)]
@@ -4385,11 +4385,11 @@ fn __action5<
     'input,
 >(
     input: &'input str,
-    (_, n, _): (usize, f64, usize),
+    (_, __0, _): (usize, f64, usize),
     (_, _, _): (usize, &'input str, usize),
 ) -> GeneralItem
 {
-    GeneralItem::Frequency(n)
+    GeneralItem::Frequency(__0)
 }
 
 #[allow(unused_variables)]
@@ -4397,11 +4397,11 @@ fn __action6<
     'input,
 >(
     input: &'input str,
-    (_, n, _): (usize, f64, usize),
+    (_, __0, _): (usize, f64, usize),
     (_, _, _): (usize, &'input str, usize),
 ) -> GeneralItem
 {
-    GeneralItem::DutyCycle(n)
+    GeneralItem::DutyCycle(__0)
 }
 
 #[allow(unused_variables)]
@@ -5144,11 +5144,11 @@ fn __action67<
 >(
     input: &'input str,
     (_, _, _): (usize, &'input str, usize),
-    (_, e, _): (usize, Expression, usize),
+    (_, __0, _): (usize, Expression, usize),
     (_, _, _): (usize, &'input str, usize),
 ) -> Expression
 {
-    e
+    __0
 }
 
 #[allow(unused_variables)]
@@ -5178,10 +5178,10 @@ fn __action70<
     'input,
 >(
     input: &'input str,
-    (_, i, _): (usize, i64, usize),
+    (_, __0, _): (usize, i64, usize),
 ) -> RepeatMarker
 {
-    RepeatMarker::Count(i)
+    RepeatMarker::Count(__0)
 }
 
 #[allow(unused_variables)]
@@ -5189,11 +5189,11 @@ fn __action71<
     'input,
 >(
     input: &'input str,
-    (_, i, _): (usize, i64, usize),
+    (_, __0, _): (usize, i64, usize),
     (_, _, _): (usize, &'input str, usize),
 ) -> RepeatMarker
 {
-    RepeatMarker::CountOrMore(i)
+    RepeatMarker::CountOrMore(__0)
 }
 
 #[allow(unused_variables)]
@@ -5227,11 +5227,11 @@ fn __action74<
 >(
     input: &'input str,
     (_, _, _): (usize, &'input str, usize),
-    (_, b, _): (usize, Vec<Vec<Duration>>, usize),
+    (_, __0, _): (usize, Vec<Vec<Duration>>, usize),
     (_, _, _): (usize, &'input str, usize),
 ) -> Vec<Vec<Duration>>
 {
-    b
+    __0
 }
 
 #[allow(unused_variables)]
