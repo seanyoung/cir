@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.18.1"
-// sha256: a8c2134659414fe8615e2b9a2443cdb8799eaca8daa3d0cff0eaafb4e45c23
+// sha256: e6d38050eaf3e6ad8817b05198fa22d2d11ee5d44bac37696d296ba4448df073
 use std::str::FromStr;
 use crate::irp::ast::*;
 #[allow(unused_extern_crates)]
