@@ -62,13 +62,13 @@ impl<'a> Output<'a> {
 
     fn add(&mut self, dur: &Duration, vars: &Vartable) -> Result<(), String> {
         match dur {
-            Duration::FlashConstant(p, u) => self.add_u32(u.eval(*p as i64, &self.general_spec)?),
-            Duration::GapConstant(p, u) => self.add_u32(u.eval(-p as i64, &self.general_spec)?),
+            Duration::FlashConstant(p, u) => self.add_flash(u.eval(*p as i64, &self.general_spec)?),
+            Duration::GapConstant(p, u) => self.add_gap(u.eval(*p as i64, &self.general_spec)?),
             Duration::FlashIdentifier(id, u) => {
-                self.add_u32(u.eval(vars.get(id)?, &self.general_spec)?)
+                self.add_flash(u.eval(vars.get(id)?, &self.general_spec)?)
             }
             Duration::GapIdentifier(id, u) => {
-                self.add_u32(-u.eval(vars.get(id)?, &self.general_spec)?)
+                self.add_gap(u.eval(vars.get(id)?, &self.general_spec)?)
             }
             Duration::ExtentConstant(p, u) => {
                 self.add_extend(u.eval(*p as i64, &self.general_spec)?)
@@ -81,27 +81,27 @@ impl<'a> Output<'a> {
         Ok(())
     }
 
-    fn add_u32(&mut self, n: i64) {
-        assert_ne!(n, 0);
+    fn add_flash(&mut self, n: i64) {
+        assert!(n > 0);
 
-        if self.raw.is_empty() {
-            if n > 0 {
-                self.raw.push(n as u32);
-            }
-        } else if (self.raw.len() % 2) == 1 {
-            // last entry is flash
-            if n > 0 {
-                *self.raw.last_mut().unwrap() += n as u32;
-            } else {
-                self.raw.push(-n as u32);
-            }
+        if (self.raw.len() % 2) == 1 {
+            *self.raw.last_mut().unwrap() += n as u32;
         } else {
-            // last entry is gap
-            if n < 0 {
-                *self.raw.last_mut().unwrap() += -n as u32;
-            } else {
-                self.raw.push(n as u32);
-            }
+            self.raw.push(n as u32);
+        }
+    }
+
+    fn add_gap(&mut self, n: i64) {
+        assert!(n > 0);
+
+        let len = self.raw.len();
+
+        if len == 0 {
+            // ignore leading gaps
+        } else if (len % 2) == 0 {
+            *self.raw.last_mut().unwrap() += n as u32;
+        } else {
+            self.raw.push(n as u32);
         }
     }
 
@@ -110,11 +110,10 @@ impl<'a> Output<'a> {
     }
 
     fn add_extend(&mut self, extent: i64) {
-        let end = self.end() as i64;
-        let marker = *self.extent_marker.last().unwrap();
+        let end = self.end() as i64 - *self.extent_marker.last().unwrap() as i64;
 
         if end < extent {
-            self.add_u32(end - extent);
+            self.add_gap(extent - end);
         }
     }
 }
@@ -150,22 +149,6 @@ impl Unit {
                 Some(f) => Ok(v * 1000 / f),
                 None => Err("pulses specified but no carrier given".to_string()),
             },
-        }
-    }
-}
-
-impl Duration {
-    fn eval(&self, vars: &Vartable, spec: &GeneralSpec) -> Result<i64, String> {
-        match self {
-            Duration::FlashConstant(p, u) => u.eval((p * spec.unit) as i64, spec),
-            Duration::GapConstant(p, u) => u.eval((-p * spec.unit) as i64, spec),
-            Duration::FlashIdentifier(id, u) => {
-                u.eval((vars.get(id)? as f64 * spec.unit) as i64, spec)
-            }
-            Duration::GapIdentifier(id, u) => {
-                u.eval((-vars.get(id)? as f64 * spec.unit) as i64, spec)
-            }
-            _ => unimplemented!(),
         }
     }
 }
@@ -232,6 +215,8 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
             }
         }
     }
+
+    out.pop_extend_marker();
 
     Ok(out.raw)
 }
