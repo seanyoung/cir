@@ -1,5 +1,6 @@
 use super::ast::*;
 use super::irp;
+use crate::rawir;
 
 use std::collections::HashMap;
 
@@ -36,6 +37,40 @@ impl Vartable {
     }
 }
 
+struct Output {
+    raw: Vec<u32>,
+}
+
+impl Output {
+    fn new() -> Self {
+        Self { raw: Vec::new() }
+    }
+
+    fn add(&mut self, n: i64) {
+        assert_ne!(n, 0);
+
+        if self.raw.is_empty() {
+            if n > 0 {
+                self.raw.push(n as u32);
+            }
+        } else if (self.raw.len() % 2) == 1 {
+            // last entry is flash
+            if n > 0 {
+                *self.raw.last_mut().unwrap() += n as u32;
+            } else {
+                self.raw.push(-n as u32);
+            }
+        } else {
+            // last entry is gap
+            if n < 0 {
+                *self.raw.last_mut().unwrap() += -n as u32;
+            } else {
+                self.raw.push(n as u32);
+            }
+        }
+    }
+}
+
 impl Expression {
     fn eval(&self, vars: &Vartable) -> Result<i64, String> {
         match self {
@@ -51,6 +86,7 @@ impl Expression {
             Expression::BitwiseAnd(l, r) => Ok(l.eval(vars)? & r.eval(vars)?),
             Expression::BitwiseOr(l, r) => Ok(l.eval(vars)? | r.eval(vars)?),
             Expression::BitwiseXor(l, r) => Ok(l.eval(vars)? ^ r.eval(vars)?),
+            Expression::Power(l, r) => Ok(l.eval(vars)?.pow(r.eval(vars)? as u32)),
             _ => unimplemented!(),
         }
     }
@@ -92,19 +128,49 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
 
     let gs = general_spec(&irp.general_spec)?;
 
+    let mut out = Output::new();
+
+    if irp.bit_spec.len() != 2 {
+        println!("bit_spec {:?}", irp.bit_spec);
+        return Err("bit spec should have two entries".to_string());
+    }
+
     for i in irp.stream.stream {
         match i {
             IrStreamItem::Duration(d) => {
-                d.eval(&vars, &gs);
+                out.add(d.eval(&vars, &gs)?);
             }
             IrStreamItem::Assignment(id, expr) => {
                 vars.set(id, expr.eval(&vars)?);
             }
-            _ => unimplemented!(),
+            IrStreamItem::BitField(complement, b, reverse, l, None) => {
+                let mut b = b.eval(&vars)?;
+                let l = l.eval(&vars)?;
+
+                if complement {
+                    b = !b;
+                }
+
+                // a tricksy way of say !gs.lsb logical xor reverse
+                if gs.lsb == reverse {
+                    b = b.reverse_bits().rotate_left(l as u32);
+                }
+
+                for _ in 0..l {
+                    for dur in &irp.bit_spec[(b & 1) as usize] {
+                        out.add(dur.eval(&vars, &gs)?);
+                    }
+                    b >>= 1;
+                }
+            }
+            _ => {
+                println!("before we go away:{}", rawir::print_to_string(&out.raw));
+                unimplemented!();
+            }
         }
     }
 
-    Err("not implemented".to_string())
+    Ok(out.raw)
 }
 
 fn general_spec(general_spec: &Vec<GeneralItem>) -> Result<GeneralSpec, String> {
@@ -182,8 +248,19 @@ fn test() {
     let mut vars = Vartable::new();
 
     vars.set("F".to_string(), 1);
+    vars.set("D".to_string(), 0xe9);
+    vars.set("S".to_string(), 0xfe);
 
     let res = render("{38.0k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1)", vars);
 
-    assert_eq!(res, Ok(vec!(4500u32)));
+    assert_eq!(
+        res,
+        Ok(vec!(
+            9024, 4512, 564, 1692, 564, 564, 564, 564, 564, 1692, 564, 564, 564, 1692, 564, 1692,
+            564, 1692, 564, 564, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692,
+            564, 1692, 564, 1692, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564,
+            564, 564, 564, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564,
+            1692, 564
+        ))
+    );
 }

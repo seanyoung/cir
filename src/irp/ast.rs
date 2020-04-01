@@ -4,7 +4,7 @@ pub struct Irp {
     pub stream: IrStream,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Unit {
     Microseconds,
     Milliseconds,
@@ -20,7 +20,7 @@ pub enum GeneralItem {
     Unit(f64, Unit),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Duration {
     FlashConstant(f64, Unit),
     GapConstant(f64, Unit),

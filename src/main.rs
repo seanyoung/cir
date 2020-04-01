@@ -34,13 +34,13 @@ fn main() {
     };
     if matches.is_present("RAWIR") {
         match rawir::parse(&arg) {
-            Ok(ir) => println!("{}", rawir::print_to_string(ir)),
+            Ok(ir) => println!("{}", rawir::print_to_string(&ir)),
             Err(s) => eprintln!("error: {}", s),
         }
     }
     if matches.is_present("MODE2") {
         match mode2::parse(&arg) {
-            Ok(ir) => println!("{}", rawir::print_to_string(ir)),
+            Ok(ir) => println!("{}", rawir::print_to_string(&ir)),
             Err(s) => eprintln!("error: {}", s),
         }
     }

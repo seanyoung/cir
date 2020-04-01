@@ -49,7 +49,7 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
 }
 
 /// Convert a Vec<u32> to raw IR string
-pub fn print_to_string(ir: Vec<u32>) -> String {
+pub fn print_to_string(ir: &Vec<u32>) -> String {
     ir.iter()
         .enumerate()
         .map(|(i, v)| format!("{}{}", if i.is_even() { "+" } else { "-" }, v))
@@ -85,5 +85,5 @@ fn parse_test() {
 
 #[test]
 fn print_test() {
-    assert_eq!(print_to_string(vec!(100, 50, 75)), "+100 -50 +75");
+    assert_eq!(print_to_string(&vec!(100, 50, 75)), "+100 -50 +75");
 }
