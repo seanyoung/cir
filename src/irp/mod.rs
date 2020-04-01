@@ -81,7 +81,7 @@ pub fn parse(input: &str) -> Result<Irp, String> {
                         }
                     }
                     Unit::Milliseconds => p * 1000.0,
-                    Unit::Microseconds => p,
+                    Unit::Units | Unit::Microseconds => p,
                 }
             }
 

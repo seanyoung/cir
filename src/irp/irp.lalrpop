@@ -26,7 +26,8 @@ identifier: String = {
 }
 
 unit: Unit = {
-    "u"? => Unit::Microseconds,
+     => Unit::Units,
+    "u" => Unit::Microseconds,
     "m" => Unit::Milliseconds,
     "p" => Unit::Pulses,
 }

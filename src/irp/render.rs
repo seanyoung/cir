@@ -37,16 +37,51 @@ impl Vartable {
     }
 }
 
-struct Output {
+struct Output<'a> {
+    general_spec: &'a GeneralSpec,
     raw: Vec<u32>,
+    extent_marker: Vec<u32>,
 }
 
-impl Output {
-    fn new() -> Self {
-        Self { raw: Vec::new() }
+impl<'a> Output<'a> {
+    fn new(gs: &'a GeneralSpec) -> Self {
+        Self {
+            general_spec: gs,
+            raw: Vec::new(),
+            extent_marker: Vec::new(),
+        }
     }
 
-    fn add(&mut self, n: i64) {
+    fn push_extent_marker(&mut self) {
+        self.extent_marker.push(self.end());
+    }
+
+    fn pop_extend_marker(&mut self) {
+        self.extent_marker.pop();
+    }
+
+    fn add(&mut self, dur: &Duration, vars: &Vartable) -> Result<(), String> {
+        match dur {
+            Duration::FlashConstant(p, u) => self.add_u32(u.eval(*p as i64, &self.general_spec)?),
+            Duration::GapConstant(p, u) => self.add_u32(u.eval(-p as i64, &self.general_spec)?),
+            Duration::FlashIdentifier(id, u) => {
+                self.add_u32(u.eval(vars.get(id)?, &self.general_spec)?)
+            }
+            Duration::GapIdentifier(id, u) => {
+                self.add_u32(-u.eval(vars.get(id)?, &self.general_spec)?)
+            }
+            Duration::ExtentConstant(p, u) => {
+                self.add_extend(u.eval(*p as i64, &self.general_spec)?)
+            }
+            Duration::ExtentIdentifier(id, u) => {
+                self.add_extend(u.eval(vars.get(id)?, &self.general_spec)?)
+            }
+        }
+
+        Ok(())
+    }
+
+    fn add_u32(&mut self, n: i64) {
         assert_ne!(n, 0);
 
         if self.raw.is_empty() {
@@ -67,6 +102,19 @@ impl Output {
             } else {
                 self.raw.push(n as u32);
             }
+        }
+    }
+
+    fn end(&self) -> u32 {
+        self.raw.iter().sum()
+    }
+
+    fn add_extend(&mut self, extent: i64) {
+        let end = self.end() as i64;
+        let marker = *self.extent_marker.last().unwrap();
+
+        if end < extent {
+            self.add_u32(end - extent);
         }
     }
 }
@@ -95,6 +143,7 @@ impl Expression {
 impl Unit {
     fn eval(&self, v: i64, spec: &GeneralSpec) -> Result<i64, String> {
         match self {
+            Unit::Units => Ok((v as f64 * spec.unit) as i64),
             Unit::Microseconds => Ok(v),
             Unit::Milliseconds => Ok(v * 1000),
             Unit::Pulses => match spec.carrier {
@@ -128,24 +177,34 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
 
     let gs = general_spec(&irp.general_spec)?;
 
-    let mut out = Output::new();
+    let mut out = Output::new(&gs);
 
     if irp.bit_spec.len() != 2 {
         println!("bit_spec {:?}", irp.bit_spec);
         return Err("bit spec should have two entries".to_string());
     }
 
+    out.push_extent_marker();
+
     for i in irp.stream.stream {
         match i {
             IrStreamItem::Duration(d) => {
-                out.add(d.eval(&vars, &gs)?);
+                out.add(&d, &vars)?;
             }
             IrStreamItem::Assignment(id, expr) => {
                 vars.set(id, expr.eval(&vars)?);
             }
-            IrStreamItem::BitField(complement, b, reverse, l, None) => {
-                let mut b = b.eval(&vars)?;
-                let l = l.eval(&vars)?;
+            IrStreamItem::BitField(complement, expr, reverse, begin, end) => {
+                let expr = expr.eval(&vars)?;
+
+                let (mut b, l) = match end {
+                    Some(end) => {
+                        let begin = begin.eval(&vars)?;
+
+                        (expr >> begin, end.eval(&vars)?)
+                    }
+                    None => (expr, begin.eval(&vars)?),
+                };
 
                 if complement {
                     b = !b;
@@ -158,13 +217,17 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
 
                 for _ in 0..l {
                     for dur in &irp.bit_spec[(b & 1) as usize] {
-                        out.add(dur.eval(&vars, &gs)?);
+                        out.add(&dur, &vars)?;
                     }
                     b >>= 1;
                 }
             }
             _ => {
-                println!("before we go away:{}", rawir::print_to_string(&out.raw));
+                println!(
+                    "i:{:?} before we go away:{}",
+                    i,
+                    rawir::print_to_string(&out.raw)
+                );
                 unimplemented!();
             }
         }
@@ -233,7 +296,7 @@ fn general_spec(general_spec: &Vec<GeneralItem>) -> Result<GeneralSpec, String> 
                 }
             }
             Unit::Milliseconds => p * 1000.0,
-            Unit::Microseconds => *p,
+            Unit::Units | Unit::Microseconds => *p,
         }
     }
 
@@ -261,6 +324,25 @@ fn test() {
             564, 1692, 564, 1692, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564,
             564, 564, 564, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564,
             1692, 564
+        ))
+    );
+
+    let mut vars = Vartable::new();
+
+    vars.set("F".to_string(), 1);
+    vars.set("D".to_string(), 0xe9);
+    vars.set("T".to_string(), 0);
+
+    let res = render(
+        "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+",
+        vars,
+    );
+
+    assert_eq!(
+        res,
+        Ok(vec!(
+            889, 889, 889, 889, 889, 889, 889, 889, 889, 889, 889, 889, 1778, 889, 889, 1778, 1778,
+            889, 889, 1778, 1778, 889, 889, 889, 889, 889, 889, 889, 889, 1778, 889, 81107
         ))
     );
 }

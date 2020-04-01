@@ -6,6 +6,7 @@ pub struct Irp {
 
 #[derive(PartialEq, Debug)]
 pub enum Unit {
+    Units,
     Microseconds,
     Milliseconds,
     Pulses,
@@ -30,7 +31,7 @@ pub enum Duration {
     ExtentIdentifier(String, Unit),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum IrStreamItem {
     Duration(Duration),
     Assignment(String, Expression),
@@ -52,7 +53,7 @@ pub struct IrStream {
     pub repeat: Option<RepeatMarker>,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Expression {
     Number(i64),
     Identifier(String),
