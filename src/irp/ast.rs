@@ -2,6 +2,7 @@ pub struct Irp {
     pub general_spec: Vec<GeneralItem>,
     pub bit_spec: Vec<Vec<Duration>>,
     pub stream: IrStream,
+    pub definitions: Vec<(String, Expression)>,
 }
 
 #[derive(PartialEq, Debug)]

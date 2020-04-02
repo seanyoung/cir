@@ -165,8 +165,19 @@ bit_spec: Vec<Vec<Duration>> = {
     "<" <PipeList<BareIrStream>> ">" => <>,
 }
 
+definitions: Vec<(String, Expression)> = {
+    => Vec::new(),
+    "{" <CommaList<definition>> "}" => <>,
+}
+
+definition: (String, Expression) = {
+    <id:identifier> "=" <e:expression> => (id, e)
+}
+
 pub protocol: Irp = {
-    "{" <v:CommaList<GeneralItem>> "}" <b:bit_spec> <ir:IrStream> => Irp { general_spec: v, bit_spec: b, stream: ir },
+    "{" <v:CommaList<GeneralItem>> "}" <b:bit_spec> <ir:IrStream> <d:definitions> => {
+        Irp { general_spec: v, bit_spec: b, stream: ir, definitions: d }
+    }
 }
 
 CommaList<T>: Vec<T> = {
