@@ -4,7 +4,7 @@ use num::Integer;
 pub fn parse(s: &str) -> Result<Vec<u32>, String> {
     let mut res = Vec::new();
 
-    for (i, e) in s.split_whitespace().enumerate() {
+    for (i, e) in s.split(|c: char| c.is_whitespace() || c == ',').enumerate() {
         let mut chars = e.chars().peekable();
 
         match chars.peek() {
@@ -41,15 +41,11 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
         return Err("missing length".to_string());
     }
 
-    if res.len().is_even() {
-        return Err("odd number of lengths expected".to_string());
-    }
-
     Ok(res)
 }
 
 /// Convert a Vec<u32> to raw IR string
-pub fn print_to_string(ir: &Vec<u32>) -> String {
+pub fn print_to_string(ir: &[u32]) -> String {
     ir.iter()
         .enumerate()
         .map(|(i, v)| format!("{}{}", if i.is_even() { "+" } else { "-" }, v))
@@ -69,21 +65,22 @@ fn parse_test() {
         Err("unexpected ‘-’ encountered".to_string())
     );
 
-    assert_eq!(
-        parse("+100 -100"),
-        Err("odd number of lengths expected".to_string())
-    );
+    assert_eq!(parse("+100 -100"), Ok(vec!(100, 100)));
 
-    assert_eq!(parse(""), Err("missing length".to_string()));
+    assert_eq!(parse(""), Err("invalid number ‘’".to_string()));
 
     assert_eq!(parse("+a"), Err("invalid number ‘a’".to_string()));
 
     assert_eq!(parse("+0"), Err("nonsensical 0 length".to_string()));
 
     assert_eq!(parse("100 100 +1"), Ok(vec!(100u32, 100u32, 1u32)));
+    assert_eq!(
+        parse("100,100,+1,-20000"),
+        Ok(vec!(100u32, 100u32, 1u32, 20000u32))
+    );
 }
 
 #[test]
 fn print_test() {
-    assert_eq!(print_to_string(&vec!(100, 50, 75)), "+100 -50 +75");
+    assert_eq!(print_to_string(&[100, 50, 75]), "+100 -50 +75");
 }

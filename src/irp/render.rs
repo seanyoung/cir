@@ -53,7 +53,7 @@ impl<'a> Output<'a> {
     }
 
     fn push_extent_marker(&mut self) {
-        self.extent_marker.push(self.end());
+        self.extent_marker.push(0);
     }
 
     fn pop_extend_marker(&mut self) {
@@ -84,6 +84,8 @@ impl<'a> Output<'a> {
     fn add_flash(&mut self, n: i64) {
         assert!(n > 0);
 
+        *self.extent_marker.last_mut().unwrap() += n as u32;
+
         if (self.raw.len() % 2) == 1 {
             *self.raw.last_mut().unwrap() += n as u32;
         } else {
@@ -93,6 +95,8 @@ impl<'a> Output<'a> {
 
     fn add_gap(&mut self, n: i64) {
         assert!(n > 0);
+
+        *self.extent_marker.last_mut().unwrap() += n as u32;
 
         let len = self.raw.len();
 
@@ -105,15 +109,11 @@ impl<'a> Output<'a> {
         }
     }
 
-    fn end(&self) -> u32 {
-        self.raw.iter().sum()
-    }
+    fn add_extend(&mut self, mut extent: i64) {
+        extent -= *self.extent_marker.last().unwrap() as i64;
 
-    fn add_extend(&mut self, extent: i64) {
-        let end = self.end() as i64 - *self.extent_marker.last().unwrap() as i64;
-
-        if end < extent {
-            self.add_gap(extent - end);
+        if extent > 0 {
+            self.add_gap(extent);
         }
     }
 }
@@ -177,21 +177,18 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
             IrStreamItem::Assignment(id, expr) => {
                 vars.set(id, expr.eval(&vars)?);
             }
-            IrStreamItem::BitField(complement, expr, reverse, begin, end) => {
-                let expr = expr.eval(&vars)?;
+            IrStreamItem::BitField(complement, e, reverse, length, skip) => {
+                let mut b = e.eval(&vars)?;
 
-                let (mut b, l) = match end {
-                    Some(end) => {
-                        let begin = begin.eval(&vars)?;
-
-                        (expr >> begin, end.eval(&vars)?)
-                    }
-                    None => (expr, begin.eval(&vars)?),
-                };
+                if let Some(skip) = skip {
+                    b >>= skip.eval(&vars)?;
+                }
 
                 if complement {
                     b = !b;
                 }
+
+                let l = length.eval(&vars)?;
 
                 // a tricksy way of say !gs.lsb logical xor reverse
                 if gs.lsb == reverse {
@@ -299,17 +296,15 @@ fn test() {
     vars.set("D".to_string(), 0xe9);
     vars.set("S".to_string(), 0xfe);
 
-    let res = render("{38.0k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1)", vars);
+    let res = render(
+        "{38.0k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)+",
+        vars,
+    );
 
+    // irptransmogrifier.sh  --irp "{38.0k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)+" render -r -n F=1,D=0xe9,S=0xfe
     assert_eq!(
         res,
-        Ok(vec!(
-            9024, 4512, 564, 1692, 564, 564, 564, 564, 564, 1692, 564, 564, 564, 1692, 564, 1692,
-            564, 1692, 564, 564, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692,
-            564, 1692, 564, 1692, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564, 564,
-            564, 564, 564, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564, 1692, 564,
-            1692, 564
-        ))
+        Ok(rawir::parse("+9024,-4512,+564,-1692,+564,-564,+564,-564,+564,-1692,+564,-564,+564,-1692,+564,-1692,+564,-1692,+564,-564,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-564,+564,-564,+564,-564,+564,-564,+564,-564,+564,-564,+564,-564,+564,-564,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-1692,+564,-35244").unwrap())
     );
 
     let mut vars = Vartable::new();
@@ -323,11 +318,10 @@ fn test() {
         vars,
     );
 
+    // target/irptransmogrifier.sh  --irp "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+" render -r -n F=1,T=0,D=0xe9
+
     assert_eq!(
         res,
-        Ok(vec!(
-            889, 889, 889, 889, 889, 889, 889, 889, 889, 889, 889, 889, 1778, 889, 889, 1778, 1778,
-            889, 889, 1778, 1778, 889, 889, 889, 889, 889, 889, 889, 889, 1778, 889, 81107
-        ))
+        Ok(rawir::parse("+889,-889,+1778,-889,+889,-1778,+1778,-889,+889,-1778,+1778,-889,+889,-889,+889,-889,+889,-889,+889,-1778,+889,-89108").unwrap())
     );
 }
