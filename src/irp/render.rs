@@ -218,7 +218,7 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
     Ok(out.raw)
 }
 
-fn general_spec(general_spec: &Vec<GeneralItem>) -> Result<GeneralSpec, String> {
+fn general_spec(general_spec: &[GeneralItem]) -> Result<GeneralSpec, String> {
     let mut res = GeneralSpec {
         duty_cycle: None,
         carrier: None,
