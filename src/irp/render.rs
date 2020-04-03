@@ -1,5 +1,6 @@
 use super::ast::*;
 use super::irp;
+
 use crate::rawir;
 
 use std::collections::HashMap;
@@ -15,7 +16,7 @@ pub struct GeneralSpec {
 }
 
 pub struct Vartable {
-    vars: HashMap<String, i64>,
+    vars: HashMap<String, (i64, u8)>,
 }
 
 impl Vartable {
@@ -25,11 +26,11 @@ impl Vartable {
         }
     }
 
-    pub fn set(&mut self, id: String, v: i64) {
-        self.vars.insert(id, v);
+    pub fn set(&mut self, id: String, v: i64, l: u8) {
+        self.vars.insert(id, (v, l));
     }
 
-    pub fn get(&self, id: &str) -> Result<i64, String> {
+    pub fn get(&self, id: &str) -> Result<(i64, u8), String> {
         match self.vars.get(id) {
             Some(n) => Ok(*n),
             None => Err(format!("variable {} not defined", id)),
@@ -65,16 +66,16 @@ impl<'a> Output<'a> {
             Duration::FlashConstant(p, u) => self.add_flash(u.eval(*p as i64, &self.general_spec)?),
             Duration::GapConstant(p, u) => self.add_gap(u.eval(*p as i64, &self.general_spec)?),
             Duration::FlashIdentifier(id, u) => {
-                self.add_flash(u.eval(vars.get(id)?, &self.general_spec)?)
+                self.add_flash(u.eval(vars.get(id)?.0, &self.general_spec)?)
             }
             Duration::GapIdentifier(id, u) => {
-                self.add_gap(u.eval(vars.get(id)?, &self.general_spec)?)
+                self.add_gap(u.eval(vars.get(id)?.0, &self.general_spec)?)
             }
             Duration::ExtentConstant(p, u) => {
                 self.add_extend(u.eval(*p as i64, &self.general_spec)?)
             }
             Duration::ExtentIdentifier(id, u) => {
-                self.add_extend(u.eval(vars.get(id)?, &self.general_spec)?)
+                self.add_extend(u.eval(vars.get(id)?.0, &self.general_spec)?)
             }
         }
 
@@ -119,21 +120,106 @@ impl<'a> Output<'a> {
 }
 
 impl Expression {
-    fn eval(&self, vars: &Vartable) -> Result<i64, String> {
+    fn eval(&self, vars: &Vartable) -> Result<(i64, u8), String> {
         match self {
-            Expression::Number(n) => Ok(*n),
+            Expression::Number(n) => Ok((*n, 64)),
             Expression::Identifier(id) => vars.get(id),
-            Expression::Negative(e) => Ok(-e.eval(vars)?),
-            Expression::Complement(e) => Ok(!e.eval(vars)?),
-            Expression::Add(l, r) => Ok(l.eval(vars)? + r.eval(vars)?),
-            Expression::Subtract(l, r) => Ok(l.eval(vars)? - r.eval(vars)?),
-            Expression::Multiply(l, r) => Ok(l.eval(vars)? * r.eval(vars)?),
-            Expression::Divide(l, r) => Ok(l.eval(vars)? / r.eval(vars)?),
-            Expression::Modulo(l, r) => Ok(l.eval(vars)? % r.eval(vars)?),
-            Expression::BitwiseAnd(l, r) => Ok(l.eval(vars)? & r.eval(vars)?),
-            Expression::BitwiseOr(l, r) => Ok(l.eval(vars)? | r.eval(vars)?),
-            Expression::BitwiseXor(l, r) => Ok(l.eval(vars)? ^ r.eval(vars)?),
-            Expression::Power(l, r) => Ok(l.eval(vars)?.pow(r.eval(vars)? as u32)),
+            Expression::Negative(e) => {
+                let (v, l) = e.eval(vars)?;
+
+                Ok((-v, l))
+            }
+            Expression::Complement(e) => {
+                let (v, l) = e.eval(vars)?;
+
+                Ok((!v, l))
+            }
+            Expression::Add(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, r_len) = r.eval(vars)?;
+
+                Ok(((l_val + r_val), std::cmp::max(l_len, r_len)))
+            }
+            Expression::Subtract(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, r_len) = r.eval(vars)?;
+
+                Ok(((l_val - r_val), std::cmp::max(l_len, r_len)))
+            }
+            Expression::Multiply(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, r_len) = r.eval(vars)?;
+
+                Ok(((l_val * r_val), std::cmp::max(l_len, r_len)))
+            }
+            Expression::Divide(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, r_len) = r.eval(vars)?;
+
+                if r_val == 0 {
+                    return Err("divide by zero".to_string());
+                }
+
+                Ok(((l_val / r_val), std::cmp::max(l_len, r_len)))
+            }
+            Expression::Modulo(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, r_len) = r.eval(vars)?;
+
+                if r_val == 0 {
+                    return Err("divide by zero".to_string());
+                }
+
+                Ok(((l_val % r_val), std::cmp::max(l_len, r_len)))
+            }
+            Expression::BitwiseAnd(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, r_len) = r.eval(vars)?;
+
+                Ok(((l_val & r_val), std::cmp::max(l_len, r_len)))
+            }
+            Expression::BitwiseOr(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, r_len) = r.eval(vars)?;
+
+                Ok(((l_val | r_val), std::cmp::max(l_len, r_len)))
+            }
+            Expression::BitwiseXor(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, r_len) = r.eval(vars)?;
+
+                Ok(((l_val ^ r_val), std::cmp::max(l_len, r_len)))
+            }
+            Expression::Power(l, r) => {
+                let (l_val, l_len) = l.eval(vars)?;
+                let (r_val, _) = r.eval(vars)?;
+
+                if r_val < 0 {
+                    return Err("power to negative not supported".to_string());
+                }
+
+                Ok((l_val.pow(r_val as u32), l_len))
+            }
+            Expression::BitField {
+                value,
+                reverse,
+                length,
+                skip,
+            } => {
+                let (mut b, _) = value.eval(&vars)?;
+
+                if let Some(skip) = skip {
+                    b >>= skip.eval(&vars)?.0;
+                }
+
+                let (l, _) = length.eval(&vars)?;
+
+                if *reverse {
+                    b = b.reverse_bits().rotate_left(l as u32);
+                }
+
+                Ok((b, l as u8))
+            }
             _ => unimplemented!(),
         }
     }
@@ -161,7 +247,9 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
     let gs = general_spec(&irp.general_spec)?;
 
     for (name, expr) in irp.definitions {
-        vars.set(name, expr.eval(&vars)?);
+        let (v, l) = expr.eval(&vars)?;
+
+        vars.set(name, v, l);
     }
 
     let mut out = Output::new(&gs);
@@ -179,40 +267,23 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
                 out.add(&d, &vars)?;
             }
             IrStreamItem::Assignment(id, expr) => {
-                vars.set(id, expr.eval(&vars)?);
+                let (v, l) = expr.eval(&vars)?;
+
+                vars.set(id, v, l);
             }
-            IrStreamItem::BitField(complement, e, reverse, length, skip) => {
-                let mut b = e.eval(&vars)?;
+            IrStreamItem::Expression(e) => {
+                let (mut v, l) = e.eval(&vars)?;
 
-                if let Some(skip) = skip {
-                    b >>= skip.eval(&vars)?;
-                }
-
-                if complement {
-                    b = !b;
-                }
-
-                let l = length.eval(&vars)?;
-
-                // a tricksy way of say !gs.lsb logical xor reverse
-                if gs.lsb == reverse {
-                    b = b.reverse_bits().rotate_left(l as u32);
+                if !gs.lsb {
+                    v = v.reverse_bits().rotate_left(l as u32);
                 }
 
                 for _ in 0..l {
-                    for dur in &irp.bit_spec[(b & 1) as usize] {
+                    for dur in &irp.bit_spec[(v & 1) as usize] {
                         out.add(&dur, &vars)?;
                     }
-                    b >>= 1;
+                    v >>= 1;
                 }
-            }
-            _ => {
-                println!(
-                    "i:{:?} before we go away:{}",
-                    i,
-                    rawir::print_to_string(&out.raw)
-                );
-                unimplemented!();
             }
         }
     }
@@ -296,9 +367,9 @@ fn general_spec(general_spec: &[GeneralItem]) -> Result<GeneralSpec, String> {
 fn test() {
     let mut vars = Vartable::new();
 
-    vars.set("F".to_string(), 1);
-    vars.set("D".to_string(), 0xe9);
-    vars.set("S".to_string(), 0xfe);
+    vars.set("F".to_string(), 1, 8);
+    vars.set("D".to_string(), 0xe9, 8);
+    vars.set("S".to_string(), 0xfe, 8);
 
     let res = render(
         "{38.0k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)+",
@@ -313,9 +384,9 @@ fn test() {
 
     let mut vars = Vartable::new();
 
-    vars.set("F".to_string(), 1);
-    vars.set("D".to_string(), 0xe9);
-    vars.set("T".to_string(), 0);
+    vars.set("F".to_string(), 1, 8);
+    vars.set("D".to_string(), 0xe9, 8);
+    vars.set("T".to_string(), 0, 8);
 
     let res = render(
         "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+",
@@ -331,9 +402,9 @@ fn test() {
 
     let mut vars = Vartable::new();
 
-    vars.set("F".to_string(), 1);
-    vars.set("D".to_string(), 0xe9);
-    vars.set("S".to_string(), 0x88);
+    vars.set("F".to_string(), 1, 8);
+    vars.set("D".to_string(), 0xe9, 8);
+    vars.set("S".to_string(), 0x88, 8);
 
     let res = render(
         "{38k,400}<1,-1|1,-3>(8,-4,170:8,90:8,15:4,D:4,S:8,F:8,E:4,C:4,1,-48)+ {E=1,C=D^S:4:0^S:4:4^F:4:0^F:4:4^E:4}",

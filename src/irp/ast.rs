@@ -36,8 +36,7 @@ pub enum Duration {
 pub enum IrStreamItem {
     Duration(Duration),
     Assignment(String, Expression),
-    BitField(bool, Expression, bool, Expression, Option<Expression>),
-    InfiniteBitField(bool, Expression, Expression),
+    Expression(Expression),
 }
 
 #[derive(PartialEq)]
@@ -58,6 +57,13 @@ pub struct IrStream {
 pub enum Expression {
     Number(i64),
     Identifier(String),
+    BitField {
+        value: Box<Expression>,
+        reverse: bool,
+        length: Box<Expression>,
+        skip: Option<Box<Expression>>,
+    },
+
     Complement(Box<Expression>),
     Not(Box<Expression>),
     Negative(Box<Expression>),

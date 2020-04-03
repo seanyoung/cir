@@ -61,7 +61,8 @@ fn main() {
             } else {
                 i64::from_str_radix(list[1], 10).unwrap()
             };
-            vars.set(list[0].to_string(), value);
+
+            vars.set(list[0].to_string(), value, 8);
         }
 
         match irp::render::render(i, vars) {

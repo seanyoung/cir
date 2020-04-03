@@ -7,6 +7,13 @@ use ast::*;
 #[cfg_attr(rustfmt, rustfmt_skip)]
 pub mod irp;
 
+pub fn box_option<T>(o: Option<T>) -> Option<Box<T>> {
+    match o {
+        None => None,
+        Some(x) => Some(Box::new(x)),
+    }
+}
+
 #[derive(Debug)]
 pub struct Irp {
     duty_cycle: Option<u8>,

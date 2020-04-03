@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use crate::irp::ast::*;
+use crate::irp::box_option;
 
 grammar;
 
@@ -44,22 +45,25 @@ duration: Duration = {
 irstream_item: IrStreamItem = {
     duration => IrStreamItem::Duration(<>),
     <id:identifier> "=" <e:expression> => IrStreamItem::Assignment(id, e),
-    <c:"~"?> <e:primary_item> ":" <r:"-"?> <b:primary_item> <l:(":" <primary_item>)?> => {
-        IrStreamItem::BitField(c.is_some(), e, r.is_some(), b, l)
-    },
-    <c:"~"?> <e:primary_item> "::" <b:primary_item> => {
-        IrStreamItem::InfiniteBitField(c.is_some(), e, b)
+    <c:"~"?> <e:Precedence0> ":" <r:"-"?> <l:Precedence0> <b:(":" <Precedence0>)?> => {
+        let e = Expression::BitField {
+            value: Box::new(e),
+            reverse: r.is_some(),
+            length: Box::new(l),
+            skip: box_option(b),
+        };
+
+        if c.is_some() {
+            IrStreamItem::Expression(Expression::Complement(Box::new(e)))
+        } else {
+            IrStreamItem::Expression(e)
+        }
     }
 }
 
-primary_item: Expression = {
-    identifier => Expression::Identifier(<>),
-    number => Expression::Number(<>),
-    "(" <e:expression> ")" => e,
-}
-
 expression: Expression = {
-    Precedence14,
+    // FIXME: Ternary is currently not parsed. This produces shift/reduce errors
+    Precedence13,
 }
 
 Precedence14: Expression = {
@@ -141,6 +145,18 @@ Precedence2: Expression = {
 }
 
 Precedence1: Expression = {
+    <e:Precedence0> ":" <r:"-"?> <l:Precedence0> <b:(":" <Precedence0>)?> => {
+        Expression::BitField {
+            value: Box::new(e),
+            reverse: r.is_some(),
+            length: Box::new(l),
+            skip: box_option(b),
+        }
+    },
+    Precedence0,
+}
+
+Precedence0: Expression = {
     number => Expression::Number(<>),
     identifier => Expression::Identifier(<>),
     "(" <expression> ")" => <>,
