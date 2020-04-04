@@ -1,18 +1,11 @@
 use super::ast::*;
 use super::irp;
+use super::{general_spec, GeneralSpec};
 
 use bitintr::Popcnt;
 use std::collections::HashMap;
 
 // Here we parse an irp lang
-
-#[derive(Debug)]
-pub struct GeneralSpec {
-    duty_cycle: Option<u8>,
-    carrier: Option<i64>,
-    lsb: bool,
-    unit: f64,
-}
 
 pub struct Vartable {
     vars: HashMap<String, (i64, u8)>,
@@ -300,74 +293,4 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
     out.pop_extend_marker();
 
     Ok(out.raw)
-}
-
-fn general_spec(general_spec: &[GeneralItem]) -> Result<GeneralSpec, String> {
-    let mut res = GeneralSpec {
-        duty_cycle: None,
-        carrier: None,
-        lsb: true,
-        unit: 1.0,
-    };
-
-    let mut unit = None;
-    let mut lsb = None;
-
-    for i in general_spec {
-        match i {
-            GeneralItem::DutyCycle(d) => {
-                if *d < 1.0 {
-                    return Err("duty cycle less than 1% not valid".to_string());
-                }
-                if *d > 99.0 {
-                    return Err("duty cycle larger than 99% not valid".to_string());
-                }
-                if res.duty_cycle.is_some() {
-                    return Err("duty cycle specified twice".to_string());
-                }
-
-                res.duty_cycle = Some(*d as u8);
-            }
-            GeneralItem::Frequency(f) => {
-                if res.carrier.is_some() {
-                    return Err("carrier frequency specified twice".to_string());
-                }
-
-                res.carrier = Some((*f * 1000.0) as i64);
-            }
-            GeneralItem::OrderLsb | GeneralItem::OrderMsb => {
-                if lsb.is_some() {
-                    return Err("bit order (lsb,msb) specified twice".to_string());
-                }
-
-                lsb = Some(*i == GeneralItem::OrderLsb);
-            }
-            GeneralItem::Unit(p, u) => {
-                if unit.is_some() {
-                    return Err("unit specified twice".to_string());
-                }
-
-                unit = Some((p, u));
-            }
-        }
-    }
-
-    if let Some((p, u)) = unit {
-        res.unit = match u {
-            Unit::Pulses => {
-                if let Some(f) = res.carrier {
-                    p * 1_000_000.0 / f as f64
-                } else {
-                    return Err("pulse unit specified without carrier frequency".to_string());
-                }
-            }
-            Unit::Milliseconds => p * 1000.0,
-            Unit::Units | Unit::Microseconds => *p,
-        }
-    }
-
-    if Some(false) == lsb {
-        res.lsb = false;
-    }
-    Ok(res)
 }
