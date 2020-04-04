@@ -22,6 +22,10 @@ impl Vartable {
         self.vars.insert(id, (v, l));
     }
 
+    pub fn is_defined(&self, id: &str) -> bool {
+        self.vars.contains_key(id)
+    }
+
     pub fn get(&self, id: &str) -> Result<(i64, u8), String> {
         match self.vars.get(id) {
             Some(n) => Ok(*n),
@@ -247,6 +251,21 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
     let irp = parser.parse(input).map_err(|e| e.to_string())?;
 
     let gs = general_spec(&irp.general_spec)?;
+
+    for p in irp.parameters {
+        if !vars.is_defined(&p.name) {
+            match p.default {
+                Some(e) => {
+                    let (v, l) = e.eval(&vars)?;
+
+                    vars.set(p.name, v, l);
+                }
+                None => {
+                    return Err(format!("missing value for {}", p.name));
+                }
+            }
+        }
+    }
 
     for (name, expr) in irp.definitions {
         let (v, l) = expr.eval(&vars)?;

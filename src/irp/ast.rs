@@ -3,6 +3,7 @@ pub struct Irp {
     pub bit_spec: Vec<Vec<Duration>>,
     pub stream: IrStream,
     pub definitions: Vec<(String, Expression)>,
+    pub parameters: Vec<ParameterSpec>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -92,4 +93,12 @@ pub enum Expression {
     Or(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
     Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
+}
+
+pub struct ParameterSpec {
+    pub name: String,
+    pub memory: bool,
+    pub min: i64,
+    pub max: i64,
+    pub default: Option<Expression>,
 }
