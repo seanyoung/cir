@@ -1,3 +1,4 @@
+extern crate bitintr;
 extern crate clap;
 extern crate num;
 extern crate serde;

@@ -1,6 +1,7 @@
 use super::ast::*;
 use super::irp;
 
+use bitintr::Popcnt;
 use std::collections::HashMap;
 
 // Here we parse an irp lang
@@ -198,6 +199,16 @@ impl Expression {
 
                 Ok((l_val.pow(r_val as u32), l_len))
             }
+            Expression::BitCount(e) => {
+                let (mut val, len) = e.eval(vars)?;
+
+                if len < 63 {
+                    // mask off any unused bits
+                    val &= (1 << len) - 1;
+                }
+
+                Ok((val.popcnt(), len))
+            }
             Expression::BitField {
                 value,
                 reverse,
@@ -218,7 +229,7 @@ impl Expression {
 
                 Ok((b, l as u8))
             }
-            _ => unimplemented!(),
+            _ => panic!("not implement: {:?}", self),
         }
     }
 }
@@ -230,7 +241,7 @@ impl Unit {
             Unit::Microseconds => Ok(v),
             Unit::Milliseconds => Ok(v * 1000),
             Unit::Pulses => match spec.carrier {
-                Some(f) => Ok(v * 1000 / f),
+                Some(f) => Ok(v * 1_000_000 / f),
                 None => Err("pulses specified but no carrier given".to_string()),
             },
         }
@@ -345,7 +356,7 @@ fn general_spec(general_spec: &[GeneralItem]) -> Result<GeneralSpec, String> {
         res.unit = match u {
             Unit::Pulses => {
                 if let Some(f) = res.carrier {
-                    p * 1000.0 / f as f64
+                    p * 1_000_000.0 / f as f64
                 } else {
                     return Err("pulse unit specified without carrier frequency".to_string());
                 }
