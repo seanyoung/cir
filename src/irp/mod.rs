@@ -1,6 +1,9 @@
 pub mod ast;
 pub mod render;
 
+#[cfg(test)]
+mod tests;
+
 use ast::*;
 
 #[allow(clippy::all,unused_parens)]
