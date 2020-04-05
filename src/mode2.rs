@@ -22,7 +22,7 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
                 continue;
             }
             Some(w) => {
-                if !w.starts_with('#') {
+                if !w.starts_with('#') && !w.starts_with("//") {
                     return Err(format!("unexpected ‘{}’", w));
                 }
             }

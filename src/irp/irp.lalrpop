@@ -27,43 +27,15 @@ identifier: String = {
 }
 
 unit: Unit = {
-     => Unit::Units,
     "u" => Unit::Microseconds,
     "m" => Unit::Milliseconds,
     "p" => Unit::Pulses,
 }
 
-duration: Duration = {
-    <n:float_number> <u:unit> => Duration::FlashConstant(n, u),
-    "-" <n:float_number> <u:unit> => Duration::GapConstant(n, u),
-    "^" <n:float_number> <u:unit> => Duration::ExtentConstant(n, u),
-    <id:identifier> <u:unit> => Duration::FlashIdentifier(id, u),
-    "-" <id:identifier> <u:unit> => Duration::GapIdentifier(id, u),
-    "^" <id:identifier> <u:unit> => Duration::ExtentIdentifier(id, u),
-}
-
-irstream_item: IrStreamItem = {
-    duration => IrStreamItem::Duration(<>),
-    <id:identifier> "=" <e:expression> => IrStreamItem::Assignment(id, e),
-    <c:"~"?> <e:Precedence0> ":" <r:"-"?> <l:Precedence0> <b:(":" <Precedence0>)?> => {
-        let e = Expression::BitField {
-            value: Box::new(e),
-            reverse: r.is_some(),
-            length: Box::new(l),
-            skip: box_option(b),
-        };
-
-        if c.is_some() {
-            IrStreamItem::Expression(Expression::Complement(Box::new(e)))
-        } else {
-            IrStreamItem::Expression(e)
-        }
-    }
-}
-
 expression: Expression = {
     // FIXME: Ternary is currently not parsed. This produces shift/reduce errors
     Precedence13,
+    definition,
 }
 
 Precedence14: Expression = {
@@ -159,7 +131,17 @@ Precedence1: Expression = {
 Precedence0: Expression = {
     number => Expression::Number(<>),
     identifier => Expression::Identifier(<>),
-    "(" <expression> ")" => <>,
+    <n:float_number> <u:unit> => Expression::FlashConstant(n, u),
+    "^" <n:float_number> <u:unit> => Expression::ExtentConstant(n, u),
+    "^" <n:float_number> => Expression::ExtentConstant(n, Unit::Units),
+    <id:identifier> <u:unit> => Expression::FlashIdentifier(id, u),
+    "^" <id:identifier> <u:unit> => Expression::ExtentIdentifier(id, u),
+    "^" <id:identifier> => Expression::ExtentIdentifier(id, Unit::Units),
+    expression_list => <>,
+}
+
+definition: Expression = {
+    <id:identifier> "=" <e:expression> => Expression::Assignment(id, Box::new(e)),
 }
 
 RepeatMarker: RepeatMarker = {
@@ -169,25 +151,27 @@ RepeatMarker: RepeatMarker = {
     <number> "+" => RepeatMarker::CountOrMore(<>),
 }
 
+expression_list: Expression = {
+    "(" <v:CommaList<expression>> ")" => Expression::List(v),
+}
+
 IrStream: IrStream = {
-    "(" <b:CommaList<irstream_item>> ")" <r:RepeatMarker?> => IrStream{ stream: b, repeat: r},
+    <v:expression_list> <r:RepeatMarker?> => {
+        IrStream{ stream: v, repeat: r }
+    }
 }
 
-BareIrStream: Vec<Duration> = {
-    CommaList<duration> => <>,
+bit_spec1: Expression = {
+    <v:CommaList<Precedence2>> => Expression::List(v),
 }
 
-bit_spec: Vec<Vec<Duration>> = {
-    "<" <PipeList<BareIrStream>> ">" => <>,
+bit_spec: Vec<Expression> = {
+    "<" <PipeList<bit_spec1>> ">" => <>,
 }
 
-definitions: Vec<(String, Expression)> = {
+definitions: Vec<Expression> = {
     => Vec::new(),
     "{" <CommaList<definition>> "}" => <>,
-}
-
-definition: (String, Expression) = {
-    <id:identifier> "=" <e:expression> => (id, e)
 }
 
 parameter_specs: Vec<ParameterSpec> = {

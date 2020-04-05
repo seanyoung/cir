@@ -1,12 +1,12 @@
 pub struct Irp {
     pub general_spec: Vec<GeneralItem>,
-    pub bit_spec: Vec<Vec<Duration>>,
+    pub bit_spec: Vec<Expression>,
     pub stream: IrStream,
-    pub definitions: Vec<(String, Expression)>,
+    pub definitions: Vec<Expression>,
     pub parameters: Vec<ParameterSpec>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Unit {
     Units,
     Microseconds,
@@ -24,23 +24,6 @@ pub enum GeneralItem {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Duration {
-    FlashConstant(f64, Unit),
-    GapConstant(f64, Unit),
-    ExtentConstant(f64, Unit),
-    FlashIdentifier(String, Unit),
-    GapIdentifier(String, Unit),
-    ExtentIdentifier(String, Unit),
-}
-
-#[derive(PartialEq, Debug)]
-pub enum IrStreamItem {
-    Duration(Duration),
-    Assignment(String, Expression),
-    Expression(Expression),
-}
-
-#[derive(PartialEq)]
 pub enum RepeatMarker {
     Any,
     OneOrMore,
@@ -48,14 +31,19 @@ pub enum RepeatMarker {
     CountOrMore(i64),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct IrStream {
-    pub stream: Vec<IrStreamItem>,
+    pub stream: Expression,
     pub repeat: Option<RepeatMarker>,
 }
 
 #[derive(PartialEq, Debug)]
 pub enum Expression {
+    FlashConstant(f64, Unit),
+    ExtentConstant(f64, Unit),
+    FlashIdentifier(String, Unit),
+    ExtentIdentifier(String, Unit),
+    Assignment(String, Box<Expression>),
     Number(i64),
     Identifier(String),
     BitField {
@@ -93,6 +81,7 @@ pub enum Expression {
     Or(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
     Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
+    List(Vec<Expression>),
 }
 
 pub struct ParameterSpec {

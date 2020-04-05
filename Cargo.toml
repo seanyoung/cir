@@ -6,11 +6,11 @@ edition = "2018"
 build = "build.rs"
 
 [build-dependencies.lalrpop]
-version = "0.18"
+version = "0.19"
 features = ["lexer"]
 
 [dependencies]
-lalrpop-util = "0.18"
+lalrpop-util = "0.19"
 num = "0.2.1"
 clap = "2.33.0"
 toml = "0.5"

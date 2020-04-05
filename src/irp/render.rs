@@ -35,6 +35,7 @@ impl Vartable {
 }
 
 struct Output<'a> {
+    #[allow(dead_code)]
     general_spec: &'a GeneralSpec,
     raw: Vec<u32>,
     extent_marker: Vec<u32>,
@@ -55,27 +56,6 @@ impl<'a> Output<'a> {
 
     fn pop_extend_marker(&mut self) {
         self.extent_marker.pop();
-    }
-
-    fn add(&mut self, dur: &Duration, vars: &Vartable) -> Result<(), String> {
-        match dur {
-            Duration::FlashConstant(p, u) => self.add_flash(u.eval(*p as i64, &self.general_spec)?),
-            Duration::GapConstant(p, u) => self.add_gap(u.eval(*p as i64, &self.general_spec)?),
-            Duration::FlashIdentifier(id, u) => {
-                self.add_flash(u.eval(vars.get(id)?.0, &self.general_spec)?)
-            }
-            Duration::GapIdentifier(id, u) => {
-                self.add_gap(u.eval(vars.get(id)?.0, &self.general_spec)?)
-            }
-            Duration::ExtentConstant(p, u) => {
-                self.add_extend(u.eval(*p as i64, &self.general_spec)?)
-            }
-            Duration::ExtentIdentifier(id, u) => {
-                self.add_extend(u.eval(vars.get(id)?.0, &self.general_spec)?)
-            }
-        }
-
-        Ok(())
     }
 
     fn add_flash(&mut self, n: i64) {
@@ -226,6 +206,11 @@ impl Expression {
 
                 Ok((b, l as u8))
             }
+            Expression::List(v) if v.len() == 1 => {
+                let (v, l) = v[0].eval(vars)?;
+
+                Ok((v, l))
+            }
             _ => panic!("not implement: {:?}", self),
         }
     }
@@ -267,10 +252,12 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
         }
     }
 
-    for (name, expr) in irp.definitions {
-        let (v, l) = expr.eval(&vars)?;
+    for e in irp.definitions {
+        if let Expression::Assignment(name, expr) = e {
+            let (v, l) = expr.eval(&vars)?;
 
-        vars.set(name, v, l);
+            vars.set(name, v, l);
+        }
     }
 
     let mut out = Output::new(&gs);
@@ -282,34 +269,59 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
 
     out.push_extent_marker();
 
-    for i in irp.stream.stream {
-        match i {
-            IrStreamItem::Duration(d) => {
-                out.add(&d, &vars)?;
-            }
-            IrStreamItem::Assignment(id, expr) => {
-                let (v, l) = expr.eval(&vars)?;
-
-                vars.set(id, v, l);
-            }
-            IrStreamItem::Expression(e) => {
-                let (mut v, l) = e.eval(&vars)?;
-
-                if !gs.lsb {
-                    v = v.reverse_bits().rotate_left(l as u32);
-                }
-
-                for _ in 0..l {
-                    for dur in &irp.bit_spec[(v & 1) as usize] {
-                        out.add(&dur, &vars)?;
-                    }
-                    v >>= 1;
-                }
-            }
-        }
-    }
+    eval_expression(&irp.stream.stream, &irp.bit_spec, &mut out, &mut vars, &gs)?;
 
     out.pop_extend_marker();
 
     Ok(out.raw)
+}
+
+fn eval_expression(
+    e: &Expression,
+    bit_spec: &[Expression],
+    out: &mut Output,
+    vars: &mut Vartable,
+    gs: &GeneralSpec,
+) -> Result<(), String> {
+    match e {
+        Expression::Number(v) => out.add_flash(Unit::Units.eval(*v, gs)?),
+        Expression::Negative(e) => match e.as_ref() {
+            Expression::Number(v) => out.add_gap(Unit::Units.eval(*v, gs)?),
+            Expression::FlashConstant(v, u) => out.add_gap(u.eval(*v as i64, gs)?),
+            _ => unreachable!(),
+        },
+        Expression::FlashConstant(p, u) => out.add_flash(u.eval(*p as i64, gs)?),
+        Expression::FlashIdentifier(id, u) => out.add_flash(u.eval(vars.get(id)?.0, gs)?),
+        Expression::ExtentConstant(p, u) => out.add_extend(u.eval(*p as i64, gs)?),
+        Expression::ExtentIdentifier(id, u) => out.add_extend(u.eval(vars.get(id)?.0, gs)?),
+        Expression::Assignment(id, expr) => {
+            let (v, l) = expr.eval(&vars)?;
+
+            vars.set(id.to_string(), v, l);
+        }
+        Expression::List(s) => {
+            for expr in s {
+                eval_expression(expr, bit_spec, out, vars, gs)?;
+            }
+        }
+        _ => {
+            let (mut v, l) = e.eval(&vars)?;
+
+            if !gs.lsb {
+                v = v.reverse_bits().rotate_left(l as u32);
+            }
+
+            for _ in 0..l {
+                if let Expression::List(v) = &bit_spec[(v & 1) as usize] {
+                    for expr in v {
+                        eval_expression(&expr, bit_spec, out, vars, gs)?;
+                    }
+                }
+
+                v >>= 1;
+            }
+        }
+    }
+
+    Ok(())
 }
