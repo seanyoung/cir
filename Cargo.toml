@@ -11,7 +11,7 @@ features = ["lexer"]
 
 [dependencies]
 lalrpop-util = "0.19"
-num = "0.2.1"
+num = "0.3"
 clap = "2.33.0"
 toml = "0.5"
 serde = "1.0"
