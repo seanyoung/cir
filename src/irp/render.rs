@@ -13,9 +13,20 @@ pub struct Vartable {
 
 impl Vartable {
     pub fn new() -> Self {
-        Self {
+        let mut v = Vartable {
             vars: HashMap::new(),
-        }
+        };
+
+        v.vars
+            .insert(String::from("UINT8_MAX"), (u8::max as i64, 8));
+        v.vars
+            .insert(String::from("UINT16_MAX"), (u16::max as i64, 16));
+        v.vars
+            .insert(String::from("UINT32_MAX"), (u32::max as i64, 32));
+        v.vars
+            .insert(String::from("UINT64_MAX"), (u64::max as i64, 64));
+
+        v
     }
 
     pub fn set(&mut self, id: String, v: i64, l: u8) {
@@ -262,16 +273,18 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
 
     let mut out = Output::new(&gs);
 
-    if irp.bit_spec.len() != 2 {
-        println!("bit_spec {:?}", irp.bit_spec);
-        return Err("bit spec should have two entries".to_string());
+    if let Expression::Stream(stream) = &irp.stream {
+        if stream.bit_spec.len() != 2 {
+            println!("bit_spec {:?}", stream.bit_spec);
+            return Err("bit spec should have two entries".to_string());
+        }
+
+        out.push_extent_marker();
+
+        eval_expression(&irp.stream, &stream.bit_spec, &mut out, &mut vars, &gs)?;
+
+        out.pop_extend_marker();
     }
-
-    out.push_extent_marker();
-
-    eval_expression(&irp.stream.stream, &irp.bit_spec, &mut out, &mut vars, &gs)?;
-
-    out.pop_extend_marker();
 
     Ok(out.raw)
 }
@@ -298,6 +311,11 @@ fn eval_expression(
             let (v, l) = expr.eval(&vars)?;
 
             vars.set(id.to_string(), v, l);
+        }
+        Expression::Stream(stream) => {
+            for expr in &stream.stream {
+                eval_expression(expr, bit_spec, out, vars, gs)?;
+            }
         }
         Expression::List(s) => {
             for expr in s {

@@ -7,6 +7,7 @@ grammar;
 GeneralItem: GeneralItem = {
     "msb" => GeneralItem::OrderMsb,
     "lsb" => GeneralItem::OrderLsb,
+    <float_number> "u" => GeneralItem::Unit(<>, Unit::Units),
     <float_number> "p" => GeneralItem::Unit(<>, Unit::Pulses),
     <float_number> => GeneralItem::Unit(<>, Unit::Microseconds),
     <float_number> "k" => GeneralItem::Frequency(<>),
@@ -15,6 +16,8 @@ GeneralItem: GeneralItem = {
 
 number: i64 = {
     r"\d+" => i64::from_str(<>).unwrap(),
+    r"0x[0-9a-fA-F]+" => i64::from_str_radix(&<>[2..], 16).unwrap(),
+    r"0b[01]+" => i64::from_str_radix(&<>[2..], 2).unwrap(),
 }
 
 float_number: f64 = {
@@ -130,6 +133,7 @@ Precedence1: Expression = {
 
 Precedence0: Expression = {
     number => Expression::Number(<>),
+    r"\d+\.\d+" => Expression::FloatNumber(f64::from_str(<>).unwrap()),
     identifier => Expression::Identifier(<>),
     <n:float_number> <u:unit> => Expression::FlashConstant(n, u),
     "^" <n:float_number> <u:unit> => Expression::ExtentConstant(n, u),
@@ -137,7 +141,6 @@ Precedence0: Expression = {
     <id:identifier> <u:unit> => Expression::FlashIdentifier(id, u),
     "^" <id:identifier> <u:unit> => Expression::ExtentIdentifier(id, u),
     "^" <id:identifier> => Expression::ExtentIdentifier(id, Unit::Units),
-    expression_list => <>,
 }
 
 definition: Expression = {
@@ -151,13 +154,18 @@ RepeatMarker: RepeatMarker = {
     <number> "+" => RepeatMarker::CountOrMore(<>),
 }
 
-expression_list: Expression = {
-    "(" <v:CommaList<expression>> ")" => Expression::List(v),
+IrStreamItem: Expression = {
+    expression,
+    IrStream,
+    "(" <v:CommaList<IrStreamItem>> ")" ":" <bits:expression> => {
+        Expression::Number(1)
+    }
 }
 
-IrStream: IrStream = {
-    <v:expression_list> <r:RepeatMarker?> => {
-        IrStream{ stream: v, repeat: r }
+IrStream: Expression = {
+    <b:bit_spec?> "(" <v:CommaList<IrStreamItem>> ")" <r:RepeatMarker?> => {
+        let bit_spec = b.unwrap_or(Vec::new());
+        Expression::Stream(IrStream{ bit_spec, stream: v, repeat: r })
     }
 }
 
@@ -171,6 +179,7 @@ bit_spec: Vec<Expression> = {
 
 definitions: Vec<Expression> = {
     => Vec::new(),
+    "{" "}" => Vec::new(),
     "{" <CommaList<definition>> "}" => <>,
 }
 
@@ -180,7 +189,7 @@ parameter_specs: Vec<ParameterSpec> = {
 }
 
 parameter_spec: ParameterSpec = {
-    <name:identifier> ":" <min:number> ".." <max:number> <default:("=" <expression>)?> => {
+    <name:identifier> ":" <min:Precedence0> ".." <max:Precedence0> <default:("=" <expression>)?> => {
         ParameterSpec {
             name,
             memory: false,
@@ -189,7 +198,7 @@ parameter_spec: ParameterSpec = {
             default,
         }
     },
-    <name:identifier> "@" ":" <min:number> ".." <max:number> "=" <default:expression> => {
+    <name:identifier> "@" ":" <min:Precedence0> ".." <max:Precedence0> "=" <default:expression> => {
         ParameterSpec {
             name,
             memory: true,
@@ -201,8 +210,8 @@ parameter_spec: ParameterSpec = {
 }
 
 pub protocol: Irp = {
-    "{" <v:CommaList<GeneralItem>> "}" <b:bit_spec> <ir:IrStream> <d:definitions> <s:parameter_specs> => {
-        Irp { general_spec: v, bit_spec: b, stream: ir, definitions: d, parameters: s }
+    "{" <v:CommaList<GeneralItem>> "}" <ir:IrStream> <d:definitions> <s:parameter_specs> => {
+        Irp { general_spec: v, stream: ir, definitions: d, parameters: s }
     }
 }
 

@@ -1,7 +1,6 @@
 pub struct Irp {
     pub general_spec: Vec<GeneralItem>,
-    pub bit_spec: Vec<Expression>,
-    pub stream: IrStream,
+    pub stream: Expression,
     pub definitions: Vec<Expression>,
     pub parameters: Vec<ParameterSpec>,
 }
@@ -33,7 +32,8 @@ pub enum RepeatMarker {
 
 #[derive(PartialEq, Debug)]
 pub struct IrStream {
-    pub stream: Expression,
+    pub bit_spec: Vec<Expression>,
+    pub stream: Vec<Expression>,
     pub repeat: Option<RepeatMarker>,
 }
 
@@ -45,6 +45,7 @@ pub enum Expression {
     ExtentIdentifier(String, Unit),
     Assignment(String, Box<Expression>),
     Number(i64),
+    FloatNumber(f64),
     Identifier(String),
     BitField {
         value: Box<Expression>,
@@ -82,12 +83,13 @@ pub enum Expression {
     And(Box<Expression>, Box<Expression>),
     Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
     List(Vec<Expression>),
+    Stream(IrStream),
 }
 
 pub struct ParameterSpec {
     pub name: String,
     pub memory: bool,
-    pub min: i64,
-    pub max: i64,
+    pub min: Expression,
+    pub max: Expression,
     pub default: Option<Expression>,
 }

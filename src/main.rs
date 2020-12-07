@@ -1,6 +1,7 @@
 extern crate bitintr;
 extern crate clap;
 extern crate num;
+extern crate quick_xml;
 extern crate serde;
 extern crate serde_derive;
 extern crate toml;
@@ -9,6 +10,7 @@ mod irp;
 mod keymap;
 mod mode2;
 mod pronto;
+mod protocols;
 mod rawir;
 
 use clap::{App, Arg, SubCommand};
