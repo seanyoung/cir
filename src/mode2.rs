@@ -53,15 +53,13 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
             } else {
                 res.push(value);
             }
-        } else {
-            if res.len() % 2 == 0 {
-                // two consecutive spaces should be folded, but leading spaces are ignored
-                if let Some(last) = res.last_mut() {
-                    *last += value;
-                }
-            } else {
-                res.push(value);
+        } else if res.len() % 2 == 0 {
+            // two consecutive spaces should be folded, but leading spaces are ignored
+            if let Some(last) = res.last_mut() {
+                *last += value;
             }
+        } else {
+            res.push(value);
         }
     }
 

@@ -1,8 +1,17 @@
+#[derive(Debug)]
 pub struct Irp {
-    pub general_spec: Vec<GeneralItem>,
+    pub general_spec: GeneralSpec,
     pub stream: Expression,
     pub definitions: Vec<Expression>,
     pub parameters: Vec<ParameterSpec>,
+}
+
+#[derive(Debug)]
+pub struct GeneralSpec {
+    pub duty_cycle: Option<u8>,
+    pub carrier: Option<i64>,
+    pub lsb: bool,
+    pub unit: f64,
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
@@ -11,15 +20,6 @@ pub enum Unit {
     Microseconds,
     Milliseconds,
     Pulses,
-}
-
-#[derive(PartialEq)]
-pub enum GeneralItem {
-    Frequency(f64),
-    DutyCycle(f64),
-    OrderMsb,
-    OrderLsb,
-    Unit(f64, Unit),
 }
 
 #[derive(PartialEq, Debug)]
@@ -45,7 +45,6 @@ pub enum Expression {
     ExtentIdentifier(String, Unit),
     Assignment(String, Box<Expression>),
     Number(i64),
-    FloatNumber(f64),
     Identifier(String),
     BitField {
         value: Box<Expression>,
@@ -86,6 +85,7 @@ pub enum Expression {
     Stream(IrStream),
 }
 
+#[derive(Debug)]
 pub struct ParameterSpec {
     pub name: String,
     pub memory: bool,

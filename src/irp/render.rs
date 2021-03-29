@@ -1,6 +1,5 @@
 use super::ast::*;
-use super::irp;
-use super::{general_spec, GeneralSpec};
+use super::parse;
 
 use bitintr::Popcnt;
 use std::collections::HashMap;
@@ -13,20 +12,9 @@ pub struct Vartable {
 
 impl Vartable {
     pub fn new() -> Self {
-        let mut v = Vartable {
+        Vartable {
             vars: HashMap::new(),
-        };
-
-        v.vars
-            .insert(String::from("UINT8_MAX"), (u8::max as i64, 8));
-        v.vars
-            .insert(String::from("UINT16_MAX"), (u16::max as i64, 16));
-        v.vars
-            .insert(String::from("UINT32_MAX"), (u32::max as i64, 32));
-        v.vars
-            .insert(String::from("UINT64_MAX"), (u64::max as i64, 64));
-
-        v
+        }
     }
 
     pub fn set(&mut self, id: String, v: i64, l: u8) {
@@ -242,11 +230,7 @@ impl Unit {
 }
 
 pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
-    let parser = irp::protocolParser::new();
-
-    let irp = parser.parse(input).map_err(|e| e.to_string())?;
-
-    let gs = general_spec(&irp.general_spec)?;
+    let irp = parse(input)?;
 
     for p in irp.parameters {
         if !vars.is_defined(&p.name) {
@@ -271,7 +255,7 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
         }
     }
 
-    let mut out = Output::new(&gs);
+    let mut out = Output::new(&irp.general_spec);
 
     if let Expression::Stream(stream) = &irp.stream {
         if stream.bit_spec.len() != 2 {
@@ -281,7 +265,13 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
 
         out.push_extent_marker();
 
-        eval_expression(&irp.stream, &stream.bit_spec, &mut out, &mut vars, &gs)?;
+        eval_expression(
+            &irp.stream,
+            &stream.bit_spec,
+            &mut out,
+            &mut vars,
+            &irp.general_spec,
+        )?;
 
         out.pop_extend_marker();
     }

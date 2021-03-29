@@ -1,0 +1,83 @@
+irp <- general_spec bitspec_irstream definitions* parameter_specs? EOI;
+
+general_spec <- WHITESPACE "{" WHITESPACE general_item ("," WHITESPACE general_item)* "}" WHITESPACE;
+
+general_item <- "msb" WHITESPACE
+    / "lsb" WHITESPACE
+    / number_decimals WHITESPACE ("u" / "p" / "k" / "%") WHITESPACE
+    / number_decimals WHITESPACE;
+
+number_decimals <- r"\\d+\\.\\d+"
+    / r"\\d+";
+
+definitions <- '{' definition ("," WHITESPACE definition)* '}' WHITESPACE;
+
+definition <- XID_IDENTIFIER  WHITESPACE '=' WHITESPACE expression WHITESPACE;
+
+bitspec <- "<" WHITESPACE bare_irstream ("|" WHITESPACE bare_irstream)* ">" WHITESPACE;
+
+bare_irstream <- irstream_item ("," irstream_item)*;
+
+irstream <- '(' bare_irstream ')' repeat_marker?;
+
+repeat_marker <- '*' / '+' / number '+'?;
+
+irstream_item <- variation
+    / bit_field
+    / definition
+    / duration
+    / irstream
+    / bitspec_irstream;
+
+bitspec_irstream <- bitspec irstream WHITESPACE;
+
+duration <- ('-' / '^')? name_or_number ('m' / 'u' / 'p')?;
+
+name_or_number <- XID_IDENTIFIER / number_decimals;
+
+variation <- alternative alternative alternative?;
+
+alternative <- '[' bare_irstream ']';
+
+parameter_specs <- "[" WHITESPACE parameter_spec ("," WHITESPACE parameter_spec)* "]" WHITESPACE
+    / "[" WHITESPACE "]" WHITESPACE;
+
+parameter_spec <- XID_IDENTIFIER WHITESPACE "@"? WHITESPACE ":" WHITESPACE number WHITESPACE ".." WHITESPACE number WHITESPACE ('=' expression)? WHITESPACE;
+
+number <- r"0x[0-9a-fA-F]+"
+    / r"0b[01]+"
+    / r"\\d+"
+    / "UINT8_MAX"
+    / "UINT16_MAX"
+    / "UINT32_MAX"
+    / "UINT64_MAX";
+
+primary_item <- number
+    / XID_IDENTIFIER
+    / "(" expression ")";
+
+bit_field <- "~"? primary_item ":" "-"? primary_item (":" primary_item)?
+    / "~"? primary_item "::" primary_item;
+
+expression <- "~" expression
+    / "!" expression
+    / "-" expression
+    / "#" expression
+    / expression1 "**" expression
+    / expression1;
+
+expression1 <- expression1 ('*' / '/' / '%') expression1
+    / expression1 ('+' / '-') expression1
+    / expression1 ('<<' / '>>') expression1
+    / expression1 ('<=' / '>=' / '<' / '>') expression1
+    / expression1 ('!=' / '==') expression1
+    / expression1 '&' expression1
+    / expression1 '^' expression1
+    / expression1 '|' expression1
+    / expression1 '&&' expression1
+    / expression1 '||' expression1
+    / expression2 '?' expression1 ':' expression1
+    / expression2;
+
+expression2 <- bit_field
+    / primary_item;
