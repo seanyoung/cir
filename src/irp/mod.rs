@@ -182,35 +182,33 @@ fn parameters(node: &irp::Node, input: &str) -> Result<Vec<ParameterSpec>, Strin
 
 fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
     match node.rule {
-        irp::Rule::expression => match node.alternative {
-            Some(0) => Ok(Expression::Complement(Box::new(expression(
-                &node.children[2],
-                input,
-            )?))),
-            Some(1) => Ok(Expression::Not(Box::new(expression(
-                &node.children[2],
-                input,
-            )?))),
-            Some(2) => Ok(Expression::Negative(Box::new(expression(
-                &node.children[2],
-                input,
-            )?))),
-            Some(3) => Ok(Expression::BitCount(Box::new(expression(
-                &node.children[2],
-                input,
-            )?))),
-            Some(4) => Ok(Expression::Power(
-                Box::new(expression(&node.children[0], input)?),
-                Box::new(expression(&node.children[3], input)?),
-            )),
-            Some(5) => expression(&node.children[0], input),
-            _ => unreachable!(),
-        },
-        irp::Rule::expression1 => {
+        irp::Rule::expression
+        | irp::Rule::expression2
+        | irp::Rule::expression3
+        | irp::Rule::expression4
+        | irp::Rule::expression5
+        | irp::Rule::expression6
+        | irp::Rule::expression7
+        | irp::Rule::expression8
+        | irp::Rule::expression9
+        | irp::Rule::expression10
+        | irp::Rule::expression11
+        | irp::Rule::expression12
+        | irp::Rule::expression13
+        | irp::Rule::expression14
+        | irp::Rule::expression15
+        | irp::Rule::expression16 => {
             // expression1
-            debug_assert_eq!(node.rule, irp::Rule::expression1);
-
-            if node.children.len() == 4 {
+            if node.children.len() == 3 {
+                let expr = Box::new(expression(&node.children[2], input)?);
+                match node.children[0].as_str(input) {
+                    "#" => Ok(Expression::BitCount(expr)),
+                    "!" => Ok(Expression::Not(expr)),
+                    "~" => Ok(Expression::Complement(expr)),
+                    "-" => Ok(Expression::Negative(expr)),
+                    op => panic!("{} not expected", op),
+                }
+            } else if node.children.len() == 4 {
                 let left = Box::new(expression(&node.children[0], input)?);
                 let right = Box::new(expression(&node.children[3], input)?);
 
@@ -233,6 +231,7 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
                     "^" => Ok(Expression::BitwiseXor(left, right)),
                     "&&" => Ok(Expression::And(left, right)),
                     "||" => Ok(Expression::Or(left, right)),
+                    "**" => Ok(Expression::Power(left, right)),
                     _ => unimplemented!(),
                 }
             } else if node.children.len() == 6 {
@@ -246,7 +245,7 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
                 expression(&node.children[0], input)
             }
         }
-        irp::Rule::expression2 => expression(&node.children[0], input),
+        irp::Rule::expression17 => expression(&node.children[0], input),
         irp::Rule::primary_item => match node.alternative {
             Some(0) => expression(&node.children[0], input),
             Some(1) => {

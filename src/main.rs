@@ -52,20 +52,22 @@ fn main() {
 
         let i = matches.value_of("IRP").unwrap();
 
-        for f in matches.values_of("FIELD").unwrap() {
-            let list: Vec<&str> = f.split('=').collect();
+        if let Some(values) = matches.values_of("FIELD") {
+            for f in values {
+                let list: Vec<&str> = f.split('=').collect();
 
-            if list.len() != 2 {
-                eprintln!("argument to --field must be X=1");
+                if list.len() != 2 {
+                    eprintln!("argument to --field must be X=1");
+                }
+
+                let value = if list[1].starts_with("0x") {
+                    i64::from_str_radix(&list[1][2..], 16).unwrap()
+                } else {
+                    i64::from_str_radix(list[1], 10).unwrap()
+                };
+
+                vars.set(list[0].to_string(), value, 8);
             }
-
-            let value = if list[1].starts_with("0x") {
-                i64::from_str_radix(&list[1][2..], 16).unwrap()
-            } else {
-                i64::from_str_radix(list[1], 10).unwrap()
-            };
-
-            vars.set(list[0].to_string(), value, 8);
         }
 
         match irp::render::render(i, vars) {

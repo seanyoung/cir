@@ -71,27 +71,55 @@ primary_item <- number ws
 bit_field <- "~"? ws primary_item ":" ws "-"? ws primary_item (":" ws primary_item)? ws
     / "~"? ws primary_item "::" ws primary_item ws;
 
-expression <- "~" ws expression
-    / "!" ws expression
-    / "-" ws expression
-    / "#" ws expression
-    / expression1 "**" ws expression
-    / expression1;
-
-expression1 <- expression2 ('*' / '/' / '%') ws expression
-    / expression2 ('+' / '-') ws expression
-    / expression2 ('<<' / '>>') ws expression
-    / expression2 ('<=' / '>=' / '<' / '>') ws expression
-    / expression2 ('!=' / '==') ws expression
-    / expression2 '&' ws expression
-    / expression2 '^' ws expression
-    / expression2 '|' ws expression
-    / expression2 '&&' ws expression
-    / expression2 '||' ws expression
-    / expression2 '?' ws expression ':' ws expression
+expression <- expression '?' ws expression2 ':' ws expression2
     / expression2;
 
-expression2 <- bit_field
+expression2 <- expression2 '||' ws expression3
+    / expression3;
+
+expression3 <- expression3 '&&' ws expression4
+    / expression4;
+
+expression4 <- expression4 '|' ws expression5
+    / expression5;
+
+expression5 <- expression5 '^' ws expression6
+    / expression6;
+
+expression6 <- expression6 '&' ws expression7
+    / expression7;
+
+expression7 <- expression7 ('!=' / '==') ws expression8
+    / expression8;
+
+expression8 <- expression8 ('<=' / '>=' / '<' / '>') ws expression9
+    / expression9;
+
+expression9 <- expression9 ('<<' / '>>') ws expression10
+    / expression10;
+
+expression10 <- expression10 ('+' / '-') ws expression11
+    / expression11;
+
+expression11 <- expression11 ('*' / '/' / '%') ws expression12
+    / expression12;
+
+expression12 <- expression13 "**" ws expression12
+    / expression13;
+
+expression13 <- "#" ws expression14
+    / expression14;
+
+expression14 <- "!" ws expression15
+    / expression15;
+
+expression15 <- "-" ws expression16
+    / expression16;
+
+expression16 <- "~" ws expression17
+    / expression17;
+
+expression17 <- bit_field
     / primary_item;
 
 ws <- WHITESPACE r"/\\*.*?\\*/" ws
