@@ -1,24 +1,29 @@
 irp <- general_spec bitspec_irstream definitions* parameter_specs? EOI;
 
-general_spec <- WHITESPACE "{" WHITESPACE general_item ("," WHITESPACE general_item)* "}" WHITESPACE;
+general_spec <- ws "{" ws general_item ("," ws general_item)* "}" ws;
 
-general_item <- "msb" WHITESPACE
-    / "lsb" WHITESPACE
-    / number_decimals WHITESPACE ("u" / "p" / "k" / "%") WHITESPACE
-    / number_decimals WHITESPACE;
+general_item <- "msb" ws
+    / "lsb" ws
+    / number_decimals ws ("u" / "p" / "k" / "%") ws
+    / number_decimals ws;
 
 number_decimals <- r"\\d+\\.\\d+"
     / r"\\d+";
 
-definitions <- '{' definition ("," WHITESPACE definition)* '}' WHITESPACE;
+definitions <- '{' ws definition ("," ws definition)* '}' ws
+    / '{' ws '}' ws;
 
-definition <- XID_IDENTIFIER  WHITESPACE '=' WHITESPACE expression WHITESPACE;
+definition <- XID_IDENTIFIER ws '=' ws expression ws;
 
-bitspec <- "<" WHITESPACE bare_irstream ("|" WHITESPACE bare_irstream)* ">" WHITESPACE;
+bitspec_definition <- XID_IDENTIFIER ws '=' ws primary_item ws;
 
-bare_irstream <- irstream_item ("," irstream_item)*;
+bitspec <- "<" ws bare_bitspec ("|" ws bare_bitspec)* ">" ws;
 
-irstream <- '(' bare_irstream ')' repeat_marker?;
+bare_bitspec <- (bitspec_item ("," ws bitspec_item)*)? ;
+
+bare_irstream <- (irstream_item ("," ws irstream_item)*)? ;
+
+irstream <- '(' ws bare_irstream ')' ws repeat_marker? ws;
 
 repeat_marker <- '*' / '+' / number '+'?;
 
@@ -29,20 +34,27 @@ irstream_item <- variation
     / irstream
     / bitspec_irstream;
 
-bitspec_irstream <- bitspec irstream WHITESPACE;
+bitspec_item <- variation
+    / bit_field
+    / bitspec_definition
+    / duration
+    / irstream
+    / bitspec_irstream;
 
-duration <- ('-' / '^')? name_or_number ('m' / 'u' / 'p')?;
+bitspec_irstream <- bitspec irstream;
+
+duration <- ('-' / '^')? name_or_number ('m' / 'u' / 'p')? ws;
 
 name_or_number <- XID_IDENTIFIER / number_decimals;
 
 variation <- alternative alternative alternative?;
 
-alternative <- '[' bare_irstream ']';
+alternative <- '[' ws bare_irstream ']' ws;
 
-parameter_specs <- "[" WHITESPACE parameter_spec ("," WHITESPACE parameter_spec)* "]" WHITESPACE
-    / "[" WHITESPACE "]" WHITESPACE;
+parameter_specs <- "[" ws parameter_spec ("," ws parameter_spec)* "]" ws
+    / "[" ws "]" ws;
 
-parameter_spec <- XID_IDENTIFIER WHITESPACE "@"? WHITESPACE ":" WHITESPACE number WHITESPACE ".." WHITESPACE number WHITESPACE ('=' expression)? WHITESPACE;
+parameter_spec <- XID_IDENTIFIER ws "@"? ws ":" ws number ws ".." ws number ws ('=' expression)? ws;
 
 number <- r"0x[0-9a-fA-F]+"
     / r"0b[01]+"
@@ -52,32 +64,36 @@ number <- r"0x[0-9a-fA-F]+"
     / "UINT32_MAX"
     / "UINT64_MAX";
 
-primary_item <- number
-    / XID_IDENTIFIER
-    / "(" expression ")";
+primary_item <- number ws
+    / XID_IDENTIFIER ws
+    / "(" ws expression ")" ws;
 
-bit_field <- "~"? primary_item ":" "-"? primary_item (":" primary_item)?
-    / "~"? primary_item "::" primary_item;
+bit_field <- "~"? ws primary_item ":" ws "-"? ws primary_item (":" ws primary_item)? ws
+    / "~"? ws primary_item "::" ws primary_item ws;
 
-expression <- "~" expression
-    / "!" expression
-    / "-" expression
-    / "#" expression
-    / expression1 "**" expression
+expression <- "~" ws expression
+    / "!" ws expression
+    / "-" ws expression
+    / "#" ws expression
+    / expression1 "**" ws expression
     / expression1;
 
-expression1 <- expression1 ('*' / '/' / '%') expression1
-    / expression1 ('+' / '-') expression1
-    / expression1 ('<<' / '>>') expression1
-    / expression1 ('<=' / '>=' / '<' / '>') expression1
-    / expression1 ('!=' / '==') expression1
-    / expression1 '&' expression1
-    / expression1 '^' expression1
-    / expression1 '|' expression1
-    / expression1 '&&' expression1
-    / expression1 '||' expression1
-    / expression2 '?' expression1 ':' expression1
+expression1 <- expression2 ('*' / '/' / '%') ws expression
+    / expression2 ('+' / '-') ws expression
+    / expression2 ('<<' / '>>') ws expression
+    / expression2 ('<=' / '>=' / '<' / '>') ws expression
+    / expression2 ('!=' / '==') ws expression
+    / expression2 '&' ws expression
+    / expression2 '^' ws expression
+    / expression2 '|' ws expression
+    / expression2 '&&' ws expression
+    / expression2 '||' ws expression
+    / expression2 '?' ws expression ':' ws expression
     / expression2;
 
 expression2 <- bit_field
     / primary_item;
+
+ws <- WHITESPACE r"/\\*.*?\\*/" ws
+    / WHITESPACE r"//[*\\n]*" ws
+    / WHITESPACE;

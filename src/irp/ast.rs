@@ -40,8 +40,10 @@ pub struct IrStream {
 #[derive(PartialEq, Debug)]
 pub enum Expression {
     FlashConstant(f64, Unit),
+    GapConstant(f64, Unit),
     ExtentConstant(f64, Unit),
     FlashIdentifier(String, Unit),
+    GapIdentifier(String, Unit),
     ExtentIdentifier(String, Unit),
     Assignment(String, Box<Expression>),
     Number(i64),
@@ -52,7 +54,10 @@ pub enum Expression {
         length: Box<Expression>,
         skip: Option<Box<Expression>>,
     },
-
+    InfiniteBitField {
+        value: Box<Expression>,
+        skip: Box<Expression>,
+    },
     Complement(Box<Expression>),
     Not(Box<Expression>),
     Negative(Box<Expression>),
@@ -83,6 +88,7 @@ pub enum Expression {
     Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
     List(Vec<Expression>),
     Stream(IrStream),
+    Variation(Vec<Expression>),
 }
 
 #[derive(Debug)]

@@ -297,6 +297,8 @@ fn eval_expression(
         Expression::FlashIdentifier(id, u) => out.add_flash(u.eval(vars.get(id)?.0, gs)?),
         Expression::ExtentConstant(p, u) => out.add_extend(u.eval(*p as i64, gs)?),
         Expression::ExtentIdentifier(id, u) => out.add_extend(u.eval(vars.get(id)?.0, gs)?),
+        Expression::GapConstant(p, u) => out.add_gap(u.eval(*p as i64, gs)?),
+        Expression::GapIdentifier(id, u) => out.add_gap(u.eval(vars.get(id)?.0, gs)?),
         Expression::Assignment(id, expr) => {
             let (v, l) = expr.eval(&vars)?;
 

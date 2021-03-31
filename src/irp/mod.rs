@@ -29,7 +29,7 @@ pub fn parse(input: &str) -> Result<Irp, String> {
                 parameters,
             })
         }
-        Err(r) => Err(r.to_string()),
+        Err(pos) => Err(format!("parse error at {}", pos)),
     }
 }
 
@@ -184,24 +184,24 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
     match node.rule {
         irp::Rule::expression => match node.alternative {
             Some(0) => Ok(Expression::Complement(Box::new(expression(
-                &node.children[1],
+                &node.children[2],
                 input,
             )?))),
             Some(1) => Ok(Expression::Not(Box::new(expression(
-                &node.children[1],
+                &node.children[2],
                 input,
             )?))),
             Some(2) => Ok(Expression::Negative(Box::new(expression(
-                &node.children[1],
+                &node.children[2],
                 input,
             )?))),
             Some(3) => Ok(Expression::BitCount(Box::new(expression(
-                &node.children[1],
+                &node.children[2],
                 input,
             )?))),
             Some(4) => Ok(Expression::Power(
                 Box::new(expression(&node.children[0], input)?),
-                Box::new(expression(&node.children[2], input)?),
+                Box::new(expression(&node.children[3], input)?),
             )),
             Some(5) => expression(&node.children[0], input),
             _ => unreachable!(),
@@ -210,9 +210,9 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
             // expression1
             debug_assert_eq!(node.rule, irp::Rule::expression1);
 
-            if node.children.len() == 3 {
+            if node.children.len() == 4 {
                 let left = Box::new(expression(&node.children[0], input)?);
-                let right = Box::new(expression(&node.children[2], input)?);
+                let right = Box::new(expression(&node.children[3], input)?);
 
                 match node.children[1].as_str(input) {
                     "*" => Ok(Expression::Multiply(left, right)),
@@ -235,10 +235,10 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
                     "||" => Ok(Expression::Or(left, right)),
                     _ => unimplemented!(),
                 }
-            } else if node.children.len() == 5 {
+            } else if node.children.len() == 6 {
                 let cond = Box::new(expression(&node.children[0], input)?);
-                let left = Box::new(expression(&node.children[2], input)?);
-                let right = Box::new(expression(&node.children[4], input)?);
+                let left = Box::new(expression(&node.children[3], input)?);
+                let right = Box::new(expression(&node.children[6], input)?);
 
                 Ok(Expression::Ternary(cond, left, right))
             } else {
@@ -254,25 +254,25 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
 
                 Ok(Expression::Identifier(s.to_owned()))
             }
-            Some(2) => expression(&node.children[1], input),
+            Some(2) => expression(&node.children[2], input),
             _ => unreachable!(),
         },
         irp::Rule::bit_field => {
-            let mut value = Box::new(expression(&node.children[1], input)?);
+            let mut value = Box::new(expression(&node.children[2], input)?);
             if !node.children[0].is_empty() {
                 value = Box::new(Expression::Complement(value));
             }
             match node.alternative {
                 Some(0) => {
-                    let reverse = !node.children[3].is_empty();
-                    let length = Box::new(expression(&node.children[4], input)?);
+                    let reverse = !node.children[5].is_empty();
+                    let length = Box::new(expression(&node.children[7], input)?);
 
-                    let skip_node = &node.children[5];
+                    let skip_node = &node.children[8];
 
                     let skip = if skip_node.children.is_empty() {
                         None
                     } else {
-                        Some(Box::new(expression(&skip_node.children[1], input)?))
+                        Some(Box::new(expression(&skip_node.children[2], input)?))
                     };
 
                     Ok(Expression::BitField {
@@ -282,7 +282,11 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
                         skip,
                     })
                 }
-                Some(1) => unimplemented!(),
+                Some(1) => {
+                    let skip = Box::new(expression(&node.children[5], input)?);
+
+                    Ok(Expression::InfiniteBitField { value, skip })
+                }
                 _ => unreachable!(),
             }
         }
@@ -306,7 +310,7 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
                 Ok(Expression::Number(i64::from_str_radix(s, 10).unwrap()))
             }
         }
-        irp::Rule::definition => {
+        irp::Rule::bitspec_definition | irp::Rule::definition => {
             let name = node.children[0].as_str(input);
 
             let expr = expression(&node.children[4], input)?;
@@ -329,8 +333,9 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
             if duration_node.alternative == Some(0) {
                 if op == "^" {
                     Ok(Expression::ExtentIdentifier(duration.to_owned(), unit))
+                } else if op == "-" {
+                    Ok(Expression::GapIdentifier(duration.to_owned(), unit))
                 } else {
-                    // FIXME: What about -?
                     assert_eq!(op, "");
 
                     Ok(Expression::FlashIdentifier(duration.to_owned(), unit))
@@ -341,7 +346,7 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
                 if op == "^" {
                     Ok(Expression::ExtentConstant(value, unit))
                 } else if op == "-" {
-                    Ok(Expression::ExtentConstant(-value, unit))
+                    Ok(Expression::GapConstant(value, unit))
                 } else {
                     assert_eq!(op, "");
 
@@ -349,7 +354,22 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
                 }
             }
         }
-        irp::Rule::irstream_item => expression(&node.children[0], input),
+        irp::Rule::irstream_item | irp::Rule::bitspec_item => expression(&node.children[0], input),
+        irp::Rule::irstream => {
+            let (stream, repeat) = irstream(node, input)?;
+
+            Ok(Expression::Stream(IrStream {
+                bit_spec: Vec::new(),
+                stream,
+                repeat,
+            }))
+        }
+        irp::Rule::bitspec_irstream => bitspec_irstream(node, input),
+        irp::Rule::variation => {
+            let list = bitspec(node, input)?;
+
+            Ok(Expression::Variation(list))
+        }
         rule => {
             println!("node:{}", node.print_to_string(input));
             panic!("rule {:?} not expected", rule);
@@ -371,8 +391,18 @@ fn bitspec_irstream(node: &irp::Node, input: &str) -> Result<Expression, String>
 fn bitspec(node: &irp::Node, input: &str) -> Result<Vec<Expression>, String> {
     let mut list = Vec::new();
 
-    for node in collect_rules(node, irp::Rule::bare_irstream) {
-        list.push(Expression::List(bare_irstream(node, input)?));
+    for node in collect_rules(node, irp::Rule::bare_bitspec) {
+        list.push(Expression::List(bare_bitspec(node, input)?));
+    }
+
+    Ok(list)
+}
+
+fn bare_bitspec(node: &irp::Node, input: &str) -> Result<Vec<Expression>, String> {
+    let mut list = Vec::new();
+
+    for node in collect_rules(node, irp::Rule::bitspec_item) {
+        list.push(expression(node, input)?);
     }
 
     Ok(list)
@@ -394,15 +424,13 @@ fn irstream(
 ) -> Result<(Vec<Expression>, Option<RepeatMarker>), String> {
     assert_eq!(node.rule, irp::Rule::irstream);
 
-    let bare_irstream = bare_irstream(&node.children[1], input)?;
+    let bare_irstream = bare_irstream(&node.children[2], input)?;
 
-    let repeat_node = &node.children[3];
+    let repeat_node = &node.children[5];
 
     let repeat = if repeat_node.children.is_empty() {
         None
     } else {
-        let repeat_node = &node.children[0];
-
         Some(match repeat_node.alternative {
             Some(0) => RepeatMarker::Any,
             Some(1) => RepeatMarker::OneOrMore,
