@@ -140,6 +140,14 @@ fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String
     match (l, r) {
         (Ok(l), Ok(r)) => {
             if l.len() != r.len() {
+                println!(
+                    "comparing:\n{:?} with\n{:?}\n have different lengths {} and {}",
+                    l,
+                    r,
+                    l.len(),
+                    r.len()
+                );
+
                 return false;
             }
 
@@ -150,6 +158,14 @@ fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String
                     r[i] - l[i]
                 };
                 if diff > 1 {
+                    println!(
+                        "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {}",
+                        l,
+                        r,
+                        i,
+                        l.len()
+                    );
+
                     return false;
                 }
             }
