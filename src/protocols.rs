@@ -14,9 +14,7 @@ pub struct Protocol {
 
 #[allow(dead_code)]
 pub fn read_protocols() -> Vec<Protocol> {
-    let protocols_xml =
-        std::fs::read_to_string("/home/sean/git/IrpTransmogrifier/target/IrpProtocols.xml")
-            .expect("file not found!");
+    let protocols_xml = std::fs::read_to_string("IrpProtocols.xml").expect("file not found!");
 
     let protocols: Protocols = from_str(&protocols_xml).expect("unexpected xml");
 
