@@ -6,12 +6,11 @@ extern crate serde;
 extern crate serde_derive;
 extern crate toml;
 
-mod irp;
-mod keymap;
-mod mode2;
-mod pronto;
-mod protocols;
-mod rawir;
+use ir_ctl::irp;
+use ir_ctl::keymap;
+use ir_ctl::mode2;
+use ir_ctl::pronto;
+use ir_ctl::rawir;
 
 use clap::{App, Arg, SubCommand};
 use std::fs;
