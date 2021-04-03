@@ -1,0 +1,11 @@
+output <- params render EOI;
+
+params <- "{" param ("," param)* "}" WHITESPACE;
+
+param <- XID_IDENTIFIER "=" r"\\d+";
+
+render <- ("Freq=" r"\\d+" "Hz")? rawir+ WHITESPACE;
+
+rawir <- "[" (value ("," value)+)? "]";
+
+value <- ("+" / "-") r"\\d+";

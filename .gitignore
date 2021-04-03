@@ -1,3 +1,4 @@
 Cargo.lock
 /target
 /src/irp/irp.rs
+/src/bin/transmogrifier/output.rs
