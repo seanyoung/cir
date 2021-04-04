@@ -24,6 +24,9 @@ fn go() {
     let testdata: Vec<TestData> = serde_json::from_str(&data).unwrap();
     let protocols = protocols::read_protocols();
 
+    let mut fails = 0;
+    let total_tests = testdata.len();
+
     for test in testdata {
         let protocol = protocols.iter().find(|p| p.name == test.protocol).unwrap();
 
@@ -39,16 +42,23 @@ fn go() {
 
         let f = render(&protocol.irp, vars, 0);
 
-        assert!(compare_with_rounding(Ok(test.render[0].clone()), f));
-
-        println!("ok");
+        if compare_with_rounding(Ok(test.render[0].clone()), f) {
+            println!("OK");
+        } else {
+            println!("FAIL");
+            fails += 1;
+        }
     }
+
+    println!("tests: {} fails: {}", total_tests, fails);
 }
 
 fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String>) -> bool {
     if l == r {
         return true;
     }
+
+    let mut success = true;
 
     match (&l, &r) {
         (Ok(l), Ok(r)) => {
@@ -61,10 +71,10 @@ fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String
                     r.len()
                 );
 
-                return false;
+                success = false;
             }
 
-            for i in 0..l.len() {
+            for i in 0..std::cmp::min(l.len(), r.len()) {
                 let diff = if l[i] > r[i] {
                     l[i] - r[i]
                 } else {
@@ -72,22 +82,23 @@ fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String
                 };
                 if diff > 1 {
                     println!(
-                        "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {}",
+                        "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {} found {} expected {}",
                         l,
                         r,
                         i,
-                        l.len()
+                        l.len(),
+                        l[i], r[i]
                     );
 
-                    return false;
+                    success = false;
                 }
             }
-
-            true
         }
         _ => {
             println!("{:?} {:?}", l, r);
-            false
+            success = false;
         }
     }
+
+    success
 }

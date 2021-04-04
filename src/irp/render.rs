@@ -7,7 +7,7 @@ use std::collections::HashMap;
 // Here we parse an irp lang
 #[derive(Default)]
 pub struct Vartable {
-    vars: HashMap<String, (i64, u8)>,
+    vars: HashMap<String, (i64, u8, Option<Expression>)>,
 }
 
 impl Vartable {
@@ -17,8 +17,12 @@ impl Vartable {
         }
     }
 
-    pub fn set(&mut self, id: String, v: i64, l: u8) {
-        self.vars.insert(id, (v, l));
+    pub fn set_definition(&mut self, name: String, expr: Expression) {
+        self.vars.insert(name, (0, 0, Some(expr)));
+    }
+
+    pub fn set(&mut self, id: String, name: i64, length: u8) {
+        self.vars.insert(id, (name, length, None));
     }
 
     pub fn is_defined(&self, id: &str) -> bool {
@@ -27,8 +31,9 @@ impl Vartable {
 
     pub fn get(&self, id: &str) -> Result<(i64, u8), String> {
         match self.vars.get(id) {
-            Some(n) => Ok(*n),
-            None => Err(format!("variable {} not defined", id)),
+            Some((val, length, None)) => Ok((*val, *length)),
+            Some((_, _, Some(expr))) => expr.eval(self),
+            None => Err(format!("variable `{}´ not defined", id)),
         }
     }
 }
@@ -61,7 +66,6 @@ impl<'a> Output<'a> {
         assert!(n > 0);
 
         *self.extent_marker.last_mut().unwrap() += n as u32;
-
         if (self.raw.len() % 2) == 1 {
             *self.raw.last_mut().unwrap() += n as u32;
         } else {
@@ -185,6 +189,18 @@ impl Expression {
 
                 Ok((val.popcnt(), len))
             }
+            Expression::ShiftLeft(value, r) => {
+                let (value, len) = value.eval(vars)?;
+                let (r, _) = r.eval(vars)?;
+
+                Ok((value << r, len))
+            }
+            Expression::ShiftRight(value, r) => {
+                let (value, len) = value.eval(vars)?;
+                let (r, _) = r.eval(vars)?;
+
+                Ok((value >> r, len))
+            }
             Expression::BitField {
                 value,
                 reverse,
@@ -203,7 +219,16 @@ impl Expression {
                     b = b.reverse_bits().rotate_left(l as u32);
                 }
 
+                b &= (1 << l) - 1;
+
                 Ok((b, l as u8))
+            }
+            Expression::InfiniteBitField { value, skip } => {
+                let (mut b, _) = value.eval(&vars)?;
+
+                b >>= skip.eval(&vars)?.0;
+
+                Ok((b, 8))
             }
             Expression::List(v) if v.len() == 1 => {
                 let (v, l) = v[0].eval(vars)?;
@@ -212,6 +237,23 @@ impl Expression {
             }
             _ => panic!("not implement: {:?}", self),
         }
+    }
+
+    fn is_stream(&self) -> bool {
+        matches!(
+            self,
+            Expression::Number(_)
+                | Expression::Negative(_)
+                | Expression::FlashConstant(_, _)
+                | Expression::FlashIdentifier(_, _)
+                | Expression::GapConstant(_, _)
+                | Expression::GapIdentifier(_, _)
+                | Expression::ExtentConstant(_, _)
+                | Expression::ExtentIdentifier(_, _)
+                | Expression::Assignment(_, _)
+                | Expression::List(_)
+                | Expression::Stream(_)
+        )
     }
 }
 
@@ -223,6 +265,18 @@ impl Unit {
             Unit::Milliseconds => Ok(v * 1000),
             Unit::Pulses => match spec.carrier {
                 Some(f) => Ok(v * 1_000_000 / f),
+                None => Err("pulses specified but no carrier given".to_string()),
+            },
+        }
+    }
+
+    fn eval_float(&self, v: f64, spec: &GeneralSpec) -> Result<i64, String> {
+        match self {
+            Unit::Units => Ok((v * spec.unit) as i64),
+            Unit::Microseconds => Ok(v as i64),
+            Unit::Milliseconds => Ok((v * 1000.0) as i64),
+            Unit::Pulses => match spec.carrier {
+                Some(f) => Ok((v * 1_000_000.0) as i64 / f),
                 None => Err("pulses specified but no carrier given".to_string()),
             },
         }
@@ -249,22 +303,13 @@ pub fn render(input: &str, mut vars: Vartable, repeats: i64) -> Result<Vec<u32>,
 
     for e in irp.definitions {
         if let Expression::Assignment(name, expr) = e {
-            let (v, l) = expr.eval(&vars)?;
-
-            vars.set(name, v, l);
+            vars.set_definition(name, *expr);
         }
     }
 
     let mut out = Output::new(&irp.general_spec);
 
     if let Expression::Stream(stream) = &irp.stream {
-        if stream.bit_spec.len() != 2 {
-            println!("bit_spec {:?}", stream.bit_spec);
-            return Err("bit spec should have two entries".to_string());
-        }
-
-        out.push_extent_marker();
-
         eval_expression(
             &irp.stream,
             &stream.bit_spec,
@@ -273,8 +318,6 @@ pub fn render(input: &str, mut vars: Vartable, repeats: i64) -> Result<Vec<u32>,
             &irp.general_spec,
             repeats,
         )?;
-
-        out.pop_extend_marker();
     }
 
     Ok(out.raw)
@@ -292,14 +335,14 @@ fn eval_expression(
         Expression::Number(v) => out.add_flash(Unit::Units.eval(*v, gs)?),
         Expression::Negative(e) => match e.as_ref() {
             Expression::Number(v) => out.add_gap(Unit::Units.eval(*v, gs)?),
-            Expression::FlashConstant(v, u) => out.add_gap(u.eval(*v as i64, gs)?),
+            Expression::FlashConstant(v, u) => out.add_gap(u.eval_float(*v, gs)?),
             _ => unreachable!(),
         },
-        Expression::FlashConstant(p, u) => out.add_flash(u.eval(*p as i64, gs)?),
+        Expression::FlashConstant(p, u) => out.add_flash(u.eval_float(*p, gs)?),
         Expression::FlashIdentifier(id, u) => out.add_flash(u.eval(vars.get(id)?.0, gs)?),
-        Expression::ExtentConstant(p, u) => out.add_extend(u.eval(*p as i64, gs)?),
+        Expression::ExtentConstant(p, u) => out.add_extend(u.eval_float(*p, gs)?),
         Expression::ExtentIdentifier(id, u) => out.add_extend(u.eval(vars.get(id)?.0, gs)?),
-        Expression::GapConstant(p, u) => out.add_gap(u.eval(*p as i64, gs)?),
+        Expression::GapConstant(p, u) => out.add_gap(u.eval_float(*p, gs)?),
         Expression::GapIdentifier(id, u) => out.add_gap(u.eval(vars.get(id)?.0, gs)?),
         Expression::Assignment(id, expr) => {
             let (v, l) = expr.eval(&vars)?;
@@ -307,43 +350,112 @@ fn eval_expression(
             vars.set(id.to_string(), v, l);
         }
         Expression::Stream(stream) => {
-            let count = match stream.repeat {
-                None => 1,
-                Some(RepeatMarker::Any) => repeats,
-                Some(RepeatMarker::Count(num)) => num,
-                Some(RepeatMarker::OneOrMore) => repeats + 1,
-                Some(RepeatMarker::CountOrMore(num)) => repeats + num,
+            let (indefinite, count) = match stream.repeat {
+                None => (1, 0),
+                Some(RepeatMarker::Any) => (0, repeats),
+                Some(RepeatMarker::Count(num)) => (num, 0),
+                Some(RepeatMarker::OneOrMore) => (1, repeats),
+                Some(RepeatMarker::CountOrMore(num)) => (num, repeats),
             };
 
-            for _ in 0..count {
-                for expr in &stream.stream {
-                    eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
-                }
+            for _ in 0..indefinite {
+                eval_stream(&stream.stream, bit_spec, out, vars, gs, repeats, 0)?;
             }
+
+            for _ in 0..count {
+                eval_stream(&stream.stream, bit_spec, out, vars, gs, repeats, 1)?;
+            }
+
+            if let Expression::Variation(list) = &stream.stream[0] {
+                if list.len() == 3 {
+                    eval_stream(&stream.stream, bit_spec, out, vars, gs, repeats, 2)?;
+                }
+            };
         }
-        Expression::List(s) => {
-            for expr in s {
+        _ => unreachable!(),
+    }
+
+    Ok(())
+}
+
+fn eval_stream(
+    stream: &[Expression],
+    bit_spec: &[Expression],
+    out: &mut Output,
+    vars: &mut Vartable,
+    gs: &GeneralSpec,
+    repeats: i64,
+    alternative: usize,
+) -> Result<(), String> {
+    let mut bit_stream = 0;
+    let mut bit_stream_length: u32 = 0;
+
+    out.push_extent_marker();
+
+    for expr in stream {
+        if let Expression::Variation(list) = expr {
+            let alternative = &list[alternative];
+
+            if alternative.is_empty() {
+                break;
+            }
+            for expr in alternative {
                 eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
             }
-        }
-        _ => {
-            let (mut v, l) = e.eval(&vars)?;
-
-            if !gs.lsb {
-                v = v.reverse_bits().rotate_left(l as u32);
+        } else if expr.is_stream() {
+            if bit_stream_length != 0 {
+                return Err(format!(
+                    "{} bits left in stream when non bit expression encountered",
+                    bit_stream_length
+                ));
             }
 
-            for _ in 0..l {
-                if let Expression::List(v) = &bit_spec[(v & 1) as usize] {
-                    for expr in v {
-                        eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
-                    }
-                }
+            eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
+        } else {
+            let (bits, length) = expr.eval(&vars)?;
 
-                v >>= 1;
+            bit_stream = (bit_stream << length) | bits;
+
+            bit_stream_length += length as u32;
+
+            let len = bit_spec.len();
+            // 2 => 1, 4 => 2, 8 => 3, 16 => 4
+            let bits_step = len.trailing_zeros();
+
+            debug_assert_eq!(1 << bits_step, len);
+
+            if gs.lsb {
+                let limit = bit_stream_length & !(bits_step as u32 - 1);
+
+                for _ in (0..limit).step_by(bits_step as usize) {
+                    if let Expression::List(v) = &bit_spec[bit_stream as usize & (len - 1)] {
+                        for expr in v {
+                            eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
+                        }
+                    }
+
+                    bit_stream >>= bits_step;
+                    bit_stream_length -= bits_step;
+                }
+            } else {
+                let start = bit_stream_length & (bits_step as u32 - 1);
+
+                for i in (start..bit_stream_length).step_by(bits_step as usize).rev() {
+                    let w = bit_stream >> i;
+
+                    if let Expression::List(v) = &bit_spec[w as usize & (len - 1)] {
+                        for expr in v {
+                            eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
+                        }
+                    }
+
+                    bit_stream &= (1 << (i as i64)) - 1;
+                    bit_stream_length -= bits_step;
+                }
             }
         }
     }
+    out.pop_extend_marker();
 
     Ok(())
 }

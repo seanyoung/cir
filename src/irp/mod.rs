@@ -249,7 +249,7 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
         irp::Rule::primary_item => match node.alternative {
             Some(0) => expression(&node.children[0], input),
             Some(1) => {
-                let s = node.as_str(input);
+                let s = node.children[0].as_str(input);
 
                 Ok(Expression::Identifier(s.to_owned()))
             }
@@ -365,7 +365,11 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
         }
         irp::Rule::bitspec_irstream => bitspec_irstream(node, input),
         irp::Rule::variation => {
-            let list = bitspec(node, input)?;
+            let mut list = Vec::new();
+
+            for node in collect_rules(node, irp::Rule::alternative) {
+                list.push(bare_irstream(node, input)?);
+            }
 
             Ok(Expression::Variation(list))
         }
@@ -394,7 +398,13 @@ fn bitspec(node: &irp::Node, input: &str) -> Result<Vec<Expression>, String> {
         list.push(Expression::List(bare_bitspec(node, input)?));
     }
 
-    Ok(list)
+    match list.len() {
+        2 | 4 | 8 | 16 => Ok(list),
+        len => Err(format!(
+            "bitspec should have 2, 4, 8, or 16 entries, found {}",
+            len
+        )),
+    }
 }
 
 fn bare_bitspec(node: &irp::Node, input: &str) -> Result<Vec<Expression>, String> {

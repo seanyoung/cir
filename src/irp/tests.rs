@@ -31,7 +31,7 @@ fn test() {
     let res = render(
         "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+",
         vars,
-        1,
+        0,
     );
 
     // irptransmogrifier.sh  --irp "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+" render -r -n F=1,T=0,D=0xe9
@@ -49,7 +49,7 @@ fn test() {
 
     let res = render(
         "{38k,400}<1,-1|1,-3>(8,-4,170:8,90:8,15:4,D:4,S:8,F:8,E:4,C:4,1,-48)+ {E=1,C=D^S:4:0^S:4:4^F:4:0^F:4:4^E:4}",
-        vars,1
+        vars, 0
     );
 
     assert_eq!(

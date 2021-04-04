@@ -88,7 +88,7 @@ pub enum Expression {
     Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
     List(Vec<Expression>),
     Stream(IrStream),
-    Variation(Vec<Expression>),
+    Variation(Vec<Vec<Expression>>),
 }
 
 #[derive(Debug)]
