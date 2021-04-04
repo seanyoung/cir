@@ -81,7 +81,7 @@ fn parse_test() {
         for s in scancodes {
             match (s.0.as_str(), s.1.as_str()) {
                 ("0x1e3b", "KEY_SELECT") | ("0x1e3d", "KEY_POWER2") | ("0x1e1c", "KEY_TV") => {}
-                _ => panic!(format!("{:?} not expected", s)),
+                _ => panic!("{:?} not expected", s),
             }
         }
     }

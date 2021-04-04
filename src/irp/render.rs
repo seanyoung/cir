@@ -5,7 +5,7 @@ use bitintr::Popcnt;
 use std::collections::HashMap;
 
 // Here we parse an irp lang
-
+#[derive(Default)]
 pub struct Vartable {
     vars: HashMap<String, (i64, u8)>,
 }
@@ -229,7 +229,7 @@ impl Unit {
     }
 }
 
-pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
+pub fn render(input: &str, mut vars: Vartable, repeats: i64) -> Result<Vec<u32>, String> {
     let irp = parse(input)?;
 
     for p in irp.parameters {
@@ -271,6 +271,7 @@ pub fn render(input: &str, mut vars: Vartable) -> Result<Vec<u32>, String> {
             &mut out,
             &mut vars,
             &irp.general_spec,
+            repeats,
         )?;
 
         out.pop_extend_marker();
@@ -285,6 +286,7 @@ fn eval_expression(
     out: &mut Output,
     vars: &mut Vartable,
     gs: &GeneralSpec,
+    repeats: i64,
 ) -> Result<(), String> {
     match e {
         Expression::Number(v) => out.add_flash(Unit::Units.eval(*v, gs)?),
@@ -305,13 +307,23 @@ fn eval_expression(
             vars.set(id.to_string(), v, l);
         }
         Expression::Stream(stream) => {
-            for expr in &stream.stream {
-                eval_expression(expr, bit_spec, out, vars, gs)?;
+            let count = match stream.repeat {
+                None => 1,
+                Some(RepeatMarker::Any) => repeats,
+                Some(RepeatMarker::Count(num)) => num,
+                Some(RepeatMarker::OneOrMore) => repeats + 1,
+                Some(RepeatMarker::CountOrMore(num)) => repeats + num,
+            };
+
+            for _ in 0..count {
+                for expr in &stream.stream {
+                    eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
+                }
             }
         }
         Expression::List(s) => {
             for expr in s {
-                eval_expression(expr, bit_spec, out, vars, gs)?;
+                eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
             }
         }
         _ => {
@@ -324,7 +336,7 @@ fn eval_expression(
             for _ in 0..l {
                 if let Expression::List(v) = &bit_spec[(v & 1) as usize] {
                     for expr in v {
-                        eval_expression(&expr, bit_spec, out, vars, gs)?;
+                        eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
                     }
                 }
 

@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Sean Young <sean@mess.org>"]
 edition = "2018"
 build = "build.rs"
+default-run = "ir-ctl"
 
 [build-dependencies]
 lrpeg = { git = "https://github.com/seanyoung/lrpeg", branch = "main" }

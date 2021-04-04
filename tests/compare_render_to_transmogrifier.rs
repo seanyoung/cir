@@ -37,9 +37,11 @@ fn go() {
             vars.set(param.name, param.value as i64, 8);
         }
 
-        let f = render(&protocol.irp, vars);
+        let f = render(&protocol.irp, vars, 0);
 
         assert!(compare_with_rounding(Ok(test.render[0].clone()), f));
+
+        println!("ok");
     }
 }
 
@@ -48,7 +50,7 @@ fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String
         return true;
     }
 
-    match (l, r) {
+    match (&l, &r) {
         (Ok(l), Ok(r)) => {
             if l.len() != r.len() {
                 println!(
@@ -83,6 +85,9 @@ fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String
 
             true
         }
-        _ => false,
+        _ => {
+            println!("{:?} {:?}", l, r);
+            false
+        }
     }
 }

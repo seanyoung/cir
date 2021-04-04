@@ -39,10 +39,10 @@ fn collect_rules(node: &irp::Node, rule: irp::Rule) -> Vec<&irp::Node> {
     fn recurse<'t>(node: &'t irp::Node, rule: irp::Rule, list: &mut Vec<&'t irp::Node>) {
         if node.rule == rule {
             list.push(node);
-        }
-
-        for node in &node.children {
-            recurse(node, rule, list);
+        } else {
+            for node in &node.children {
+                recurse(node, rule, list);
+            }
         }
     }
 
@@ -427,7 +427,7 @@ fn irstream(
 
     let repeat_node = &node.children[5];
 
-    let repeat = if repeat_node.children.is_empty() {
+    let repeat = if repeat_node.is_empty() {
         None
     } else {
         Some(match repeat_node.alternative {

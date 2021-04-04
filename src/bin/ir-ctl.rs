@@ -1,11 +1,3 @@
-extern crate bitintr;
-extern crate clap;
-extern crate num;
-extern crate quick_xml;
-extern crate serde;
-extern crate serde_derive;
-extern crate toml;
-
 use ir_ctl::irp;
 use ir_ctl::keymap;
 use ir_ctl::mode2;
@@ -35,6 +27,12 @@ fn main() {
                         .long("irp")
                         .takes_value(true)
                         .required(true),
+                )
+                .arg(
+                    Arg::with_name("REPEATS")
+                        .long("repeats")
+                        .short("r")
+                        .takes_value(true),
                 )
                 .arg(
                     Arg::with_name("FIELD")
@@ -69,7 +67,18 @@ fn main() {
             }
         }
 
-        match irp::render::render(i, vars) {
+        let repeats = match matches.value_of("REPEATS") {
+            None => 0,
+            Some(s) => match i64::from_str_radix(s, 10) {
+                Ok(num) => num,
+                Err(_) => {
+                    eprintln!("error: {} is not numeric", s);
+                    std::process::exit(2);
+                }
+            },
+        };
+
+        match irp::render::render(i, vars, repeats) {
             Ok(ir) => println!("{}", rawir::print_to_string(&ir)),
             Err(s) => eprintln!("error: {}", s),
         }

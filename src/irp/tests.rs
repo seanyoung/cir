@@ -13,7 +13,7 @@ fn test() {
 
     let res = render(
         "{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]",
-        vars,
+        vars, 1,
     );
 
     // irptransmogrifier.sh  --irp "{38.0k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)+" render -r -n F=1,D=0xe9,S=0xfe
@@ -31,6 +31,7 @@ fn test() {
     let res = render(
         "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+",
         vars,
+        1,
     );
 
     // irptransmogrifier.sh  --irp "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+" render -r -n F=1,T=0,D=0xe9
@@ -48,7 +49,7 @@ fn test() {
 
     let res = render(
         "{38k,400}<1,-1|1,-3>(8,-4,170:8,90:8,15:4,D:4,S:8,F:8,E:4,C:4,1,-48)+ {E=1,C=D^S:4:0^S:4:4^F:4:0^F:4:4^E:4}",
-        vars,
+        vars,1
     );
 
     assert_eq!(
@@ -70,7 +71,7 @@ fn rs200() {
     vars.set("H3".to_string(), 3, 8);
     vars.set("H4".to_string(), 4, 8);
 
-    let res = render(irp, vars);
+    let res = render(irp, vars, 1);
 
     assert!(compare_with_rounding(
         res,
@@ -87,7 +88,7 @@ fn nec() {
 
     let res = render(
         "{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]",
-        vars,
+        vars,1
     );
 
     // irptransmogrifier.sh --irp  "{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]" render -r -n F=1,D=0xe9
@@ -104,7 +105,7 @@ fn keeprite_ac() {
     vars.set("A".to_string(), 1, 32);
     vars.set("B".to_string(), 0xe9, 32);
 
-    let res = render("{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]", vars);
+    let res = render("{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]", vars, 1);
 
     // irptransmogrifier.sh --irp  "{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]" render -r -n A=1,B=0xe9
     assert_eq!(
