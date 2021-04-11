@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct TestData {
     pub protocol: String,
+    pub repeats: i64,
     pub params: Vec<Param>,
     pub render: Vec<Vec<u32>>,
 }
@@ -34,13 +35,15 @@ fn go() {
 
         println!("testing {} irp {}", protocol.name, protocol.irp);
 
+        println!("repeats {}", test.repeats);
+
         for param in test.params {
             println!("{} = {}", param.name, param.value);
 
             vars.set(param.name, param.value as i64, 8);
         }
 
-        let f = render(&protocol.irp, vars, 0);
+        let f = render(&protocol.irp, vars, test.repeats);
 
         if compare_with_rounding(Ok(test.render[0].clone()), f) {
             println!("OK");
@@ -80,7 +83,7 @@ fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String
                 } else {
                     r[i] - l[i]
                 };
-                if diff > 1 {
+                if diff > 8 {
                     println!(
                         "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {} found {} expected {}",
                         l,

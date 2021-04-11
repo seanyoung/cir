@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct TestData {
     pub protocol: String,
     pub params: Vec<Param>,
+    pub repeats: u8,
     pub render: Vec<Vec<u32>>,
 }
 
@@ -16,11 +17,12 @@ pub struct Param {
     pub value: u64,
 }
 
-pub fn parse_output(protocol: String, input: &str) -> TestData {
+pub fn parse_output(protocol: String, repeats: u8, input: &str) -> TestData {
     let mut parser = output::PEG::new();
 
     let mut data = TestData {
         protocol,
+        repeats,
         params: Vec::new(),
         render: Vec::new(),
     };
