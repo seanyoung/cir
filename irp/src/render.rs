@@ -283,7 +283,11 @@ impl Unit {
     }
 }
 
-pub fn render(input: &str, mut vars: Vartable, repeats: i64) -> Result<Vec<u32>, String> {
+pub fn render(
+    input: &str,
+    mut vars: Vartable,
+    repeats: i64,
+) -> Result<(Option<i64>, Vec<u32>), String> {
     let irp = parse(input)?;
 
     for p in &irp.parameters {
@@ -344,7 +348,7 @@ pub fn render(input: &str, mut vars: Vartable, repeats: i64) -> Result<Vec<u32>,
         )?;
     }
 
-    Ok(out.raw)
+    Ok((irp.general_spec.carrier, out.raw))
 }
 
 fn eval_expression(

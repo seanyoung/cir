@@ -9,6 +9,7 @@ lrpeg = { git = "https://github.com/seanyoung/lrpeg", branch = "main" }
 
 [dependencies]
 irp = { path = "irp" }
+lirc = { path = "lirc" }
 clap = "2.33.0"
 toml = "0.5"
 serde_derive = { version = "1.0" }

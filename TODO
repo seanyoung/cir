@@ -1,0 +1,8 @@
+- Fix remaining irp render bugs
+- Finish off lirc sending (duty cycle, transmitters, others, verbose)
+- rc0 parsing etc
+- Start irp decoder
+- wasmtime bpf backend
+- Generate bpf decoder
+- Read keymaps (both formats!)
+- reading input and keys for testing

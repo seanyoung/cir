@@ -48,9 +48,9 @@ fn go() {
             vars.set(param.name, param.value as i64, 8);
         }
 
-        let f = render(&protocol.irp, vars, test.repeats);
+        let (_, f) = render(&protocol.irp, vars, test.repeats).unwrap();
 
-        if compare_with_rounding(Ok(test.render[0].clone()), f) {
+        if compare_with_rounding(test.render[0].clone(), f) {
             println!("OK");
         } else {
             println!("FAIL");
@@ -61,35 +61,33 @@ fn go() {
     println!("tests: {} fails: {}", total_tests, fails);
 }
 
-fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String>) -> bool {
+fn compare_with_rounding(l: Vec<u32>, r: Vec<u32>) -> bool {
     if l == r {
         return true;
     }
 
     let mut success = true;
 
-    match (&l, &r) {
-        (Ok(l), Ok(r)) => {
-            if l.len() != r.len() {
-                println!(
-                    "comparing:\n{:?} with\n{:?}\n have different lengths {} and {}",
-                    l,
-                    r,
-                    l.len(),
-                    r.len()
-                );
+    if l.len() != r.len() {
+        println!(
+            "comparing:\n{:?} with\n{:?}\n have different lengths {} and {}",
+            l,
+            r,
+            l.len(),
+            r.len()
+        );
 
-                success = false;
-            }
+        success = false;
+    }
 
-            for i in 0..std::cmp::min(l.len(), r.len()) {
-                let diff = if l[i] > r[i] {
-                    l[i] - r[i]
-                } else {
-                    r[i] - l[i]
-                };
-                if diff > 8 {
-                    println!(
+    for i in 0..std::cmp::min(l.len(), r.len()) {
+        let diff = if l[i] > r[i] {
+            l[i] - r[i]
+        } else {
+            r[i] - l[i]
+        };
+        if diff > 8 {
+            println!(
                         "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {} found {} expected {}",
                         l,
                         r,
@@ -98,12 +96,6 @@ fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String
                         l[i], r[i]
                     );
 
-                    success = false;
-                }
-            }
-        }
-        _ => {
-            println!("{:?} {:?}", l, r);
             success = false;
         }
     }
