@@ -100,3 +100,26 @@ fn parse_test() {
         Err("pronto hex should be at least 6 numbers long".to_string())
     );
 }
+
+impl Pronto {
+    pub fn render(&self, repeats: usize) -> Vec<u32> {
+        match self {
+            Pronto::LearnedModulated { intro, repeat, .. }
+            | Pronto::LearnedUnmodulated { intro, repeat } => {
+                let mut res: Vec<u32> = Vec::with_capacity(intro.len() + repeats * repeat.len());
+
+                for v in intro {
+                    res.push(*v as u32);
+                }
+
+                for _ in 0..repeats {
+                    for v in repeat {
+                        res.push(*v as u32);
+                    }
+                }
+
+                res
+            }
+        }
+    }
+}
