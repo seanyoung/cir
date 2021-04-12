@@ -37,6 +37,10 @@ fn go() {
 
         println!("repeats {}", test.repeats);
 
+        if test.repeats != 0 {
+            continue;
+        }
+
         for param in test.params {
             println!("{} = {}", param.name, param.value);
 

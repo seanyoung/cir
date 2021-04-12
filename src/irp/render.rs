@@ -235,7 +235,7 @@ impl Expression {
 
                 Ok((v, l))
             }
-            _ => panic!("not implement: {:?}", self),
+            _ => panic!("not implemented: {:?}", self),
         }
     }
 
@@ -286,17 +286,41 @@ impl Unit {
 pub fn render(input: &str, mut vars: Vartable, repeats: i64) -> Result<Vec<u32>, String> {
     let irp = parse(input)?;
 
-    for p in irp.parameters {
-        if !vars.is_defined(&p.name) {
-            match p.default {
-                Some(e) => {
-                    let (v, l) = e.eval(&vars)?;
+    for p in &irp.parameters {
+        let val = if let Ok((val, _)) = vars.get(&p.name) {
+            val
+        } else if let Some(e) = &p.default {
+            let (v, l) = e.eval(&vars)?;
 
-                    vars.set(p.name, v, l);
-                }
-                None => {
-                    return Err(format!("missing value for {}", p.name));
-                }
+            vars.set(p.name.to_owned(), v, l);
+
+            v
+        } else {
+            return Err(format!("missing value for {}", p.name));
+        };
+
+        let (min, _) = p.min.eval(&vars)?;
+        if val < min {
+            return Err(format!(
+                "{} is less than minimum value {} for parameter {}",
+                val, min, p.name
+            ));
+        }
+
+        let (max, _) = p.max.eval(&vars)?;
+        if val > max {
+            return Err(format!(
+                "{} is more than maximum value {} for parameter {}",
+                val, max, p.name
+            ));
+        }
+    }
+
+    // if parameters are defined, only allow parameters to be set
+    if !irp.parameters.is_empty() {
+        for name in vars.vars.keys() {
+            if !irp.parameters.iter().any(|p| &p.name == name) {
+                return Err(format!("no parameter called {}", name));
             }
         }
     }

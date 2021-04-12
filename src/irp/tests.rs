@@ -115,6 +115,86 @@ fn keeprite_ac() {
 }
 
 #[test]
+fn vars() {
+    let mut vars = Vartable::new();
+
+    vars.set("S".to_string(), 2, 8);
+    vars.set("F".to_string(), 0xe9, 8);
+
+    let res = render(
+        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
+        vars,
+        1,
+    );
+
+    assert_eq!(
+        res,
+        Err(String::from(
+            "2 is more than maximum value 1 for parameter S"
+        ))
+    );
+
+    let mut vars = Vartable::new();
+
+    vars.set("S".to_string(), 1, 8);
+    vars.set("F".to_string(), 0, 8);
+
+    let res = render(
+        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
+        vars,
+        1,
+    );
+
+    assert_eq!(
+        res,
+        Err(String::from(
+            "0 is less than minimum value 1 for parameter F"
+        ))
+    );
+
+    let mut vars = Vartable::new();
+
+    vars.set("S".to_string(), 1, 8);
+    vars.set("X".to_string(), 0, 8);
+
+    let res = render(
+        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
+        vars,
+        1,
+    );
+
+    assert_eq!(res, Err(String::from("missing value for F")));
+
+    let mut vars = Vartable::new();
+
+    vars.set("S".to_string(), 1, 8);
+    vars.set("F".to_string(), 2, 8);
+    vars.set("X".to_string(), 0, 8);
+
+    let res = render(
+        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
+        vars,
+        1,
+    );
+
+    assert_eq!(res, Err(String::from("no parameter called X")));
+
+    let mut vars = Vartable::new();
+
+    vars.set("S".to_string(), 1, 8);
+    vars.set("F".to_string(), 2, 8);
+    vars.set("X".to_string(), 0, 8);
+
+    let res = render(
+        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}",
+        vars,
+        1,
+    );
+
+    assert!(res.is_ok());
+}
+
+#[test]
 fn parse_all_of_them() {
     let protocols = read_protocols();
 
