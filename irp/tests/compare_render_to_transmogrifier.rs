@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize)]
 pub struct TestData {
@@ -14,8 +15,8 @@ pub struct Param {
     pub value: u64,
 }
 
-use ir_ctl::irp::render::{render, Vartable};
-use ir_ctl::protocols;
+use irp::protocols;
+use irp::render::{render, Vartable};
 
 #[test]
 fn go() {
@@ -23,7 +24,7 @@ fn go() {
     let data = std::fs::read_to_string("transmogrifier_test_data.json").unwrap();
 
     let testdata: Vec<TestData> = serde_json::from_str(&data).unwrap();
-    let protocols = protocols::read_protocols();
+    let protocols = protocols::read_protocols(&PathBuf::from("IrpProtocols.xml"));
 
     let mut fails = 0;
     let total_tests = testdata.len();

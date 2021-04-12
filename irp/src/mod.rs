@@ -2,6 +2,9 @@ use crate::num::Num;
 use std::str::FromStr;
 
 pub mod ast;
+mod mode2;
+mod pronto;
+mod rawir;
 pub mod render;
 
 #[cfg(test)]

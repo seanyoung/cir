@@ -2,6 +2,7 @@ use super::parse;
 use super::render::{render, Vartable};
 use crate::protocols::read_protocols;
 use crate::rawir;
+use std::path::PathBuf;
 
 #[test]
 fn test() {
@@ -196,7 +197,7 @@ fn vars() {
 
 #[test]
 fn parse_all_of_them() {
-    let protocols = read_protocols();
+    let protocols = read_protocols(&PathBuf::from("IrpProtocols.xml"));
 
     let mut broken = 0;
     let mut total = 0;

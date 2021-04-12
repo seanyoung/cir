@@ -1,8 +1,4 @@
-use ir_ctl::irp;
-use ir_ctl::keymap;
-use ir_ctl::mode2;
-use ir_ctl::pronto;
-use ir_ctl::rawir;
+mod keymap;
 
 use clap::{App, Arg, SubCommand};
 use std::fs;
@@ -77,7 +73,7 @@ fn main() {
             };
 
             match irp::render::render(i, vars, repeats) {
-                Ok(ir) => println!("{}", rawir::print_to_string(&ir)),
+                Ok(ir) => println!("{}", irp::rawir::print_to_string(&ir)),
                 Err(s) => eprintln!("error: {}", s),
             }
         }
@@ -88,19 +84,19 @@ fn main() {
             matches.value_of("INPUT").unwrap().to_string()
         };
         if matches.is_present("RAWIR") {
-            match rawir::parse(&arg) {
-                Ok(ir) => println!("{}", rawir::print_to_string(&ir)),
+            match irp::rawir::parse(&arg) {
+                Ok(ir) => println!("{}", irp::rawir::print_to_string(&ir)),
                 Err(s) => eprintln!("error: {}", s),
             }
         }
         if matches.is_present("MODE2") {
-            match mode2::parse(&arg) {
-                Ok(ir) => println!("{}", rawir::print_to_string(&ir)),
+            match irp::mode2::parse(&arg) {
+                Ok(ir) => println!("{}", irp::rawir::print_to_string(&ir)),
                 Err(s) => eprintln!("error: {}", s),
             }
         }
         if matches.is_present("PRONTO") {
-            match pronto::parse(&arg) {
+            match irp::pronto::parse(&arg) {
                 Ok(ir) => println!("{:?}", ir),
                 Err(s) => eprintln!("error: {}", s),
             }

@@ -1,5 +1,6 @@
 use quick_xml::de::from_str;
 use serde::Deserialize;
+use std::path::Path;
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Protocols {
@@ -13,8 +14,8 @@ pub struct Protocol {
 }
 
 #[allow(dead_code)]
-pub fn read_protocols() -> Vec<Protocol> {
-    let protocols_xml = std::fs::read_to_string("IrpProtocols.xml").expect("file not found!");
+pub fn read_protocols(path: &Path) -> Vec<Protocol> {
+    let protocols_xml = std::fs::read_to_string(path).expect("file not found!");
 
     let protocols: Protocols = from_str(&protocols_xml).expect("unexpected xml");
 
