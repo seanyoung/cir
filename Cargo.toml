@@ -1,11 +1,8 @@
 [package]
-name = "ir-ctl"
+name = "ir"
 version = "0.1.0"
 authors = ["Sean Young <sean@mess.org>"]
 edition = "2018"
-
-[build-dependencies]
-lrpeg = { git = "https://github.com/seanyoung/lrpeg", branch = "main" }
 
 [dependencies]
 irp = { path = "irp" }

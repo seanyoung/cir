@@ -1,8 +1,15 @@
-- Fix remaining irp render bugs
+- Fix remaining irp render bugs with repeats
 - Finish off lirc sending (duty cycle, transmitters, others, verbose)
+- render -> send/blast/transmit --only-print
 - rc0 parsing etc
 - Start irp decoder
 - wasmtime bpf backend
 - Generate bpf decoder
 - Read keymaps (both formats!)
 - reading input and keys for testing
+- Need ir-ctl and ir-keytable command line parsing
+- where to host?
+   - v4l-utils?
+   - already on github
+   - github issues is pretty good
+   - how can it be part of the distributions

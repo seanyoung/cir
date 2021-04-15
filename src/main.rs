@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 fn main() {
-    let matches = App::new("ir-ctl")
+    let matches = App::new("ir")
         .version("0.1")
         .author("Sean Young")
         .about("Linux Infrared Control")
