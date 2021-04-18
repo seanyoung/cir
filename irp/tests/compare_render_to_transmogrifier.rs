@@ -29,36 +29,32 @@ fn go() {
     let mut fails = 0;
     let total_tests = testdata.len();
 
-    for test in testdata {
+    for test in &testdata {
         let protocol = protocols.iter().find(|p| p.name == test.protocol).unwrap();
 
         let mut vars = Vartable::new();
 
-        println!("testing {} irp {}", protocol.name, protocol.irp);
-
-        println!("repeats {}", test.repeats);
-
-        if test.repeats != 0 {
-            continue;
-        }
-
-        for param in test.params {
-            println!("{} = {}", param.name, param.value);
-
-            vars.set(param.name, param.value as i64, 8);
+        for param in &test.params {
+            vars.set(param.name.to_owned(), param.value as i64, 8);
         }
 
         let (_, f) = render(&protocol.irp, vars, test.repeats).unwrap();
 
-        if compare_with_rounding(test.render[0].clone(), f) {
-            println!("OK");
-        } else {
-            println!("FAIL");
+        if !compare_with_rounding(test.render[0].clone(), f) {
+            println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
+
+            for param in &test.params {
+                println!("{} = {}", param.name, param.value);
+            }
+            println!("repeats {}", test.repeats);
+
             fails += 1;
         }
     }
 
     println!("tests: {} fails: {}", total_tests, fails);
+
+    assert_eq!(fails, 0);
 }
 
 fn compare_with_rounding(l: Vec<u32>, r: Vec<u32>) -> bool {
@@ -86,7 +82,8 @@ fn compare_with_rounding(l: Vec<u32>, r: Vec<u32>) -> bool {
         } else {
             r[i] - l[i]
         };
-        if diff > 8 {
+        // is the difference more than 8 and more than 1 promille
+        if diff > 8 && (diff * 1000 / l[i]) > 0 {
             println!(
                         "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {} found {} expected {}",
                         l,

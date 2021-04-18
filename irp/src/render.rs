@@ -379,7 +379,14 @@ fn eval_expression(
         }
         Expression::Stream(stream) => {
             let (indefinite, count) = match stream.repeat {
-                None => (1, 0),
+                None => {
+                    // If a stream starts with variation, then it is implicitly repeating
+                    if let Expression::Variation(_) = &stream.stream[0] {
+                        (1, repeats)
+                    } else {
+                        (1, 0)
+                    }
+                }
                 Some(RepeatMarker::Any) => (0, repeats),
                 Some(RepeatMarker::Count(num)) => (num, 0),
                 Some(RepeatMarker::OneOrMore) => (1, repeats),
