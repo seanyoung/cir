@@ -2,6 +2,7 @@ use super::ast::*;
 use super::parse;
 
 use bitintr::Popcnt;
+use bitvec::prelude::*;
 use std::collections::HashMap;
 
 // Here we parse an irp lang
@@ -421,9 +422,8 @@ fn eval_stream(
     gs: &GeneralSpec,
     repeats: i64,
     alternative: usize,
-) -> Result<(), String> {
-    let mut bit_stream = 0;
-    let mut bit_stream_length: u32 = 0;
+) -> Result<BitVec<LocalBits>, String> {
+    let mut res = BitVec::<LocalBits, usize>::new();
 
     out.push_extent_marker();
 
@@ -434,63 +434,96 @@ fn eval_stream(
             if alternative.is_empty() {
                 break;
             }
+
             for expr in alternative {
                 eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
             }
         } else if expr.is_stream() {
-            if bit_stream_length != 0 {
-                return Err(format!(
-                    "{} bits left in stream when non bit expression encountered",
-                    bit_stream_length
-                ));
-            }
+            flush_bit_stream(&mut res, bit_spec, out, vars, gs, repeats)?;
 
             eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
         } else {
             let (bits, length) = expr.eval(&vars)?;
 
-            bit_stream = (bit_stream << length) | bits;
+            let mut bv = BitVec::<LocalBits, usize>::from_element(bits as usize);
 
-            bit_stream_length += length as u32;
+            bv.truncate(length as usize);
 
-            let len = bit_spec.len();
-            // 2 => 1, 4 => 2, 8 => 3, 16 => 4
-            let bits_step = len.trailing_zeros();
-
-            debug_assert_eq!(1 << bits_step, len);
+            bv.reverse();
 
             if gs.lsb {
-                let limit = bit_stream_length & !(bits_step as u32 - 1);
-
-                for _ in (0..limit).step_by(bits_step as usize) {
-                    if let Expression::List(v) = &bit_spec[bit_stream as usize & (len - 1)] {
-                        for expr in v {
-                            eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
-                        }
-                    }
-
-                    bit_stream >>= bits_step;
-                    bit_stream_length -= bits_step;
-                }
+                bv.append(&mut res);
+                res = bv;
             } else {
-                let start = bit_stream_length & (bits_step as u32 - 1);
+                res.append(&mut bv);
+            }
+        }
+    }
 
-                for i in (start..bit_stream_length).step_by(bits_step as usize).rev() {
-                    let w = bit_stream >> i;
+    flush_bit_stream(&mut res, bit_spec, out, vars, gs, repeats)?;
 
-                    if let Expression::List(v) = &bit_spec[w as usize & (len - 1)] {
-                        for expr in v {
-                            eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
-                        }
-                    }
+    out.pop_extend_marker();
 
-                    bit_stream &= (1 << (i as i64)) - 1;
-                    bit_stream_length -= bits_step;
+    Ok(res)
+}
+
+fn flush_bit_stream(
+    res: &mut BitVec<LocalBits, usize>,
+    bit_spec: &[Expression],
+    out: &mut Output,
+    vars: &mut Vartable,
+    gs: &GeneralSpec,
+    repeats: i64,
+) -> Result<(), String> {
+    let len = bit_spec.len();
+    // 2 => 1, 4 => 2, 8 => 3, 16 => 4
+    let bits_step = len.trailing_zeros();
+
+    if (res.len() % bits_step as usize) != 0 {
+        return Err(format!(
+            "{} bits found, not multiple of {}",
+            res.len(),
+            bits_step
+        ));
+    }
+
+    debug_assert_eq!(1 << bits_step, len);
+
+    if !gs.lsb {
+        for bit in res.chunks(bits_step as usize) {
+            let bit = bit_to_usize(bit);
+
+            if let Expression::List(v) = &bit_spec[bit] {
+                for expr in v {
+                    eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
+                }
+            }
+        }
+    } else {
+        for bit in res.chunks(bits_step as usize).rev() {
+            let bit = bit_to_usize(bit);
+
+            if let Expression::List(v) = &bit_spec[bit] {
+                for expr in v {
+                    eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
                 }
             }
         }
     }
-    out.pop_extend_marker();
+
+    res.truncate(0);
 
     Ok(())
+}
+
+fn bit_to_usize(bit: &BitSlice) -> usize {
+    let mut v = 0;
+
+    for i in 0..bit.len() {
+        if bit[i] {
+            v |= 1 << (bit.len() - 1 - i);
+        }
+    }
+
+    v
 }

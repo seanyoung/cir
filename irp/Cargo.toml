@@ -18,3 +18,4 @@ quick-xml = { version = "0.22.0", features = [ "serialize" ] }
 unicode-xid = "0.2"
 serde_json = "1.0"
 rand = "0.8"
+bitvec = "0.22"
