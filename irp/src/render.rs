@@ -40,10 +40,16 @@ impl Vartable {
 }
 
 struct Output<'a> {
-    #[allow(dead_code)]
     general_spec: &'a GeneralSpec,
     raw: Vec<u32>,
-    extent_marker: Vec<u32>,
+    total: i64,
+    extent_marker: Vec<i64>,
+    levels: Vec<BitspecLevel<'a>>,
+}
+
+struct BitspecLevel<'a> {
+    bit_spec: &'a [Expression],
+    res: BitVec<LocalBits, usize>,
 }
 
 impl<'a> Output<'a> {
@@ -51,12 +57,14 @@ impl<'a> Output<'a> {
         Self {
             general_spec: gs,
             raw: Vec::new(),
+            total: 0,
             extent_marker: Vec::new(),
+            levels: Vec::new(),
         }
     }
 
     fn push_extent_marker(&mut self) {
-        self.extent_marker.push(0);
+        self.extent_marker.push(self.total);
     }
 
     fn pop_extend_marker(&mut self) {
@@ -66,7 +74,8 @@ impl<'a> Output<'a> {
     fn add_flash(&mut self, n: i64) {
         assert!(n > 0);
 
-        *self.extent_marker.last_mut().unwrap() += n as u32;
+        self.total += n;
+
         if (self.raw.len() % 2) == 1 {
             *self.raw.last_mut().unwrap() += n as u32;
         } else {
@@ -74,10 +83,105 @@ impl<'a> Output<'a> {
         }
     }
 
+    fn add_bits(&mut self, bits: i64, length: u8, level: Option<usize>) -> Result<(), String> {
+        match level {
+            Some(level) => {
+                let mut bv = BitVec::<LocalBits, usize>::from_element(bits as usize);
+
+                bv.truncate(length as usize);
+
+                bv.reverse();
+
+                let level = &mut self.levels[level];
+
+                if self.general_spec.lsb {
+                    bv.append(&mut level.res);
+                    level.res = bv;
+                } else {
+                    level.res.append(&mut bv);
+                }
+
+                Ok(())
+            }
+            None => Err(String::from("bits not permitted")),
+        }
+    }
+
+    fn push_bitspec(&mut self, bit_spec: &'a [Expression]) {
+        self.levels.push(BitspecLevel {
+            bit_spec,
+            res: BitVec::new(),
+        })
+    }
+
+    fn flush_level(&mut self, level: Option<usize>, vars: &mut Vartable) -> Result<(), String> {
+        let level = match level {
+            Some(level) => level,
+            None => {
+                return Ok(());
+            }
+        };
+
+        let x = &self.levels[level];
+
+        let lower_level = if level > 0 { Some(level - 1) } else { None };
+
+        if x.res.is_empty() {
+            self.flush_level(lower_level, vars)?;
+
+            return Ok(());
+        }
+
+        let mut bits = BitVec::new();
+
+        std::mem::swap(&mut bits, &mut self.levels[level].res);
+
+        let len = self.levels[level].bit_spec.len();
+        // 2 => 1, 4 => 2, 8 => 3, 16 => 4
+        let bits_step = len.trailing_zeros();
+
+        if (bits.len() % bits_step as usize) != 0 {
+            return Err(format!(
+                "{} bits found, not multiple of {}",
+                self.levels[level].res.len(),
+                bits_step
+            ));
+        }
+
+        debug_assert_eq!(1 << bits_step, len);
+
+        if !self.general_spec.lsb {
+            for bit in bits.chunks(bits_step as usize) {
+                let bit = bit_to_usize(bit);
+
+                if let Expression::List(v) = &self.levels[level].bit_spec[bit] {
+                    eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
+                }
+            }
+        } else {
+            for bit in bits.chunks(bits_step as usize).rev() {
+                let bit = bit_to_usize(bit);
+
+                if let Expression::List(v) = &self.levels[level].bit_spec[bit] {
+                    eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
+                }
+            }
+        }
+
+        self.flush_level(lower_level, vars)?;
+
+        Ok(())
+    }
+
+    fn pop_bitspec(&mut self) {
+        self.levels.pop();
+    }
+
     fn add_gap(&mut self, n: i64) {
         assert!(n > 0);
 
-        *self.extent_marker.last_mut().unwrap() += n as u32;
+        // Leading gaps must be added to the totals
+        self.total += n;
 
         let len = self.raw.len();
 
@@ -91,7 +195,7 @@ impl<'a> Output<'a> {
     }
 
     fn add_extend(&mut self, mut extent: i64) {
-        extent -= *self.extent_marker.last().unwrap() as i64;
+        extent -= self.total - *self.extent_marker.last().unwrap();
 
         if extent > 0 {
             self.add_gap(extent);
@@ -239,23 +343,6 @@ impl Expression {
             _ => panic!("not implemented: {:?}", self),
         }
     }
-
-    fn is_stream(&self) -> bool {
-        matches!(
-            self,
-            Expression::Number(_)
-                | Expression::Negative(_)
-                | Expression::FlashConstant(_, _)
-                | Expression::FlashIdentifier(_, _)
-                | Expression::GapConstant(_, _)
-                | Expression::GapIdentifier(_, _)
-                | Expression::ExtentConstant(_, _)
-                | Expression::ExtentIdentifier(_, _)
-                | Expression::Assignment(_, _)
-                | Expression::List(_)
-                | Expression::Stream(_)
-        )
-    }
 }
 
 impl Unit {
@@ -338,180 +425,145 @@ pub fn render(
 
     let mut out = Output::new(&irp.general_spec);
 
-    if let Expression::Stream(stream) = &irp.stream {
-        eval_expression(
-            &irp.stream,
-            &stream.bit_spec,
-            &mut out,
-            &mut vars,
-            &irp.general_spec,
-            repeats,
-        )?;
-    }
+    let stream = vec![irp.stream];
+
+    eval_stream(
+        &stream,
+        &mut out,
+        None,
+        &mut vars,
+        &irp.general_spec,
+        repeats,
+        0,
+    )?;
 
     Ok((irp.general_spec.carrier, out.raw))
 }
 
-fn eval_expression(
-    e: &Expression,
-    bit_spec: &[Expression],
-    out: &mut Output,
-    vars: &mut Vartable,
-    gs: &GeneralSpec,
-    repeats: i64,
-) -> Result<(), String> {
-    match e {
-        Expression::Number(v) => out.add_flash(Unit::Units.eval(*v, gs)?),
-        Expression::Negative(e) => match e.as_ref() {
-            Expression::Number(v) => out.add_gap(Unit::Units.eval(*v, gs)?),
-            Expression::FlashConstant(v, u) => out.add_gap(u.eval_float(*v, gs)?),
-            _ => unreachable!(),
-        },
-        Expression::FlashConstant(p, u) => out.add_flash(u.eval_float(*p, gs)?),
-        Expression::FlashIdentifier(id, u) => out.add_flash(u.eval(vars.get(id)?.0, gs)?),
-        Expression::ExtentConstant(p, u) => out.add_extend(u.eval_float(*p, gs)?),
-        Expression::ExtentIdentifier(id, u) => out.add_extend(u.eval(vars.get(id)?.0, gs)?),
-        Expression::GapConstant(p, u) => out.add_gap(u.eval_float(*p, gs)?),
-        Expression::GapIdentifier(id, u) => out.add_gap(u.eval(vars.get(id)?.0, gs)?),
-        Expression::Assignment(id, expr) => {
-            let (v, l) = expr.eval(&vars)?;
-
-            vars.set(id.to_string(), v, l);
-        }
-        Expression::Stream(stream) => {
-            let (indefinite, count) = match stream.repeat {
-                None => {
-                    // If a stream starts with variation, then it is implicitly repeating
-                    if let Expression::Variation(_) = &stream.stream[0] {
-                        (1, repeats)
-                    } else {
-                        (1, 0)
-                    }
-                }
-                Some(RepeatMarker::Any) => (0, repeats),
-                Some(RepeatMarker::Count(num)) => (num, 0),
-                Some(RepeatMarker::OneOrMore) => (1, repeats),
-                Some(RepeatMarker::CountOrMore(num)) => (num, repeats),
-            };
-
-            for _ in 0..indefinite {
-                eval_stream(&stream.stream, bit_spec, out, vars, gs, repeats, 0)?;
-            }
-
-            for _ in 0..count {
-                eval_stream(&stream.stream, bit_spec, out, vars, gs, repeats, 1)?;
-            }
-
-            if let Expression::Variation(list) = &stream.stream[0] {
-                if list.len() == 3 {
-                    eval_stream(&stream.stream, bit_spec, out, vars, gs, repeats, 2)?;
-                }
-            };
-        }
-        _ => unreachable!(),
-    }
-
-    Ok(())
-}
-
-fn eval_stream(
-    stream: &[Expression],
-    bit_spec: &[Expression],
-    out: &mut Output,
+fn eval_stream<'a>(
+    stream: &'a [Expression],
+    out: &mut Output<'a>,
+    level: Option<usize>,
     vars: &mut Vartable,
     gs: &GeneralSpec,
     repeats: i64,
     alternative: usize,
-) -> Result<BitVec<LocalBits>, String> {
-    let mut res = BitVec::<LocalBits, usize>::new();
-
-    out.push_extent_marker();
-
-    for expr in stream {
-        if let Expression::Variation(list) = expr {
-            let alternative = &list[alternative];
-
-            if alternative.is_empty() {
-                break;
-            }
-
-            for expr in alternative {
-                eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
-            }
-        } else if expr.is_stream() {
-            flush_bit_stream(&mut res, bit_spec, out, vars, gs, repeats)?;
-
-            eval_expression(expr, bit_spec, out, vars, gs, repeats)?;
-        } else {
-            let (bits, length) = expr.eval(&vars)?;
-
-            let mut bv = BitVec::<LocalBits, usize>::from_element(bits as usize);
-
-            bv.truncate(length as usize);
-
-            bv.reverse();
-
-            if gs.lsb {
-                bv.append(&mut res);
-                res = bv;
-            } else {
-                res.append(&mut bv);
-            }
-        }
-    }
-
-    flush_bit_stream(&mut res, bit_spec, out, vars, gs, repeats)?;
-
-    out.pop_extend_marker();
-
-    Ok(res)
-}
-
-fn flush_bit_stream(
-    res: &mut BitVec<LocalBits, usize>,
-    bit_spec: &[Expression],
-    out: &mut Output,
-    vars: &mut Vartable,
-    gs: &GeneralSpec,
-    repeats: i64,
 ) -> Result<(), String> {
-    let len = bit_spec.len();
-    // 2 => 1, 4 => 2, 8 => 3, 16 => 4
-    let bits_step = len.trailing_zeros();
+    for expr in stream {
+        match expr {
+            Expression::Number(v) => {
+                out.flush_level(level, vars)?;
 
-    if (res.len() % bits_step as usize) != 0 {
-        return Err(format!(
-            "{} bits found, not multiple of {}",
-            res.len(),
-            bits_step
-        ));
-    }
-
-    debug_assert_eq!(1 << bits_step, len);
-
-    if !gs.lsb {
-        for bit in res.chunks(bits_step as usize) {
-            let bit = bit_to_usize(bit);
-
-            if let Expression::List(v) = &bit_spec[bit] {
-                for expr in v {
-                    eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
+                out.add_flash(Unit::Units.eval(*v, gs)?);
+            }
+            Expression::Negative(e) => {
+                out.flush_level(level, vars)?;
+                match e.as_ref() {
+                    Expression::Number(v) => out.add_gap(Unit::Units.eval(*v, gs)?),
+                    Expression::FlashConstant(v, u) => out.add_gap(u.eval_float(*v, gs)?),
+                    _ => unreachable!(),
                 }
             }
-        }
-    } else {
-        for bit in res.chunks(bits_step as usize).rev() {
-            let bit = bit_to_usize(bit);
+            Expression::FlashConstant(p, u) => {
+                out.flush_level(level, vars)?;
+                out.add_flash(u.eval_float(*p, gs)?);
+            }
+            Expression::FlashIdentifier(id, u) => {
+                out.flush_level(level, vars)?;
+                out.add_flash(u.eval(vars.get(id)?.0, gs)?);
+            }
+            Expression::ExtentConstant(p, u) => {
+                out.flush_level(level, vars)?;
+                out.add_extend(u.eval_float(*p, gs)?);
+            }
+            Expression::ExtentIdentifier(id, u) => {
+                out.flush_level(level, vars)?;
+                out.add_extend(u.eval(vars.get(id)?.0, gs)?);
+            }
+            Expression::GapConstant(p, u) => {
+                out.flush_level(level, vars)?;
+                out.add_gap(u.eval_float(*p, gs)?);
+            }
+            Expression::GapIdentifier(id, u) => {
+                out.flush_level(level, vars)?;
+                out.add_gap(u.eval(vars.get(id)?.0, gs)?);
+            }
+            Expression::Assignment(id, expr) => {
+                out.flush_level(level, vars)?;
 
-            if let Expression::List(v) = &bit_spec[bit] {
-                for expr in v {
-                    eval_expression(&expr, bit_spec, out, vars, gs, repeats)?;
+                let (v, l) = expr.eval(&vars)?;
+
+                vars.set(id.to_string(), v, l);
+            }
+            Expression::Stream(stream) => {
+                let (indefinite, count) = match stream.repeat {
+                    None => {
+                        // If a stream starts with variation, then it is implicitly repeating
+                        if let Expression::Variation(_) = &stream.stream[0] {
+                            (1, repeats)
+                        } else {
+                            (1, 0)
+                        }
+                    }
+                    Some(RepeatMarker::Any) => (0, repeats),
+                    Some(RepeatMarker::Count(num)) => (num, 0),
+                    Some(RepeatMarker::OneOrMore) => (1, repeats),
+                    Some(RepeatMarker::CountOrMore(num)) => (num, repeats),
+                };
+
+                let level = if !stream.bit_spec.is_empty() {
+                    out.push_bitspec(&stream.bit_spec);
+
+                    match level {
+                        None => Some(0),
+                        Some(level) => Some(level + 1),
+                    }
+                } else {
+                    level
+                };
+
+                for _ in 0..indefinite {
+                    out.push_extent_marker();
+                    eval_stream(&stream.stream, out, level, vars, gs, repeats, 0)?;
+                    out.pop_extend_marker();
                 }
+
+                for _ in 0..count {
+                    out.push_extent_marker();
+                    eval_stream(&stream.stream, out, level, vars, gs, repeats, 1)?;
+                    out.pop_extend_marker();
+                }
+
+                if let Expression::Variation(list) = &stream.stream[0] {
+                    if list.len() == 3 {
+                        out.push_extent_marker();
+                        eval_stream(&stream.stream, out, level, vars, gs, repeats, 2)?;
+                        out.pop_extend_marker();
+                    }
+                }
+
+                if !stream.bit_spec.is_empty() {
+                    out.pop_bitspec();
+                }
+            }
+            Expression::Variation(list) => {
+                let variation = &list[alternative];
+
+                if variation.is_empty() {
+                    break;
+                }
+
+                eval_stream(variation, out, level, vars, gs, repeats, alternative)?;
+            }
+            _ => {
+                let (bits, length) = expr.eval(&vars)?;
+
+                out.add_bits(bits, length, level)?;
             }
         }
     }
 
-    res.truncate(0);
+    out.flush_level(level, vars)?;
 
     Ok(())
 }
