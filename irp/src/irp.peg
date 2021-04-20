@@ -1,6 +1,6 @@
 irp <- general_spec bitspec_irstream definitions* parameter_specs? EOI;
 
-general_spec <- ws "{" ws general_item ("," ws general_item)* "}" ws;
+general_spec <- ws "{" (ws general_item ("," ws general_item)*)? "}" ws;
 
 general_item <- "msb" ws
     / "lsb" ws

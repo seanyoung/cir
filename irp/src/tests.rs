@@ -118,6 +118,29 @@ fn keeprite_ac() {
 }
 
 #[test]
+fn variants() {
+    let res = encode("{}<1,-1|1,-3>([11][22][33],-100)+", Vartable::new(), 1).unwrap();
+
+    assert_eq!(res.raw, rawir::parse("+11 -100 +22 -100 +33 -100").unwrap());
+
+    let res = encode("{}<1,-1|1,-3>([11][22][33],-100)+", Vartable::new(), 1).unwrap();
+
+    assert_eq!(res.raw, rawir::parse("+11 -100 +22 -100 +33 -100").unwrap());
+
+    let res = encode(
+        "{}<1,-1|1,-3>(111,-222,[11][][33],-100)+",
+        Vartable::new(),
+        1,
+    )
+    .unwrap();
+
+    assert_eq!(
+        res.raw,
+        rawir::parse("+111 -222 +11 -100 +111 -222 +111 -222 +33 -100").unwrap()
+    );
+}
+
+#[test]
 fn vars() {
     let mut vars = Vartable::new();
 

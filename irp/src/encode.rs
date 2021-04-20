@@ -517,10 +517,22 @@ fn eval_stream<'a>(
                 vars.set(id.to_string(), v, l);
             }
             Expression::Stream(stream) => {
+                let variant_count = stream
+                    .stream
+                    .iter()
+                    .filter_map(|e| {
+                        if let Expression::Variation(list) = e {
+                            Some(list.len())
+                        } else {
+                            None
+                        }
+                    })
+                    .max();
+
                 let (indefinite, count) = match stream.repeat {
                     None => {
                         // If a stream starts with variation, then it is implicitly repeating
-                        if let Expression::Variation(_) = &stream.stream[0] {
+                        if variant_count.is_some() {
                             (1, repeats)
                         } else {
                             (1, 0)
@@ -555,12 +567,10 @@ fn eval_stream<'a>(
                     encoder.pop_extend_marker();
                 }
 
-                if let Expression::Variation(list) = &stream.stream[0] {
-                    if list.len() == 3 {
-                        encoder.push_extent_marker();
-                        eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 2)?;
-                        encoder.pop_extend_marker();
-                    }
+                if variant_count == Some(3) {
+                    encoder.push_extent_marker();
+                    eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 2)?;
+                    encoder.pop_extend_marker();
                 }
 
                 if !stream.bit_spec.is_empty() {
