@@ -1,8 +1,11 @@
+use super::Message;
+
 /// parse pulse/space type input. This format is produces by lirc's mode2 tool.
 /// Some lirc drivers sometimes produce consecutive pulses or spaces, rather
 /// than alternating. These have to be folded.
-pub fn parse(s: &str) -> Result<Vec<u32>, String> {
+pub fn parse(s: &str) -> Result<Message, String> {
     let mut res = Vec::new();
+    let mut carrier = None;
 
     for line in s.lines() {
         let mut words = line.split_whitespace();
@@ -11,6 +14,35 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
             Some("pulse") => true,
             Some("space") => false,
             Some("timeout") => false,
+            Some("carrier") => {
+                match words.next() {
+                    Some(w) => match i64::from_str_radix(w, 10) {
+                        Ok(c) => {
+                            if carrier.is_some() && carrier != Some(c) {
+                                return Err(String::from("carrier specified more than once"));
+                            }
+
+                            if c < 0 {
+                                return Err(format!("negative carrier {} does not make sense", c));
+                            }
+
+                            carrier = Some(c);
+                        }
+                        Err(_) => {
+                            return Err(format!("carrier argument ‘{}’ is not a number", w));
+                        }
+                    },
+                    None => return Err(String::from("missing carrier value")),
+                }
+
+                if let Some(w) = words.next() {
+                    if !w.starts_with('#') && !w.starts_with("//") {
+                        return Err(format!("unexpected ‘{}’", w));
+                    }
+                }
+
+                continue;
+            }
             Some(w) => {
                 if !w.starts_with('#') && !w.starts_with("//") {
                     return Err(format!("unexpected ‘{}’", w));
@@ -67,45 +99,70 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
         return Err("missing pulse".to_string());
     }
 
-    Ok(res)
+    Ok(Message {
+        duty_cycle: None,
+        carrier,
+        raw: res,
+    })
 }
 
 #[test]
 fn test_parse() {
-    assert_eq!(parse(""), Err("missing pulse".to_string()));
-    assert_eq!(parse("pulse 0"), Err("nonsensical 0 duration".to_string()));
-    assert_eq!(parse("pulse"), Err("missing duration".to_string()));
+    assert_eq!(parse("").err(), Some("missing pulse".to_string()));
     assert_eq!(
-        parse("pulse abc"),
-        Err("invalid duration ‘abc’".to_string())
+        parse("pulse 0").err(),
+        Some("nonsensical 0 duration".to_string())
     );
-    assert_eq!(parse("pulse 1\npulse 2"), Ok(vec!(3u32)));
+    assert_eq!(parse("pulse").err(), Some("missing duration".to_string()));
     assert_eq!(
-        parse("space 1\r\nspace 2\npulse 1\npulse 2"),
-        Ok(vec!(3u32))
+        parse("pulse abc").err(),
+        Some("invalid duration ‘abc’".to_string())
     );
+    assert_eq!(parse("pulse 1\npulse 2").unwrap().raw, vec!(3u32));
     assert_eq!(
-        parse("pulse 100\npulse 21\nspace 10\nspace 50"),
-        Ok(vec!(121u32, 60u32))
-    );
-    assert_eq!(
-        parse("polse 100\nspace 10\nspace 50"),
-        Err("unexpected ‘polse’".to_string())
+        parse("space 1\r\nspace 2\npulse 1\npulse 2").unwrap().raw,
+        vec!(3u32)
     );
     assert_eq!(
-        parse("pulse 100\nspace 10\npulse 50"),
-        Ok(vec!(100u32, 10u32, 50u32))
+        parse("pulse 100\npulse 21\nspace 10\nspace 50")
+            .unwrap()
+            .raw,
+        vec!(121u32, 60u32)
     );
     assert_eq!(
-        parse("pulse 100\nspace 10\npulse 50\nspace 34134134"),
-        Err("duration ‘34134134’ too long".to_string())
+        parse("polse 100\nspace 10\nspace 50").err(),
+        Some("unexpected ‘polse’".to_string())
     );
     assert_eq!(
-        parse("pulse 100\nspace 10\npulse 50 foobar\nspace 34134134"),
-        Err("unexpected ‘foobar’".to_string())
+        parse("pulse 100\nspace 10\npulse 50").unwrap().raw,
+        vec!(100u32, 10u32, 50u32)
     );
     assert_eq!(
-        parse("pulse 100\nspace 10\npulse 50\ntimeout 100000"),
-        Ok(vec!(100u32, 10u32, 50u32, 100000u32))
+        parse("pulse 100\nspace 10\npulse 50\nspace 34134134").err(),
+        Some("duration ‘34134134’ too long".to_string())
+    );
+    assert_eq!(
+        parse("pulse 100\nspace 10\npulse 50 foobar\nspace 34134134").err(),
+        Some("unexpected ‘foobar’".to_string())
+    );
+    assert_eq!(
+        parse("pulse 100\nspace 10\ncarrier foobar\nspace 34134134").err(),
+        Some("carrier argument ‘foobar’ is not a number".to_string())
+    );
+    assert_eq!(
+        parse("pulse 100\nspace 10\ncarrier\nspace 34134134").err(),
+        Some("missing carrier value".to_string())
+    );
+    assert_eq!(
+        parse("pulse 100\nspace 10\ncarrier 500 x\nspace 34134134").err(),
+        Some("unexpected ‘x’".to_string())
+    );
+    assert_eq!(
+        parse("pulse 100\nspace 10\npulse 50\ncarrier 500 // hiya\ntimeout 100000").unwrap(),
+        Message {
+            carrier: Some(500),
+            duty_cycle: None,
+            raw: vec!(100u32, 10u32, 50u32, 100000u32)
+        }
     );
 }

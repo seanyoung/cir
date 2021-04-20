@@ -1,6 +1,5 @@
-- Fix remaining irp render bugs with repeats
 - Finish off lirc sending (duty cycle, transmitters, others, verbose)
-- render -> send/blast/transmit --only-print
+- ir encode/send needs to read xml file
 - rc0 parsing etc
 - Start irp decoder
 - wasmtime bpf backend

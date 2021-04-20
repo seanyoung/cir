@@ -1,11 +1,84 @@
 use super::ast::*;
-use super::parse;
+use super::parser::parse;
+use super::Message;
 
 use bitintr::Popcnt;
 use bitvec::prelude::*;
 use std::collections::HashMap;
 
-// Here we parse an irp lang
+/// Parse an IRP expression and encode it to raw IR with the given variables
+pub fn encode(input: &str, mut vars: Vartable, repeats: i64) -> Result<Message, String> {
+    let irp = parse(input)?;
+
+    for p in &irp.parameters {
+        let val = if let Ok((val, _)) = vars.get(&p.name) {
+            val
+        } else if let Some(e) = &p.default {
+            let (v, l) = e.eval(&vars)?;
+
+            vars.set(p.name.to_owned(), v, l);
+
+            v
+        } else {
+            return Err(format!("missing value for {}", p.name));
+        };
+
+        let (min, _) = p.min.eval(&vars)?;
+        if val < min {
+            return Err(format!(
+                "{} is less than minimum value {} for parameter {}",
+                val, min, p.name
+            ));
+        }
+
+        let (max, _) = p.max.eval(&vars)?;
+        if val > max {
+            return Err(format!(
+                "{} is more than maximum value {} for parameter {}",
+                val, max, p.name
+            ));
+        }
+    }
+
+    // if parameters are defined, only allow parameters to be set
+    if !irp.parameters.is_empty() {
+        for name in vars.vars.keys() {
+            if !irp.parameters.iter().any(|p| &p.name == name) {
+                return Err(format!("no parameter called {}", name));
+            }
+        }
+    }
+
+    for e in irp.definitions {
+        if let Expression::Assignment(name, expr) = e {
+            vars.set_definition(name, *expr);
+        } else {
+            panic!("definition not correct expression: {:?}", e);
+        }
+    }
+
+    let mut encoder = Encoder::new(&irp.general_spec);
+
+    let stream = vec![irp.stream];
+
+    eval_stream(
+        &stream,
+        &mut encoder,
+        None,
+        &mut vars,
+        &irp.general_spec,
+        repeats,
+        0,
+    )?;
+
+    Ok(Message {
+        carrier: irp.general_spec.carrier,
+        duty_cycle: irp.general_spec.duty_cycle,
+        raw: encoder.raw,
+    })
+}
+
+/// During IRP evaluation, variables may change their value
 #[derive(Default)]
 pub struct Vartable {
     vars: HashMap<String, (i64, u8, Option<Expression>)>,
@@ -18,7 +91,8 @@ impl Vartable {
         }
     }
 
-    pub fn set_definition(&mut self, name: String, expr: Expression) {
+    /// IRP definitions are evaluated each time when they are referenced
+    fn set_definition(&mut self, name: String, expr: Expression) {
         self.vars.insert(name, (0, 0, Some(expr)));
     }
 
@@ -39,50 +113,91 @@ impl Vartable {
     }
 }
 
-struct Output<'a> {
+/// Encoder. This can be used to add flash, gap, extents and deals with nested bitspec scopes.
+struct Encoder<'a> {
+    /// Reference to general spec for lsb/msb etc
     general_spec: &'a GeneralSpec,
+    /// Raw output. Even entries are flash, odd are spaces
     raw: Vec<u32>,
-    total: i64,
+    /// Length of IR generated, including leading space
+    total_length: i64,
+    /// Extents start from this point
     extent_marker: Vec<i64>,
-    levels: Vec<BitspecLevel<'a>>,
+    /// Nested bitspec scopes
+    bitspec_scope: Vec<BitspecScope<'a>>,
 }
 
-struct BitspecLevel<'a> {
+/// A single bitscope
+struct BitspecScope<'a> {
+    /// The bitspec itself
     bit_spec: &'a [Expression],
-    res: BitVec<LocalBits, usize>,
+    /// The bitstream. This will be populated bit by bit, and then flushed.
+    bitstream: BitVec<LocalBits, usize>,
 }
 
-impl<'a> Output<'a> {
+impl<'a> Encoder<'a> {
+    /// Create a new encoder. One is needed per IRP encode.
     fn new(gs: &'a GeneralSpec) -> Self {
-        Self {
+        Encoder {
             general_spec: gs,
             raw: Vec::new(),
-            total: 0,
+            total_length: 0,
             extent_marker: Vec::new(),
-            levels: Vec::new(),
+            bitspec_scope: Vec::new(),
         }
     }
 
+    /// When we enter an IR stream, we should mark reference point for extents
     fn push_extent_marker(&mut self) {
-        self.extent_marker.push(self.total);
+        self.extent_marker.push(self.total_length);
     }
 
+    /// When we are done with an IR stream, the last extent reference point is no longer needed
     fn pop_extend_marker(&mut self) {
         self.extent_marker.pop();
     }
 
-    fn add_flash(&mut self, n: i64) {
-        assert!(n > 0);
+    /// Add a flash of length microseconds
+    fn add_flash(&mut self, length: i64) {
+        assert!(length > 0);
 
-        self.total += n;
+        self.total_length += length;
 
         if (self.raw.len() % 2) == 1 {
-            *self.raw.last_mut().unwrap() += n as u32;
+            *self.raw.last_mut().unwrap() += length as u32;
         } else {
-            self.raw.push(n as u32);
+            self.raw.push(length as u32);
         }
     }
 
+    /// Add a gap of length microseconds
+    fn add_gap(&mut self, length: i64) {
+        assert!(length > 0);
+
+        // Leading gaps must be added to the totals
+        self.total_length += length;
+
+        let len = self.raw.len();
+
+        if len == 0 {
+            // ignore leading gaps
+        } else if (len % 2) == 0 {
+            *self.raw.last_mut().unwrap() += length as u32;
+        } else {
+            self.raw.push(length as u32);
+        }
+    }
+
+    /// Add an extent.
+    fn add_extend(&mut self, mut extent: i64) {
+        extent -= self.total_length - *self.extent_marker.last().unwrap();
+
+        if extent > 0 {
+            self.add_gap(extent);
+        }
+    }
+
+    /// Add some bits after evaluating a bitfield.
     fn add_bits(&mut self, bits: i64, length: u8, level: Option<usize>) -> Result<(), String> {
         match level {
             Some(level) => {
@@ -92,13 +207,13 @@ impl<'a> Output<'a> {
 
                 bv.reverse();
 
-                let level = &mut self.levels[level];
+                let level = &mut self.bitspec_scope[level];
 
                 if self.general_spec.lsb {
-                    bv.append(&mut level.res);
-                    level.res = bv;
+                    bv.append(&mut level.bitstream);
+                    level.bitstream = bv;
                 } else {
-                    level.res.append(&mut bv);
+                    level.bitstream.append(&mut bv);
                 }
 
                 Ok(())
@@ -107,13 +222,20 @@ impl<'a> Output<'a> {
         }
     }
 
-    fn push_bitspec(&mut self, bit_spec: &'a [Expression]) {
-        self.levels.push(BitspecLevel {
+    /// When entering an IR stream with a bitspec, enter a new scope
+    fn enter_bitspec_scope(&mut self, bit_spec: &'a [Expression]) {
+        self.bitspec_scope.push(BitspecScope {
             bit_spec,
-            res: BitVec::new(),
+            bitstream: BitVec::new(),
         })
     }
 
+    /// When leaving an IR stream with a bitspec, leave this scope
+    fn leave_bitspec_scope(&mut self) {
+        self.bitspec_scope.pop();
+    }
+
+    /// Flush the bitstream for a bitspec scope, which should recurse all the way down the scopes
     fn flush_level(&mut self, level: Option<usize>, vars: &mut Vartable) -> Result<(), String> {
         let level = match level {
             Some(level) => level,
@@ -122,48 +244,44 @@ impl<'a> Output<'a> {
             }
         };
 
-        let x = &self.levels[level];
-
         let lower_level = if level > 0 { Some(level - 1) } else { None };
 
-        if x.res.is_empty() {
-            self.flush_level(lower_level, vars)?;
+        if !self.bitspec_scope[level].bitstream.is_empty() {
+            let mut bits = BitVec::new();
 
-            return Ok(());
-        }
+            // Swap in a new empty bitvec, we will consume the enter stream and then we
+            // don't need a mutable reference.
+            std::mem::swap(&mut bits, &mut self.bitspec_scope[level].bitstream);
 
-        let mut bits = BitVec::new();
+            let len = self.bitspec_scope[level].bit_spec.len();
+            // 2 => 1, 4 => 2, 8 => 3, 16 => 4
+            let bits_step = len.trailing_zeros();
 
-        std::mem::swap(&mut bits, &mut self.levels[level].res);
-
-        let len = self.levels[level].bit_spec.len();
-        // 2 => 1, 4 => 2, 8 => 3, 16 => 4
-        let bits_step = len.trailing_zeros();
-
-        if (bits.len() % bits_step as usize) != 0 {
-            return Err(format!(
-                "{} bits found, not multiple of {}",
-                self.levels[level].res.len(),
-                bits_step
-            ));
-        }
-
-        debug_assert_eq!(1 << bits_step, len);
-
-        if !self.general_spec.lsb {
-            for bit in bits.chunks(bits_step as usize) {
-                let bit = bit_to_usize(bit);
-
-                if let Expression::List(v) = &self.levels[level].bit_spec[bit] {
-                    eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
-                }
+            if (bits.len() % bits_step as usize) != 0 {
+                return Err(format!(
+                    "{} bits found, not multiple of {}",
+                    self.bitspec_scope[level].bitstream.len(),
+                    bits_step
+                ));
             }
-        } else {
-            for bit in bits.chunks(bits_step as usize).rev() {
-                let bit = bit_to_usize(bit);
 
-                if let Expression::List(v) = &self.levels[level].bit_spec[bit] {
-                    eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
+            debug_assert_eq!(1 << bits_step, len);
+
+            if !self.general_spec.lsb {
+                for bit in bits.chunks(bits_step as usize) {
+                    let bit = bit_to_usize(bit);
+
+                    if let Expression::List(v) = &self.bitspec_scope[level].bit_spec[bit] {
+                        eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
+                    }
+                }
+            } else {
+                for bit in bits.chunks(bits_step as usize).rev() {
+                    let bit = bit_to_usize(bit);
+
+                    if let Expression::List(v) = &self.bitspec_scope[level].bit_spec[bit] {
+                        eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
+                    }
                 }
             }
         }
@@ -172,38 +290,10 @@ impl<'a> Output<'a> {
 
         Ok(())
     }
-
-    fn pop_bitspec(&mut self) {
-        self.levels.pop();
-    }
-
-    fn add_gap(&mut self, n: i64) {
-        assert!(n > 0);
-
-        // Leading gaps must be added to the totals
-        self.total += n;
-
-        let len = self.raw.len();
-
-        if len == 0 {
-            // ignore leading gaps
-        } else if (len % 2) == 0 {
-            *self.raw.last_mut().unwrap() += n as u32;
-        } else {
-            self.raw.push(n as u32);
-        }
-    }
-
-    fn add_extend(&mut self, mut extent: i64) {
-        extent -= self.total - *self.extent_marker.last().unwrap();
-
-        if extent > 0 {
-            self.add_gap(extent);
-        }
-    }
 }
 
 impl Expression {
+    /// Evaluate an arithmetic expression
     fn eval(&self, vars: &Vartable) -> Result<(i64, u8), String> {
         match self {
             Expression::Number(n) => Ok((*n, 64)),
@@ -371,78 +461,9 @@ impl Unit {
     }
 }
 
-pub fn render(
-    input: &str,
-    mut vars: Vartable,
-    repeats: i64,
-) -> Result<(Option<i64>, Vec<u32>), String> {
-    let irp = parse(input)?;
-
-    for p in &irp.parameters {
-        let val = if let Ok((val, _)) = vars.get(&p.name) {
-            val
-        } else if let Some(e) = &p.default {
-            let (v, l) = e.eval(&vars)?;
-
-            vars.set(p.name.to_owned(), v, l);
-
-            v
-        } else {
-            return Err(format!("missing value for {}", p.name));
-        };
-
-        let (min, _) = p.min.eval(&vars)?;
-        if val < min {
-            return Err(format!(
-                "{} is less than minimum value {} for parameter {}",
-                val, min, p.name
-            ));
-        }
-
-        let (max, _) = p.max.eval(&vars)?;
-        if val > max {
-            return Err(format!(
-                "{} is more than maximum value {} for parameter {}",
-                val, max, p.name
-            ));
-        }
-    }
-
-    // if parameters are defined, only allow parameters to be set
-    if !irp.parameters.is_empty() {
-        for name in vars.vars.keys() {
-            if !irp.parameters.iter().any(|p| &p.name == name) {
-                return Err(format!("no parameter called {}", name));
-            }
-        }
-    }
-
-    for e in irp.definitions {
-        if let Expression::Assignment(name, expr) = e {
-            vars.set_definition(name, *expr);
-        }
-    }
-
-    let mut out = Output::new(&irp.general_spec);
-
-    let stream = vec![irp.stream];
-
-    eval_stream(
-        &stream,
-        &mut out,
-        None,
-        &mut vars,
-        &irp.general_spec,
-        repeats,
-        0,
-    )?;
-
-    Ok((irp.general_spec.carrier, out.raw))
-}
-
 fn eval_stream<'a>(
     stream: &'a [Expression],
-    out: &mut Output<'a>,
+    encoder: &mut Encoder<'a>,
     level: Option<usize>,
     vars: &mut Vartable,
     gs: &GeneralSpec,
@@ -452,44 +473,44 @@ fn eval_stream<'a>(
     for expr in stream {
         match expr {
             Expression::Number(v) => {
-                out.flush_level(level, vars)?;
+                encoder.flush_level(level, vars)?;
 
-                out.add_flash(Unit::Units.eval(*v, gs)?);
+                encoder.add_flash(Unit::Units.eval(*v, gs)?);
             }
             Expression::Negative(e) => {
-                out.flush_level(level, vars)?;
+                encoder.flush_level(level, vars)?;
                 match e.as_ref() {
-                    Expression::Number(v) => out.add_gap(Unit::Units.eval(*v, gs)?),
-                    Expression::FlashConstant(v, u) => out.add_gap(u.eval_float(*v, gs)?),
+                    Expression::Number(v) => encoder.add_gap(Unit::Units.eval(*v, gs)?),
+                    Expression::FlashConstant(v, u) => encoder.add_gap(u.eval_float(*v, gs)?),
                     _ => unreachable!(),
                 }
             }
             Expression::FlashConstant(p, u) => {
-                out.flush_level(level, vars)?;
-                out.add_flash(u.eval_float(*p, gs)?);
+                encoder.flush_level(level, vars)?;
+                encoder.add_flash(u.eval_float(*p, gs)?);
             }
             Expression::FlashIdentifier(id, u) => {
-                out.flush_level(level, vars)?;
-                out.add_flash(u.eval(vars.get(id)?.0, gs)?);
+                encoder.flush_level(level, vars)?;
+                encoder.add_flash(u.eval(vars.get(id)?.0, gs)?);
             }
             Expression::ExtentConstant(p, u) => {
-                out.flush_level(level, vars)?;
-                out.add_extend(u.eval_float(*p, gs)?);
+                encoder.flush_level(level, vars)?;
+                encoder.add_extend(u.eval_float(*p, gs)?);
             }
             Expression::ExtentIdentifier(id, u) => {
-                out.flush_level(level, vars)?;
-                out.add_extend(u.eval(vars.get(id)?.0, gs)?);
+                encoder.flush_level(level, vars)?;
+                encoder.add_extend(u.eval(vars.get(id)?.0, gs)?);
             }
             Expression::GapConstant(p, u) => {
-                out.flush_level(level, vars)?;
-                out.add_gap(u.eval_float(*p, gs)?);
+                encoder.flush_level(level, vars)?;
+                encoder.add_gap(u.eval_float(*p, gs)?);
             }
             Expression::GapIdentifier(id, u) => {
-                out.flush_level(level, vars)?;
-                out.add_gap(u.eval(vars.get(id)?.0, gs)?);
+                encoder.flush_level(level, vars)?;
+                encoder.add_gap(u.eval(vars.get(id)?.0, gs)?);
             }
             Expression::Assignment(id, expr) => {
-                out.flush_level(level, vars)?;
+                encoder.flush_level(level, vars)?;
 
                 let (v, l) = expr.eval(&vars)?;
 
@@ -512,7 +533,7 @@ fn eval_stream<'a>(
                 };
 
                 let level = if !stream.bit_spec.is_empty() {
-                    out.push_bitspec(&stream.bit_spec);
+                    encoder.enter_bitspec_scope(&stream.bit_spec);
 
                     match level {
                         None => Some(0),
@@ -523,27 +544,27 @@ fn eval_stream<'a>(
                 };
 
                 for _ in 0..indefinite {
-                    out.push_extent_marker();
-                    eval_stream(&stream.stream, out, level, vars, gs, repeats, 0)?;
-                    out.pop_extend_marker();
+                    encoder.push_extent_marker();
+                    eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 0)?;
+                    encoder.pop_extend_marker();
                 }
 
                 for _ in 0..count {
-                    out.push_extent_marker();
-                    eval_stream(&stream.stream, out, level, vars, gs, repeats, 1)?;
-                    out.pop_extend_marker();
+                    encoder.push_extent_marker();
+                    eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 1)?;
+                    encoder.pop_extend_marker();
                 }
 
                 if let Expression::Variation(list) = &stream.stream[0] {
                     if list.len() == 3 {
-                        out.push_extent_marker();
-                        eval_stream(&stream.stream, out, level, vars, gs, repeats, 2)?;
-                        out.pop_extend_marker();
+                        encoder.push_extent_marker();
+                        eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 2)?;
+                        encoder.pop_extend_marker();
                     }
                 }
 
                 if !stream.bit_spec.is_empty() {
-                    out.pop_bitspec();
+                    encoder.leave_bitspec_scope();
                 }
             }
             Expression::Variation(list) => {
@@ -553,17 +574,17 @@ fn eval_stream<'a>(
                     break;
                 }
 
-                eval_stream(variation, out, level, vars, gs, repeats, alternative)?;
+                eval_stream(variation, encoder, level, vars, gs, repeats, alternative)?;
             }
             _ => {
                 let (bits, length) = expr.eval(&vars)?;
 
-                out.add_bits(bits, length, level)?;
+                encoder.add_bits(bits, length, level)?;
             }
         }
     }
 
-    out.flush_level(level, vars)?;
+    encoder.flush_level(level, vars)?;
 
     Ok(())
 }

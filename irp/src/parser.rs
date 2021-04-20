@@ -1,20 +1,9 @@
-use crate::num::Num;
+use super::ast::*;
+use super::irp;
+use num::Num;
 use std::str::FromStr;
 
-pub mod ast;
-mod mode2;
-mod pronto;
-mod rawir;
-pub mod render;
-
-#[cfg(test)]
-mod tests;
-
-use ast::*;
-
-#[rustfmt::skip]
-pub mod irp;
-
+/// Parse an irp into an AST type representation
 pub fn parse(input: &str) -> Result<Irp, String> {
     let mut parser = irp::PEG::new();
 

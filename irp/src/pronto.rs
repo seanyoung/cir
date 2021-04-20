@@ -1,3 +1,5 @@
+use crate::Message;
+
 #[derive(Debug, PartialEq)]
 pub enum Pronto {
     LearnedUnmodulated {
@@ -22,7 +24,7 @@ pub fn parse(s: &str) -> Result<Pronto, String> {
 
     for elem in s.split_whitespace() {
         if elem.len() != 4 {
-            return Err("pronto hex expects 4 hex digits".to_string());
+            return Err(format!("pronto hex expects 4 hex digits, {} found", elem));
         }
 
         match u16::from_str_radix(elem, 16) {
@@ -102,8 +104,8 @@ fn parse_test() {
 }
 
 impl Pronto {
-    pub fn render(&self, repeats: usize) -> Vec<u32> {
-        match self {
+    pub fn encode(&self, repeats: usize) -> Message {
+        let raw = match self {
             Pronto::LearnedModulated { intro, repeat, .. }
             | Pronto::LearnedUnmodulated { intro, repeat } => {
                 let mut res: Vec<u32> = Vec::with_capacity(intro.len() + repeats * repeat.len());
@@ -120,6 +122,17 @@ impl Pronto {
 
                 res
             }
+        };
+
+        let carrier = match self {
+            Pronto::LearnedModulated { carrier, .. } => Some(*carrier as i64),
+            Pronto::LearnedUnmodulated { .. } => None,
+        };
+
+        Message {
+            duty_cycle: None,
+            carrier,
+            raw,
         }
     }
 }

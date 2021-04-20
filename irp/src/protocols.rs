@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::path::Path;
 
 #[derive(Debug, Deserialize, PartialEq)]
-pub struct Protocols {
+struct Protocols {
     protocol: Vec<Protocol>,
 }
 
