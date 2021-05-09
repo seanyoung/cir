@@ -41,7 +41,9 @@
 //! Philips Pronto universal remote. The format is a series of 4 digits hex numbers. This library can parse the long
 //! codes, there is no support for the short format yet.
 //!
-//!     let pronto = irp::pronto::parse(r#"
+//!     use irp::pronto::Pronto;
+//!
+//!     let pronto = Pronto::parse(r#"
 //!         0000 006C 0000 0022 00AD 00AD 0016 0041 0016 0041 0016 0041 0016 0016 0016
 //!         0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0041 0016 0041 0016 0016
 //!         0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016

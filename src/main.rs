@@ -1,6 +1,7 @@
 mod keymap;
 
 use clap::{App, Arg, SubCommand};
+use irp::pronto::Pronto;
 use irp::Message;
 use lirc::lirc_open;
 use std::fs;
@@ -91,7 +92,8 @@ fn main() {
                             Arg::with_name("REPEATS")
                                 .long("repeats")
                                 .short("r")
-                                .takes_value(true),
+                                .takes_value(true)
+                                .default_value("1"),
                         )
                         .arg(
                             Arg::with_name("FIELD")
@@ -107,7 +109,8 @@ fn main() {
                             Arg::with_name("REPEATS")
                                 .long("repeats")
                                 .short("r")
-                                .takes_value(true),
+                                .takes_value(true)
+                                .default_value("1"),
                         )
                         .arg(
                             Arg::with_name("PRONTO")
@@ -147,7 +150,17 @@ fn main() {
         ("encode", Some(matches)) => {
             let message = encode_args(matches);
 
-            println!("{}", message.print_rawir());
+            if let Some(carrier) = &message.carrier {
+                if *carrier == 0 {
+                    println!("carrier: unmodulated (no carrier)");
+                } else {
+                    println!("carrier: {}Hz", carrier);
+                }
+            }
+            if let Some(duty_cycle) = &message.duty_cycle {
+                println!("duty cycle: {}%", duty_cycle);
+            }
+            println!("rawir: {}", message.print_rawir());
         }
         ("send", Some(matches)) => {
             let message = encode_args(matches);
@@ -286,7 +299,7 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
                 },
             };
 
-            let pronto = match irp::pronto::parse(&pronto) {
+            let pronto = match Pronto::parse(&pronto) {
                 Ok(pronto) => pronto,
                 Err(err) => {
                     eprintln!("error: {}", err);

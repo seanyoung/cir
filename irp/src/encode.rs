@@ -599,6 +599,7 @@ fn eval_stream<'a>(
     Ok(())
 }
 
+// See https://github.com/bitvecto-rs/bitvec/issues/119
 fn bit_to_usize(bit: &BitSlice) -> usize {
     let mut v = 0;
 
