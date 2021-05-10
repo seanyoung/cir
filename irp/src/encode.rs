@@ -1,90 +1,147 @@
 use super::ast::*;
-use super::parser::parse;
+use super::pronto::Pronto;
 use super::Message;
 
 use bitintr::Popcnt;
 use bitvec::prelude::*;
 use std::collections::HashMap;
 
-/// Parse an IRP expression and encode it to raw IR with the given variables
-pub fn encode(input: &str, mut vars: Vartable, repeats: i64) -> Result<Message, String> {
-    let irp = parse(input)?;
+impl Irp {
+    /// Render it to raw IR with the given variables
+    pub fn encode<'a>(&'a self, mut vars: Vartable<'a>, repeats: i64) -> Result<Message, String> {
+        self.check_parameters(&mut vars)?;
 
-    for p in &irp.parameters {
-        let val = if let Ok((val, _)) = vars.get(&p.name) {
-            val
-        } else if let Some(e) = &p.default {
-            let (v, l) = e.eval(&vars)?;
+        let mut encoder = Encoder::new(&self.general_spec);
 
-            vars.set(p.name.to_owned(), v, l);
+        eval_stream(
+            &self.stream,
+            &mut encoder,
+            None,
+            &mut vars,
+            &self.general_spec,
+            repeats,
+            0,
+        )?;
 
-            v
-        } else {
-            return Err(format!("missing value for {}", p.name));
+        Ok(Message {
+            carrier: self.general_spec.carrier,
+            duty_cycle: self.general_spec.duty_cycle,
+            raw: encoder.raw,
+        })
+    }
+
+    /// Render it to pronto hex with the given variables. Any trailing part after the repeating section
+    /// cannot be represented in pronto hex, so this is dropped. This part of the IR is commonly use for
+    /// a "key up" type message.
+    pub fn encode_pronto<'a>(&'a self, mut vars: Vartable<'a>) -> Result<Pronto, String> {
+        self.check_parameters(&mut vars)?;
+
+        let mut encoder = Encoder::new(&self.general_spec);
+
+        eval_stream(
+            &self.stream,
+            &mut encoder,
+            None,
+            &mut vars,
+            &self.general_spec,
+            1,
+            0,
+        )?;
+
+        let carrier = match self.general_spec.carrier {
+            // This is the carrier transmogrifier uses for unmodulated signals
+            Some(0) => 414514,
+            None => 38000,
+            Some(c) => c,
         };
 
-        let (min, _) = p.min.eval(&vars)?;
-        if val < min {
-            return Err(format!(
-                "{} is less than minimum value {} for parameter {}",
-                val, min, p.name
-            ));
-        }
+        let intro_length = encoder.repeats_starts.unwrap_or(encoder.raw.len());
+        let repeat_length = encoder.ending_starts.unwrap_or(encoder.raw.len());
 
-        let (max, _) = p.max.eval(&vars)?;
-        if val > max {
-            return Err(format!(
-                "{} is more than maximum value {} for parameter {}",
-                val, max, p.name
-            ));
+        let intro = encoder.raw[0..intro_length]
+            .iter()
+            .map(|v| *v as f64)
+            .collect();
+
+        let repeat = encoder.raw[intro_length..repeat_length]
+            .iter()
+            .map(|v| *v as f64)
+            .collect();
+
+        if self.general_spec.carrier != Some(0) {
+            Ok(Pronto::LearnedModulated {
+                frequency: carrier as f64,
+                intro,
+                repeat,
+            })
+        } else {
+            Ok(Pronto::LearnedUnmodulated {
+                frequency: carrier as f64,
+                intro,
+                repeat,
+            })
         }
     }
 
-    // if parameters are defined, only allow parameters to be set
-    if !irp.parameters.is_empty() {
-        for name in vars.vars.keys() {
-            if !irp.parameters.iter().any(|p| &p.name == name) {
-                return Err(format!("no parameter called {}", name));
+    fn check_parameters<'a>(&'a self, vars: &mut Vartable<'a>) -> Result<(), String> {
+        for p in &self.parameters {
+            let val = if let Ok((val, _)) = vars.get(&p.name) {
+                val
+            } else if let Some(e) = &p.default {
+                let (v, l) = e.eval(&vars)?;
+
+                vars.set(p.name.to_owned(), v, l);
+
+                v
+            } else {
+                return Err(format!("missing value for {}", p.name));
+            };
+
+            let (min, _) = p.min.eval(&vars)?;
+            if val < min {
+                return Err(format!(
+                    "{} is less than minimum value {} for parameter {}",
+                    val, min, p.name
+                ));
+            }
+
+            let (max, _) = p.max.eval(&vars)?;
+            if val > max {
+                return Err(format!(
+                    "{} is more than maximum value {} for parameter {}",
+                    val, max, p.name
+                ));
             }
         }
-    }
 
-    for e in irp.definitions {
-        if let Expression::Assignment(name, expr) = e {
-            vars.set_definition(name, *expr);
-        } else {
-            panic!("definition not correct expression: {:?}", e);
+        // if parameters are defined, only allow parameters to be set
+        if !self.parameters.is_empty() {
+            for name in vars.vars.keys() {
+                if !self.parameters.iter().any(|p| &p.name == name) {
+                    return Err(format!("no parameter called {}", name));
+                }
+            }
         }
+
+        for e in &self.definitions {
+            if let Expression::Assignment(name, expr) = e {
+                vars.set_definition(name.clone(), expr.as_ref());
+            } else {
+                panic!("definition not correct expression: {:?}", e);
+            }
+        }
+
+        Ok(())
     }
-
-    let mut encoder = Encoder::new(&irp.general_spec);
-
-    let stream = vec![irp.stream];
-
-    eval_stream(
-        &stream,
-        &mut encoder,
-        None,
-        &mut vars,
-        &irp.general_spec,
-        repeats,
-        0,
-    )?;
-
-    Ok(Message {
-        carrier: irp.general_spec.carrier,
-        duty_cycle: irp.general_spec.duty_cycle,
-        raw: encoder.raw,
-    })
 }
 
 /// During IRP evaluation, variables may change their value
 #[derive(Default)]
-pub struct Vartable {
-    vars: HashMap<String, (i64, u8, Option<Expression>)>,
+pub struct Vartable<'a> {
+    vars: HashMap<String, (i64, u8, Option<&'a Expression>)>,
 }
 
-impl Vartable {
+impl<'a> Vartable<'a> {
     pub fn new() -> Self {
         Vartable {
             vars: HashMap::new(),
@@ -92,7 +149,7 @@ impl Vartable {
     }
 
     /// IRP definitions are evaluated each time when they are referenced
-    fn set_definition(&mut self, name: String, expr: Expression) {
+    fn set_definition(&mut self, name: String, expr: &'a Expression) {
         self.vars.insert(name, (0, 0, Some(expr)));
     }
 
@@ -125,6 +182,10 @@ struct Encoder<'a> {
     extent_marker: Vec<i64>,
     /// Nested bitspec scopes
     bitspec_scope: Vec<BitspecScope<'a>>,
+    /// At which point that the repeating section start
+    repeats_starts: Option<usize>,
+    /// At this point the trailing section starts
+    ending_starts: Option<usize>,
 }
 
 /// A single bitscope
@@ -144,6 +205,8 @@ impl<'a> Encoder<'a> {
             total_length: 0,
             extent_marker: Vec::new(),
             bitspec_scope: Vec::new(),
+            repeats_starts: None,
+            ending_starts: None,
         }
     }
 
@@ -529,11 +592,11 @@ fn eval_stream<'a>(
                     })
                     .max();
 
-                let (indefinite, count) = match stream.repeat {
+                let (indefinite, count, set_marker) = match stream.repeat {
                     None if variant_count.is_some() => {
                         return Err(String::from("cannot have variant without repeat"));
                     }
-                    None => (1, 0),
+                    None => (1, 0, false),
                     Some(RepeatMarker::Any) => {
                         if variant_count.is_some() {
                             // if the first variant is empty, then Any is permitted
@@ -552,11 +615,11 @@ fn eval_stream<'a>(
                             }
                         }
 
-                        (0, repeats)
+                        (0, repeats, true)
                     }
-                    Some(RepeatMarker::Count(num)) => (num, 0),
-                    Some(RepeatMarker::OneOrMore) => (1, repeats),
-                    Some(RepeatMarker::CountOrMore(num)) => (num, repeats),
+                    Some(RepeatMarker::Count(num)) => (num, 0, false),
+                    Some(RepeatMarker::OneOrMore) => (1, repeats, true),
+                    Some(RepeatMarker::CountOrMore(num)) => (num, repeats, true),
                 };
 
                 let level = if !stream.bit_spec.is_empty() {
@@ -576,10 +639,20 @@ fn eval_stream<'a>(
                     encoder.pop_extend_marker();
                 }
 
-                for _ in 0..count {
-                    encoder.push_extent_marker();
-                    eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 1)?;
-                    encoder.pop_extend_marker();
+                if count > 0 {
+                    if set_marker && encoder.repeats_starts.is_none() {
+                        encoder.repeats_starts = Some(encoder.raw.len());
+                    }
+
+                    for _ in 0..count {
+                        encoder.push_extent_marker();
+                        eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 1)?;
+                        encoder.pop_extend_marker();
+                    }
+                }
+
+                if set_marker {
+                    encoder.ending_starts = Some(encoder.raw.len());
                 }
 
                 if variant_count == Some(3) {

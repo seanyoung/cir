@@ -14,14 +14,15 @@
 //!
 //! This example sets some parameters, encodes and then simply prints the result.
 //!
+//!     use irp::ast::Irp;
+//!
 //!     let mut vars = irp::encode::Vartable::new();
 //!     vars.set(String::from("D"), 255, 8);
 //!     vars.set(String::from("S"), 52, 8);
 //!     vars.set(String::from("F"), 1, 8);
-//!     let message = irp::encode::encode(
-//!         "{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]",
-//!         vars,
-//!         0).expect("encode should succeed");
+//!     let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]")
+//!         .expect("parse should succeed");
+//!     let message = irp.encode(vars, 0).expect("encode should succeed");
 //!     if let Some(carrier) = &message.carrier {
 //!         println!("carrier: {}Hz", carrier);
 //!     }
@@ -93,7 +94,7 @@
 //!     println!("{}", irp::rawir::print_to_string(&rawir));
 //!
 
-mod ast;
+pub mod ast;
 #[rustfmt::skip]
 mod irp;
 pub mod encode;

@@ -4,24 +4,26 @@ use num::Num;
 use std::str::FromStr;
 
 /// Parse an irp into an AST type representation
-pub fn parse(input: &str) -> Result<Irp, String> {
-    let mut parser = irp::PEG::new();
+impl Irp {
+    pub fn parse(input: &str) -> Result<Irp, String> {
+        let mut parser = irp::PEG::new();
 
-    match parser.parse(input) {
-        Ok(node) => {
-            let general_spec = general_spec(&node.children[0], input)?;
-            let stream = bitspec_irstream(&node.children[1], input)?;
-            let definitions = definitions(&node.children[2], input)?;
-            let parameters = parameters(&node.children[3], input)?;
+        match parser.parse(input) {
+            Ok(node) => {
+                let general_spec = general_spec(&node.children[0], input)?;
+                let stream = bitspec_irstream(&node.children[1], input)?;
+                let definitions = definitions(&node.children[2], input)?;
+                let parameters = parameters(&node.children[3], input)?;
 
-            Ok(Irp {
-                general_spec,
-                stream,
-                definitions,
-                parameters,
-            })
+                Ok(Irp {
+                    general_spec,
+                    stream: vec![stream],
+                    definitions,
+                    parameters,
+                })
+            }
+            Err(pos) => Err(format!("parse error at {}", pos)),
         }
-        Err(pos) => Err(format!("parse error at {}", pos)),
     }
 }
 

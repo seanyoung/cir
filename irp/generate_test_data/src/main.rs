@@ -12,8 +12,17 @@ use serde::{Deserialize, Serialize};
 pub struct TestData {
     pub protocol: String,
     pub params: Vec<Param>,
+    #[serde(skip_serializing_if = "is_zero")]
     pub repeats: u8,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub pronto: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub render: Vec<Vec<u32>>,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(num: &u8) -> bool {
+    *num == 0
 }
 
 #[derive(Serialize, Deserialize)]
@@ -29,6 +38,7 @@ pub fn parse_output(protocol: String, repeats: u8, input: &str) -> TestData {
         protocol,
         repeats,
         params: Vec::new(),
+        pronto: String::new(),
         render: Vec::new(),
     };
 
@@ -50,17 +60,21 @@ pub fn parse_output(protocol: String, repeats: u8, input: &str) -> TestData {
                         }
                     }
                     Rule::render => {
-                        for rawir in collect_rules(node, Rule::rawir) {
-                            let mut res = Vec::new();
+                        if node.children[0].rule == Rule::pronto_out {
+                            data.pronto = node.children[0].as_str(input).trim().to_owned();
+                        } else {
+                            for rawir in collect_rules(node, Rule::rawir) {
+                                let mut res = Vec::new();
 
-                            for rawir in collect_rules(rawir, Rule::value) {
-                                res.push(
-                                    u32::from_str_radix(&rawir.children[1].as_str(input), 10)
-                                        .unwrap(),
-                                );
+                                for rawir in collect_rules(rawir, Rule::value) {
+                                    res.push(
+                                        u32::from_str_radix(&rawir.children[1].as_str(input), 10)
+                                            .unwrap(),
+                                    );
+                                }
+
+                                data.render.push(res);
                             }
-
-                            data.render.push(res);
                         }
                     }
                     _ => unimplemented!(),
@@ -130,6 +144,21 @@ fn main() {
 
             test_data.push(data);
         }
+
+        let output = Command::new("irptransmogrifier.sh")
+            .args(&["render", "--random", "-p", "-P", &protocol.name])
+            .output()
+            .expect("Failed to execute irptransmogrifier.sh");
+
+        if !output.status.success() {
+            continue;
+        }
+
+        let result = String::from_utf8(output.stdout).unwrap();
+
+        let data = parse_output(protocol.name.clone(), 0, &result);
+
+        test_data.push(data);
     }
 
     let test_data = serde_json::to_string(&test_data).unwrap();

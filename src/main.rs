@@ -1,6 +1,7 @@
 mod keymap;
 
 use clap::{App, Arg, SubCommand};
+use irp::ast::Irp;
 use irp::pronto::Pronto;
 use irp::Message;
 use lirc::lirc_open;
@@ -18,16 +19,12 @@ fn main() {
                 .subcommand(
                     SubCommand::with_name("irp")
                         .about("Encode using IRP langauge")
-                        .arg(
-                            Arg::with_name("IRP")
-                                .help("IRP protocol")
-                                .required(true)
-                                .index(1),
-                        )
+                        .arg(Arg::with_name("PRONTO").long("pronto").short("p"))
                         .arg(
                             Arg::with_name("REPEATS")
                                 .long("repeats")
                                 .short("r")
+                                .conflicts_with("PRONTO")
                                 .takes_value(true),
                         )
                         .arg(
@@ -36,6 +33,12 @@ fn main() {
                                 .short("f")
                                 .takes_value(true)
                                 .multiple(true),
+                        )
+                        .arg(
+                            Arg::with_name("IRP")
+                                .help("IRP protocol")
+                                .required(true)
+                                .index(1),
                         ),
                 )
                 .subcommand(
@@ -277,11 +280,32 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
                 },
             };
 
-            match irp::encode::encode(i, vars, repeats) {
+            let irp = match Irp::parse(i) {
                 Ok(m) => m,
                 Err(s) => {
-                    eprintln!("error: {}", s);
+                    eprintln!("parse error: {}", s);
                     std::process::exit(2);
+                }
+            };
+
+            if matches.is_present("PRONTO") {
+                match irp.encode_pronto(vars) {
+                    Ok(p) => {
+                        println!("{}", p);
+                        std::process::exit(0);
+                    }
+                    Err(s) => {
+                        eprintln!("error: {}", s);
+                        std::process::exit(2);
+                    }
+                }
+            } else {
+                match irp.encode(vars, repeats) {
+                    Ok(m) => m,
+                    Err(s) => {
+                        eprintln!("error: {}", s);
+                        std::process::exit(2);
+                    }
                 }
             }
         }

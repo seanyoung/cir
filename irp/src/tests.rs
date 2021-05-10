@@ -1,5 +1,5 @@
-use super::encode::{encode, Vartable};
-use super::parser::parse;
+use super::encode::Vartable;
+use crate::ast::Irp;
 use crate::protocols::read_protocols;
 use crate::rawir;
 use serde::{Deserialize, Serialize};
@@ -13,10 +13,9 @@ fn test() {
     vars.set("D".to_string(), 0xe9, 8);
     vars.set("S".to_string(), 0xfe, 8);
 
-    let res = encode(
-        "{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]",
-        vars, 1,
-    ).unwrap();
+    let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
+
+    let res = irp.encode(vars, 1).unwrap();
 
     // irptransmogrifier.sh  --irp "{38.0k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)+" encode -r -n F=1,D=0xe9,S=0xfe
     assert_eq!(
@@ -30,12 +29,8 @@ fn test() {
     vars.set("D".to_string(), 0xe9, 8);
     vars.set("T".to_string(), 0, 8);
 
-    let res = encode(
-        "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+",
-        vars,
-        0,
-    )
-    .unwrap();
+    let irp = Irp::parse("{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+").unwrap();
+    let res = irp.encode(vars, 0).unwrap();
 
     // irptransmogrifier.sh  --irp "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+" encode -r -n F=1,T=0,D=0xe9
 
@@ -50,10 +45,8 @@ fn test() {
     vars.set("D".to_string(), 0xe9, 8);
     vars.set("S".to_string(), 0x88, 8);
 
-    let res = encode(
-        "{38k,400}<1,-1|1,-3>(8,-4,170:8,90:8,15:4,D:4,S:8,F:8,E:4,C:4,1,-48)+ {E=1,C=D^S:4:0^S:4:4^F:4:0^F:4:4^E:4}",
-        vars, 0
-    ).unwrap();
+    let irp = Irp::parse("{38k,400}<1,-1|1,-3>(8,-4,170:8,90:8,15:4,D:4,S:8,F:8,E:4,C:4,1,-48)+ {E=1,C=D^S:4:0^S:4:4^F:4:0^F:4:4^E:4}").unwrap();
+    let res = irp.encode(vars, 0).unwrap();
 
     assert_eq!(
         res.raw,
@@ -63,7 +56,7 @@ fn test() {
 
 #[test]
 fn rs200() {
-    let irp = "{35.7k,msb}<50p,-120p|21p,-120p>(25:6,(H4-1):2,(H3-1):2,(H2-1):2,(H1-1):2,P:1,(D-1):3,F:2,0:2,sum:4,-1160p)*{   P=~(#(D-1)+#F):1,sum=9+((H4-1)*4+(H3-1)) + ((H2-1)*4+(H1-1)) + (P*8+(D-1)) + F*4}";
+    let irp = Irp::parse("{35.7k,msb}<50p,-120p|21p,-120p>(25:6,(H4-1):2,(H3-1):2,(H2-1):2,(H1-1):2,P:1,(D-1):3,F:2,0:2,sum:4,-1160p)*{   P=~(#(D-1)+#F):1,sum=9+((H4-1)*4+(H3-1)) + ((H2-1)*4+(H1-1)) + (P*8+(D-1)) + F*4}").unwrap();
 
     let mut vars = Vartable::new();
 
@@ -74,7 +67,7 @@ fn rs200() {
     vars.set("H3".to_string(), 3, 8);
     vars.set("H4".to_string(), 4, 8);
 
-    let res = encode(irp, vars, 1).unwrap();
+    let res = irp.encode(vars, 1).unwrap();
 
     assert!(compare_with_rounding(
         Ok(res.raw),
@@ -89,10 +82,8 @@ fn nec() {
     vars.set("F".to_string(), 1, 8);
     vars.set("D".to_string(), 0xe9, 8);
 
-    let res = encode(
-        "{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]",
-        vars,1
-    ).unwrap();
+    let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
+    let res = irp.encode(vars, 1).unwrap();
 
     // irptransmogrifier.sh --irp  "{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]" encode -r -n F=1,D=0xe9
     assert_eq!(
@@ -108,7 +99,8 @@ fn keeprite_ac() {
     vars.set("A".to_string(), 1, 32);
     vars.set("B".to_string(), 0xe9, 32);
 
-    let res = encode("{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]", vars, 1).unwrap();
+    let irp = Irp::parse("{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]").unwrap();
+    let res = irp.encode(vars, 1).unwrap();
 
     // irptransmogrifier.sh --irp  "{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]" encode -r -n A=1,B=0xe9
     assert_eq!(
@@ -119,38 +111,36 @@ fn keeprite_ac() {
 
 #[test]
 fn variants() {
-    let res = encode("{}<1,-1|1,-3>([11][22][33],-100)+", Vartable::new(), 1).unwrap();
+    let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33],-100)+").unwrap();
+    let res = irp.encode(Vartable::new(), 1).unwrap();
 
     assert_eq!(res.raw, rawir::parse("+11 -100 +22 -100 +33 -100").unwrap());
 
-    let res = encode("{}<1,-1|1,-3>([11][22][33],-100)+", Vartable::new(), 1).unwrap();
+    let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33],-100)+").unwrap();
+
+    let res = irp.encode(Vartable::new(), 1).unwrap();
 
     assert_eq!(res.raw, rawir::parse("+11 -100 +22 -100 +33 -100").unwrap());
 
-    let res = encode(
-        "{}<1,-1|1,-3>(111,-222,[11][][33],-100)+",
-        Vartable::new(),
-        1,
-    )
-    .unwrap();
+    let irp = Irp::parse("{}<1,-1|1,-3>(111,-222,[11][][33],-100)+").unwrap();
+    let res = irp.encode(Vartable::new(), 1).unwrap();
 
     assert_eq!(
         res.raw,
         rawir::parse("+111 -222 +11 -100 +111 -222 +111 -222 +33 -100").unwrap()
     );
 
-    let res = encode(
-        "{100}<1,-1|1,-3>([1][2],-10,10:10,1,-100m)",
-        Vartable::new(),
-        1,
-    );
+    let irp = Irp::parse("{100}<1,-1|1,-3>([1][2],-10,10:10,1,-100m)").unwrap();
+    let res = irp.encode(Vartable::new(), 1);
 
     assert_eq!(
         res.err(),
         Some(String::from("cannot have variant without repeat"))
     );
 
-    let res = encode("{}<1,-1|1,-3>([11][22],-100)*", Vartable::new(), 1);
+    let irp = Irp::parse("{}<1,-1|1,-3>([11][22],-100)*").unwrap();
+
+    let res = irp.encode(Vartable::new(), 1);
 
     assert_eq!(
         res.err(),
@@ -167,11 +157,12 @@ fn vars() {
     vars.set("S".to_string(), 2, 8);
     vars.set("F".to_string(), 0xe9, 8);
 
-    let res = encode(
+    let irp = Irp::parse(
         "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
-        vars,
-        1,
-    );
+    )
+    .unwrap();
+
+    let res = irp.encode(vars, 1);
 
     assert_eq!(
         res.err(),
@@ -185,11 +176,7 @@ fn vars() {
     vars.set("S".to_string(), 1, 8);
     vars.set("F".to_string(), 0, 8);
 
-    let res = encode(
-        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
-        vars,
-        1,
-    );
+    let res = irp.encode(vars, 1);
 
     assert_eq!(
         res.err(),
@@ -203,11 +190,7 @@ fn vars() {
     vars.set("S".to_string(), 1, 8);
     vars.set("X".to_string(), 0, 8);
 
-    let res = encode(
-        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
-        vars,
-        1,
-    );
+    let res = irp.encode(vars, 1);
 
     assert_eq!(res.err(), Some(String::from("missing value for F")));
 
@@ -217,25 +200,19 @@ fn vars() {
     vars.set("F".to_string(), 2, 8);
     vars.set("X".to_string(), 0, 8);
 
-    let res = encode(
-        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
-        vars,
-        1,
-    );
+    let res = irp.encode(vars, 1);
 
     assert_eq!(res.err(), Some(String::from("no parameter called X")));
 
     let mut vars = Vartable::new();
 
+    let irp = Irp::parse("{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}").unwrap();
+
     vars.set("S".to_string(), 1, 8);
     vars.set("F".to_string(), 2, 8);
     vars.set("X".to_string(), 0, 8);
 
-    let res = encode(
-        "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}",
-        vars,
-        1,
-    );
+    let res = irp.encode(vars, 1);
 
     assert!(res.is_ok());
 }
@@ -248,7 +225,7 @@ fn parse_all_of_them() {
     let mut total = 0;
     for p in &protocols {
         total += 1;
-        if let Err(s) = parse(&p.irp) {
+        if let Err(s) = Irp::parse(&p.irp) {
             broken += 1;
             println!("{}: {}: {}", p.name, p.irp, s);
         }
@@ -309,8 +286,12 @@ fn compare_encode_to_transmogrifier() {
     #[derive(Serialize, Deserialize)]
     pub struct TestData {
         pub protocol: String,
+        #[serde(default)]
         pub repeats: i64,
         pub params: Vec<Param>,
+        #[serde(default)]
+        pub pronto: String,
+        #[serde(default)]
         pub render: Vec<Vec<u32>>,
     }
 
@@ -341,17 +322,56 @@ fn compare_encode_to_transmogrifier() {
             vars.set(param.name.to_owned(), param.value as i64, 8);
         }
 
-        let f = encode(&protocol.irp, vars, testcase.repeats).unwrap();
+        let irp = Irp::parse(&protocol.irp).unwrap();
 
-        if !compare_with_rounding(Ok(testcase.render[0].clone()), Ok(f.raw)) {
-            println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
+        if testcase.pronto.is_empty() {
+            let f = irp.encode(vars, testcase.repeats).unwrap();
 
-            for param in &testcase.params {
-                println!("{} = {}", param.name, param.value);
+            if !compare_with_rounding(Ok(testcase.render[0].clone()), Ok(f.raw)) {
+                println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
+
+                for param in &testcase.params {
+                    println!("{} = {}", param.name, param.value);
+                }
+                println!("repeats {}", testcase.repeats);
+
+                fails += 1;
             }
-            println!("repeats {}", testcase.repeats);
+        } else {
+            let pronto = irp.encode_pronto(vars).unwrap();
 
-            fails += 1;
+            let f = pronto.to_string();
+
+            if f != testcase.pronto {
+                let left: Vec<u32> = f
+                    .split_whitespace()
+                    .map(|v| u32::from_str_radix(v, 16).unwrap())
+                    .collect();
+
+                let right: Vec<u32> = testcase
+                    .pronto
+                    .split_whitespace()
+                    .map(|v| u32::from_str_radix(v, 16).unwrap())
+                    .collect();
+
+                if left[0] != right[0]
+                    || left[1] != right[1]
+                    || left[2] != right[2]
+                    || left[3] != right[3]
+                    || !compare_with_rounding(Ok(left), Ok(right))
+                {
+                    println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
+
+                    println!("left: {}", f);
+                    println!("right: {}", testcase.pronto);
+
+                    for param in &testcase.params {
+                        println!("{} = {}", param.name, param.value);
+                    }
+
+                    fails += 1;
+                }
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 use crate::Message;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Pronto {
@@ -106,9 +107,11 @@ impl Pronto {
             raw,
         }
     }
+}
 
+impl fmt::Display for Pronto {
     /// Produce pronto hex string
-    pub fn to_pronto_hex_string(&self) -> String {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut codes = Vec::new();
 
         match self {
@@ -131,7 +134,7 @@ impl Pronto {
 
                 let frequency = 1_000_000f64 / (*frequency as f64 * 0.241_246f64);
                 // carrier
-                codes.push(frequency as usize);
+                codes.push((frequency + 0.5) as usize);
 
                 // lengths
                 codes.push(intro.len() / 2);
@@ -158,7 +161,7 @@ impl Pronto {
         // return last space
         s.pop();
 
-        s
+        write!(f, "{}", s)
     }
 }
 
@@ -167,7 +170,7 @@ fn parse_test() {
     let pronto_hex_code = "0000 006C 0022 0002 015B 00AD 0016 0016 0016 0016 0016 0041 0016 0041 0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0041 0016 0041 0016 0016 0016 0016 0016 0041 0016 0041 0016 0041 0016 0016 0016 0016 0016 0016 0016 0041 0016 0041 0016 06A4 015B 0057 0016 0E6C";
     let pronto = Pronto::parse(pronto_hex_code).expect("parse should succeed");
 
-    assert_eq!(pronto.to_pronto_hex_string(), pronto_hex_code);
+    assert_eq!(pronto.to_string(), pronto_hex_code);
 
     if let Pronto::LearnedModulated {
         frequency,
