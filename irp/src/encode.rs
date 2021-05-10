@@ -530,15 +530,30 @@ fn eval_stream<'a>(
                     .max();
 
                 let (indefinite, count) = match stream.repeat {
-                    None => {
-                        // If a stream starts with variation, then it is implicitly repeating
-                        if variant_count.is_some() {
-                            (1, repeats)
-                        } else {
-                            (1, 0)
-                        }
+                    None if variant_count.is_some() => {
+                        return Err(String::from("cannot have variant without repeat"));
                     }
-                    Some(RepeatMarker::Any) => (0, repeats),
+                    None => (1, 0),
+                    Some(RepeatMarker::Any) => {
+                        if variant_count.is_some() {
+                            // if the first variant is empty, then Any is permitted
+                            let mut first_variant_empty = false;
+
+                            if let Expression::Variation(list) = &stream.stream[0] {
+                                if list[0].is_empty() {
+                                    first_variant_empty = true;
+                                }
+                            }
+
+                            if !first_variant_empty {
+                                return Err(String::from(
+                                    "cannot have variant with '*' repeat, use '+' instead",
+                                ));
+                            }
+                        }
+
+                        (0, repeats)
+                    }
                     Some(RepeatMarker::Count(num)) => (num, 0),
                     Some(RepeatMarker::OneOrMore) => (1, repeats),
                     Some(RepeatMarker::CountOrMore(num)) => (num, repeats),

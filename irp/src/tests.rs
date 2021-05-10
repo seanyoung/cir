@@ -138,6 +138,26 @@ fn variants() {
         res.raw,
         rawir::parse("+111 -222 +11 -100 +111 -222 +111 -222 +33 -100").unwrap()
     );
+
+    let res = encode(
+        "{100}<1,-1|1,-3>([1][2],-10,10:10,1,-100m)",
+        Vartable::new(),
+        1,
+    );
+
+    assert_eq!(
+        res.err(),
+        Some(String::from("cannot have variant without repeat"))
+    );
+
+    let res = encode("{}<1,-1|1,-3>([11][22],-100)*", Vartable::new(), 1);
+
+    assert_eq!(
+        res.err(),
+        Some(String::from(
+            "cannot have variant with \'*\' repeat, use \'+\' instead"
+        ))
+    );
 }
 
 #[test]
