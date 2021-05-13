@@ -69,8 +69,8 @@ fn rs200() {
     let res = irp.encode(vars, 1).unwrap();
 
     assert!(compare_with_rounding(
-        Ok(res.raw),
-        Ok(rawir::parse("+1401,-3361,+588,-3361,+588,-3361,+1401,-3361,+1401,-3361,+588,-3361,+588,-3361,+588,-3361,+588,-3361,+1401,-3361,+1401,-3361,+588,-3361,+588,-3361,+588,-3361,+1401,-3361,+1401,-3361,+588,-3361,+588,-3361,+1401,-3361,+588,-3361,+1401,-3361,+1401,-3361,+1401,-3361,+588,-3361,+1401,-3361,+588,-35854").unwrap())
+        &res.raw,
+        &rawir::parse("+1401,-3361,+588,-3361,+588,-3361,+1401,-3361,+1401,-3361,+588,-3361,+588,-3361,+588,-3361,+588,-3361,+1401,-3361,+1401,-3361,+588,-3361,+588,-3361,+588,-3361,+1401,-3361,+1401,-3361,+588,-3361,+588,-3361,+1401,-3361,+588,-3361,+1401,-3361,+1401,-3361,+1401,-3361,+588,-3361,+1401,-3361,+588,-35854").unwrap()
     ));
 }
 
@@ -235,49 +235,44 @@ fn parse_all_of_them() {
     }
 }
 
-fn compare_with_rounding(l: Result<Vec<u32>, String>, r: Result<Vec<u32>, String>) -> bool {
+fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
     if l == r {
         return true;
     }
 
-    match (l, r) {
-        (Ok(l), Ok(r)) => {
-            if l.len() != r.len() {
-                println!(
-                    "comparing:\n{:?} with\n{:?}\n have different lengths {} and {}",
-                    l,
-                    r,
-                    l.len(),
-                    r.len()
-                );
+    if l.len() != r.len() {
+        println!(
+            "comparing:\n{:?} with\n{:?}\n have different lengths {} and {}",
+            l,
+            r,
+            l.len(),
+            r.len()
+        );
 
-                return false;
-            }
-
-            for i in 0..l.len() {
-                let diff = if l[i] > r[i] {
-                    l[i] - r[i]
-                } else {
-                    r[i] - l[i]
-                };
-                // is the difference more than 8 and more than 1 promille
-                if diff > 8 && (diff * 1000 / l[i]) > 0 {
-                    println!(
-                        "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {}",
-                        l,
-                        r,
-                        i,
-                        l.len()
-                    );
-
-                    return false;
-                }
-            }
-
-            true
-        }
-        _ => false,
+        return false;
     }
+
+    for i in 0..l.len() {
+        let diff = if l[i] > r[i] {
+            l[i] - r[i]
+        } else {
+            r[i] - l[i]
+        };
+        // is the difference more than 8 and more than 1 promille
+        if diff > 8 && (diff * 1000 / l[i]) > 0 {
+            println!(
+                "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {}",
+                l,
+                r,
+                i,
+                l.len()
+            );
+
+            return false;
+        }
+    }
+
+    true
 }
 
 #[test]
@@ -326,7 +321,7 @@ fn compare_encode_to_transmogrifier() {
         if testcase.pronto.is_empty() {
             let f = irp.encode(vars, testcase.repeats).unwrap();
 
-            if !compare_with_rounding(Ok(testcase.render[0].clone()), Ok(f.raw)) {
+            if !compare_with_rounding(&testcase.render[0], &f.raw) {
                 println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
 
                 for param in &testcase.params {
@@ -357,7 +352,7 @@ fn compare_encode_to_transmogrifier() {
                     || left[1] != right[1]
                     || left[2] != right[2]
                     || left[3] != right[3]
-                    || !compare_with_rounding(Ok(left), Ok(right))
+                    || !compare_with_rounding(&left, &right)
                 {
                     println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
 
