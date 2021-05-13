@@ -14,9 +14,9 @@
 //!
 //! This example sets some parameters, encodes and then simply prints the result.
 //!
-//!     use irp::ast::Irp;
+//!     use irp::Irp;
 //!
-//!     let mut vars = irp::encode::Vartable::new();
+//!     let mut vars = irp::Vartable::new();
 //!     vars.set(String::from("D"), 255, 8);
 //!     vars.set(String::from("S"), 52, 8);
 //!     vars.set(String::from("F"), 1, 8);
@@ -42,7 +42,7 @@
 //! Philips Pronto universal remote. The format is a series of 4 digits hex numbers. This library can parse the long
 //! codes, there is no support for the short format yet.
 //!
-//!     use irp::pronto::Pronto;
+//!     use irp::Pronto;
 //!
 //!     let pronto = Pronto::parse(r#"
 //!         0000 006C 0000 0022 00AD 00AD 0016 0041 0016 0041 0016 0041 0016 0016 0016
@@ -94,17 +94,18 @@
 //!     println!("{}", irp::rawir::print_to_string(&rawir));
 //!
 
-pub mod ast;
-#[rustfmt::skip]
-mod irp;
-pub mod encode;
+mod encode;
 pub mod mode2;
 mod parser;
-pub mod pronto;
+mod pronto;
 pub mod protocols;
 pub mod rawir;
 #[cfg(test)]
 mod tests;
+#[rustfmt::skip]
+mod irp;
+
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 /// An encoded raw infrared message
@@ -122,4 +123,124 @@ impl Message {
     pub fn print_rawir(&self) -> String {
         rawir::print_to_string(&self.raw)
     }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Pronto {
+    LearnedUnmodulated {
+        frequency: f64,
+        intro: Vec<f64>,
+        repeat: Vec<f64>,
+    },
+    LearnedModulated {
+        frequency: f64,
+        intro: Vec<f64>,
+        repeat: Vec<f64>,
+    },
+}
+
+pub struct Irp {
+    general_spec: GeneralSpec,
+    stream: Vec<Expression>,
+    definitions: Vec<Expression>,
+    parameters: Vec<ParameterSpec>,
+}
+
+struct GeneralSpec {
+    duty_cycle: Option<u8>,
+    carrier: Option<i64>,
+    lsb: bool,
+    unit: f64,
+}
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+enum Unit {
+    Units,
+    Microseconds,
+    Milliseconds,
+    Pulses,
+}
+
+#[derive(PartialEq, Debug)]
+enum RepeatMarker {
+    Any,
+    OneOrMore,
+    Count(i64),
+    CountOrMore(i64),
+}
+
+#[derive(PartialEq, Debug)]
+struct IrStream {
+    bit_spec: Vec<Expression>,
+    stream: Vec<Expression>,
+    repeat: Option<RepeatMarker>,
+}
+
+#[derive(PartialEq, Debug)]
+enum Expression {
+    FlashConstant(f64, Unit),
+    GapConstant(f64, Unit),
+    ExtentConstant(f64, Unit),
+    FlashIdentifier(String, Unit),
+    GapIdentifier(String, Unit),
+    ExtentIdentifier(String, Unit),
+    Assignment(String, Box<Expression>),
+    Number(i64),
+    Identifier(String),
+    BitField {
+        value: Box<Expression>,
+        reverse: bool,
+        length: Box<Expression>,
+        skip: Option<Box<Expression>>,
+    },
+    InfiniteBitField {
+        value: Box<Expression>,
+        skip: Box<Expression>,
+    },
+    Complement(Box<Expression>),
+    Not(Box<Expression>),
+    Negative(Box<Expression>),
+    BitCount(Box<Expression>),
+
+    Power(Box<Expression>, Box<Expression>),
+    Multiply(Box<Expression>, Box<Expression>),
+    Divide(Box<Expression>, Box<Expression>),
+    Modulo(Box<Expression>, Box<Expression>),
+    Add(Box<Expression>, Box<Expression>),
+    Subtract(Box<Expression>, Box<Expression>),
+
+    ShiftLeft(Box<Expression>, Box<Expression>),
+    ShiftRight(Box<Expression>, Box<Expression>),
+
+    LessEqual(Box<Expression>, Box<Expression>),
+    Less(Box<Expression>, Box<Expression>),
+    More(Box<Expression>, Box<Expression>),
+    MoreEqual(Box<Expression>, Box<Expression>),
+    Equal(Box<Expression>, Box<Expression>),
+    NotEqual(Box<Expression>, Box<Expression>),
+
+    BitwiseAnd(Box<Expression>, Box<Expression>),
+    BitwiseOr(Box<Expression>, Box<Expression>),
+    BitwiseXor(Box<Expression>, Box<Expression>),
+    Or(Box<Expression>, Box<Expression>),
+    And(Box<Expression>, Box<Expression>),
+    Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
+    List(Vec<Expression>),
+    Stream(IrStream),
+    Variation(Vec<Vec<Expression>>),
+}
+
+#[derive(Debug)]
+struct ParameterSpec {
+    pub name: String,
+    pub memory: bool,
+    pub min: Expression,
+    pub max: Expression,
+    pub default: Option<Expression>,
+}
+
+/// During IRP evaluation, variables may change their value
+#[derive(Default)]
+pub struct Vartable<'a> {
+    vars: HashMap<String, (i64, u8, Option<&'a Expression>)>,
 }

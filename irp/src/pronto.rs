@@ -1,19 +1,5 @@
-use crate::Message;
+use super::{Message, Pronto};
 use std::fmt;
-
-#[derive(Debug, PartialEq)]
-pub enum Pronto {
-    LearnedUnmodulated {
-        frequency: f64,
-        intro: Vec<f64>,
-        repeat: Vec<f64>,
-    },
-    LearnedModulated {
-        frequency: f64,
-        intro: Vec<f64>,
-        repeat: Vec<f64>,
-    },
-}
 
 impl Pronto {
     /// Parse a pronto hex string

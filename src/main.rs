@@ -1,9 +1,7 @@
 mod keymap;
 
 use clap::{App, Arg, SubCommand};
-use irp::ast::Irp;
-use irp::pronto::Pronto;
-use irp::Message;
+use irp::{Irp, Message, Pronto};
 use lirc::lirc_open;
 use std::fs;
 use std::path::PathBuf;
@@ -247,7 +245,7 @@ fn main() {
 fn encode_args(matches: &clap::ArgMatches) -> Message {
     match matches.subcommand() {
         ("irp", Some(matches)) => {
-            let mut vars = irp::encode::Vartable::new();
+            let mut vars = irp::Vartable::new();
 
             let i = matches.value_of("IRP").unwrap();
 

@@ -1,6 +1,4 @@
-use super::ast::*;
-use super::pronto::Pronto;
-use super::Message;
+use super::{Expression, GeneralSpec, Irp, Message, Pronto, RepeatMarker, Unit, Vartable};
 
 use bitintr::Popcnt;
 use bitvec::prelude::*;
@@ -133,12 +131,6 @@ impl Irp {
 
         Ok(())
     }
-}
-
-/// During IRP evaluation, variables may change their value
-#[derive(Default)]
-pub struct Vartable<'a> {
-    vars: HashMap<String, (i64, u8, Option<&'a Expression>)>,
 }
 
 impl<'a> Vartable<'a> {

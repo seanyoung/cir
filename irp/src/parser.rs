@@ -1,5 +1,5 @@
-use super::ast::*;
 use super::irp;
+use super::{Expression, GeneralSpec, IrStream, Irp, ParameterSpec, RepeatMarker, Unit};
 use num::Num;
 use std::str::FromStr;
 

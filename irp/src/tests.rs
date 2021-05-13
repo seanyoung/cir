@@ -1,7 +1,6 @@
-use super::encode::Vartable;
-use crate::ast::Irp;
 use crate::protocols::read_protocols;
 use crate::rawir;
+use crate::{Irp, Vartable};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
