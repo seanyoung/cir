@@ -1,6 +1,6 @@
 mod keymap;
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, AppSettings, Arg, SubCommand};
 use irp::{Irp, Message, Pronto};
 use lirc::lirc_open;
 use std::fs;
@@ -11,15 +11,23 @@ fn main() {
         .version(env!("CARGO_PKG_VERSION"))
         .author("Sean Young <sean@mess.org>")
         .about("Linux Infrared Control")
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("encode")
                 .about("Encode IR and print to stdout")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     SubCommand::with_name("irp")
                         .about("Encode using IRP langauge")
-                        .arg(Arg::with_name("PRONTO").long("pronto").short("p"))
+                        .arg(
+                            Arg::with_name("PRONTO")
+                                .help("Encode IRP to pronto hex")
+                                .long("pronto")
+                                .short("p"),
+                        )
                         .arg(
                             Arg::with_name("REPEATS")
+                                .help("Number of IRP repeats to encode")
                                 .long("repeats")
                                 .short("r")
                                 .conflicts_with("PRONTO")
@@ -27,10 +35,12 @@ fn main() {
                         )
                         .arg(
                             Arg::with_name("FIELD")
+                                .help("Set input variable like KEY=VALUE")
                                 .long("field")
                                 .short("f")
                                 .takes_value(true)
-                                .multiple(true),
+                                .multiple(true)
+                                .number_of_values(1),
                         )
                         .arg(
                             Arg::with_name("IRP")
@@ -45,7 +55,8 @@ fn main() {
                             Arg::with_name("REPEATS")
                                 .long("repeats")
                                 .short("r")
-                                .takes_value(true),
+                                .takes_value(true)
+                                .default_value("1"),
                         )
                         .arg(
                             Arg::with_name("PRONTO")
@@ -71,6 +82,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("send")
                 .about("Encode IR and transmit")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .arg(
                     Arg::with_name("LIRCDEV")
                         .long("device")
@@ -100,8 +112,7 @@ fn main() {
                             Arg::with_name("FIELD")
                                 .long("field")
                                 .short("f")
-                                .takes_value(true)
-                                .multiple(true),
+                                .takes_value(true),
                         ),
                 )
                 .subcommand(
@@ -222,10 +233,7 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        _ => {
-            eprintln!("command required");
-            std::process::exit(2);
-        }
+        _ => unreachable!(),
     }
 
     if let ("keymap", Some(matches)) = matches.subcommand() {
@@ -255,6 +263,7 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
 
                     if list.len() != 2 {
                         eprintln!("argument to --field must be X=1");
+                        std::process::exit(2);
                     }
 
                     let value = if list[1].starts_with("0x") {
@@ -268,7 +277,7 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
             }
 
             let repeats = match matches.value_of("REPEATS") {
-                None => 0,
+                None => 1,
                 Some(s) => match i64::from_str_radix(s, 10) {
                     Ok(num) => num,
                     Err(_) => {
