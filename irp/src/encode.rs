@@ -348,7 +348,7 @@ impl<'a> Encoder<'a> {
 
 impl Expression {
     /// Evaluate an arithmetic expression
-    fn eval(&self, vars: &Vartable) -> Result<(i64, u8), String> {
+    pub fn eval(&self, vars: &Vartable) -> Result<(i64, u8), String> {
         match self {
             Expression::Number(n) => Ok((*n, 64)),
             Expression::Identifier(id) => vars.get(id),
@@ -492,7 +492,7 @@ impl Expression {
 }
 
 impl Unit {
-    fn eval(&self, v: i64, spec: &GeneralSpec) -> Result<i64, String> {
+    pub fn eval(&self, v: i64, spec: &GeneralSpec) -> Result<i64, String> {
         match self {
             Unit::Units => Ok((v as f64 * spec.unit) as i64),
             Unit::Microseconds => Ok(v),
@@ -504,7 +504,7 @@ impl Unit {
         }
     }
 
-    fn eval_float(&self, v: f64, spec: &GeneralSpec) -> Result<i64, String> {
+    pub fn eval_float(&self, v: f64, spec: &GeneralSpec) -> Result<i64, String> {
         match self {
             Unit::Units => Ok((v * spec.unit) as i64),
             Unit::Microseconds => Ok(v as i64),

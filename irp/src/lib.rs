@@ -116,7 +116,9 @@
 //! println!("{}", irp::rawir::print_to_string(&rawir));
 //! ```
 
+mod build_nfa;
 mod encode;
+mod match_nfa;
 pub mod mode2;
 mod parser;
 mod pronto;
@@ -128,6 +130,7 @@ mod tests;
 include!(concat!(env!("OUT_DIR"), "/irp.rs"));
 
 use std::collections::HashMap;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 /// An encoded raw infrared message
@@ -170,7 +173,7 @@ pub struct Irp {
     parameters: Vec<ParameterSpec>,
 }
 
-struct GeneralSpec {
+pub struct GeneralSpec {
     duty_cycle: Option<u8>,
     carrier: Option<i64>,
     lsb: bool,
@@ -178,7 +181,7 @@ struct GeneralSpec {
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
-enum Unit {
+pub enum Unit {
     Units,
     Microseconds,
     Milliseconds,
@@ -186,7 +189,7 @@ enum Unit {
 }
 
 #[derive(PartialEq, Debug)]
-enum RepeatMarker {
+pub enum RepeatMarker {
     Any,
     OneOrMore,
     Count(i64),
@@ -194,14 +197,14 @@ enum RepeatMarker {
 }
 
 #[derive(PartialEq, Debug)]
-struct IrStream {
+pub struct IrStream {
     bit_spec: Vec<Expression>,
     stream: Vec<Expression>,
     repeat: Option<RepeatMarker>,
 }
 
 #[derive(PartialEq, Debug)]
-enum Expression {
+pub enum Expression {
     FlashConstant(f64, Unit),
     GapConstant(f64, Unit),
     ExtentConstant(f64, Unit),
@@ -254,6 +257,17 @@ enum Expression {
     Variation(Vec<Vec<Expression>>),
 }
 
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Expression::Number(v) => write!(f, "{}", v),
+            Expression::Identifier(id) => write!(f, "{}", id),
+            Expression::Add(left, right) => write!(f, "{} + {}", left, right),
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct ParameterSpec {
     pub name: String,
@@ -264,7 +278,7 @@ struct ParameterSpec {
 }
 
 /// During IRP evaluation, variables may change their value
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct Vartable<'a> {
     vars: HashMap<String, (i64, u8, Option<&'a Expression>)>,
 }
