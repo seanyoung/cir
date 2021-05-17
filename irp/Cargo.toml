@@ -11,7 +11,7 @@ build = "build.rs"
 license = "MIT"
 
 [build-dependencies]
-lrpeg = "0.2.0"
+lrpeg = "0.3.0"
 
 [dependencies]
 num = "0.4"

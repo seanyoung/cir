@@ -102,8 +102,8 @@ pub mod protocols;
 pub mod rawir;
 #[cfg(test)]
 mod tests;
-#[rustfmt::skip]
-mod irp;
+
+include!(concat!(env!("OUT_DIR"), "/irp.rs"));
 
 use std::collections::HashMap;
 
