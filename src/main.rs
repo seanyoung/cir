@@ -269,7 +269,7 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
                     let value = if list[1].starts_with("0x") {
                         i64::from_str_radix(&list[1][2..], 16).unwrap()
                     } else {
-                        i64::from_str_radix(list[1], 10).unwrap()
+                        str::parse(list[1]).unwrap()
                     };
 
                     vars.set(list[0].to_string(), value, 8);
@@ -278,7 +278,7 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
 
             let repeats = match matches.value_of("REPEATS") {
                 None => 1,
-                Some(s) => match i64::from_str_radix(s, 10) {
+                Some(s) => match str::parse(s) {
                     Ok(num) => num,
                     Err(_) => {
                         eprintln!("error: {} is not numeric", s);
@@ -321,7 +321,7 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
 
             let repeats = match matches.value_of("REPEATS") {
                 None => 0,
-                Some(s) => match usize::from_str_radix(s, 10) {
+                Some(s) => match str::parse(s) {
                     Ok(num) => num,
                     Err(_) => {
                         eprintln!("error: {} is not numeric", s);
