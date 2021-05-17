@@ -8,6 +8,7 @@ description = "Infrared IRP encoder"
 documentation = "https://docs.rs/irp/"
 keywords = [ "IRP", "IR", "infrared", "pronto" ]
 build = "build.rs"
+readme = "README.md"
 license = "MIT"
 
 [build-dependencies]
