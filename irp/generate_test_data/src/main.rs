@@ -54,8 +54,7 @@ pub fn parse_output(protocol: String, repeats: u8, input: &str) -> TestData {
                         for param in collect_rules(node, Rule::param) {
                             data.params.push(Param {
                                 name: param.children[0].as_str(input).to_owned(),
-                                value: u64::from_str_radix(param.children[2].as_str(input), 10)
-                                    .unwrap(),
+                                value: param.children[2].as_str(input).parse().unwrap(),
                             });
                         }
                     }
@@ -67,10 +66,7 @@ pub fn parse_output(protocol: String, repeats: u8, input: &str) -> TestData {
                                 let mut res = Vec::new();
 
                                 for rawir in collect_rules(rawir, Rule::value) {
-                                    res.push(
-                                        u32::from_str_radix(&rawir.children[1].as_str(input), 10)
-                                            .unwrap(),
-                                    );
+                                    res.push(rawir.children[1].as_str(input).parse().unwrap());
                                 }
 
                                 data.render.push(res);

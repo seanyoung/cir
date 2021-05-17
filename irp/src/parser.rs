@@ -300,7 +300,7 @@ fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
             } else if let Some(bin) = s.strip_prefix("0b") {
                 Ok(Expression::Number(i64::from_str_radix(bin, 2).unwrap()))
             } else {
-                Ok(Expression::Number(str::parse(s).unwrap()))
+                Ok(Expression::Number(s.parse().unwrap()))
             }
         }
         irp::Rule::bitspec_definition | irp::Rule::definition => {
@@ -438,7 +438,7 @@ fn irstream(
             Some(0) => RepeatMarker::Any,
             Some(1) => RepeatMarker::OneOrMore,
             Some(2) => {
-                let value = str::parse(repeat_node.children[0].as_str(input)).unwrap();
+                let value = repeat_node.children[0].as_str(input).parse().unwrap();
                 if repeat_node.children[1].is_empty() {
                     RepeatMarker::Count(value)
                 } else {

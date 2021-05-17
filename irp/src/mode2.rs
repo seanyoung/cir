@@ -16,7 +16,7 @@ pub fn parse(s: &str) -> Result<Message, String> {
             Some("timeout") => false,
             Some("carrier") => {
                 match words.next() {
-                    Some(w) => match str::parse(w) {
+                    Some(w) => match w.parse() {
                         Ok(c) => {
                             if carrier.is_some() && carrier != Some(c) {
                                 return Err(String::from("carrier specified more than once"));
@@ -55,7 +55,7 @@ pub fn parse(s: &str) -> Result<Message, String> {
         };
 
         let value = match words.next() {
-            Some(w) => match str::parse(w) {
+            Some(w) => match w.parse() {
                 Ok(0) => {
                     return Err("nonsensical 0 duration".to_string());
                 }

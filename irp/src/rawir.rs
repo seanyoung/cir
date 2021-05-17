@@ -28,7 +28,7 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
 
         let v = chars.collect::<String>();
 
-        let v = str::parse(&v).map_err(|_| format!("invalid number ‘{}’", v))?;
+        let v = v.parse().map_err(|_| format!("invalid number ‘{}’", v))?;
 
         if v == 0 {
             return Err("nonsensical 0 length".to_string());
