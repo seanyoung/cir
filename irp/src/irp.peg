@@ -7,8 +7,8 @@ general_item <- "msb" ws
     / number_decimals ws ("u" / "p" / "k" / "%") ws
     / number_decimals ws;
 
-number_decimals <- r"\\d+\\.\\d+"
-    / r"\\d+";
+number_decimals <- re#\d+\.\d+#
+    / re#\d+#;
 
 definitions <- '{' ws definition ("," ws definition)* '}' ws
     / '{' ws '}' ws;
@@ -56,9 +56,9 @@ parameter_specs <- "[" ws parameter_spec ("," ws parameter_spec)* "]" ws
 
 parameter_spec <- XID_IDENTIFIER ws "@"? ws ":" ws number ws ".." ws number ws ('=' expression)? ws;
 
-number <- r"0x[0-9a-fA-F]+"
-    / r"0b[01]+"
-    / r"\\d+"
+number <- re#0x[0-9a-fA-F]+#
+    / re#0b[01]+#
+    / re#\d+#
     / "UINT8_MAX"
     / "UINT16_MAX"
     / "UINT32_MAX"
@@ -122,6 +122,6 @@ expression16 <- "~" ws expression17
 expression17 <- bit_field
     / primary_item;
 
-ws <- WHITESPACE r"/\\*.*?\\*/" ws
-    / WHITESPACE r"//[*\\n]*" ws
+ws <- WHITESPACE re#/\\*.*?\\*/# ws
+    / WHITESPACE re#//[^\n]*# ws
     / WHITESPACE;
