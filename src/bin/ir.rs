@@ -1,8 +1,6 @@
-mod keymap;
-
 use clap::{App, AppSettings, Arg, SubCommand};
+use ir::{keymap, lirc::lirc_open};
 use irp::{Irp, Message, Pronto};
-use lirc::lirc_open;
 use std::fs;
 use std::path::PathBuf;
 

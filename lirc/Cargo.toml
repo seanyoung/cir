@@ -1,8 +1,0 @@
-[package]
-name = "lirc"
-version = "0.1.0"
-authors = ["Sean Young <sean@mess.org>"]
-edition = "2018"
-
-[dependencies]
-iocuddle = "0.1.1"
