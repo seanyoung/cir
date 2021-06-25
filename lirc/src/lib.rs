@@ -1,8 +1,8 @@
 use iocuddle::*;
 use std::fs::{File, OpenOptions};
 use std::io;
-use std::io::Write;
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Read, Write};
+use std::mem;
 use std::ops::Range;
 use std::path::Path;
 
@@ -18,6 +18,7 @@ const LIRC_GET_MIN_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x0
 const LIRC_GET_MAX_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x09) };
 const LIRC_SET_WIDEBAND_RECEIVER: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x23) };
 const LIRC_SET_MEASURE_CARRIER_MODE: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x1d) };
+const LIRC_SET_REC_MODE: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x12) };
 
 const LIRC_CAN_SET_SEND_CARRIER: u32 = 0x100;
 const LIRC_CAN_SET_SEND_DUTY_CYCLE: u32 = 0x200;
@@ -26,17 +27,75 @@ const LIRC_CAN_SEND_PULSE: u32 = 2;
 const LIRC_CAN_SET_REC_TIMEOUT: u32 = 0x10000000;
 const LIRC_CAN_MEASURE_CARRIER: u32 = 0x20000000;
 const LIRC_CAN_USE_WIDEBAND_RECEIVER: u32 = 0x40000000;
+const LIRC_CAN_REC_MODE2: u32 = 0x00040000;
+const LIRC_CAN_REC_SCANCODE: u32 = 0x00080000;
 
+const LIRC_MODE_MODE2: u32 = 0x00000004;
+const LIRC_MODE_SCANCODE: u32 = 0x00000008;
+
+pub const LIRC_MODE2_SPACE: u32 = 0x00000000;
+pub const LIRC_MODE2_PULSE: u32 = 0x01000000;
+pub const LIRC_MODE2_FREQUENCY: u32 = 0x02000000;
+pub const LIRC_MODE2_TIMEOUT: u32 = 0x03000000;
+
+const LIRC_VALUE_MASK: u32 = 0x00FFFFFF;
+const LIRC_MODE2_MASK: u32 = 0xFF000000;
+
+///
 pub struct Lirc {
     file: File,
     features: u32,
+    raw_mode: bool,
 }
 
+/// Type used for receiving decoded IR.
+pub struct LircScancode {
+    pub timestamp: u64,
+    pub flags: u16,
+    pub rc_proto: u16,
+    pub keycode: u32,
+    pub scancode: u64,
+}
+
+/// Type used for receiving raw IR (aka mode2)
+pub struct LircRaw(u32);
+
+impl LircRaw {
+    pub fn is_pulse(&self) -> bool {
+        (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_PULSE
+    }
+
+    pub fn is_space(&self) -> bool {
+        (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_SPACE
+    }
+
+    pub fn is_frequency(&self) -> bool {
+        (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_FREQUENCY
+    }
+
+    pub fn is_timemout(&self) -> bool {
+        (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_TIMEOUT
+    }
+
+    pub fn ty(&self) -> u32 {
+        self.0 & LIRC_MODE2_MASK
+    }
+
+    pub fn value(&self) -> u32 {
+        self.0 & LIRC_VALUE_MASK
+    }
+}
+
+/// Open a lirc chardev, which should have a path like "/dev/lirc0"
 pub fn lirc_open(path: &Path) -> io::Result<Lirc> {
     let file = OpenOptions::new().read(true).write(true).open(path)?;
 
     if let Ok((0, features)) = LIRC_GET_FEATURES.ioctl(&file) {
-        Ok(Lirc { file, features })
+        Ok(Lirc {
+            file,
+            features,
+            raw_mode: true,
+        })
     } else {
         Err(Error::new(
             ErrorKind::NotFound,
@@ -46,12 +105,17 @@ pub fn lirc_open(path: &Path) -> io::Result<Lirc> {
 }
 
 impl Lirc {
+    /// Transmit infrared. Each element in the array describes the number of microseconds the IR should be on and off,
+    /// respectively.
     pub fn send(&mut self, data: &[u32]) -> io::Result<()> {
+        assert!(!data.is_empty());
+
         if (self.features & LIRC_CAN_SEND_PULSE) != 0 {
             let bs_length = if (data.len() % 2) == 0 {
-                (data.len() - 1) * 4
+                // remove trailing space
+                (data.len() - 1) * mem::size_of::<u32>()
             } else {
-                data.len() * 4
+                data.len() * mem::size_of::<u32>()
             };
 
             // there must be a nicer way to write an array of u32s..
@@ -179,6 +243,59 @@ impl Lirc {
     pub fn set_measure_carrier(&mut self, enable: bool) -> io::Result<()> {
         let enable = if enable { 1 } else { 0 };
         LIRC_SET_MEASURE_CARRIER_MODE.ioctl(&mut self.file, &enable)?;
+
+        Ok(())
+    }
+
+    /// Does this lirc device support receiving in raw format
+    pub fn can_receive_raw(&self) -> bool {
+        (self.features & LIRC_CAN_REC_MODE2) != 0
+    }
+
+    /// Read the raw IR. If there is nothing to be read, the result vector will be
+    /// set to length 0. Otherwise, up to the capacity of result entries will be read.
+    pub fn receive_raw(&mut self, result: &mut Vec<LircRaw>) -> io::Result<()> {
+        if !self.raw_mode {
+            let mode = LIRC_MODE_MODE2;
+
+            LIRC_SET_REC_MODE.ioctl(&mut self.file, &mode)?;
+
+            self.raw_mode = true;
+        }
+
+        let length = result.capacity() * mem::size_of::<LircRaw>();
+        let data = unsafe { std::slice::from_raw_parts_mut(result.as_ptr() as *mut u8, length) };
+
+        let res = self.file.read(data)?;
+
+        unsafe { result.set_len(res / mem::size_of::<LircRaw>()) };
+
+        Ok(())
+    }
+
+    /// Does this lirc device support receiving in decoded scancode format
+    pub fn can_receive_scancodes(&self) -> bool {
+        (self.features & LIRC_CAN_REC_SCANCODE) != 0
+    }
+
+    /// Read the decoded IR.
+    pub fn receive_scancodes(&mut self, result: &mut Vec<LircScancode>) -> io::Result<()> {
+        if self.raw_mode {
+            let mode = LIRC_MODE_SCANCODE;
+
+            LIRC_SET_REC_MODE.ioctl(&mut self.file, &mode)?;
+
+            self.raw_mode = false;
+        }
+
+        let length = result.capacity() * mem::size_of::<LircScancode>();
+        let data = unsafe { std::slice::from_raw_parts_mut(result.as_ptr() as *mut u8, length) };
+
+        let res = self.file.read(data)?;
+
+        unsafe {
+            result.set_len(res / mem::size_of::<LircScancode>());
+        }
 
         Ok(())
     }
