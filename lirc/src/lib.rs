@@ -3,6 +3,7 @@ use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::Write;
 use std::io::{Error, ErrorKind};
+use std::ops::Range;
 use std::path::Path;
 
 const LIRC: Group = Group::new(b'i');
@@ -11,11 +12,16 @@ const LIRC_SET_SEND_CARRIER: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(
 const LIRC_SET_SEND_DUTY_CYCLE: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x15) };
 const LIRC_SET_TRANSMITTER_MASK: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x17) };
 const LIRC_GET_FEATURES: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x00) };
+const LIRC_GET_REC_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x24) };
+const LIRC_SET_REC_TIMEOUT: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x18) };
+const LIRC_GET_MIN_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x08) };
+const LIRC_GET_MAX_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x09) };
 
 const LIRC_CAN_SET_SEND_CARRIER: u32 = 0x100;
 const LIRC_CAN_SET_SEND_DUTY_CYCLE: u32 = 0x200;
 const LIRC_CAN_SET_TRANSMITTER_MASK: u32 = 0x400;
 const LIRC_CAN_SEND_PULSE: u32 = 2;
+const LIRC_CAN_SET_REC_TIMEOUT: u32 = 0x10000000;
 
 pub struct Lirc {
     file: File,
@@ -118,5 +124,32 @@ impl Lirc {
         } else {
             Ok(())
         }
+    }
+
+    /// Does this lirc device support setting send carrier
+    pub fn can_set_timeout(&self) -> bool {
+        (self.features & LIRC_CAN_SET_REC_TIMEOUT) != 0
+    }
+
+    /// Set the receiving timeout in microseconds
+    pub fn set_timeout(&mut self, timeout: u32) -> io::Result<()> {
+        LIRC_SET_REC_TIMEOUT.ioctl(&mut self.file, &timeout)?;
+
+        Ok(())
+    }
+
+    /// Get the current receiving timeout in microseconds
+    pub fn get_timeout(&self) -> io::Result<u32> {
+        let (_, timeout) = LIRC_GET_REC_TIMEOUT.ioctl(&self.file)?;
+
+        Ok(timeout)
+    }
+
+    /// Get the minimum and maximum timeout this lirc device supports
+    pub fn get_min_max_timeout(&self) -> io::Result<Range<u32>> {
+        let (_, min) = LIRC_GET_MIN_TIMEOUT.ioctl(&self.file)?;
+        let (_, max) = LIRC_GET_MAX_TIMEOUT.ioctl(&self.file)?;
+
+        Ok(min..max)
     }
 }
