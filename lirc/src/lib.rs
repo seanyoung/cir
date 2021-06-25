@@ -16,12 +16,16 @@ const LIRC_GET_REC_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x2
 const LIRC_SET_REC_TIMEOUT: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x18) };
 const LIRC_GET_MIN_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x08) };
 const LIRC_GET_MAX_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x09) };
+const LIRC_SET_WIDEBAND_RECEIVER: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x23) };
+const LIRC_SET_MEASURE_CARRIER_MODE: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x1d) };
 
 const LIRC_CAN_SET_SEND_CARRIER: u32 = 0x100;
 const LIRC_CAN_SET_SEND_DUTY_CYCLE: u32 = 0x200;
 const LIRC_CAN_SET_TRANSMITTER_MASK: u32 = 0x400;
 const LIRC_CAN_SEND_PULSE: u32 = 2;
 const LIRC_CAN_SET_REC_TIMEOUT: u32 = 0x10000000;
+const LIRC_CAN_MEASURE_CARRIER: u32 = 0x20000000;
+const LIRC_CAN_USE_WIDEBAND_RECEIVER: u32 = 0x40000000;
 
 pub struct Lirc {
     file: File,
@@ -151,5 +155,31 @@ impl Lirc {
         let (_, max) = LIRC_GET_MAX_TIMEOUT.ioctl(&self.file)?;
 
         Ok(min..max)
+    }
+
+    /// Does this lirc device support setting send carrier
+    pub fn can_use_wideband_receiver(&self) -> bool {
+        (self.features & LIRC_CAN_USE_WIDEBAND_RECEIVER) != 0
+    }
+
+    /// Set the receiving timeout in microseconds
+    pub fn set_wideband_receiver(&mut self, enable: bool) -> io::Result<()> {
+        let enable = if enable { 1 } else { 0 };
+        LIRC_SET_WIDEBAND_RECEIVER.ioctl(&mut self.file, &enable)?;
+
+        Ok(())
+    }
+
+    /// Does this lirc device support measuring the carrier
+    pub fn can_measure_carrier(&self) -> bool {
+        (self.features & LIRC_CAN_MEASURE_CARRIER) != 0
+    }
+
+    /// Enabling measuring the carrier
+    pub fn set_measure_carrier(&mut self, enable: bool) -> io::Result<()> {
+        let enable = if enable { 1 } else { 0 };
+        LIRC_SET_MEASURE_CARRIER_MODE.ioctl(&mut self.file, &enable)?;
+
+        Ok(())
     }
 }
