@@ -97,7 +97,6 @@ fn main() {
                         .conflicts_with("LIRCDEV"),
                 )
                 .arg(Arg::with_name("VERBOSE").long("verbose").short("v"))
-                .about("Encode IR and print")
                 .subcommand(
                     SubCommand::with_name("irp")
                         .about("Encode using IRP langauge")
@@ -163,6 +162,31 @@ fn main() {
                 ),
         )
         .subcommand(SubCommand::with_name("list").about("List IR devices"))
+        .subcommand(
+            SubCommand::with_name("receive")
+                .about("Receive IR")
+                .arg(
+                    Arg::with_name("LIRCDEV")
+                        .long("device")
+                        .short("d")
+                        .takes_value(true)
+                        .conflicts_with("RCDEV"),
+                )
+                .arg(
+                    Arg::with_name("RCDEV")
+                        .long("rcdev")
+                        .short("s")
+                        .takes_value(true)
+                        .conflicts_with("LIRCDEV"),
+                )
+                .arg(Arg::with_name("LEARNING").long("learning-mode").short("l"))
+                .arg(
+                    Arg::with_name("TIMEOUT")
+                        .long("timeout")
+                        .short("t")
+                        .takes_value(true),
+                ),
+        )
         .get_matches();
 
     match matches.subcommand() {
@@ -198,49 +222,7 @@ fn main() {
                 println!("rawir: {}", message.print_rawir());
             }
 
-            let list = match rcdev::enumerate_rc_dev() {
-                Ok(list) if list.is_empty() => {
-                    eprintln!("error: no devices found");
-                    std::process::exit(1);
-                }
-                Ok(list) => list,
-                Err(err) => {
-                    eprintln!("error: no devices found: {}", err.to_string());
-                    std::process::exit(1);
-                }
-            };
-
-            let lircdev = if let Some(lircdev) = matches.value_of("LIRCDEV") {
-                lircdev
-            } else {
-                let entry = if let Some(rcdev) = matches.value_of("RCDEV") {
-                    if let Some(entry) = list.iter().position(|rc| rc.name == rcdev) {
-                        entry
-                    } else {
-                        eprintln!("error: {} not found", rcdev);
-                        std::process::exit(1);
-                    }
-                } else {
-                    0
-                };
-
-                if let Some(lircdev) = &list[entry].lircdev {
-                    lircdev
-                } else {
-                    eprintln!("error: {} has no lirc device not found", list[entry].name);
-                    std::process::exit(1);
-                }
-            };
-
-            let lircpath = PathBuf::from(lircdev);
-
-            let mut lircdev = match lirc::lirc_open(&lircpath) {
-                Ok(l) => l,
-                Err(s) => {
-                    eprintln!("error: {}: {}", lircpath.display(), s);
-                    std::process::exit(1);
-                }
-            };
+            let mut lircdev = open_lirc(matches);
 
             if let Some(duty_cycle) = message.duty_cycle {
                 if lircdev.can_set_send_duty_cycle() {
@@ -281,6 +263,119 @@ fn main() {
                 std::process::exit(1);
             }
         },
+        ("receive", Some(matches)) => {
+            let mut lircdev = open_lirc(matches);
+
+            let mut buf = Vec::with_capacity(1024);
+            let mut carrier = None;
+            let mut leading_space = true;
+
+            if matches.is_present("LEARNING") {
+                let mut learning_mode = false;
+
+                if lircdev.can_measure_carrier() {
+                    if let Err(err) = lircdev.set_measure_carrier(true) {
+                        eprintln!("error: {}", err.to_string());
+                        std::process::exit(1);
+                    }
+                    learning_mode = true;
+                }
+
+                if lircdev.can_use_wideband_receiver() {
+                    if let Err(err) = lircdev.set_wideband_receiver(true) {
+                        eprintln!("error: {}", err.to_string());
+                        std::process::exit(1);
+                    }
+                    learning_mode = true;
+                }
+
+                if !learning_mode {
+                    eprintln!("error: lirc device does not support learning mode");
+                    std::process::exit(1);
+                }
+            } else {
+                if lircdev.can_measure_carrier() {
+                    if let Err(err) = lircdev.set_measure_carrier(false) {
+                        eprintln!(
+                            "error: failed to enable measure carrier: {}",
+                            err.to_string()
+                        );
+                        std::process::exit(1);
+                    }
+                }
+
+                if lircdev.can_use_wideband_receiver() {
+                    if let Err(err) = lircdev.set_wideband_receiver(false) {
+                        eprintln!(
+                            "error: failed to enable wideband receiver: {}",
+                            err.to_string()
+                        );
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            if let Some(timeout) = matches.value_of("TIMEOUT") {
+                if let Ok(timeout) = u32::from_str_radix(timeout, 10) {
+                    if lircdev.can_set_timeout() {
+                        match lircdev.get_min_max_timeout() {
+                            Ok(range) if range.contains(&timeout) => {
+                                if let Err(err) = lircdev.set_timeout(timeout) {
+                                    eprintln!("error: {}", err.to_string());
+                                    std::process::exit(1);
+                                }
+                            }
+                            Ok(range) => {
+                                eprintln!(
+                                    "error: {} not in the range {}-{}",
+                                    timeout, range.start, range.end
+                                );
+                                std::process::exit(1);
+                            }
+                            Err(err) => {
+                                eprintln!("error: {}", err.to_string());
+                                std::process::exit(1);
+                            }
+                        }
+                    } else {
+                        eprintln!("error: cannot set timeout");
+                        std::process::exit(1);
+                    }
+                } else {
+                    eprintln!("error: timeout {} not valid", timeout);
+                    std::process::exit(1);
+                }
+            }
+
+            loop {
+                if let Err(err) = lircdev.receive_raw(&mut buf) {
+                    eprintln!("error: {}", err.to_string());
+                    std::process::exit(1);
+                }
+
+                for entry in &buf {
+                    if entry.is_space() {
+                        if leading_space {
+                            leading_space = false;
+                        } else {
+                            print!("-{} ", entry.value());
+                        }
+                    } else if entry.is_pulse() {
+                        print!("+{} ", entry.value());
+                    } else if entry.is_frequency() {
+                        carrier = Some(entry.value());
+                    } else if entry.is_timeout() {
+                        if let Some(freq) = carrier {
+                            println!(" # timeout {}, carrier {}Hz", entry.value(), freq);
+                            carrier = None;
+                        } else {
+                            println!(" # timeout {}", entry.value());
+                        }
+                        leading_space = true;
+                    }
+                }
+            }
+        }
         _ => unreachable!(),
     }
 
@@ -548,5 +643,51 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
                 .map(|p| &rcdev.supported_protocols[*p])
                 .join(" ")
         );
+    }
+}
+
+fn open_lirc(matches: &clap::ArgMatches) -> lirc::Lirc {
+    let list = match rcdev::enumerate_rc_dev() {
+        Ok(list) if list.is_empty() => {
+            eprintln!("error: no devices found");
+            std::process::exit(1);
+        }
+        Ok(list) => list,
+        Err(err) => {
+            eprintln!("error: no devices found: {}", err.to_string());
+            std::process::exit(1);
+        }
+    };
+
+    let lircdev = if let Some(lircdev) = matches.value_of("LIRCDEV") {
+        lircdev
+    } else {
+        let entry = if let Some(rcdev) = matches.value_of("RCDEV") {
+            if let Some(entry) = list.iter().position(|rc| rc.name == rcdev) {
+                entry
+            } else {
+                eprintln!("error: {} not found", rcdev);
+                std::process::exit(1);
+            }
+        } else {
+            0
+        };
+
+        if let Some(lircdev) = &list[entry].lircdev {
+            lircdev
+        } else {
+            eprintln!("error: {} has no lirc device not found", list[entry].name);
+            std::process::exit(1);
+        }
+    };
+
+    let lircpath = PathBuf::from(lircdev);
+
+    match lirc::lirc_open(&lircpath) {
+        Ok(l) => l,
+        Err(s) => {
+            eprintln!("error: {}: {}", lircpath.display(), s);
+            std::process::exit(1);
+        }
     }
 }

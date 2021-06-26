@@ -75,7 +75,7 @@ impl LircRaw {
         (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_FREQUENCY
     }
 
-    pub fn is_timemout(&self) -> bool {
+    pub fn is_timeout(&self) -> bool {
         (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_TIMEOUT
     }
 
