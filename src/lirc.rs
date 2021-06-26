@@ -19,14 +19,16 @@ const LIRC_GET_MAX_TIMEOUT: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x0
 const LIRC_SET_WIDEBAND_RECEIVER: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x23) };
 const LIRC_SET_MEASURE_CARRIER_MODE: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x1d) };
 const LIRC_SET_REC_MODE: Ioctl<iocuddle::Write, &u32> = unsafe { LIRC.write(0x12) };
+const LIRC_GET_REC_RESOLUTION: Ioctl<iocuddle::Read, &u32> = unsafe { LIRC.read(0x07) };
 
 const LIRC_CAN_SET_SEND_CARRIER: u32 = 0x100;
 const LIRC_CAN_SET_SEND_DUTY_CYCLE: u32 = 0x200;
 const LIRC_CAN_SET_TRANSMITTER_MASK: u32 = 0x400;
 const LIRC_CAN_SEND_PULSE: u32 = 2;
 const LIRC_CAN_SET_REC_TIMEOUT: u32 = 0x10000000;
-const LIRC_CAN_MEASURE_CARRIER: u32 = 0x20000000;
-const LIRC_CAN_USE_WIDEBAND_RECEIVER: u32 = 0x40000000;
+const LIRC_CAN_GET_REC_RESOLUTION: u32 = 0x20000000;
+const LIRC_CAN_MEASURE_CARRIER: u32 = 0x02000000;
+const LIRC_CAN_USE_WIDEBAND_RECEIVER: u32 = 0x04000000;
 const LIRC_CAN_REC_MODE2: u32 = 0x00040000;
 const LIRC_CAN_REC_SCANCODE: u32 = 0x00080000;
 
@@ -298,5 +300,17 @@ impl Lirc {
         }
 
         Ok(())
+    }
+
+    /// Can we get the receiver resolution
+    pub fn can_get_rec_resolution(&self) -> bool {
+        (self.features & LIRC_CAN_GET_REC_RESOLUTION) != 0
+    }
+
+    /// Enabling measuring the carrier
+    pub fn receiver_resolution(&self) -> io::Result<u32> {
+        let (_, res) = LIRC_GET_REC_RESOLUTION.ioctl(&self.file)?;
+
+        Ok(res)
     }
 }

@@ -1,6 +1,7 @@
 use clap::{App, AppSettings, Arg, SubCommand};
-use ir::{keymap, lirc::lirc_open};
+use ir::{keymap, lirc, rcdev};
 use irp::{Irp, Message, Pronto};
+use itertools::Itertools;
 use std::fs;
 use std::path::PathBuf;
 
@@ -85,8 +86,15 @@ fn main() {
                     Arg::with_name("LIRCDEV")
                         .long("device")
                         .short("d")
-                        .default_value("/dev/lirc0")
-                        .takes_value(true),
+                        .takes_value(true)
+                        .conflicts_with("RCDEV"),
+                )
+                .arg(
+                    Arg::with_name("RCDEV")
+                        .long("rcdev")
+                        .short("s")
+                        .takes_value(true)
+                        .conflicts_with("LIRCDEV"),
                 )
                 .arg(Arg::with_name("VERBOSE").long("verbose").short("v"))
                 .about("Encode IR and print")
@@ -154,6 +162,7 @@ fn main() {
                         ),
                 ),
         )
+        .subcommand(SubCommand::with_name("list").about("List IR devices"))
         .get_matches();
 
     match matches.subcommand() {
@@ -189,9 +198,43 @@ fn main() {
                 println!("rawir: {}", message.print_rawir());
             }
 
-            let lircpath = PathBuf::from(matches.value_of("LIRCDEV").unwrap());
+            let list = match rcdev::enumerate_rc_dev() {
+                Ok(list) if list.is_empty() => {
+                    eprintln!("error: no devices found");
+                    std::process::exit(1);
+                }
+                Ok(list) => list,
+                Err(err) => {
+                    eprintln!("error: no devices found: {}", err.to_string());
+                    std::process::exit(1);
+                }
+            };
 
-            let mut lircdev = match lirc_open(&lircpath) {
+            let lircdev = if let Some(lircdev) = matches.value_of("LIRCDEV") {
+                lircdev
+            } else {
+                let entry = if let Some(rcdev) = matches.value_of("RCDEV") {
+                    if let Some(entry) = list.iter().position(|rc| rc.name == rcdev) {
+                        entry
+                    } else {
+                        eprintln!("error: {} not found", rcdev);
+                        std::process::exit(1);
+                    }
+                } else {
+                    0
+                };
+
+                if let Some(lircdev) = &list[entry].lircdev {
+                    lircdev
+                } else {
+                    eprintln!("error: {} has no lirc device not found", list[entry].name);
+                    std::process::exit(1);
+                }
+            };
+
+            let lircpath = PathBuf::from(lircdev);
+
+            let mut lircdev = match lirc::lirc_open(&lircpath) {
                 Ok(l) => l,
                 Err(s) => {
                     eprintln!("error: {}: {}", lircpath.display(), s);
@@ -231,6 +274,13 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        ("list", Some(_)) => match rcdev::enumerate_rc_dev() {
+            Ok(list) => print_rc_dev(&list),
+            Err(err) => {
+                eprintln!("error: {}", err.to_string());
+                std::process::exit(1);
+            }
+        },
         _ => unreachable!(),
     }
 
@@ -374,5 +424,129 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
             eprintln!("encode requires a subcommand");
             std::process::exit(2);
         }
+    }
+}
+
+fn print_rc_dev(list: &[rcdev::Rcdev]) {
+    if list.is_empty() {
+        eprintln!("error: no devices found");
+        std::process::exit(1);
+    }
+
+    for rcdev in list {
+        println!("{}:", rcdev.name);
+
+        println!("\tDevice Name\t\t: {}", rcdev.device_name);
+        println!("\tDriver\t\t\t: {}", rcdev.driver);
+        println!("\tDefault Keymap\t\t: {}", rcdev.default_keymap);
+        if let Some(inputdev) = &rcdev.inputdev {
+            println!("\tInput Device\t\t: {}", inputdev);
+        }
+        if let Some(lircdev) = &rcdev.lircdev {
+            println!("\tLIRC Device\t\t: {}", lircdev);
+
+            match lirc::lirc_open(&PathBuf::from(lircdev)) {
+                Ok(lircdev) => {
+                    if lircdev.can_receive_raw() {
+                        println!("\tLIRC Receiver\t\t: raw receiver");
+
+                        if lircdev.can_get_rec_resolution() {
+                            println!(
+                                "\tLIRC Resolution\t\t: {}",
+                                match lircdev.receiver_resolution() {
+                                    Ok(res) => format!("{} microseconds", res),
+                                    Err(err) => err.to_string(),
+                                }
+                            );
+                        } else {
+                            println!("\tLIRC Resolution\t\t: unknown");
+                        }
+
+                        println!(
+                            "\tLIRC Timeout\t\t: {}",
+                            match lircdev.get_timeout() {
+                                Ok(timeout) => format!("{} microseconds", timeout),
+                                Err(err) => err.to_string(),
+                            }
+                        );
+
+                        if lircdev.can_set_timeout() {
+                            println!(
+                                "\tLIRC Timeout Range\t: {}",
+                                match lircdev.get_min_max_timeout() {
+                                    Ok(range) =>
+                                        format!("{} - {} microseconds", range.start, range.end),
+                                    Err(err) => err.to_string(),
+                                }
+                            );
+                        } else {
+                            println!("\tLIRC Receiver Timeout Range\t: none");
+                        }
+
+                        println!(
+                            "\tLIRC Wideband Receiver\t: {}",
+                            if lircdev.can_use_wideband_receiver() {
+                                "yes"
+                            } else {
+                                "no"
+                            }
+                        );
+
+                        println!(
+                            "\tLIRC Measure Carrier\t: {}",
+                            if lircdev.can_measure_carrier() {
+                                "yes"
+                            } else {
+                                "no"
+                            }
+                        );
+                    } else if lircdev.can_receive_scancodes() {
+                        println!("\tLIRC Receiver\t\t: scancode");
+                    } else {
+                        println!("\tLIRC Receiver\t\t: none");
+                    }
+
+                    if lircdev.can_send() {
+                        println!("\tLIRC Transmitter\t: yes");
+
+                        println!(
+                            "\tLIRC Set Tx Carrier\t: {}",
+                            if lircdev.can_set_send_carrier() {
+                                "yes"
+                            } else {
+                                "no"
+                            }
+                        );
+
+                        println!(
+                            "\tLIRC Set Tx Duty Cycle\t: {}",
+                            if lircdev.can_set_send_duty_cycle() {
+                                "yes"
+                            } else {
+                                "no"
+                            }
+                        );
+                    } else {
+                        println!("\tLIRC Transmitter\t: no");
+                    }
+                }
+                Err(err) => {
+                    println!("\tLIRC Features: {}", err.to_string());
+                }
+            }
+        }
+        println!(
+            "\tSupported Protocols\t: {}",
+            rcdev.supported_protocols.join(" ")
+        );
+
+        println!(
+            "\tEnabled Protocols\t: {}",
+            rcdev
+                .enabled_protocols
+                .iter()
+                .map(|p| &rcdev.supported_protocols[*p])
+                .join(" ")
+        );
     }
 }
