@@ -1,12 +1,20 @@
 - Finish off lirc sending (duty cycle, transmitters, others, verbose)
 - ir encode/send needs to read xml file
-- ir receiving scancodes/input device
+- ir receiving input device
 - Start irp decoder
 - wasmtime bpf backend
 - Generate bpf decoder
 - Read keymaps (both formats!)
 - reading input and keys for testing
 - Need ir-ctl and ir-keytable command line parsing
+- cargo name
+  - ir already taken
+  - ir-ctl/ir-tools/ir-utils: it's also a lib!
+  - cir ?
+  - cir
+  - linux-ir
+  - ir-remote?
+  - lirc? irp?
 - where to host?
    - v4l-utils?
    - already on github

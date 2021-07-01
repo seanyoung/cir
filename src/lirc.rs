@@ -4,6 +4,7 @@ use std::io;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::mem;
 use std::ops::Range;
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 const LIRC: Group = Group::new(b'i');
@@ -35,20 +36,23 @@ const LIRC_CAN_REC_SCANCODE: u32 = 0x00080000;
 const LIRC_MODE_MODE2: u32 = 0x00000004;
 const LIRC_MODE_SCANCODE: u32 = 0x00000008;
 
-pub const LIRC_MODE2_SPACE: u32 = 0x00000000;
-pub const LIRC_MODE2_PULSE: u32 = 0x01000000;
-pub const LIRC_MODE2_FREQUENCY: u32 = 0x02000000;
-pub const LIRC_MODE2_TIMEOUT: u32 = 0x03000000;
+const LIRC_MODE2_SPACE: u32 = 0x00000000;
+const LIRC_MODE2_PULSE: u32 = 0x01000000;
+const LIRC_MODE2_FREQUENCY: u32 = 0x02000000;
+const LIRC_MODE2_TIMEOUT: u32 = 0x03000000;
 
 const LIRC_VALUE_MASK: u32 = 0x00FFFFFF;
 const LIRC_MODE2_MASK: u32 = 0xFF000000;
 
 ///
 pub struct Lirc {
-    file: File,
+    pub file: File,
     features: u32,
     raw_mode: bool,
 }
+
+pub const LIRC_SCANCODE_FLAG_TOGGLE: u16 = 1;
+pub const LIRC_SCANCODE_FLAG_REPEAT: u16 = 2;
 
 /// Type used for receiving decoded IR.
 pub struct LircScancode {
@@ -79,10 +83,6 @@ impl LircRaw {
         (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_TIMEOUT
     }
 
-    pub fn ty(&self) -> u32 {
-        self.0 & LIRC_MODE2_MASK
-    }
-
     pub fn value(&self) -> u32 {
         self.0 & LIRC_VALUE_MASK
     }
@@ -90,7 +90,11 @@ impl LircRaw {
 
 /// Open a lirc chardev, which should have a path like "/dev/lirc0"
 pub fn lirc_open(path: &Path) -> io::Result<Lirc> {
-    let file = OpenOptions::new().read(true).write(true).open(path)?;
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)?;
 
     if let Ok((0, features)) = LIRC_GET_FEATURES.ioctl(&file) {
         Ok(Lirc {
@@ -268,7 +272,11 @@ impl Lirc {
         let length = result.capacity() * mem::size_of::<LircRaw>();
         let data = unsafe { std::slice::from_raw_parts_mut(result.as_ptr() as *mut u8, length) };
 
-        let res = self.file.read(data)?;
+        let res = match self.file.read(data) {
+            Ok(res) => res,
+            Err(err) if err.raw_os_error() == Some(libc::EAGAIN) => 0,
+            Err(err) => return Err(err),
+        };
 
         unsafe { result.set_len(res / mem::size_of::<LircRaw>()) };
 
@@ -277,7 +285,7 @@ impl Lirc {
 
     /// Does this lirc device support receiving in decoded scancode format
     pub fn can_receive_scancodes(&self) -> bool {
-        (self.features & LIRC_CAN_REC_SCANCODE) != 0
+        (self.features & LIRC_CAN_REC_MODE2 | LIRC_CAN_REC_SCANCODE) != 0
     }
 
     /// Read the decoded IR.
@@ -293,7 +301,11 @@ impl Lirc {
         let length = result.capacity() * mem::size_of::<LircScancode>();
         let data = unsafe { std::slice::from_raw_parts_mut(result.as_ptr() as *mut u8, length) };
 
-        let res = self.file.read(data)?;
+        let res = match self.file.read(data) {
+            Ok(res) => res,
+            Err(err) if err.raw_os_error() == Some(libc::EAGAIN) => 0,
+            Err(err) => return Err(err),
+        };
 
         unsafe {
             result.set_len(res / mem::size_of::<LircScancode>());
