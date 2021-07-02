@@ -1,8 +1,10 @@
 use clap::{App, AppSettings, Arg, SubCommand};
-use ir::{keymap, lirc, rcdev};
+use evdev::Device;
 use irp::{Irp, Message, Pronto};
 use itertools::Itertools;
+use linux_infrared::{keymap, lirc, rcdev};
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
+use nix::fcntl::{FcntlArg, OFlag};
 use std::fs;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
@@ -538,7 +540,8 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
     }
 }
 
-fn open_lirc(matches: &clap::ArgMatches) -> lirc::Lirc {
+/// Enumerate all rc devices and find the lirc and input devices
+fn find_devices(matches: &clap::ArgMatches) -> (Option<String>, Option<String>) {
     let list = match rcdev::enumerate_rc_dev() {
         Ok(list) if list.is_empty() => {
             eprintln!("error: no devices found");
@@ -551,8 +554,8 @@ fn open_lirc(matches: &clap::ArgMatches) -> lirc::Lirc {
         }
     };
 
-    let lircdev = if let Some(lircdev) = matches.value_of("LIRCDEV") {
-        lircdev
+    if let Some(lircdev) = matches.value_of("LIRCDEV") {
+        (Some(lircdev.to_owned()), None)
     } else {
         let entry = if let Some(rcdev) = matches.value_of("RCDEV") {
             if let Some(entry) = list.iter().position(|rc| rc.name == rcdev) {
@@ -570,155 +573,197 @@ fn open_lirc(matches: &clap::ArgMatches) -> lirc::Lirc {
             }
         };
 
-        if let Some(lircdev) = &list[entry].lircdev {
-            lircdev
-        } else {
-            eprintln!("error: {} has no lirc device", list[entry].name);
-            std::process::exit(1);
-        }
-    };
+        (list[entry].lircdev.clone(), list[entry].inputdev.clone())
+    }
+}
 
-    let lircpath = PathBuf::from(lircdev);
+fn open_lirc(matches: &clap::ArgMatches) -> lirc::Lirc {
+    let (lircdev, _) = find_devices(matches);
 
-    match lirc::lirc_open(&lircpath) {
-        Ok(l) => l,
-        Err(s) => {
-            eprintln!("error: {}: {}", lircpath.display(), s);
-            std::process::exit(1);
+    if let Some(lircdev) = lircdev {
+        let lircpath = PathBuf::from(lircdev);
+
+        match lirc::lirc_open(&lircpath) {
+            Ok(l) => l,
+            Err(s) => {
+                eprintln!("error: {}: {}", lircpath.display(), s);
+                std::process::exit(1);
+            }
         }
+    } else {
+        eprintln!("error: no lirc device found");
+        std::process::exit(1);
     }
 }
 
 fn receive(matches: &clap::ArgMatches) {
-    let mut lircdev = open_lirc(matches);
+    let (lircdev, inputdev) = find_devices(matches);
     let raw_token: Token = Token(0);
     let scancodes_token: Token = Token(1);
+    let input_token: Token = Token(2);
 
     let mut poll = Poll::new().expect("failed to create poll");
+    let mut scandev = None;
+    let mut rawdev = None;
+    let mut eventdev = None;
 
-    if matches.is_present("LEARNING") {
-        let mut learning_mode = false;
+    if let Some(lircdev) = lircdev {
+        let lircpath = PathBuf::from(lircdev);
 
-        if lircdev.can_measure_carrier() {
-            if let Err(err) = lircdev.set_measure_carrier(true) {
-                eprintln!(
-                    "error: failed to enable measure carrier: {}",
-                    err.to_string()
-                );
+        let mut lircdev = match lirc::lirc_open(&lircpath) {
+            Ok(l) => l,
+            Err(s) => {
+                eprintln!("error: {}: {}", lircpath.display(), s);
                 std::process::exit(1);
             }
-            learning_mode = true;
-        }
+        };
 
-        if lircdev.can_use_wideband_receiver() {
-            if let Err(err) = lircdev.set_wideband_receiver(true) {
-                eprintln!(
-                    "error: failed to enable wideband receiver: {}",
-                    err.to_string()
-                );
+        if matches.is_present("LEARNING") {
+            let mut learning_mode = false;
+
+            if lircdev.can_measure_carrier() {
+                if let Err(err) = lircdev.set_measure_carrier(true) {
+                    eprintln!(
+                        "error: failed to enable measure carrier: {}",
+                        err.to_string()
+                    );
+                    std::process::exit(1);
+                }
+                learning_mode = true;
+            }
+
+            if lircdev.can_use_wideband_receiver() {
+                if let Err(err) = lircdev.set_wideband_receiver(true) {
+                    eprintln!(
+                        "error: failed to enable wideband receiver: {}",
+                        err.to_string()
+                    );
+                    std::process::exit(1);
+                }
+                learning_mode = true;
+            }
+
+            if !learning_mode {
+                eprintln!("error: lirc device does not support learning mode");
                 std::process::exit(1);
             }
-            learning_mode = true;
-        }
+        } else {
+            if lircdev.can_measure_carrier() {
+                if let Err(err) = lircdev.set_measure_carrier(false) {
+                    eprintln!(
+                        "error: failed to disable measure carrier: {}",
+                        err.to_string()
+                    );
+                    std::process::exit(1);
+                }
+            }
 
-        if !learning_mode {
-            eprintln!("error: lirc device does not support learning mode");
-            std::process::exit(1);
-        }
-    } else {
-        if lircdev.can_measure_carrier() {
-            if let Err(err) = lircdev.set_measure_carrier(false) {
-                eprintln!(
-                    "error: failed to disable measure carrier: {}",
-                    err.to_string()
-                );
-                std::process::exit(1);
+            if lircdev.can_use_wideband_receiver() {
+                if let Err(err) = lircdev.set_wideband_receiver(false) {
+                    eprintln!(
+                        "error: failed to disable wideband receiver: {}",
+                        err.to_string()
+                    );
+                    std::process::exit(1);
+                }
             }
         }
 
-        if lircdev.can_use_wideband_receiver() {
-            if let Err(err) = lircdev.set_wideband_receiver(false) {
-                eprintln!(
-                    "error: failed to disable wideband receiver: {}",
-                    err.to_string()
-                );
-                std::process::exit(1);
-            }
-        }
-    }
-
-    if let Some(timeout) = matches.value_of("TIMEOUT") {
-        if let Ok(timeout) = timeout.parse() {
-            if lircdev.can_set_timeout() {
-                match lircdev.get_min_max_timeout() {
-                    Ok(range) if range.contains(&timeout) => {
-                        if let Err(err) = lircdev.set_timeout(timeout) {
+        if let Some(timeout) = matches.value_of("TIMEOUT") {
+            if let Ok(timeout) = timeout.parse() {
+                if lircdev.can_set_timeout() {
+                    match lircdev.get_min_max_timeout() {
+                        Ok(range) if range.contains(&timeout) => {
+                            if let Err(err) = lircdev.set_timeout(timeout) {
+                                eprintln!("error: {}", err.to_string());
+                                std::process::exit(1);
+                            }
+                        }
+                        Ok(range) => {
+                            eprintln!(
+                                "error: {} not in the range {}-{}",
+                                timeout, range.start, range.end
+                            );
+                            std::process::exit(1);
+                        }
+                        Err(err) => {
                             eprintln!("error: {}", err.to_string());
                             std::process::exit(1);
                         }
                     }
-                    Ok(range) => {
-                        eprintln!(
-                            "error: {} not in the range {}-{}",
-                            timeout, range.start, range.end
-                        );
-                        std::process::exit(1);
-                    }
-                    Err(err) => {
-                        eprintln!("error: {}", err.to_string());
-                        std::process::exit(1);
-                    }
+                } else {
+                    eprintln!("error: cannot set timeout");
+                    std::process::exit(1);
                 }
             } else {
-                eprintln!("error: cannot set timeout");
+                eprintln!("error: timeout {} not valid", timeout);
                 std::process::exit(1);
             }
-        } else {
-            eprintln!("error: timeout {} not valid", timeout);
-            std::process::exit(1);
         }
+
+        if lircdev.can_receive_raw() {
+            poll.registry()
+                .register(
+                    &mut SourceFd(&lircdev.file.as_raw_fd()),
+                    raw_token,
+                    Interest::READABLE,
+                )
+                .expect("failed to add raw poll");
+
+            if lircdev.can_receive_scancodes() {
+                let mut lircdev = open_lirc(matches);
+
+                lircdev
+                    .scancode_mode()
+                    .expect("should be able to switch to scancode mode");
+
+                poll.registry()
+                    .register(
+                        &mut SourceFd(&lircdev.file.as_raw_fd()),
+                        scancodes_token,
+                        Interest::READABLE,
+                    )
+                    .expect("failed to add scancodes poll");
+
+                scandev = Some(lircdev);
+            }
+
+            rawdev = Some(lircdev);
+        } else {
+            if lircdev.can_receive_scancodes() {
+                poll.registry()
+                    .register(
+                        &mut SourceFd(&lircdev.file.as_raw_fd()),
+                        scancodes_token,
+                        Interest::READABLE,
+                    )
+                    .expect("failed to add scancodes poll");
+
+                scandev = Some(lircdev);
+            }
+        };
     }
 
-    let mut scandev = None;
-    let mut rawdev = None;
+    if let Some(inputdev) = inputdev {
+        let inputdev = match Device::open(&inputdev) {
+            Ok(l) => l,
+            Err(s) => {
+                eprintln!("error: {}: {}", inputdev, s);
+                std::process::exit(1);
+            }
+        };
 
-    if lircdev.can_receive_raw() {
+        let raw_fd = inputdev.as_raw_fd();
+
+        nix::fcntl::fcntl(raw_fd, FcntlArg::F_SETFL(OFlag::O_NONBLOCK))
+            .expect("should be able to set non-blocking");
+
         poll.registry()
-            .register(
-                &mut SourceFd(&lircdev.file.as_raw_fd()),
-                raw_token,
-                Interest::READABLE,
-            )
-            .expect("failed to add raw poll");
+            .register(&mut SourceFd(&raw_fd), input_token, Interest::READABLE)
+            .expect("failed to add scancodes poll");
 
-        if lircdev.can_receive_scancodes() {
-            let lircdev = open_lirc(matches);
-
-            poll.registry()
-                .register(
-                    &mut SourceFd(&lircdev.file.as_raw_fd()),
-                    scancodes_token,
-                    Interest::READABLE,
-                )
-                .expect("failed to add scancodes poll");
-
-            scandev = Some(lircdev);
-        }
-
-        rawdev = Some(lircdev);
-    } else {
-        if lircdev.can_receive_scancodes() {
-            poll.registry()
-                .register(
-                    &mut SourceFd(&lircdev.file.as_raw_fd()),
-                    scancodes_token,
-                    Interest::READABLE,
-                )
-                .expect("failed to add scancodes poll");
-
-            scandev = Some(lircdev);
-        }
-    };
+        eventdev = Some(inputdev);
+    }
 
     let mut rawbuf = Vec::with_capacity(1024);
     let mut carrier = None;
@@ -784,6 +829,21 @@ fn receive(matches: &clap::ArgMatches) {
                         ""
                     },
                 );
+            }
+        }
+
+        if let Some(eventdev) = &mut eventdev {
+            match eventdev.fetch_events() {
+                Ok(iterator) => {
+                    for ev in iterator {
+                        println!("{:?}", ev);
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => (),
+                Err(e) => {
+                    eprintln!("error: {}", e.to_string());
+                    std::process::exit(1);
+                }
             }
         }
 

@@ -288,8 +288,8 @@ impl Lirc {
         (self.features & LIRC_CAN_REC_MODE2 | LIRC_CAN_REC_SCANCODE) != 0
     }
 
-    /// Read the decoded IR.
-    pub fn receive_scancodes(&mut self, result: &mut Vec<LircScancode>) -> io::Result<()> {
+    /// Switch to scancode mode
+    pub fn scancode_mode(&mut self) -> io::Result<()> {
         if self.raw_mode {
             let mode = LIRC_MODE_SCANCODE;
 
@@ -297,6 +297,13 @@ impl Lirc {
 
             self.raw_mode = false;
         }
+
+        Ok(())
+    }
+
+    /// Read the decoded IR.
+    pub fn receive_scancodes(&mut self, result: &mut Vec<LircScancode>) -> io::Result<()> {
+        self.scancode_mode()?;
 
         let length = result.capacity() * mem::size_of::<LircScancode>();
         let data = unsafe { std::slice::from_raw_parts_mut(result.as_ptr() as *mut u8, length) };

@@ -1,5 +1,5 @@
 [package]
-name = "ir"
+name = "linux-infrared"
 version = "0.1.0"
 authors = ["Sean Young <sean@mess.org>"]
 edition = "2018"
@@ -15,6 +15,7 @@ itertools = "0.10"
 evdev = { git = "https://github.com/emberian/evdev" }
 mio = { version = "0.7", features = [ "os-poll", "os-ext" ] }
 libc = "0.2"
+nix = "0.21"
 
 [profile.release]
 lto = true
