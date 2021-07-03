@@ -1,6 +1,6 @@
 - Finish off lirc sending (duty cycle, transmitters, others, verbose)
 - ir encode/send needs to read xml file
-- ir receiving input device
+- Formatting of ir receive is poor/broken
 - Start irp decoder
 - wasmtime bpf backend
 - Generate bpf decoder

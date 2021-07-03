@@ -1,6 +1,5 @@
 use super::{Expression, GeneralSpec, Irp, Message, Pronto, RepeatMarker, Unit, Vartable};
 
-use bitintr::Popcnt;
 use bitvec::prelude::*;
 use std::collections::HashMap;
 
@@ -437,7 +436,7 @@ impl Expression {
                     val &= (1 << len) - 1;
                 }
 
-                Ok((val.popcnt(), len))
+                Ok((val.count_ones().into(), len))
             }
             Expression::ShiftLeft(value, r) => {
                 let (value, len) = value.eval(vars)?;

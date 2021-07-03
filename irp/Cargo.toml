@@ -19,7 +19,6 @@ num = "0.4"
 regex = "1"
 serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
-bitintr = "0.3.0"
 quick-xml = { version = "0.22.0", features = [ "serialize" ] }
 unicode-xid = "0.2"
 serde_json = "1.0"

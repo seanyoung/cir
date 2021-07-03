@@ -55,6 +55,7 @@ pub const LIRC_SCANCODE_FLAG_TOGGLE: u16 = 1;
 pub const LIRC_SCANCODE_FLAG_REPEAT: u16 = 2;
 
 /// Type used for receiving decoded IR.
+#[repr(C)]
 pub struct LircScancode {
     pub timestamp: u64,
     pub flags: u16,
