@@ -427,7 +427,9 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
 
         println!("\tDevice Name\t\t: {}", rcdev.device_name);
         println!("\tDriver\t\t\t: {}", rcdev.driver);
-        println!("\tDefault Keymap\t\t: {}", rcdev.default_keymap);
+        if !rcdev.default_keymap.is_empty() {
+            println!("\tDefault Keymap\t\t: {}", rcdev.default_keymap);
+        }
         if let Some(inputdev) = &rcdev.inputdev {
             println!("\tInput Device\t\t: {}", inputdev);
         }
@@ -520,23 +522,26 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
                     }
                 }
                 Err(err) => {
-                    println!("\tLIRC Features: {}", err.to_string());
+                    println!("\tLIRC Features\t\t: {}", err.to_string());
                 }
             }
         }
-        println!(
-            "\tSupported Protocols\t: {}",
-            rcdev.supported_protocols.join(" ")
-        );
 
-        println!(
-            "\tEnabled Protocols\t: {}",
-            rcdev
-                .enabled_protocols
-                .iter()
-                .map(|p| &rcdev.supported_protocols[*p])
-                .join(" ")
-        );
+        if !rcdev.supported_protocols.is_empty() {
+            println!(
+                "\tSupported Protocols\t: {}",
+                rcdev.supported_protocols.join(" ")
+            );
+
+            println!(
+                "\tEnabled Protocols\t: {}",
+                rcdev
+                    .enabled_protocols
+                    .iter()
+                    .map(|p| &rcdev.supported_protocols[*p])
+                    .join(" ")
+            );
+        }
     }
 }
 

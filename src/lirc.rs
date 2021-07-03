@@ -286,7 +286,7 @@ impl Lirc {
 
     /// Does this lirc device support receiving in decoded scancode format
     pub fn can_receive_scancodes(&self) -> bool {
-        (self.features & LIRC_CAN_REC_MODE2 | LIRC_CAN_REC_SCANCODE) != 0
+        (self.features & (LIRC_CAN_REC_MODE2 | LIRC_CAN_REC_SCANCODE)) != 0
     }
 
     /// Switch to scancode mode
