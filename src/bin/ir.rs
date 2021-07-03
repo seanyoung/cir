@@ -437,7 +437,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
             println!("\tLIRC Device\t\t: {}", lircdev);
 
             match lirc::open(&PathBuf::from(lircdev)) {
-                Ok(lircdev) => {
+                Ok(mut lircdev) => {
                     if lircdev.can_receive_raw() {
                         println!("\tLIRC Receiver\t\t: raw receiver");
 
@@ -466,7 +466,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
                                 "\tLIRC Timeout Range\t: {}",
                                 match lircdev.get_min_max_timeout() {
                                     Ok(range) =>
-                                        format!("{} - {} microseconds", range.start, range.end),
+                                        format!("{} to {} microseconds", range.start, range.end),
                                     Err(err) => err.to_string(),
                                 }
                             );
@@ -517,6 +517,18 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
                                 "no"
                             }
                         );
+
+                        if lircdev.can_set_send_transmitter_mask() {
+                            println!(
+                                "\tLIRC Transmitters\t: {}",
+                                match lircdev.num_transmitters() {
+                                    Ok(count) => format!("{}", count),
+                                    Err(err) => err.to_string(),
+                                }
+                            );
+                        } else {
+                            println!("\tLIRC Receiver Timeout Range\t: none");
+                        }
                     } else {
                         println!("\tLIRC Transmitter\t: no");
                     }
