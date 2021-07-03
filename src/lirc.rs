@@ -4,7 +4,7 @@ use std::io;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::mem;
 use std::ops::Range;
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
 
 const LIRC: Group = Group::new(b'i');
@@ -44,9 +44,9 @@ const LIRC_MODE2_TIMEOUT: u32 = 0x03000000;
 const LIRC_VALUE_MASK: u32 = 0x00FFFFFF;
 const LIRC_MODE2_MASK: u32 = 0xFF000000;
 
-///
+/// A physical or virtual lirc device
 pub struct Lirc {
-    pub file: File,
+    file: File,
     features: u32,
     raw_mode: bool,
 }
@@ -90,12 +90,8 @@ impl LircRaw {
 }
 
 /// Open a lirc chardev, which should have a path like "/dev/lirc0"
-pub fn lirc_open(path: &Path) -> io::Result<Lirc> {
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .custom_flags(libc::O_NONBLOCK)
-        .open(path)?;
+pub fn open(path: &Path) -> io::Result<Lirc> {
+    let file = OpenOptions::new().read(true).write(true).open(path)?;
 
     if let Ok((0, features)) = LIRC_GET_FEATURES.ioctl(&file) {
         Ok(Lirc {
@@ -275,7 +271,6 @@ impl Lirc {
 
         let res = match self.file.read(data) {
             Ok(res) => res,
-            Err(err) if err.raw_os_error() == Some(libc::EAGAIN) => 0,
             Err(err) => return Err(err),
         };
 
@@ -311,7 +306,6 @@ impl Lirc {
 
         let res = match self.file.read(data) {
             Ok(res) => res,
-            Err(err) if err.raw_os_error() == Some(libc::EAGAIN) => 0,
             Err(err) => return Err(err),
         };
 
@@ -332,5 +326,11 @@ impl Lirc {
         let (_, res) = LIRC_GET_REC_RESOLUTION.ioctl(&self.file)?;
 
         Ok(res)
+    }
+}
+
+impl AsRawFd for Lirc {
+    fn as_raw_fd(&self) -> RawFd {
+        self.file.as_raw_fd()
     }
 }

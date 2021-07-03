@@ -436,7 +436,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
         if let Some(lircdev) = &rcdev.lircdev {
             println!("\tLIRC Device\t\t: {}", lircdev);
 
-            match lirc::lirc_open(&PathBuf::from(lircdev)) {
+            match lirc::open(&PathBuf::from(lircdev)) {
                 Ok(lircdev) => {
                     if lircdev.can_receive_raw() {
                         println!("\tLIRC Receiver\t\t: raw receiver");
@@ -588,7 +588,7 @@ fn open_lirc(matches: &clap::ArgMatches) -> lirc::Lirc {
     if let Some(lircdev) = lircdev {
         let lircpath = PathBuf::from(lircdev);
 
-        match lirc::lirc_open(&lircpath) {
+        match lirc::open(&lircpath) {
             Ok(l) => l,
             Err(s) => {
                 eprintln!("error: {}: {}", lircpath.display(), s);
@@ -615,7 +615,7 @@ fn receive(matches: &clap::ArgMatches) {
     if let Some(lircdev) = lircdev {
         let lircpath = PathBuf::from(lircdev);
 
-        let mut lircdev = match lirc::lirc_open(&lircpath) {
+        let mut lircdev = match lirc::open(&lircpath) {
             Ok(l) => l,
             Err(s) => {
                 eprintln!("error: {}: {}", lircpath.display(), s);
@@ -709,7 +709,7 @@ fn receive(matches: &clap::ArgMatches) {
         if lircdev.can_receive_raw() {
             poll.registry()
                 .register(
-                    &mut SourceFd(&lircdev.file.as_raw_fd()),
+                    &mut SourceFd(&lircdev.as_raw_fd()),
                     raw_token,
                     Interest::READABLE,
                 )
@@ -722,12 +722,13 @@ fn receive(matches: &clap::ArgMatches) {
                     .scancode_mode()
                     .expect("should be able to switch to scancode mode");
 
+                let raw_fd = lircdev.as_raw_fd();
+
+                nix::fcntl::fcntl(raw_fd, FcntlArg::F_SETFL(OFlag::O_NONBLOCK))
+                    .expect("should be able to set non-blocking");
+
                 poll.registry()
-                    .register(
-                        &mut SourceFd(&lircdev.file.as_raw_fd()),
-                        scancodes_token,
-                        Interest::READABLE,
-                    )
+                    .register(&mut SourceFd(&raw_fd), scancodes_token, Interest::READABLE)
                     .expect("failed to add scancodes poll");
 
                 scandev = Some(lircdev);
@@ -736,12 +737,13 @@ fn receive(matches: &clap::ArgMatches) {
             rawdev = Some(lircdev);
         } else {
             if lircdev.can_receive_scancodes() {
+                let raw_fd = lircdev.as_raw_fd();
+
+                nix::fcntl::fcntl(raw_fd, FcntlArg::F_SETFL(OFlag::O_NONBLOCK))
+                    .expect("should be able to set non-blocking");
+
                 poll.registry()
-                    .register(
-                        &mut SourceFd(&lircdev.file.as_raw_fd()),
-                        scancodes_token,
-                        Interest::READABLE,
-                    )
+                    .register(&mut SourceFd(&raw_fd), scancodes_token, Interest::READABLE)
                     .expect("failed to add scancodes poll");
 
                 scandev = Some(lircdev);
