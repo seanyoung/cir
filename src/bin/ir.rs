@@ -429,6 +429,31 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
         }
         if let Some(inputdev) = &rcdev.inputdev {
             println!("\tInput Device\t\t: {}", inputdev);
+
+            match Device::open(&inputdev) {
+                Ok(inputdev) => {
+                    let id = inputdev.input_id();
+
+                    println!("\tBus\t\t\t: {}", id.bus_type());
+
+                    println!(
+                        "\tVendor/product\t\t: {:04x}:{:04x} version 0x{:04x}",
+                        id.product(),
+                        id.vendor(),
+                        id.version()
+                    );
+
+                    let repeat = inputdev.get_auto_repeat();
+
+                    println!(
+                        "\tRepeat\t\t\t: delay {} ms, period {} ms",
+                        repeat.delay, repeat.period
+                    );
+                }
+                Err(err) => {
+                    println!("\tInput properties\t: {}", err);
+                }
+            };
         }
         if let Some(lircdev) = &rcdev.lircdev {
             println!("\tLIRC Device\t\t: {}", lircdev);

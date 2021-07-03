@@ -12,7 +12,7 @@ serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
 iocuddle = "0.1.1"
 itertools = "0.10"
-evdev = { git = "https://github.com/emberian/evdev" }
+evdev = { git = "https://github.com/emberian/evdev/" }
 mio = { version = "0.7", features = [ "os-poll", "os-ext" ] }
 libc = "0.2"
 nix = "0.21"
