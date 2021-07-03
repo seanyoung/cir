@@ -1,8 +1,8 @@
 [package]
 name = "irp"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Sean Young <sean@mess.org>"]
-repository = "https://github.com/seanyoung/ir"
+repository = "https://github.com/seanyoung/linux-infrared"
 edition = "2018"
 description = "Infrared IRP encoder"
 documentation = "https://docs.rs/irp/"
