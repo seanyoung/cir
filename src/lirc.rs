@@ -180,9 +180,7 @@ impl Lirc {
 
     pub fn num_transmitters(&mut self) -> io::Result<u32> {
         // If the LIRC_SET_TRANSMITTER_MASK is called with an invalid mask, the number of transmitters are returned
-        LIRC_SET_TRANSMITTER_MASK
-            .ioctl(&mut self.file, &!0)
-            .map(|v| v.count_ones())
+        LIRC_SET_TRANSMITTER_MASK.ioctl(&mut self.file, &!0)
     }
 
     /// Set the send carrier. A carrier of 0 means unmodulated
