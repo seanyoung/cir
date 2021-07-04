@@ -81,7 +81,7 @@ fn main() {
                         .arg(Arg::with_name("RAWIR").help("Raw IR").required(true)),
                 ),
         )
-        .subcommand(SubCommand::with_name("keymap").arg(Arg::with_name("FILE").long("keymap")))
+        .subcommand(SubCommand::with_name("keymap").arg(Arg::with_name("FILE").required(true)))
         .subcommand(
             SubCommand::with_name("send")
                 .about("Encode IR and transmit")
@@ -270,20 +270,17 @@ fn main() {
         ("receive", Some(matches)) => {
             receive(matches);
         }
-        _ => unreachable!(),
-    }
+        ("keymap", Some(matches)) => {
+            let filename = matches.value_of("FILE").unwrap();
 
-    if let ("keymap", Some(matches)) = matches.subcommand() {
-        let arg = if matches.is_present("FILE") {
-            fs::read_to_string(matches.value_of("FILE").unwrap()).unwrap()
-        } else {
-            matches.value_of("INPUT").unwrap().to_string()
-        };
+            let contents = fs::read_to_string(filename).unwrap();
 
-        match keymap::parse(&arg) {
-            Ok(ir) => println!("{:?}", ir),
-            Err(s) => eprintln!("error: {}", s),
+            match keymap::parse(&contents, &filename) {
+                Ok(ir) => println!("{:?}", ir),
+                Err(s) => eprintln!("error: {}", s),
+            }
         }
+        _ => unreachable!(),
     }
 }
 

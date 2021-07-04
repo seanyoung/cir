@@ -1,0 +1,16 @@
+keymap <- first_line lines* EOI;
+
+first_line <- WHITESPACE "#" WHITESPACE "table" (":" / "=")? WHITESPACE identifier WHITESPACE "," WHITESPACE "type" (":" / "=")? WHITESPACE protocols WHITESPACE;
+
+protocols <- protocols ","? WHITESPACE protocols
+        / identifier WHITESPACE;
+
+lines <- comment / scancode;
+
+comment <- re#\#.*# WHITESPACE;
+
+scancode <- hex WHITESPACE identifier WHITESPACE;
+
+hex <- re#0x[0-9a-fA-F]*#;
+
+identifier <- re#[a-zA-Z][-_0-9a-zA-Z]*#;

@@ -16,6 +16,11 @@ evdev = { git = "https://github.com/emberian/evdev" }
 mio = { version = "0.7", features = [ "os-poll", "os-ext" ] }
 libc = "0.2"
 nix = "0.21"
+regex = "1"
+unicode-xid = "0.2"
+
+[build-dependencies]
+lrpeg = { git = "https://github.com/seanyoung/lrpeg/" }
 
 [profile.release]
 lto = true

@@ -1,10 +1,11 @@
 - Finish off lirc sending (duty cycle, transmitters, others, verbose)
 - ir encode/send needs to read xml file
 - Formatting of ir receive is poor/broken
-- read input device keymappings
 - Start irp decoder
 - wasmtime bpf backend
 - Generate bpf decoder
 - Read keymaps (both formats!)
 - reading input and keys for testing
+- Update protocols file
+- Test all keymaps
 - Need ir-ctl and ir-keytable command line parsing
