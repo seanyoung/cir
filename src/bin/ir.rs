@@ -1,5 +1,5 @@
 use clap::{App, AppSettings, Arg, SubCommand};
-use evdev::Device;
+use evdev::{Device, Key};
 use irp::{Irp, Message, Pronto};
 use itertools::Itertools;
 use linux_infrared::{keymap, lirc, rcdev};
@@ -83,6 +83,45 @@ fn main() {
                 ),
         )
         .subcommand(SubCommand::with_name("keymap").arg(Arg::with_name("FILE").required(true)))
+        .subcommand(
+            SubCommand::with_name("decoder")
+                .about("Configure IR decoder")
+                .arg(
+                    Arg::with_name("LIRCDEV")
+                        .long("device")
+                        .short("d")
+                        .takes_value(true)
+                        .conflicts_with("RCDEV"),
+                )
+                .arg(
+                    Arg::with_name("RCDEV")
+                        .long("rcdev")
+                        .short("s")
+                        .takes_value(true)
+                        .conflicts_with("LIRCDEV"),
+                )
+                .arg(
+                    Arg::with_name("DELAY")
+                        .long("delay")
+                        .short("D")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("PERIOD")
+                        .long("period")
+                        .short("P")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("KEYMAP")
+                        .long("write")
+                        .short("w")
+                        .takes_value(true)
+                        .multiple(true),
+                )
+                .arg(Arg::with_name("CLEAR").long("clear").short("c"))
+                .arg(Arg::with_name("VERBOSE").long("verbose").short("v")),
+        )
         .subcommand(
             SubCommand::with_name("send")
                 .about("Encode IR and transmit")
@@ -168,7 +207,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("list")
-                .about("List IR devices")
+                .about("List IR and CEC devices")
                 .arg(
                     Arg::with_name("LIRCDEV")
                         .long("device")
@@ -187,7 +226,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("receive")
-                .about("Receive IR")
+                .about("Receive IR and print to stdout")
                 .arg(
                     Arg::with_name("LIRCDEV")
                         .long("device")
@@ -298,6 +337,9 @@ fn main() {
                 Ok(ir) => println!("{:?}", ir),
                 Err(s) => eprintln!("error: {}", s),
             }
+        }
+        ("decoder", Some(matches)) => {
+            decoder(matches);
         }
         _ => unreachable!(),
     }
@@ -694,13 +736,11 @@ fn find_devices(matches: &clap::ArgMatches) -> (Option<String>, Option<String>) 
                 eprintln!("error: {} not found", rcdev);
                 std::process::exit(1);
             }
+        } else if let Some(entry) = list.iter().position(|rc| rc.lircdev.is_some()) {
+            entry
         } else {
-            if let Some(entry) = list.iter().position(|rc| rc.lircdev.is_some()) {
-                entry
-            } else {
-                eprintln!("error: no lirc device found");
-                std::process::exit(1);
-            }
+            eprintln!("error: no lirc device found");
+            std::process::exit(1);
         };
 
         (list[entry].lircdev.clone(), list[entry].inputdev.clone())
@@ -726,6 +766,8 @@ fn open_lirc(matches: &clap::ArgMatches) -> lirc::Lirc {
     }
 }
 
+// Clippy comparison_chain doesn't make any sense. It make the code _worse_
+#[allow(clippy::comparison_chain)]
 fn receive(matches: &clap::ArgMatches) {
     let (lircdev, inputdev) = find_devices(matches);
     let raw_token: Token = Token(0);
@@ -860,20 +902,18 @@ fn receive(matches: &clap::ArgMatches) {
             }
 
             rawdev = Some(lircdev);
-        } else {
-            if lircdev.can_receive_scancodes() {
-                let raw_fd = lircdev.as_raw_fd();
+        } else if lircdev.can_receive_scancodes() {
+            let raw_fd = lircdev.as_raw_fd();
 
-                nix::fcntl::fcntl(raw_fd, FcntlArg::F_SETFL(OFlag::O_NONBLOCK))
-                    .expect("should be able to set non-blocking");
+            nix::fcntl::fcntl(raw_fd, FcntlArg::F_SETFL(OFlag::O_NONBLOCK))
+                .expect("should be able to set non-blocking");
 
-                poll.registry()
-                    .register(&mut SourceFd(&raw_fd), scancodes_token, Interest::READABLE)
-                    .expect("failed to add scancodes poll");
+            poll.registry()
+                .register(&mut SourceFd(&raw_fd), scancodes_token, Interest::READABLE)
+                .expect("failed to add scancodes poll");
 
-                scandev = Some(lircdev);
-            }
-        };
+            scandev = Some(lircdev);
+        }
     }
 
     if let Some(inputdev) = inputdev {
@@ -980,5 +1020,68 @@ fn receive(matches: &clap::ArgMatches) {
         }
 
         poll.poll(&mut events, None).expect("poll should not fail");
+    }
+}
+
+fn decoder(matches: &clap::ArgMatches) {
+    let (_, inputdev) = find_devices(matches);
+
+    if inputdev.is_none() {
+        eprintln!("error: input device is missing");
+        std::process::exit(1);
+    }
+
+    let inputdev = inputdev.unwrap();
+
+    let mut inputdev = match Device::open(&inputdev) {
+        Ok(l) => l,
+        Err(s) => {
+            eprintln!("error: {}: {}", inputdev, s);
+            std::process::exit(1);
+        }
+    };
+
+    if matches.is_present("DELAY") || matches.is_present("PERIOD") {
+        let mut repeat = inputdev
+            .get_auto_repeat()
+            .expect("auto repeat is supported");
+
+        if let Some(delay) = matches.value_of("DELAY") {
+            repeat.delay = match delay.parse() {
+                Ok(d) => d,
+                Err(_) => {
+                    eprintln!("error: ‘{}’ is not a valid delay", delay);
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        if let Some(period) = matches.value_of("PERIOD") {
+            repeat.period = match period.parse() {
+                Ok(d) => d,
+                Err(_) => {
+                    eprintln!("error: ‘{}’ is not a valid period", period);
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        if let Err(e) = inputdev.update_auto_repeat(&repeat) {
+            eprintln!("error: failed to update autorepeat: {}", e);
+            std::process::exit(1);
+        }
+    }
+
+    if matches.is_present("CLEAR") {
+        loop {
+            match inputdev.update_scancode_by_index(0, Key::KEY_RESERVED, &[]) {
+                Ok(_) => (),
+                Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => break,
+                Err(e) => {
+                    eprintln!("error: unable to remove scancode entry: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
     }
 }
