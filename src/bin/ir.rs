@@ -5,10 +5,11 @@ use itertools::Itertools;
 use linux_infrared::{keymap, lirc, rcdev};
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
 use nix::fcntl::{FcntlArg, OFlag};
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fs;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 fn main() {
     let matches = App::new("ir")
@@ -1080,6 +1081,63 @@ fn decoder(matches: &clap::ArgMatches) {
                 Err(e) => {
                     eprintln!("error: unable to remove scancode entry: {}", e);
                     std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    if let Some(keymaps) = matches.values_of("KEYMAP") {
+        for keymap_filename in keymaps {
+            let keymap_contents = fs::read_to_string(keymap_filename).unwrap();
+
+            let map = match keymap::parse(&keymap_contents, &keymap_filename) {
+                Ok(map) => map,
+                Err(e) => {
+                    eprintln!("error: {}: {}", keymap_filename, e);
+                    std::process::exit(1);
+                }
+            };
+
+            for p in map.protocols {
+                if let Some(scancodes) = p.scancodes {
+                    for (scancode, keycode) in scancodes {
+                        let key = match Key::from_str(&keycode) {
+                            Ok(key) => key,
+                            Err(_) => {
+                                eprintln!("error: ‘{}’ is not a valid keycode", keycode);
+                                continue;
+                            }
+                        };
+
+                        let scancode =
+                            match u64::from_str_radix(scancode.trim_start_matches("0x"), 16) {
+                                Ok(scancode) => scancode,
+                                Err(_) => {
+                                    eprintln!("error: ‘{}’ is not a valid scancode", scancode);
+                                    continue;
+                                }
+                            };
+
+                        // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible
+                        let scancode = if let Ok(scancode) = u32::try_from(scancode) {
+                            scancode.to_ne_bytes().to_vec()
+                        } else {
+                            scancode.to_ne_bytes().to_vec()
+                        };
+
+                        match inputdev.update_scancode(key, &scancode) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                eprintln!(
+                                    "error: failed to update key mapping from scancode {:x?} to {:?}: {}",
+                                    scancode,
+                                    key,
+                                    e
+                                );
+                                std::process::exit(1);
+                            }
+                        }
+                    }
                 }
             }
         }

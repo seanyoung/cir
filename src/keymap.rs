@@ -13,15 +13,15 @@ pub struct Protocol {
 
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct Raw {
-    keycode: String,
-    raw: Option<String>,
-    repeat: Option<String>,
-    pronto: Option<String>,
+    pub keycode: String,
+    pub raw: Option<String>,
+    pub repeat: Option<String>,
+    pub pronto: Option<String>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct Keymap {
-    protocols: Vec<Protocol>,
+    pub protocols: Vec<Protocol>,
 }
 
 include!(concat!(env!("OUT_DIR"), "/text_keymap.rs"));
