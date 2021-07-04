@@ -5,6 +5,7 @@ use itertools::Itertools;
 use linux_infrared::{keymap, lirc, rcdev};
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
 use nix::fcntl::{FcntlArg, OFlag};
+use std::convert::TryInto;
 use std::fs;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
@@ -165,7 +166,25 @@ fn main() {
                         ),
                 ),
         )
-        .subcommand(SubCommand::with_name("list").about("List IR devices"))
+        .subcommand(
+            SubCommand::with_name("list")
+                .about("List IR devices")
+                .arg(
+                    Arg::with_name("LIRCDEV")
+                        .long("device")
+                        .short("d")
+                        .takes_value(true)
+                        .conflicts_with("RCDEV"),
+                )
+                .arg(
+                    Arg::with_name("RCDEV")
+                        .long("rcdev")
+                        .short("s")
+                        .takes_value(true)
+                        .conflicts_with("LIRCDEV"),
+                )
+                .arg(Arg::with_name("READ").long("read-scancodes").short("l")),
+        )
         .subcommand(
             SubCommand::with_name("receive")
                 .about("Receive IR")
@@ -260,8 +279,8 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        ("list", Some(_)) => match rcdev::enumerate_rc_dev() {
-            Ok(list) => print_rc_dev(&list),
+        ("list", Some(matches)) => match rcdev::enumerate_rc_dev() {
+            Ok(list) => print_rc_dev(&list, matches),
             Err(err) => {
                 eprintln!("error: {}", err.to_string());
                 std::process::exit(1);
@@ -413,13 +432,26 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
     }
 }
 
-fn print_rc_dev(list: &[rcdev::Rcdev]) {
-    if list.is_empty() {
-        eprintln!("error: no devices found");
-        std::process::exit(1);
-    }
+fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
+    let mut printed = 0;
 
     for rcdev in list {
+        if let Some(needlelircdev) = matches.value_of("LIRCDEV") {
+            if let Some(lircdev) = &rcdev.lircdev {
+                if lircdev == needlelircdev {
+                    // ok
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+        } else if let Some(needlercdev) = matches.value_of("RCDEV") {
+            if needlercdev != rcdev.name {
+                continue;
+            }
+        }
+
         println!("{}:", rcdev.name);
 
         println!("\tDevice Name\t\t: {}", rcdev.device_name);
@@ -443,12 +475,58 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
                         id.version()
                     );
 
-                    let repeat = inputdev.get_auto_repeat();
+                    if let Some(repeat) = inputdev.get_auto_repeat() {
+                        println!(
+                            "\tRepeat\t\t\t: delay {} ms, period {} ms",
+                            repeat.delay, repeat.period
+                        );
+                    }
 
-                    println!(
-                        "\tRepeat\t\t\t: delay {} ms, period {} ms",
-                        repeat.delay, repeat.period
-                    );
+                    if matches.is_present("READ") {
+                        let mut index = 0;
+
+                        loop {
+                            match inputdev.get_scancode_by_index(index) {
+                                Ok((keycode, scancode)) => {
+                                    match scancode.len() {
+                                        8 => {
+                                            // kernel v5.7 and later give 64 bit scancodes
+                                            let scancode =
+                                                u64::from_ne_bytes(scancode.try_into().unwrap());
+                                            let keycode = evdev::Key::new(keycode as u16);
+
+                                            println!(
+                                                "\tScancode\t\t: 0x{:08x} => {:?}",
+                                                scancode, keycode
+                                            );
+                                        }
+                                        4 => {
+                                            // kernel v5.6 and earlier give 32 bit scancodes
+                                            let scancode =
+                                                u32::from_ne_bytes(scancode.try_into().unwrap());
+                                            let keycode = evdev::Key::new(keycode as u16);
+
+                                            println!(
+                                                "\tScancode\t\t: 0x{:08x} => {:?}",
+                                                scancode, keycode
+                                            )
+                                        }
+                                        len => panic!(
+                                            "scancode should be 4 or 8 bytes long, not {}",
+                                            len
+                                        ),
+                                    }
+
+                                    index += 1;
+                                }
+                                Err(err) if err.kind() == std::io::ErrorKind::InvalidInput => break,
+                                Err(err) => {
+                                    eprintln!("error: {}", err);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                    }
                 }
                 Err(err) => {
                     println!("\tInput properties\t: {}", err);
@@ -576,6 +654,19 @@ fn print_rc_dev(list: &[rcdev::Rcdev]) {
                     .join(" ")
             );
         }
+
+        printed += 1;
+    }
+
+    if printed == 0 {
+        if let Some(lircdev) = matches.value_of("LIRCDEV") {
+            eprintln!("error: no lirc device named {}", lircdev);
+        } else if let Some(rcdev) = matches.value_of("RCDEV") {
+            eprintln!("error: no rc device named {}", rcdev);
+        } else {
+            eprintln!("error: no devices found");
+        }
+        std::process::exit(1);
     }
 }
 
