@@ -1,5 +1,5 @@
 use clap::{App, AppSettings, Arg, SubCommand};
-use evdev::{Device, Key};
+use evdev::{Device, InputEventKind, Key};
 use irp::{Irp, Message, Pronto};
 use itertools::Itertools;
 use linux_infrared::{keymap, lirc, rcdev};
@@ -1009,7 +1009,48 @@ fn receive(matches: &clap::ArgMatches) {
             match eventdev.fetch_events() {
                 Ok(iterator) => {
                     for ev in iterator {
-                        println!("{:?}", ev);
+                        let timestamp = ev.timestamp();
+
+                        print!("event: {:?} type: ", timestamp);
+
+                        let ty = ev.event_type();
+                        let value = ev.value();
+
+                        match ev.kind() {
+                            InputEventKind::Misc(misc) => {
+                                println!("{:?}: {:?} = {:#010x}", ty, misc, value);
+                            }
+                            InputEventKind::Synchronization(sync) => {
+                                println!("{:?}", sync);
+                            }
+                            InputEventKind::Key(key) if value == 1 => {
+                                println!("KEY_DOWN: {:?} ", key);
+                            }
+                            InputEventKind::Key(key) if value == 0 => {
+                                println!("KEY_UP: {:?}", key);
+                            }
+                            InputEventKind::Key(key) => {
+                                println!("{:?} {:?} {}", ty, key, value);
+                            }
+                            InputEventKind::RelAxis(rel) => {
+                                println!("{:?} {:?} {:#08x}", ty, rel, value);
+                            }
+                            InputEventKind::AbsAxis(abs) => {
+                                println!("{:?} {:?} {:#08x}", ty, abs, value);
+                            }
+                            InputEventKind::Switch(switch) => {
+                                println!("{:?} {:?} {:#08x}", ty, switch, value);
+                            }
+                            InputEventKind::Led(led) => {
+                                println!("{:?} {:?} {:#08x}", ty, led, value);
+                            }
+                            InputEventKind::Sound(sound) => {
+                                println!("{:?} {:?} {:#08x}", ty, sound, value);
+                            }
+                            InputEventKind::Other => {
+                                println!("other");
+                            }
+                        }
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => (),
