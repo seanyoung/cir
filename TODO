@@ -7,5 +7,4 @@
 - Read keymaps (both formats!)
 - reading input and keys for testing
 - Update protocols file
-- Test all keymaps
 - Need ir-ctl and ir-keytable command line parsing

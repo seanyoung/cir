@@ -3,11 +3,12 @@ use std::collections::HashMap;
 
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct Protocol {
-    name: String,
-    protocol: String,
-    variant: Option<String>,
-    raw: Option<Vec<Raw>>,
-    scancodes: Option<HashMap<String, String>>,
+    #[serde(default = "String::new")]
+    pub name: String,
+    pub protocol: String,
+    pub variant: Option<String>,
+    pub raw: Option<Vec<Raw>>,
+    pub scancodes: Option<HashMap<String, String>>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
