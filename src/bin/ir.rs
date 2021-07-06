@@ -10,6 +10,7 @@ use std::fs;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Duration;
 
 fn main() {
     let matches = App::new("ir")
@@ -943,6 +944,8 @@ fn receive(matches: &clap::ArgMatches) {
     let mut leading_space = true;
     let mut scanbuf = Vec::with_capacity(1024);
     let mut events = Events::with_capacity(4);
+    let mut last_event_time = None;
+    let mut last_lirc_time = None;
 
     loop {
         if let Some(lircdev) = &mut rawdev {
@@ -985,10 +988,33 @@ fn receive(matches: &clap::ArgMatches) {
             for entry in &scanbuf {
                 let keycode = evdev::Key::new(entry.keycode as u16);
 
-                println!(
-                    "scancode: {}.{:#09}: scancode={:x} keycode={:?}{}{}",
+                let timestamp = Duration::new(
                     entry.timestamp / 1_000_000_000,
-                    entry.timestamp % 1_000_000_000,
+                    (entry.timestamp % 1_000_000_000) as u32,
+                );
+
+                if let Some(last) = last_lirc_time {
+                    if timestamp > last {
+                        print!(
+                            "lirc: later: {}, ",
+                            humantime::format_duration(timestamp - last)
+                        );
+                    } else if timestamp < last {
+                        print!(
+                            "lirc: earlier: {}, ",
+                            humantime::format_duration(last - timestamp)
+                        );
+                    } else {
+                        print!("lirc: same time, ");
+                    }
+                } else {
+                    print!("lirc: ");
+                };
+
+                last_lirc_time = Some(timestamp);
+
+                println!(
+                    "scancode={:x} keycode={:?}{}{}",
                     entry.scancode,
                     keycode,
                     if (entry.flags & lirc::LIRC_SCANCODE_FLAG_REPEAT) != 0 {
@@ -1009,9 +1035,30 @@ fn receive(matches: &clap::ArgMatches) {
             match eventdev.fetch_events() {
                 Ok(iterator) => {
                     for ev in iterator {
-                        let timestamp = ev.timestamp();
+                        let timestamp = ev
+                            .timestamp()
+                            .elapsed()
+                            .expect("input time should never exceed system time");
 
-                        print!("event: {:?} type: ", timestamp);
+                        if let Some(last) = last_event_time {
+                            if timestamp > last {
+                                print!(
+                                    "event: later: {}, type: ",
+                                    humantime::format_duration(timestamp - last)
+                                );
+                            } else if timestamp < last {
+                                print!(
+                                    "event: earlier: {}, type: ",
+                                    humantime::format_duration(last - timestamp)
+                                );
+                            } else {
+                                print!("event: same time, type: ");
+                            }
+                        } else {
+                            print!("event: type: ");
+                        };
+
+                        last_event_time = Some(timestamp);
 
                         let ty = ev.event_type();
                         let value = ev.value();
