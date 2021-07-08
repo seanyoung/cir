@@ -1,5 +1,6 @@
 - Finish off lirc sending (duty cycle, transmitters, others, verbose)
 - ir encode/send needs to read xml file
+- send from keymap
 - Formatting of ir receive is poor/broken
 - Start irp decoder
 - wasmtime bpf backend
@@ -10,3 +11,55 @@
 - Test all keymaps
 - Read old format keymaps
 - Need ir-ctl and ir-keytable command line parsing
+
+- scancode <=> irp mapping
+
+
+  linux scancode  -> irp
+
+  rc-5
+  rc-5x-20
+  rc-5x-sz  -> StreamZap?
+  jvc -> JVC
+  scancode = (D << 8) | F
+
+  sony-12 -> Sony12
+  scancode = (D << 8) | F
+
+  sony-15 -> Sony15
+  scancode = (D << 8) | F
+
+  sony-20 -> Sony20
+  scancode = (D << 16) | (S << 8) | F
+  
+  nec
+  nec-x
+  nec-32
+  sanyo  ??
+  mcir2-kbd -> MCIR-2-kbd
+  mcir2-mse -> MCIR-2-mouse
+
+  rc6-0 -> RC6
+  rc6-6a-20
+  rc6-6a-24
+  rc6-6a-32
+  rc6-mce
+
+  sharp -> Sharp
+  xmp
+  cec
+  imon
+  rc-mm-12
+  rc-mm-24
+  rc-mm-32
+  xbox-dvd
+
+
+irp parameter keymap
+
+	[[protocols]]
+	name = "streamzap"
+	protocol = "StreamZap"
+	[[protocols.parameter]]
+	keycode = 'KEY_1'
+	parameter = [ "D=2", "F=5" ]
