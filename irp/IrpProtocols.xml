@@ -186,7 +186,7 @@ ordering is not required but it improves the readability of the entry.
                xmlns:rm="https://sourceforge.net/projects/controlremote/files/RemoteMaster"
                xmlns:xi="http://www.w3.org/2001/XInclude"
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-               version="2020-12-31"
+               version="2021-06-27"
                xsi:schemaLocation="http://www.harctoolbox.org/irp-protocols http://www.harctoolbox.org/schemas/irp-protocols.xsd"
                xmlns:irp="http://www.harctoolbox.org/irp-protocols">
 
@@ -309,8 +309,14 @@ ordering is not required but it improves the readability of the entry.
         <irp:documentation xml:space="preserve"><a href="#relaxed">Relaxed version</a> of the Anthem protocol.</irp:documentation>
         <irp:parameter name="decode-only">true</irp:parameter>
         <irp:parameter name="uei-executor" type="xml">
-            <rm:deployment executor="0123[D,S,F:-2:6;F:6]">
+            <rm:deployment executor="0123(Anthem)[D,S,Unit;F:6]">
                 <rm:protocolName>Anthem</rm:protocolName>
+                <rm:commentItem>Non-standard repeats</rm:commentItem>
+            </rm:deployment>
+        </irp:parameter>
+        <irp:parameter name="uei-executor" type="xml">
+            <rm:deployment executor="0123(Anthem Combo)[D,S;F,Unit]">
+                <rm:protocolName>Anthem Combo</rm:protocolName>
                 <rm:commentItem>Non-standard repeats</rm:commentItem>
             </rm:deployment>
         </irp:parameter>
@@ -652,6 +658,7 @@ This is a moderately robust protocol, but <A href="#spurious">spurious decodes</
         <irp:parameter name="frequency-tolerance">1000</irp:parameter>
         <irp:parameter name="prefer-over">DirecTV_P2</irp:parameter>
         <irp:parameter name="prefer-over">DirecTV_3FG</irp:parameter>
+        <irp:parameter name="alt_name">DirecTV</irp:parameter>
         <irp:parameter name="uei-executor" type="xml">
             <rm:deployment executor="0162{Parm=3}[D,Parm;F]">
                 <rm:protocolName>DirecTV</rm:protocolName>
@@ -975,7 +982,7 @@ C3=D:1:2 + #(F&44) + #(D&2)
         <irp:documentation xml:space="preserve">These are two variants of the same protocol, differing only in frequency.
             The IRP notation is corrected from previous versions of this document, to make it consistent with DecodeIR.
         </irp:documentation>
-        <irp:parameter name="uei-executor">0112[D:6,F:1:7;D:1:6,F:7]</irp:parameter>
+        <irp:parameter name="uei-executor">0112[D:6,F:1:7;D:1:6,F:8]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="Grundig16-30">
@@ -1306,8 +1313,9 @@ C3=D:1:2 + #(F&44) + #(D&2)
         <irp:parameter name="alt_name">RC6-6-32</irp:parameter>
         <irp:parameter name="uei-executor">012A:2[D,S;F]</irp:parameter>
         <irp:parameter name="uei-executor">012A[D,S;F]</irp:parameter>
-        <irp:parameter name="uei-executor">012A:2(RC6-M-32){OEM1=128}[OEM1,(S&lt;&lt;8)+D:7,6,0,2;F]</irp:parameter>
-        <irp:parameter name="uei-executor">012A(RC6-6-32){OEM1=128}[OEM1,(S&lt;&lt;8)+D:7,2;F]</irp:parameter>
+        <irp:parameter name="uei-executor">012A:2(RC6-M-32;T==0){OEM1=128,X=T,TS=T&lt;0?-T-1:T,T=0}[OEM1,((2*S+TS)&lt;&lt;7)+D:7,6,
+            T,X&lt;0?1:0;F]</irp:parameter>
+        <irp:parameter name="uei-executor">012A(RC6-6-32){OEM1=128,X=T,TS=T&lt;0?-T-1:T,T=0}[OEM1,((2*S+TS)&lt;&lt;7)+D:7,X&lt;0?1:0;F]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="MCIR-2-kbd">
@@ -1446,6 +1454,24 @@ C3=D:1:2 + #(F&44) + #(D&2)
         <irp:documentation xml:space="preserve">The <a href="#NEC-Shirriff">NEC-Shirriff</a> protocol with payload length set to 32, making it viable for decoding.</irp:documentation>
     </irp:protocol>
 
+    <irp:protocol name="NEC-Yamaha">
+        <irp:irp>
+            <![CDATA[{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,E0:1,~F:6:1,E7:1,1,^108m) {E0=(~Y:1:1)^(F:1),E7=(~Y:1)^(F:1:7)}[D:0..255,S:0..255=255-D,F:0..255,Y:1..3]]]>
+        </irp:irp>
+        <irp:documentation xml:space="preserve">Variant of the <a href="#NEC1">NEC1</a> protocol with the checksum in byte 4 different
+(complement all of F except the MSB).
+        </irp:documentation>
+        <irp:parameter name="prefer-over">NEC-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NEC1-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NEC2-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NECx1-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NECx2-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NEC-Shirriff-32</irp:parameter>
+        <irp:parameter name="uei-executor">011A:JP1[D?0,S?0,D?1,S?1,D?2,S?2,D?3,S?3;F,??,,Y]</irp:parameter>
+        <irp:parameter name="uei-executor">01AD[;D,S,F:8,(~F:8)^(128*Y:1|Y:1:1)]</irp:parameter>
+        <irp:parameter name="uei-executor">01BA[D,S;F:8,(~F:8)^(128*Y:1|Y:1:1)]</irp:parameter>
+    </irp:protocol>
+
     <irp:protocol name="NEC1">
         <!--irp:parameter name="prefer-over">NEC1-f16</irp:parameter-->
         <!--irp:parameter name="frequencyTolerance">100</irp:parameter>
@@ -1515,12 +1541,32 @@ C3=D:1:2 + #(F&44) + #(D&2)
         <irp:irp>
             <![CDATA[{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:4:4,~F:4,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]]]>
         </irp:irp>
-        <irp:documentation xml:space="preserve">Variant of the <a href="#NEC1">NEC1</a> protocol with the checksum in byte 4 different.
+        <irp:documentation xml:space="preserve">Variant of the <a href="#NEC1">NEC1</a> protocol with the checksum in byte 4 different
+ (complement F and reverse the nibbles).
         </irp:documentation>
         <irp:parameter name="prefer-over">NEC1-f16</irp:parameter>
         <irp:parameter name="prefer-over">NEC-Shirriff-32</irp:parameter>
         <irp:parameter name="uei-executor">0206</irp:parameter>
         <irp:parameter name="uei-executor">01AD[;D,S,F,~(((F:4)&lt;&lt;4)|F:4:4):8]</irp:parameter>
+    </irp:protocol>
+
+    <irp:protocol name="NEC1-Yamaha">
+        <irp:irp>
+            <![CDATA[{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,E0:1,~F:6:1,E7:1,1,^108m,(16,-4,1,^108m)*) {E0=(~Y:1:1)^(F:1),E7=(~Y:1)^(F:1:7)}[D:0..255,S:0..255=255-D,F:0..255,Y:1..3]]]>
+        </irp:irp>
+        <irp:documentation xml:space="preserve">Variant of the <a href="#NEC1">NEC1</a> protocol with the checksum in byte 4 different
+(complement all of F except the MSB).
+        </irp:documentation>
+        <irp:parameter name="prefer-over">NEC-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NEC1-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NEC2-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NECx1-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NECx2-f16</irp:parameter>
+        <irp:parameter name="prefer-over">NEC-Yamaha</irp:parameter>
+        <irp:parameter name="prefer-over">NEC-Shirriff-32</irp:parameter>
+        <irp:parameter name="uei-executor">011A:JP1[D?0,S?0,D?1,S?1,D?2,S?2,D?3,S?3;F,??,,Y]</irp:parameter>
+        <irp:parameter name="uei-executor">01AD[;D,S,F:8,(~F:8)^(128*Y:1|Y:1:1)]</irp:parameter>
+        <irp:parameter name="uei-executor">01BA[D,S;F:8,(~F:8)^(128*Y:1|Y:1:1)]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="NEC2">
@@ -1681,29 +1727,39 @@ C3=D:1:2 + #(F&44) + #(D&2)
         </irp:irp>
         <irp:documentation xml:space="preserve">The Nokia32 protocol is one variation of the RCMM 1.5 protocol developed by Philips.
             RCMM refers to X as "System" and to D:2,S:4:4 as "Customer".
-            The parameters have been taken from <a href="http://www.sbprojects.com/knowledge/ir/rcmm.php">SB-projects</a>.
+            The parameters have been taken from <a href="https://www.sbprojects.net/knowledge/ir/rcmm.php">SB-projects</a>.
+        </irp:documentation>
+        <irp:parameter name="alt_name">RCMM32</irp:parameter>
+        <irp:parameter name="absolute-tolerance">50</irp:parameter>
+        <irp:parameter name="relative-tolerance">0.04</irp:parameter>
+        <irp:parameter name="prefer-over">Nokia32_endframe</irp:parameter>
+        <irp:parameter name="uei-executor">0173:1{Y=1,Z=T&lt;0?1:2,T=2*Z:1:1-1}(;Y*Z&gt;0)[D,S,X:7+(Y&lt;&lt;7),Z;F]</irp:parameter>
+        <irp:parameter name="uei-executor">0173:3{Y=T&lt;0?0:T,Z=T&lt;0?1:0,T=Y-2*Z:1}(;Y*Z==0)[D,S,X:7+(Y&lt;&lt;7),Z;F]</irp:parameter>
+        <irp:parameter name="uei-executor">0173:3{Y=1,Z=T&lt;0?1:2,T=2*Z:1:1-1}(;Y*Z&gt;0)[D,S,X:7+(Y&lt;&lt;7),Z;F]</irp:parameter>
+        <irp:parameter name="uei-executor">01E1:2{Y=T&lt;0?-T-1:T,Z=T&lt;0?1:0,T=Z?-Y-1:Y}[D,S,Z;F,X:7+(Y&lt;&lt;7)]</irp:parameter>
+        <irp:parameter name="uei-executor" type="xml">
+            <rm:deployment executor="0173:1{Y=T&lt;0?0:T,Z=T&lt;0?1:0,T=Y-2*Z:1}(;Y*Z==0)[D,S,X:7+(Y&lt;&lt;7),Z;F]">
+                <rm:assignment target="X">X:7+(Y&lt;&lt;7)</rm:assignment>
+                <rm:assignment target="Y">-1</rm:assignment>
+                <rm:assignment target="Z">-1</rm:assignment>
+                <rm:assignment target="T">-1</rm:assignment>
+            </rm:deployment>
+        </irp:parameter>
+    </irp:protocol>
+
+    <irp:protocol name="Nokia32_endframe">
+        <irp:irp>
+            <![CDATA[{36k,1p,msb}<6,-10|6,-16|6,-22|6,-28>([][T=0][T=1],15,-10,D:8,S:8,T:1,X:7,F:8,6,^100m)+[D:0..255,S:0..255,F:0..255,X:0..127]]]>
+        </irp:irp>
+        <irp:documentation xml:space="preserve">A version of the Nokia32 protocol that sets T=0 except for the last frame, which has T=1.
         </irp:documentation>
         <irp:parameter name="absolute-tolerance">50</irp:parameter>
         <irp:parameter name="relative-tolerance">0.04</irp:parameter>
+        <irp:parameter name="uei-executor">0173:3(;X&lt;128)[D,S,X,2;F]</irp:parameter>
         <irp:parameter name="uei-executor" type="xml">
-            <rm:deployment executor="0173:1{Y=T,Z=-1,T=Y-2*Z:1}[D,S,X:7+(Y&lt;&lt;7),Z;F]">
-                <rm:assignment target="X">X:7+(Y&lt;&lt;7)</rm:assignment>
-                <rm:assignment target="Y">-1</rm:assignment>
-                <rm:assignment target="T">-1</rm:assignment>
-            </rm:deployment>
-        </irp:parameter>
-        <irp:parameter name="uei-executor" type="xml">
-            <rm:deployment executor="0173:3{Y=T,Z=-1,T=Y-2*Z:1}[D,S,X:7+(Y&lt;&lt;7),Z;F]">
-                <rm:assignment target="X">X:7+(Y&lt;&lt;7)</rm:assignment>
-                <rm:assignment target="Y">-1</rm:assignment>
-                <rm:assignment target="T">-1</rm:assignment>
-            </rm:deployment>
-        </irp:parameter>
-        <irp:parameter name="uei-executor" type="xml">
-            <rm:deployment executor="01E1:2{Y=T,Z=-1,T=Y-2*Z:1}[D,S,Z;F,X:7+(Y&lt;&lt;7)]">
-                <rm:assignment target="X">X:7+(Y&lt;&lt;7)</rm:assignment>
-                <rm:assignment target="Y">-1</rm:assignment>
-                <rm:assignment target="T">-1</rm:assignment>
+            <rm:deployment executor="0173:1(;X&lt;128)[D,S,X,2;F]">
+                <rm:protocolName>Nokia32</rm:protocolName>
+                <rm:commentItem>adds 128 in final frame</rm:commentItem>
             </rm:deployment>
         </irp:parameter>
     </irp:protocol>
@@ -1721,14 +1777,14 @@ C3=D:1:2 + #(F&44) + #(D&2)
         <irp:irp>
             <![CDATA[{38k,500}<-1,1|1,-1>(1,-5,1:1,254:8,127:7,-15m,(1,-5,1:1,F:8,D:7,-110m)+,1,-5,1:1,254:8,127:7,-15m) [D:0..127,F:0..255]]]>
         </irp:irp>
-        <irp:parameter name="uei-executor">00B0[D,F:1:7;F:7]</irp:parameter>
+        <irp:parameter name="uei-executor">00B0[D,F:1:7;F:8]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="NRC16-32">
         <irp:irp>
             <![CDATA[{32k,500}<-1,1|1,-1>(1,-5,1:1,254:8,127:7,-15m,(1,-5,1:1,F:8,D:7,-110m)+,1,-5,1:1,254:8,127:7,-15m) [D:0..127,F:0..255]]]>
         </irp:irp>
-        <irp:parameter name="uei-executor">0075[D,F:1:7;F:7]</irp:parameter>
+        <irp:parameter name="uei-executor">0075[D,F:1:7;F:8]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="NRC17">
@@ -1736,10 +1792,10 @@ C3=D:1:2 + #(F&44) + #(D&2)
             <![CDATA[{500,38k,25%}<-1,1|1,-1>(1,-5,1:1,254:8,255:8,-28, (1,-5,1:1,F:8,D:8,-220)*, 1,-5,1:1,254:8,255:8,-200)[D:0..255,F:0..255]]]>
         </irp:irp>
         <irp:documentation xml:space="preserve">Taken from <a href="http://www.hifi-remote.com/forums/viewtopic.php?t=1044">John Fine's contribution</a> (fixed),
-            modified for the setup <a href="http://www.sbprojects.com/knowledge/ir/nrc17.php">here</a>.
+            modified for the setup <a href="https://www.sbprojects.net/knowledge/ir/nrc17.php">here</a>.
         </irp:documentation>
         <irp:parameter name="uei-executor">00BD:2[D;F]</irp:parameter>
-        <irp:parameter name="uei-executor">00BD[D,F:1:7;F:7]</irp:parameter>
+        <irp:parameter name="uei-executor">00BD[D,F:1:7;F:8]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="Ortek_NEClike">
@@ -1812,6 +1868,7 @@ C3=D:1:2 + #(F&44) + #(D&2)
             <![CDATA[{57.6k,833}<1,-1|1,-3>(4,-4,D:5,F:6,~D:5,~F:6,1,-44m)* [D:0..31,F:0..63]]]>
         </irp:irp>
         <irp:parameter name="uei-executor">0000[D?0,D?1,D?2;??,F]</irp:parameter>
+        <irp:parameter name="uei-executor">0117[;D,F]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="PCTV">
@@ -1927,10 +1984,10 @@ C3=D:1:2 + #(F&44) + #(D&2)
         <irp:documentation xml:space="preserve">In Philips' (the creator of the protocol) terminology, "D" is called "System" and "F" is called "Command".
             <a href="https://www.sbprojects.net/knowledge/ir/rc5.php">Tutorial</a>.
         </irp:documentation>
-        <irp:parameter name="uei-executor">00E8[D?0,F:1:6?0,D?1,F:1:6?1,D?2,F:1:6?2;??,F:6]</irp:parameter>
-        <irp:parameter name="uei-executor">01C3[0,D?0,F:1:6?0,D?1,F:1:6?1,D?2,F:1:6?2,D?3,F:1:6?3;??,F:6]</irp:parameter>
+        <irp:parameter name="uei-executor">00E8[D?0,F:1:6?0,D?1,F:1:6?1,D?2,F:1:6?2;??,F:7]</irp:parameter>
+        <irp:parameter name="uei-executor">01C3[0,D?0,F:1:6?0,D?1,F:1:6?1,D?2,F:1:6?2,D?3,F:1:6?3;??,F:7]</irp:parameter>
         <irp:parameter name="uei-executor">0073[;0,F,D]</irp:parameter>
-        <irp:parameter name="uei-executor">0184:2[;0,D,F]</irp:parameter>
+        <irp:parameter name="uei-executor">0184:2{D6=2*(~F):1,F6=(~D):5|32*D:1:5|64*F:1:6|128*D:1:6}[;0,D,F,D6,F6]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="RC5-7F">
@@ -1957,10 +2014,8 @@ C3=D:1:2 + #(F&44) + #(D&2)
             <![CDATA[{36k,msb,889}<1,-1|-1,1>((1,~S:1:6,T:1,D:5,-4,S:6,F:6,^114m)*,T=1-T) [D:0..31,S:0..127,F:0..63,T@:0..1=0]]]>
         </irp:irp>
         <irp:documentation xml:space="preserve">In Philips' (the creator of the protocol) terminology, "D" is called "System", "S" is called "Command", and F is called "Data".</irp:documentation>
-        <irp:parameter name="uei-executor">00F2[D,S&gt;63;S,F]</irp:parameter>
-        <irp:parameter name="uei-executor">0073[D?0,F&gt;63?0,D?1,F&gt;63?1,D?2,F&gt;63?2,D?3,F&gt;63?3;1,F,,S]</irp:parameter>
-        <irp:parameter name="uei-executor">00F2[D,S:1:6;S:6,F]</irp:parameter>
-        <irp:parameter name="uei-executor">0073[D?0,F:1:6?0,D?1,F:1:6?1,D?2,F:1:6?2,D?3,F:1:6?3;1,F:6,,S]</irp:parameter>
+        <irp:parameter name="uei-executor">00F2[D,S:1:6;S:7,F:6]</irp:parameter>
+        <irp:parameter name="uei-executor">0073[D?0,S:1:6?0,D?1,S:1:6?1,D?2,S:1:6?2,D?3,S:1:6?3;1,F:6,,??,S:7]</irp:parameter>
         <irp:parameter name="relative-tolerance">0.1</irp:parameter>
     </irp:protocol>
 
@@ -2007,9 +2062,8 @@ C3=D:1:2 + #(F&44) + #(D&2)
             The RC6-M-24 executor for this protocol supports both toggle and non-toggle behaviours for T.</irp:documentation>
         <irp:parameter name="uei-executor">0092:3(ReplayTV (Official);M==6&amp;&amp;T==0)[D,S;F]</irp:parameter>
         <irp:parameter name="uei-executor" type="xml">
-            <rm:deployment executor="0092:3{X=-1,TS=T,T=X:1-2*X:1:1}[D,S,M,X;F]">
-                <rm:assignment target="T">TS</rm:assignment>
-                <rm:assignment target="TS">-1</rm:assignment>
+            <rm:deployment executor="0092:3{X=T&lt;0?2:T,T=X:1-2*X:1:1}[D,S,M,X;F]">
+                <rm:assignment target="X">-1</rm:assignment>
             </rm:deployment>
         </irp:parameter>
     </irp:protocol>
@@ -2034,16 +2088,13 @@ C3=D:1:2 + #(F&44) + #(D&2)
 	    The executor for this protocol supports both toggle and non-toggle behaviours for T.
         </irp:documentation>
         <irp:parameter name="absolute-tolerance">300</irp:parameter>
+        <irp:parameter name="uei-executor">012A(RC6-6-32;M==6&amp;&amp;X&lt;2){X=T==0?0:1,TS=T,T=-X,T=TS}[OEM1,(OEM2&lt;&lt;8)+D:8,X;F]&gt;</irp:parameter>
+        <irp:parameter name="uei-executor">012A:2(MCE;M==6&amp;&amp;OEM1==128&amp;&amp;T==0)[D:7,OEM2;F]</irp:parameter>
         <irp:parameter name="uei-executor" type="xml">
-            <rm:deployment executor="012A:2{X=-1,Y=-1,TS=T,T=X-2*Y}(;Y&lt;2)[OEM1,(OEM2&lt;&lt;8)+D:8,M,X,Y;F]">
-                <rm:assignment target="T">TS</rm:assignment>
-                <rm:assignment target="TS">-1</rm:assignment>
-            </rm:deployment>
-        </irp:parameter>
-        <irp:parameter name="uei-executor" type="xml">
-            <rm:deployment executor="012A(RC6-6-32;M==6&amp;&amp;X&lt;2){X=-1,TS=T,T=-X}[OEM1,(OEM2&lt;&lt;8)+D:8,X;F]">
-                <rm:assignment target="T">TS</rm:assignment>
-                <rm:assignment target="TS">-1</rm:assignment>
+            <rm:deployment executor="012A:2{X=T,Y=T&lt;0?1:0,T=X-2*Y}(;Y&lt;2)[OEM1,(OEM2&lt;&lt;8)+D:8,M,X,Y;F]">
+                <rm:assignment target="T">X</rm:assignment>
+                <rm:assignment target="X">-1</rm:assignment>
+                <rm:assignment target="Y">-1</rm:assignment>
             </rm:deployment>
         </irp:parameter>
     </irp:protocol>
@@ -2401,14 +2452,14 @@ C3=D:1:2 + #(F&44) + #(D&2)
 
     <irp:protocol name="StreamZap">
         <irp:irp>
-            <![CDATA[{36k,msb,889}<1,-1|-1,1>(1,~F:1:6,T:1,D:6,F:6,^114m)*[D:0..63,F:0..63,T:0..1]]]>
+            <![CDATA[{36k,msb,889}<1,-1|-1,1>(1,~F:1:6,T:1,D:6,F:6,^114m)*[D:0..63,F:0..127,T@:0..1=0]]]>
         </irp:irp>
         <irp:parameter name="uei-executor">01FF:JP1SZ[D;F]</irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="StreamZap-57">
         <irp:irp>
-            <![CDATA[{57k,msb,889}<1,-1|-1,1>(1,~F:1:6,T:1,D:6,F:6,^114m)*[D:0..63,F:0..63,T:0..1]]]>
+            <![CDATA[{57k,msb,889}<1,-1|-1,1>(1,~F:1:6,T:1,D:6,F:6,^114m)*[D:0..63,F:0..127,T@:0..1=0]]]>
         </irp:irp>
         <irp:parameter name="uei-executor">01FF:JP1S57[D;F]</irp:parameter>
     </irp:protocol>
@@ -2422,19 +2473,19 @@ C3=D:1:2 + #(F&44) + #(D&2)
     <irp:protocol name="TCL_AC">
         <irp:parameter name="uei-executor" type="xml">
             <rm:deployment executor="01FF:JP1TCL(;mode&lt;9&amp;&amp;temp&gt;15&amp;&amp;fan&lt;6&amp;&amp;(swing==0||swing==7))[;modesw,mode,temp-16,temp-16,swing/7,fan,timesw,time]">
-	        <rm:assignment target="mode2">mode</rm:assignment>
+                <rm:assignment target="mode2">mode</rm:assignment>
                 <rm:assignment target="hrs">time/6</rm:assignment>
                 <rm:assignment target="mins">(time%6)*10</rm:assignment>
                 <rm:assignment target="swingsw">swing/7</rm:assignment>
-		<rm:translator target="modesw">modesw|Off|On</rm:translator>
+                <rm:translator target="modesw">modesw|Off|On</rm:translator>
                 <rm:translator target="timesw">timesw|Off|On</rm:translator>
                 <rm:translator target="mode2">mode2|-|heat|dry|cool|-|-|-|fan|feel</rm:translator>
-		<rm:translator target="mode">%s/%s|modesw|mode2</rm:translator>
+                <rm:translator target="mode">%s/%s|modesw|mode2</rm:translator>
                 <rm:translator target="fan">fan|auto|sleep|low|med|-|high</rm:translator>
                 <rm:translator target="swingsw">swing|Off|On</rm:translator>
                 <rm:translator target="time">%s/%02d:%02d|timesw|hrs|mins</rm:translator>
             </rm:deployment>
-	</irp:parameter>
+        </irp:parameter>
         <irp:irp><![CDATA[
          {38.2k,394}<1,-1|1,-3>(8,-4,M:40,modesw:-3,timesw:1,2:4,mode:8,~temp:5,0:3,fan:3,swing:3,timesw:1,0:1,time:8,0:24,chksum:8,1,-50m)
             {M=0x000126cb23,chksum=21+32+(4*modesw)+(72*timesw)+mode+(~temp)+fan+(swing<<3)+time}[modesw:0..1,timesw:0..1,mode:0..8,
@@ -2548,41 +2599,82 @@ C3=D:1:2 + #(F&44) + #(D&2)
         </irp:documentation>
     </irp:protocol>
 
-    <irp:protocol name="X10">
+    <irp:protocol name="X10-command">
         <irp:irp>
-            <![CDATA[{40.8k,565}<2,-12|7,-7>(7,-7,F:5,~F:5,21,-7)*[F:0..31]]]>
+            <![CDATA[{38.4k,570}<2,-12|7,-7>(7,-7,C:4,1:1,~C:4,0:1,21,-7)*[C:0..15]]]>
         </irp:irp>
-        <irp:documentation xml:space="preserve">X10 and <a href="#X10.n">X10.n</a>  are two variants of the same home automation protocol.
-            They differ in that X10.<i>n</i> has a distinctive start frame that carries a sequence number,
-            the <i>n</i> of the protocol name, in addition to F.
-            The repeat frames, and all frames of the X10 version, only carry the F.
-            The value of <i>n</i> runs from 0 to 15 (or some lower value) and then restarts again at 0.
-            It is incremented on each successive keypress.
-            A valid X10.<i>n</i> signal must have at least one repeat frame.
+        <irp:documentation xml:space="preserve">This protocol is used to send X10 command codes to an IR543 receiver or compatible device.
         </irp:documentation>
-        <irp:parameter name="uei-executor">01DF</irp:parameter>
+        <irp:parameter name="prefer-over">X10.n</irp:parameter>
+        <irp:parameter name="uei-executor" type="xml">
+            <rm:deployment executor="01DF(;G:1:4==0){G=8*C:1|4*C:1:1|2*C:1:2|C:1:3,C=-1}[;G+16]">
+                <rm:protocolName>X10</rm:protocolName>
+                <rm:translator target="G">Cmd=all off|all lights on|turn on|turn off|dim|brighten|all lights off|(reserved)|
+                    hail req|hail ack|preset dim|cmd11|cmd12|status is on|status is off|status req</rm:translator>
+            </rm:deployment>
+        </irp:parameter>
+        <irp:parameter name="uei-executor" type="xml">
+            <rm:deployment executor="003F(;G:1:4==0){G=C,C=-1}[;G+16]">
+                <rm:protocolName>X10.n</rm:protocolName>
+            </rm:deployment>
+        </irp:parameter>
+    </irp:protocol>
+
+    <irp:protocol name="X10-device">
+        <irp:irp>
+            <![CDATA[{38.4k,570}<2,-12|7,-7>(7,-7,D:4,0:1,~D:4,1:1,21,-7)*[D:0..15]]]>
+        </irp:irp>
+        <irp:documentation xml:space="preserve">This protocol is used to send X10 device (unit) selection codes to an IR543 receiver
+            or compatible device.
+            Devices are numbered from 1 to 16.
+        </irp:documentation>
+        <irp:parameter name="prefer-over">X10.n</irp:parameter>
+        <irp:parameter name="uei-executor" type="xml">
+            <rm:deployment executor="01DF(;G:1:4==0){A=(10*D:1:2)^(D&amp;10),G=(D&amp;5|A&amp;10)^12,A=-1,D=-1}[;G]">
+                <rm:protocolName>X10</rm:protocolName>
+                <rm:translator target="G">DevNbr=1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16</rm:translator>
+            </rm:deployment>
+        </irp:parameter>
+        <irp:parameter name="uei-executor" type="xml">
+            <rm:deployment executor="003F(;G:1:4==0){G=D,D=-1}[;G]">
+                <rm:protocolName>X10.n</rm:protocolName>
+            </rm:deployment>
+        </irp:parameter>
+    </irp:protocol>
+
+    <irp:protocol name="X10-house">
+        <irp:irp>
+            <![CDATA[{38.4k,570}<2,-12|7,-7>(7,-7,H:4,~H:4,21,-7)*[H:0..15]]]>
+        </irp:irp>
+        <irp:documentation xml:space="preserve">This protocol is used to send a house code to an IR543AH receiver or compatible device.
+            More basic X10 receivers such as the IR543 do not accept the house code as an IR signal.
+            The house code is a letter in the range A-P.
+        </irp:documentation>
+        <irp:parameter name="uei-executor" type="xml">
+            <rm:deployment executor="01FF:JP1X10H{A=(10*H:1:2)^(H&amp;10),G=(H&amp;5|A&amp;10)^12,A=-1,H=-1}[;G]">
+                <rm:protocolName>X10H</rm:protocolName>
+                <rm:translator target="G">HouseCode=A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P</rm:translator>
+            </rm:deployment>
+        </irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="X10.n">
         <irp:irp>
             <![CDATA[{40.8k,565}<2,-12|7,-7>(F:5,N:-4,21,-7,(7,-7,F:5,~F:5,21,-7)+,N=(N+1)%16)[F:0..31,N@:0..15=0]]]>
         </irp:irp>
-        <irp:documentation xml:space="preserve">See <a href="#X10">X10</a>.
+        <irp:documentation xml:space="preserve">
+            This protocol is a UEI version of the protocol used to send X10 device (unit) and command codes to an
+            IR543 receiver or compatible device.
+            This protocol sends a non-functional first frame that is ignored by the receiver before sending the true X10 signal.
+            The true X10 signal is that of the X10-device and X10-command protocols.
+            For receivers that accept the house code as an IR signal, the X10-house protocol is used to send that value.
         </irp:documentation>
-        <irp:parameter name="uei-executor">003F</irp:parameter>
         <irp:parameter name="reject-repeatless">true</irp:parameter>
-    </irp:protocol>
-
-    <irp:protocol name="X10_18">
-        <irp:irp>
-            <![CDATA[{40.8k,565}<2,-12|7,-7>(7,-7,F:9,~F:9,21,-7)*[F:0..511]]]>
-        </irp:irp>
-    </irp:protocol>
-
-    <irp:protocol name="X10_8">
-        <irp:irp>
-            <![CDATA[{40.8k,565}<2,-12|7,-7>(7,-7,F:4,~F:4,21,-7)*[F:0..15]]]>
-        </irp:irp>
+        <irp:parameter name="uei-executor" type="xml">
+            <rm:deployment executor="01DF">
+                <rm:commentItem>Has non-functional first frame</rm:commentItem>
+            </rm:deployment>
+        </irp:parameter>
     </irp:protocol>
 
     <irp:protocol name="Xiaomi">

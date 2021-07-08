@@ -468,7 +468,9 @@ impl Expression {
                     b = b.reverse_bits().rotate_left(l as u32);
                 }
 
-                b &= (1 << l) - 1;
+                if l < 64 {
+                    b &= (1 << l) - 1;
+                }
 
                 Ok((b, l as u8))
             }
