@@ -84,7 +84,6 @@ fn main() {
                         .arg(Arg::with_name("RAWIR").help("Raw IR").required(true)),
                 ),
         )
-        .subcommand(SubCommand::with_name("keymap").arg(Arg::with_name("FILE").required(true)))
         .subcommand(
             SubCommand::with_name("decoder")
                 .about("Configure IR decoder")
@@ -329,16 +328,6 @@ fn main() {
         },
         ("receive", Some(matches)) => {
             receive(matches);
-        }
-        ("keymap", Some(matches)) => {
-            let filename = matches.value_of("FILE").unwrap();
-
-            let contents = fs::read_to_string(filename).unwrap();
-
-            match keymap::parse(&contents, &filename) {
-                Ok(ir) => println!("{:?}", ir),
-                Err(s) => eprintln!("error: {}", s),
-            }
         }
         ("decoder", Some(matches)) => {
             decoder(matches);
