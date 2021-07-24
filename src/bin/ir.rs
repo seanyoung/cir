@@ -124,8 +124,8 @@ fn main() {
                 .arg(Arg::with_name("VERBOSE").long("verbose").short("v")),
         )
         .subcommand(
-            SubCommand::with_name("send")
-                .about("Encode IR and transmit")
+            SubCommand::with_name("transmit")
+                .about("Transmit IR")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .arg(
                     Arg::with_name("LIRCDEV")
@@ -144,7 +144,7 @@ fn main() {
                 .arg(Arg::with_name("VERBOSE").long("verbose").short("v"))
                 .subcommand(
                     SubCommand::with_name("irp")
-                        .about("Encode using IRP langauge")
+                        .about("Encode using IRP langauge and transmit")
                         .arg(
                             Arg::with_name("IRP")
                                 .help("IRP protocol")
@@ -167,6 +167,7 @@ fn main() {
                 )
                 .subcommand(
                     SubCommand::with_name("pronto")
+                        .about("Parse pronto hex code and transmit")
                         .arg(
                             Arg::with_name("REPEATS")
                                 .long("repeats")
@@ -182,7 +183,7 @@ fn main() {
                 )
                 .subcommand(
                     SubCommand::with_name("mode2")
-                        .about("Parse mode2 pulse space file and print as raw IR")
+                        .about("Parse mode2 pulse space file and transmit")
                         .arg(
                             Arg::with_name("FILE")
                                 .help("File to load and parse")
@@ -191,6 +192,7 @@ fn main() {
                 )
                 .subcommand(
                     SubCommand::with_name("rawir")
+                        .about("Parse raw IR and transmit")
                         .arg(Arg::with_name("RAWIR").help("Raw IR").required(true))
                         .arg(
                             Arg::with_name("CARRIER")
@@ -268,7 +270,7 @@ fn main() {
             }
             println!("rawir: {}", message.print_rawir());
         }
-        ("send", Some(matches)) => {
+        ("transmit", Some(matches)) => {
             let message = encode_args(matches);
 
             if matches.is_present("VERBOSE") {
@@ -660,7 +662,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                                 }
                             );
                         } else {
-                            println!("\tLIRC Receiver Timeout Range\t: none");
+                            println!("\tLIRC Transmitters\t: unknown");
                         }
                     } else {
                         println!("\tLIRC Transmitter\t: no");
