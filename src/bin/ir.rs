@@ -1,3 +1,4 @@
+use aya::programs::LircMode2;
 use clap::{App, AppSettings, Arg, SubCommand};
 use evdev::{Device, InputEventKind, Key};
 use irp::{Irp, Message, Pronto};
@@ -626,6 +627,37 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                                 "no"
                             }
                         );
+
+                        match LircMode2::query(lircdev.as_raw_fd()) {
+                            Ok(list) => {
+                                print!("\tBPF protocols\t\t: ");
+
+                                let mut first = true;
+
+                                for e in list {
+                                    if first {
+                                        first = false;
+                                    } else {
+                                        print!(", ")
+                                    }
+
+                                    match e.info() {
+                                        Ok(info) => match info.name_as_str() {
+                                            Some(name) => print!("{}", name),
+                                            None => print!("{}", info.id()),
+                                        },
+                                        Err(err) => {
+                                            print!("{}", err.to_string())
+                                        }
+                                    }
+                                }
+
+                                println!();
+                            }
+                            Err(err) => {
+                                println!("\tBPF protocols\t\t: {}", err.to_string())
+                            }
+                        }
                     } else if lircdev.can_receive_scancodes() {
                         println!("\tLIRC Receiver\t\t: scancode");
                     } else {

@@ -19,6 +19,7 @@ nix = "0.22"
 regex = "1"
 unicode-xid = "0.2"
 humantime = "2.1"
+aya = { git = "https://github.com/alessandrod/aya/" }
 
 [build-dependencies]
 lrpeg = { git = "https://github.com/seanyoung/lrpeg/" }
