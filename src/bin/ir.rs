@@ -419,7 +419,7 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
                 },
             };
 
-            let pronto = match Pronto::parse(&pronto) {
+            let pronto = match Pronto::parse(pronto) {
                 Ok(pronto) => pronto,
                 Err(err) => {
                     eprintln!("error: {}", err);
@@ -432,7 +432,7 @@ fn encode_args(matches: &clap::ArgMatches) -> Message {
         ("rawir", Some(matches)) => {
             let rawir = matches.value_of("RAWIR").unwrap();
 
-            match irp::rawir::parse(&rawir) {
+            match irp::rawir::parse(rawir) {
                 Ok(raw) => Message {
                     carrier: None,
                     duty_cycle: None,
@@ -1201,7 +1201,7 @@ fn decoder(matches: &clap::ArgMatches) {
         for keymap_filename in keymaps {
             let keymap_contents = fs::read_to_string(keymap_filename).unwrap();
 
-            let map = match keymap::parse(&keymap_contents, &keymap_filename) {
+            let map = match keymap::parse(&keymap_contents, keymap_filename) {
                 Ok(map) => map,
                 Err(e) => {
                     eprintln!("error: {}: {}", keymap_filename, e);

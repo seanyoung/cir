@@ -85,7 +85,7 @@ impl Irp {
             let val = if let Ok((val, _)) = vars.get(&p.name) {
                 val
             } else if let Some(e) = &p.default {
-                let (v, l) = e.eval(&vars)?;
+                let (v, l) = e.eval(vars)?;
 
                 vars.set(p.name.to_owned(), v, l);
 
@@ -94,7 +94,7 @@ impl Irp {
                 return Err(format!("missing value for {}", p.name));
             };
 
-            let (min, _) = p.min.eval(&vars)?;
+            let (min, _) = p.min.eval(vars)?;
             if val < min {
                 return Err(format!(
                     "{} is less than minimum value {} for parameter {}",
@@ -102,7 +102,7 @@ impl Irp {
                 ));
             }
 
-            let (max, _) = p.max.eval(&vars)?;
+            let (max, _) = p.max.eval(vars)?;
             if val > max {
                 return Err(format!(
                     "{} is more than maximum value {} for parameter {}",
@@ -456,13 +456,13 @@ impl Expression {
                 length,
                 skip,
             } => {
-                let (mut b, _) = value.eval(&vars)?;
+                let (mut b, _) = value.eval(vars)?;
 
                 if let Some(skip) = skip {
-                    b >>= skip.eval(&vars)?.0;
+                    b >>= skip.eval(vars)?.0;
                 }
 
-                let (l, _) = length.eval(&vars)?;
+                let (l, _) = length.eval(vars)?;
 
                 if *reverse {
                     b = b.reverse_bits().rotate_left(l as u32);
@@ -475,9 +475,9 @@ impl Expression {
                 Ok((b, l as u8))
             }
             Expression::InfiniteBitField { value, skip } => {
-                let (mut b, _) = value.eval(&vars)?;
+                let (mut b, _) = value.eval(vars)?;
 
-                b >>= skip.eval(&vars)?.0;
+                b >>= skip.eval(vars)?.0;
 
                 Ok((b, 8))
             }
@@ -568,7 +568,7 @@ fn eval_stream<'a>(
             Expression::Assignment(id, expr) => {
                 encoder.flush_level(level, vars)?;
 
-                let (v, l) = expr.eval(&vars)?;
+                let (v, l) = expr.eval(vars)?;
 
                 vars.set(id.to_string(), v, l);
             }
@@ -668,7 +668,7 @@ fn eval_stream<'a>(
                 eval_stream(variation, encoder, level, vars, gs, repeats, alternative)?;
             }
             _ => {
-                let (bits, length) = expr.eval(&vars)?;
+                let (bits, length) = expr.eval(vars)?;
 
                 encoder.add_bits(bits, length, level)?;
             }
