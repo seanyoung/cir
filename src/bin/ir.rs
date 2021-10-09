@@ -133,6 +133,7 @@ fn main() {
                         .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .long("device")
                         .short("d")
+                        .global(true)
                         .takes_value(true)
                         .conflicts_with("RCDEV"),
                 )
@@ -141,6 +142,7 @@ fn main() {
                         .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
                         .short("s")
+                        .global(true)
                         .takes_value(true)
                         .conflicts_with("LIRCDEV"),
                 )
@@ -150,6 +152,7 @@ fn main() {
                         .help("Comma separated list of transmitters to use, starting from 1")
                         .long("transmitters")
                         .short("e")
+                        .global(true)
                         .takes_value(true)
                         .multiple(true)
                         .require_delimiter(true),
@@ -184,6 +187,7 @@ fn main() {
                             Arg::with_name("REPEATS")
                                 .long("repeats")
                                 .short("r")
+                                .help("Number of times to repeat signal")
                                 .takes_value(true)
                                 .default_value("1"),
                         )
@@ -196,6 +200,20 @@ fn main() {
                 .subcommand(
                     SubCommand::with_name("mode2")
                         .about("Parse mode2 pulse space file and transmit")
+                        .arg(
+                            Arg::with_name("CARRIER")
+                                .long("carrier")
+                                .short("c")
+                                .help("Set carrier in Hz, 0 for unmodulated")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::with_name("DUTY_CYCLE")
+                                .long("duty-cycle")
+                                .short("u")
+                                .help("Set send duty cycle % (1 to 99)")
+                                .takes_value(true),
+                        )
                         .arg(
                             Arg::with_name("FILE")
                                 .help("File to load and parse")
@@ -210,12 +228,14 @@ fn main() {
                             Arg::with_name("CARRIER")
                                 .long("carrier")
                                 .short("c")
+                                .help("Set carrier in Hz, 0 for unmodulated")
                                 .takes_value(true),
                         )
                         .arg(
                             Arg::with_name("DUTY_CYCLE")
                                 .long("duty-cycle")
                                 .short("u")
+                                .help("Set send duty cycle % (1 to 99)")
                                 .takes_value(true),
                         ),
                 ),
@@ -285,19 +305,7 @@ fn main() {
         ("transmit", Some(matches)) => {
             let message = encode_args(matches);
 
-            if matches.is_present("VERBOSE") {
-                if let Some(carrier) = &message.carrier {
-                    if *carrier == 0 {
-                        println!("carrier: unmodulated (no carrier)");
-                    } else {
-                        println!("carrier: {}Hz", carrier);
-                    }
-                }
-                if let Some(duty_cycle) = &message.duty_cycle {
-                    println!("duty cycle: {}%", duty_cycle);
-                }
-                println!("rawir: {}", message.print_rawir());
-            }
+            let verbose = matches.is_present("VERBOSE");
 
             let mut lircdev = open_lirc(matches);
 
@@ -367,7 +375,47 @@ fn main() {
                 }
             }
 
-            if let Some(duty_cycle) = message.duty_cycle {
+            let duty_cycle = if let Some(value) = matches.value_of("DUTY_CYCLE") {
+                match value.parse() {
+                    Ok(d @ 1..=99) => Some(d),
+                    _ => {
+                        eprintln!("error: ‘{}’ duty cycle is not valid", value);
+
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                message.duty_cycle
+            };
+
+            let carrier = if let Some(value) = matches.value_of("CARRIER") {
+                match value.parse() {
+                    Ok(c @ 0..=1_000_000) => Some(c),
+                    _ => {
+                        eprintln!("error: ‘{}’ carrier is not valid", value);
+
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                message.carrier
+            };
+
+            if verbose {
+                if let Some(carrier) = &carrier {
+                    if *carrier == 0 {
+                        println!("carrier: unmodulated (no carrier)");
+                    } else {
+                        println!("carrier: {}Hz", carrier);
+                    }
+                }
+                if let Some(duty_cycle) = &duty_cycle {
+                    println!("duty cycle: {}%", duty_cycle);
+                }
+                println!("rawir: {}", message.print_rawir());
+            }
+
+            if let Some(duty_cycle) = duty_cycle {
                 if lircdev.can_set_send_duty_cycle() {
                     if let Err(s) = lircdev.set_send_duty_cycle(duty_cycle as u32) {
                         eprintln!("error: {}", s.to_string());
@@ -379,7 +427,7 @@ fn main() {
                 }
             }
 
-            if let Some(carrier) = message.carrier {
+            if let Some(carrier) = carrier {
                 if lircdev.can_set_send_carrier() {
                     if let Err(s) = lircdev.set_send_carrier(carrier as u32) {
                         eprintln!("error: {}", s.to_string());
