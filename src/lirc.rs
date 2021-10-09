@@ -2,10 +2,10 @@ use iocuddle::*;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::{Error, ErrorKind, Read, Write};
-use std::mem;
 use std::ops::Range;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::{fmt, mem};
 
 const LIRC: Group = Group::new(b'i');
 
@@ -46,6 +46,7 @@ const LIRC_MODE2_MASK: u32 = 0xFF000000;
 
 /// A physical or virtual lirc device
 pub struct Lirc {
+    path: PathBuf,
     file: File,
     features: u32,
     raw_mode: bool,
@@ -95,6 +96,7 @@ pub fn open(path: &Path) -> io::Result<Lirc> {
 
     if let Ok((0, features)) = LIRC_GET_FEATURES.ioctl(&file) {
         Ok(Lirc {
+            path: PathBuf::from(path),
             file,
             features,
             raw_mode: true,
@@ -332,5 +334,11 @@ impl Lirc {
 impl AsRawFd for Lirc {
     fn as_raw_fd(&self) -> RawFd {
         self.file.as_raw_fd()
+    }
+}
+
+impl fmt::Display for Lirc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.path.display())
     }
 }
