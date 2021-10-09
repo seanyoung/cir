@@ -130,6 +130,7 @@ fn main() {
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .arg(
                     Arg::with_name("LIRCDEV")
+                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .long("device")
                         .short("d")
                         .takes_value(true)
@@ -137,12 +138,22 @@ fn main() {
                 )
                 .arg(
                     Arg::with_name("RCDEV")
+                        .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
                         .short("s")
                         .takes_value(true)
                         .conflicts_with("LIRCDEV"),
                 )
                 .arg(Arg::with_name("VERBOSE").long("verbose").short("v"))
+                .arg(
+                    Arg::with_name("TRANSMITTERS")
+                        .help("Comma separated list of transmitters to use, starting from 1")
+                        .long("transmitters")
+                        .short("e")
+                        .takes_value(true)
+                        .multiple(true)
+                        .require_delimiter(true),
+                )
                 .subcommand(
                     SubCommand::with_name("irp")
                         .about("Encode using IRP langauge and transmit")
@@ -289,6 +300,72 @@ fn main() {
             }
 
             let mut lircdev = open_lirc(matches);
+
+            if let Some(values) = matches.values_of("TRANSMITTERS") {
+                let mut transmitters: Vec<u32> = Vec::new();
+                for t in values {
+                    let mut found_transmitters = false;
+                    for t in t.split(&[' ', ';', ':', ','][..]) {
+                        if t.is_empty() {
+                            continue;
+                        }
+                        match t.parse() {
+                            Ok(0) | Err(_) => {
+                                eprintln!("error: ‘{}’ is not a valid transmitter number", t);
+                                std::process::exit(1);
+                            }
+                            Ok(v) => transmitters.push(v),
+                        }
+                        found_transmitters = true;
+                    }
+
+                    if !found_transmitters {
+                        eprintln!("error: ‘{}’ is not a valid transmitter number", t);
+                        std::process::exit(1);
+                    }
+                }
+
+                if !transmitters.is_empty() {
+                    if !lircdev.can_set_send_transmitter_mask() {
+                        eprintln!("error: device does not support setting transmitters");
+
+                        std::process::exit(1);
+                    }
+
+                    let transmitter_count = match lircdev.num_transmitters() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            eprintln!("error: failed to get transmitter count: {}", e);
+
+                            std::process::exit(1);
+                        }
+                    };
+
+                    if let Some(t) = transmitters.iter().find(|t| **t > transmitter_count) {
+                        eprintln!(
+                            "error: transmitter {} not valid, device has {} transmitters",
+                            t, transmitter_count
+                        );
+
+                        std::process::exit(1);
+                    }
+
+                    let mask: u32 = transmitters.iter().fold(0, |acc, t| acc | (1 << (t - 1)));
+
+                    if matches.is_present("VERBOSE") {
+                        eprintln!("debug: setting transmitter mask {:08x}", mask);
+                    }
+
+                    match lircdev.set_transmitter_mask(mask) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            eprintln!("error: failed to set transmitter mask: {}", e);
+
+                            std::process::exit(1);
+                        }
+                    }
+                }
+            }
 
             if let Some(duty_cycle) = message.duty_cycle {
                 if lircdev.can_set_send_duty_cycle() {
