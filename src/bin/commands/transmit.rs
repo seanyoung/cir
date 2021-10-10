@@ -1,11 +1,11 @@
-use super::{encode_args, open_lirc};
+use super::{encode_args, open_lirc, Purpose};
 
 pub fn transmit(matches: &clap::ArgMatches) {
     let message = encode_args(matches);
 
     let verbose = matches.is_present("VERBOSE");
 
-    let mut lircdev = open_lirc(matches);
+    let mut lircdev = open_lirc(matches, Purpose::Transmit);
 
     if let Some(values) = matches.values_of("TRANSMITTERS") {
         let mut transmitters: Vec<u32> = Vec::new();

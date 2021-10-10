@@ -6,12 +6,12 @@ use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use super::{find_devices, open_lirc};
+use super::{find_devices, open_lirc, Purpose};
 
 // Clippy comparison_chain doesn't make any sense. It make the code _worse_
 #[allow(clippy::comparison_chain)]
 pub fn receive(matches: &clap::ArgMatches) {
-    let (lircdev, inputdev) = find_devices(matches);
+    let (lircdev, inputdev) = find_devices(matches, Purpose::Receive);
     let raw_token: Token = Token(0);
     let scancodes_token: Token = Token(1);
     let input_token: Token = Token(2);
@@ -128,7 +128,7 @@ pub fn receive(matches: &clap::ArgMatches) {
                 .expect("failed to add raw poll");
 
             if lircdev.can_receive_scancodes() {
-                let mut lircdev = open_lirc(matches);
+                let mut lircdev = open_lirc(matches, Purpose::Receive);
 
                 lircdev
                     .scancode_mode()

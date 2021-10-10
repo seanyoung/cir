@@ -4,10 +4,10 @@ use std::convert::TryFrom;
 use std::fs;
 use std::str::FromStr;
 
-use super::find_devices;
+use super::{find_devices, Purpose};
 
 pub fn config(matches: &clap::ArgMatches) {
-    let (_, inputdev) = find_devices(matches);
+    let (_, inputdev) = find_devices(matches, Purpose::Receive);
 
     if inputdev.is_none() {
         eprintln!("error: input device is missing");

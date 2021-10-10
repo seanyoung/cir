@@ -8,8 +8,16 @@ pub mod encode;
 pub mod receive;
 pub mod transmit;
 
+pub enum Purpose {
+    Receive,
+    Transmit,
+}
+
 /// Enumerate all rc devices and find the lirc and input devices
-pub fn find_devices(matches: &clap::ArgMatches) -> (Option<String>, Option<String>) {
+pub fn find_devices(
+    matches: &clap::ArgMatches,
+    purpose: Purpose,
+) -> (Option<String>, Option<String>) {
     let list = match rcdev::enumerate_rc_dev() {
         Ok(list) if list.is_empty() => {
             eprintln!("error: no devices found");
@@ -22,29 +30,54 @@ pub fn find_devices(matches: &clap::ArgMatches) -> (Option<String>, Option<Strin
         }
     };
 
-    if let Some(lircdev) = matches.value_of("LIRCDEV") {
-        (Some(lircdev.to_owned()), None)
-    } else {
-        let entry = if let Some(rcdev) = matches.value_of("RCDEV") {
-            if let Some(entry) = list.iter().position(|rc| rc.name == rcdev) {
-                entry
-            } else {
-                eprintln!("error: {} not found", rcdev);
-                std::process::exit(1);
-            }
-        } else if let Some(entry) = list.iter().position(|rc| rc.lircdev.is_some()) {
+    let entry = if let Some(rcdev) = matches.value_of("RCDEV") {
+        if let Some(entry) = list.iter().position(|rc| rc.name == rcdev) {
             entry
         } else {
-            eprintln!("error: no lirc device found");
+            eprintln!("error: {} not found", rcdev);
             std::process::exit(1);
-        };
+        }
+    } else if let Some(lircdev) = matches.value_of("LIRCDEV") {
+        if let Some(entry) = list
+            .iter()
+            .position(|rc| rc.lircdev == Some(lircdev.to_string()))
+        {
+            entry
+        } else {
+            eprintln!("error: {} not found", lircdev);
+            std::process::exit(1);
+        }
+    } else if let Some(entry) = list.iter().position(|rc| {
+        if rc.lircdev.is_none() {
+            false
+        } else {
+            let lircpath = PathBuf::from(rc.lircdev.as_ref().unwrap());
 
-        (list[entry].lircdev.clone(), list[entry].inputdev.clone())
-    }
+            let lirc = match lirc::open(&lircpath) {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("error: {}: {}", lircpath.display(), e);
+                    std::process::exit(1);
+                }
+            };
+
+            match purpose {
+                Purpose::Receive => lirc.can_receive_raw() || lirc.can_receive_scancodes(),
+                Purpose::Transmit => lirc.can_send(),
+            }
+        }
+    }) {
+        entry
+    } else {
+        eprintln!("error: no lirc device found");
+        std::process::exit(1);
+    };
+
+    (list[entry].lircdev.clone(), list[entry].inputdev.clone())
 }
 
-pub fn open_lirc(matches: &clap::ArgMatches) -> lirc::Lirc {
-    let (lircdev, _) = find_devices(matches);
+pub fn open_lirc(matches: &clap::ArgMatches, purpose: Purpose) -> lirc::Lirc {
+    let (lircdev, _) = find_devices(matches, purpose);
 
     if let Some(lircdev) = lircdev {
         let lircpath = PathBuf::from(lircdev);
