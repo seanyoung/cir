@@ -3,6 +3,7 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use std::process::Command;
 
+#[rustfmt::skip]
 mod output;
 
 use output::{Node, Rule};
