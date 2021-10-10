@@ -11,6 +11,7 @@
 - Test all keymaps
 - Read old format keymaps
 - Need ir-ctl and ir-keytable command line parsing
+- localization of cli messages
 
 - scancode <=> irp mapping
 

@@ -247,11 +247,13 @@ fn main() {
                     Arg::with_name("LIRCDEV")
                         .long("device")
                         .short("d")
+                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .takes_value(true)
                         .conflicts_with("RCDEV"),
                 )
                 .arg(
                     Arg::with_name("RCDEV")
+                        .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
                         .short("s")
                         .takes_value(true)
@@ -266,19 +268,27 @@ fn main() {
                     Arg::with_name("LIRCDEV")
                         .long("device")
                         .short("d")
+                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .takes_value(true)
                         .conflicts_with("RCDEV"),
                 )
                 .arg(
                     Arg::with_name("RCDEV")
+                        .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
                         .short("s")
                         .takes_value(true)
                         .conflicts_with("LIRCDEV"),
                 )
-                .arg(Arg::with_name("LEARNING").long("learning-mode").short("l"))
+                .arg(
+                    Arg::with_name("LEARNING")
+                        .help("Use short-range learning mode")
+                        .long("learning-mode")
+                        .short("l"),
+                )
                 .arg(
                     Arg::with_name("TIMEOUT")
+                        .help("Set IR timeout")
                         .long("timeout")
                         .short("t")
                         .takes_value(true),
@@ -798,8 +808,8 @@ fn receive(matches: &clap::ArgMatches) {
             if lircdev.can_measure_carrier() {
                 if let Err(err) = lircdev.set_measure_carrier(true) {
                     eprintln!(
-                        "error: failed to enable measure carrier: {}",
-                        err.to_string()
+                        "error: {}: failed to enable measure carrier: {}",
+                        lircdev, err
                     );
                     std::process::exit(1);
                 }
@@ -809,8 +819,8 @@ fn receive(matches: &clap::ArgMatches) {
             if lircdev.can_use_wideband_receiver() {
                 if let Err(err) = lircdev.set_wideband_receiver(true) {
                     eprintln!(
-                        "error: failed to enable wideband receiver: {}",
-                        err.to_string()
+                        "error: {}: failed to enable wideband receiver: {}",
+                        lircdev, err
                     );
                     std::process::exit(1);
                 }
@@ -818,15 +828,18 @@ fn receive(matches: &clap::ArgMatches) {
             }
 
             if !learning_mode {
-                eprintln!("error: lirc device does not support learning mode");
+                eprintln!(
+                    "error: {}: lirc device does not support learning mode",
+                    lircdev
+                );
                 std::process::exit(1);
             }
         } else {
             if lircdev.can_measure_carrier() {
                 if let Err(err) = lircdev.set_measure_carrier(false) {
                     eprintln!(
-                        "error: failed to disable measure carrier: {}",
-                        err.to_string()
+                        "error: {}: failed to disable measure carrier: {}",
+                        lircdev, err
                     );
                     std::process::exit(1);
                 }
@@ -835,8 +848,8 @@ fn receive(matches: &clap::ArgMatches) {
             if lircdev.can_use_wideband_receiver() {
                 if let Err(err) = lircdev.set_wideband_receiver(false) {
                     eprintln!(
-                        "error: failed to disable wideband receiver: {}",
-                        err.to_string()
+                        "error: {}: failed to disable wideband receiver: {}",
+                        lircdev, err
                     );
                     std::process::exit(1);
                 }
@@ -849,24 +862,24 @@ fn receive(matches: &clap::ArgMatches) {
                     match lircdev.get_min_max_timeout() {
                         Ok(range) if range.contains(&timeout) => {
                             if let Err(err) = lircdev.set_timeout(timeout) {
-                                eprintln!("error: {}", err.to_string());
+                                eprintln!("error: {}: {}", lircdev, err);
                                 std::process::exit(1);
                             }
                         }
                         Ok(range) => {
                             eprintln!(
-                                "error: {} not in the range {}-{}",
+                                "error: {} not in the supported range {}-{}",
                                 timeout, range.start, range.end
                             );
                             std::process::exit(1);
                         }
                         Err(err) => {
-                            eprintln!("error: {}", err.to_string());
+                            eprintln!("error: {}: {}", lircdev, err);
                             std::process::exit(1);
                         }
                     }
                 } else {
-                    eprintln!("error: cannot set timeout");
+                    eprintln!("error: {}: changing timeout not supported", lircdev);
                     std::process::exit(1);
                 }
             } else {
@@ -950,8 +963,10 @@ fn receive(matches: &clap::ArgMatches) {
     loop {
         if let Some(lircdev) = &mut rawdev {
             if let Err(err) = lircdev.receive_raw(&mut rawbuf) {
-                eprintln!("error: {}", err.to_string());
-                std::process::exit(1);
+                if err.kind() != std::io::ErrorKind::WouldBlock {
+                    eprintln!("error: {}", err.to_string());
+                    std::process::exit(1);
+                }
             }
 
             for entry in &rawbuf {
@@ -981,8 +996,10 @@ fn receive(matches: &clap::ArgMatches) {
 
         if let Some(lircdev) = &mut scandev {
             if let Err(err) = lircdev.receive_scancodes(&mut scanbuf) {
-                eprintln!("error: {}", err.to_string());
-                std::process::exit(1);
+                if err.kind() != std::io::ErrorKind::WouldBlock {
+                    eprintln!("error: {}", err.to_string());
+                    std::process::exit(1);
+                }
             }
 
             for entry in &scanbuf {
