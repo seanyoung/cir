@@ -2,16 +2,16 @@ output <- params render EOI;
 
 params <- "{" param ("," param)* "}" WHITESPACE;
 
-param <- XID_IDENTIFIER "=" r"\\d+";
+param <- XID_IDENTIFIER "=" re#\d+#;
 
 render <- pronto_out / rawir_out;
 
 pronto_out <- hex+ WHITESPACE;
 
-hex <- r"[0-9a-fA-F]+" WHITESPACE;
+hex <- re#[0-9a-fA-F]+# WHITESPACE;
 
-rawir_out <- ("Freq=" r"\\d+" "Hz")? rawir+ WHITESPACE;
+rawir_out <- ("Freq=" re#\d+# "Hz")? rawir+ WHITESPACE;
 
 rawir <- "[" (value ("," value)+)? "]";
 
-value <- ("+" / "-") r"\\d+";
+value <- ("+" / "-") re#\d+#;

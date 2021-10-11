@@ -3,8 +3,7 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use std::process::Command;
 
-#[rustfmt::skip]
-mod output;
+include!(concat!(env!("OUT_DIR"), "/output.rs"));
 
 use output::{Node, Rule};
 use serde::{Deserialize, Serialize};
@@ -81,7 +80,7 @@ pub fn parse_output(protocol: String, repeats: u8, input: &str) -> TestData {
             walk(&node, input, &mut data);
         }
         Err(pos) => {
-            panic!("cannot parse `{}` at  position {}", input, pos);
+            panic!("cannot parse `{}` at  position {}:{}", input, pos.0, pos.1);
         }
     }
 

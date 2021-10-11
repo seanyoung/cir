@@ -6,7 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [build-dependencies]
-lrpeg = "0.2.0"
+lrpeg = "0.4.1"
 
 [dependencies]
 irp = { path = ".." }

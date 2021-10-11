@@ -22,4 +22,4 @@ humantime = "2.1"
 aya = "^0.10.3"
 
 [build-dependencies]
-lrpeg = { git = "https://github.com/seanyoung/lrpeg/" }
+lrpeg = "0.4.1"

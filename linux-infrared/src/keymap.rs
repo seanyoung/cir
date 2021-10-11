@@ -102,7 +102,7 @@ pub fn parse(contents: &str, filename: &str) -> Result<Keymap, String> {
                 Ok(Keymap { protocols })
             }
             Err(pos) => {
-                return Err(format!("parse error at position {}", pos));
+                return Err(format!("parse error at {}:{}", pos.0, pos.1));
             }
         }
     }

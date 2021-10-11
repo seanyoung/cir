@@ -22,7 +22,7 @@ impl Irp {
                     parameters,
                 })
             }
-            Err(pos) => Err(format!("parse error at {}", pos)),
+            Err(pos) => Err(format!("parse error at {}:{}", pos.0, pos.1)),
         }
     }
 }

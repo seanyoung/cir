@@ -12,7 +12,7 @@ readme = "README.md"
 license = "MIT"
 
 [build-dependencies]
-lrpeg = "0.4"
+lrpeg = "0.4.1"
 
 [dependencies]
 num = "0.4"
