@@ -43,21 +43,24 @@ fn main() {
                                 .short("f")
                                 .takes_value(true)
                                 .multiple(true)
+                                .conflicts_with("PRONTO")
                                 .number_of_values(1),
                         )
                         .arg(
                             Arg::with_name("IRP")
                                 .help("IRP protocol")
                                 .required(true)
-                                .index(1),
+                                .last(true),
                         ),
                 )
                 .subcommand(
                     SubCommand::with_name("pronto")
+                        .about("Parse pronto hex code and print as raw IR")
                         .arg(
                             Arg::with_name("REPEATS")
                                 .long("repeats")
                                 .short("r")
+                                .help("Number of times to repeat signal")
                                 .takes_value(true)
                                 .default_value("1"),
                         )
@@ -77,8 +80,11 @@ fn main() {
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("rawir")
-                        .arg(Arg::with_name("RAWIR").help("Raw IR").required(true)),
+                    SubCommand::with_name("rawir").about("Parse raw IR").arg(
+                        Arg::with_name("RAWIR")
+                            .help("Raw IR to parse")
+                            .required(true),
+                    ),
                 ),
         )
         .subcommand(
