@@ -12,7 +12,7 @@
 - Read old format keymaps
 - Need ir-ctl and ir-keytable command line parsing
 - localization of cli messages
-
+- /etc/maps.cfg and ir-keytable -a options
 - scancode <=> irp mapping
 
 
