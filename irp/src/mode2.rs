@@ -3,11 +3,14 @@ use super::Message;
 /// parse pulse/space type input. This format is produces by lirc's mode2 tool.
 /// Some lirc drivers sometimes produce consecutive pulses or spaces, rather
 /// than alternating. These have to be folded.
-pub fn parse(s: &str) -> Result<Message, String> {
+pub fn parse(s: &str) -> Result<Message, (usize, String)> {
     let mut res = Vec::new();
     let mut carrier = None;
+    let mut line_no = 0;
 
     for line in s.lines() {
+        line_no += 1;
+
         let mut words = line.split_whitespace();
 
         let is_pulse = match words.next() {
@@ -19,25 +22,34 @@ pub fn parse(s: &str) -> Result<Message, String> {
                     Some(w) => match w.parse() {
                         Ok(c) => {
                             if carrier.is_some() && carrier != Some(c) {
-                                return Err(String::from("carrier specified more than once"));
+                                return Err((
+                                    line_no,
+                                    String::from("carrier specified more than once"),
+                                ));
                             }
 
                             if c < 0 {
-                                return Err(format!("negative carrier {} does not make sense", c));
+                                return Err((
+                                    line_no,
+                                    format!("negative carrier {} does not make sense", c),
+                                ));
                             }
 
                             carrier = Some(c);
                         }
                         Err(_) => {
-                            return Err(format!("carrier argument ‘{}’ is not a number", w));
+                            return Err((
+                                line_no,
+                                format!("carrier argument ‘{}’ is not a number", w),
+                            ));
                         }
                     },
-                    None => return Err(String::from("missing carrier value")),
+                    None => return Err((line_no, String::from("missing carrier value"))),
                 }
 
                 if let Some(w) = words.next() {
                     if !w.starts_with('#') && !w.starts_with("//") {
-                        return Err(format!("unexpected ‘{}’", w));
+                        return Err((line_no, format!("unexpected ‘{}’", w)));
                     }
                 }
 
@@ -45,7 +57,7 @@ pub fn parse(s: &str) -> Result<Message, String> {
             }
             Some(w) => {
                 if !w.starts_with('#') && !w.starts_with("//") {
-                    return Err(format!("unexpected ‘{}’", w));
+                    return Err((line_no, format!("unexpected ‘{}’", w)));
                 }
                 continue;
             }
@@ -57,25 +69,25 @@ pub fn parse(s: &str) -> Result<Message, String> {
         let value = match words.next() {
             Some(w) => match w.parse() {
                 Ok(0) => {
-                    return Err("nonsensical 0 duration".to_string());
+                    return Err((line_no, "nonsensical 0 duration".to_string()));
                 }
                 Ok(n) => {
                     if n > 0xff_ff_ff {
-                        return Err(format!("duration ‘{}’ too long", w));
+                        return Err((line_no, format!("duration ‘{}’ too long", w)));
                     }
                     n
                 }
                 Err(_) => {
-                    return Err(format!("invalid duration ‘{}’", w));
+                    return Err((line_no, format!("invalid duration ‘{}’", w)));
                 }
             },
             None => {
-                return Err("missing duration".to_string());
+                return Err((line_no, "missing duration".to_string()));
             }
         };
 
         if let Some(trailing) = words.next() {
-            return Err(format!("unexpected ‘{}’", trailing));
+            return Err((line_no, format!("unexpected ‘{}’", trailing)));
         }
 
         if is_pulse {
@@ -96,7 +108,10 @@ pub fn parse(s: &str) -> Result<Message, String> {
     }
 
     if res.is_empty() {
-        return Err("missing pulse".to_string());
+        if line_no == 0 {
+            line_no = 1;
+        }
+        return Err((line_no, "missing pulse".to_string()));
     }
 
     Ok(Message {
@@ -108,15 +123,18 @@ pub fn parse(s: &str) -> Result<Message, String> {
 
 #[test]
 fn test_parse() {
-    assert_eq!(parse("").err(), Some("missing pulse".to_string()));
+    assert_eq!(parse("").err(), Some((1, "missing pulse".to_string())));
     assert_eq!(
         parse("pulse 0").err(),
-        Some("nonsensical 0 duration".to_string())
+        Some((1, "nonsensical 0 duration".to_string()))
     );
-    assert_eq!(parse("pulse").err(), Some("missing duration".to_string()));
+    assert_eq!(
+        parse("pulse").err(),
+        Some((1, "missing duration".to_string()))
+    );
     assert_eq!(
         parse("pulse abc").err(),
-        Some("invalid duration ‘abc’".to_string())
+        Some((1, "invalid duration ‘abc’".to_string()))
     );
     assert_eq!(parse("pulse 1\npulse 2").unwrap().raw, vec!(3u32));
     assert_eq!(
@@ -131,7 +149,7 @@ fn test_parse() {
     );
     assert_eq!(
         parse("polse 100\nspace 10\nspace 50").err(),
-        Some("unexpected ‘polse’".to_string())
+        Some((1, "unexpected ‘polse’".to_string()))
     );
     assert_eq!(
         parse("pulse 100\nspace 10\npulse 50").unwrap().raw,
@@ -139,23 +157,23 @@ fn test_parse() {
     );
     assert_eq!(
         parse("pulse 100\nspace 10\npulse 50\nspace 34134134").err(),
-        Some("duration ‘34134134’ too long".to_string())
+        Some((4, "duration ‘34134134’ too long".to_string()))
     );
     assert_eq!(
         parse("pulse 100\nspace 10\npulse 50 foobar\nspace 34134134").err(),
-        Some("unexpected ‘foobar’".to_string())
+        Some((3, "unexpected ‘foobar’".to_string()))
     );
     assert_eq!(
         parse("pulse 100\nspace 10\ncarrier foobar\nspace 34134134").err(),
-        Some("carrier argument ‘foobar’ is not a number".to_string())
+        Some((3, "carrier argument ‘foobar’ is not a number".to_string()))
     );
     assert_eq!(
         parse("pulse 100\nspace 10\ncarrier\nspace 34134134").err(),
-        Some("missing carrier value".to_string())
+        Some((3, "missing carrier value".to_string()))
     );
     assert_eq!(
         parse("pulse 100\nspace 10\ncarrier 500 x\nspace 34134134").err(),
-        Some("unexpected ‘x’".to_string())
+        Some((3, "unexpected ‘x’".to_string()))
     );
     assert_eq!(
         parse("pulse 100\nspace 10\npulse 50\ncarrier 500 // hiya\ntimeout 100000").unwrap(),

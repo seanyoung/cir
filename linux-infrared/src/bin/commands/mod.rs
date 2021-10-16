@@ -204,7 +204,8 @@ pub fn encode_args<'a>(matches: &'a clap::ArgMatches<'a>) -> (Message, &'a clap:
             }
         }
         ("mode2", Some(matches)) => {
-            let input = match fs::read_to_string(matches.value_of("FILE").unwrap()) {
+            let filename = matches.value_of("FILE").unwrap();
+            let input = match fs::read_to_string(filename) {
                 Ok(s) => s,
                 Err(s) => {
                     eprintln!("error: {}", s.to_string());
@@ -214,8 +215,8 @@ pub fn encode_args<'a>(matches: &'a clap::ArgMatches<'a>) -> (Message, &'a clap:
 
             match irp::mode2::parse(&input) {
                 Ok(m) => (m, matches),
-                Err(s) => {
-                    eprintln!("error: {}", s);
+                Err((line_no, error)) => {
+                    eprintln!("{}:{}: error: {}", filename, line_no, error);
                     std::process::exit(2);
                 }
             }
