@@ -148,7 +148,13 @@ fn main() {
                         .takes_value(true)
                         .conflicts_with("LIRCDEV"),
                 )
-                .arg(Arg::with_name("VERBOSE").long("verbose").short("v"))
+                .arg(
+                    Arg::with_name("VERBOSE")
+                        .long("verbose")
+                        .short("v")
+                        .global(true)
+                        .help("verbose output"),
+                )
                 .arg(
                     Arg::with_name("TRANSMITTERS")
                         .help("Comma separated list of transmitters to use, starting from 1")

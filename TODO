@@ -1,4 +1,4 @@
-- Finish off lirc sending (duty cycle, transmitters, others, verbose)
+- Sending multiple keys/files
 - ir encode/send needs to read xml file
 - send from keymap
 - Formatting of ir receive is poor/broken

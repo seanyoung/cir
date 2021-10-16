@@ -1,7 +1,7 @@
 use super::encode_args;
 
 pub fn encode(matches: &clap::ArgMatches) {
-    let message = encode_args(matches);
+    let (message, _) = encode_args(matches);
 
     if let Some(carrier) = &message.carrier {
         if *carrier == 0 {

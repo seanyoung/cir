@@ -1,13 +1,16 @@
 use super::{encode_args, open_lirc, Purpose};
 
-pub fn transmit(matches: &clap::ArgMatches) {
-    let message = encode_args(matches);
+pub fn transmit(global_matches: &clap::ArgMatches) {
+    let (message, matches) = encode_args(global_matches);
 
-    let verbose = matches.is_present("VERBOSE");
+    let verbose = global_matches.is_present("VERBOSE") | matches.is_present("VERBOSE");
 
     let mut lircdev = open_lirc(matches, Purpose::Transmit);
 
-    if let Some(values) = matches.values_of("TRANSMITTERS") {
+    if let Some(values) = global_matches
+        .values_of("TRANSMITTERS")
+        .or_else(|| matches.values_of("TRANSMITTERS"))
+    {
         let mut transmitters: Vec<u32> = Vec::new();
         for t in values {
             let mut found_transmitters = false;

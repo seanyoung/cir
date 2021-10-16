@@ -95,7 +95,7 @@ pub fn open_lirc(matches: &clap::ArgMatches, purpose: Purpose) -> lirc::Lirc {
     }
 }
 
-pub fn encode_args(matches: &clap::ArgMatches) -> Message {
+pub fn encode_args<'a>(matches: &'a clap::ArgMatches<'a>) -> (Message, &'a clap::ArgMatches<'a>) {
     match matches.subcommand() {
         ("irp", Some(matches)) => {
             let mut vars = irp::Vartable::new();
@@ -153,7 +153,7 @@ pub fn encode_args(matches: &clap::ArgMatches) -> Message {
                 }
             } else {
                 match irp.encode(vars, repeats) {
-                    Ok(m) => m,
+                    Ok(m) => (m, matches),
                     Err(s) => {
                         eprintln!("error: {}", s);
                         std::process::exit(2);
@@ -183,17 +183,20 @@ pub fn encode_args(matches: &clap::ArgMatches) -> Message {
                 }
             };
 
-            pronto.encode(repeats)
+            (pronto.encode(repeats), matches)
         }
         ("rawir", Some(matches)) => {
             let rawir = matches.value_of("RAWIR").unwrap();
 
             match irp::rawir::parse(rawir) {
-                Ok(raw) => Message {
-                    carrier: None,
-                    duty_cycle: None,
-                    raw,
-                },
+                Ok(raw) => (
+                    Message {
+                        carrier: None,
+                        duty_cycle: None,
+                        raw,
+                    },
+                    matches,
+                ),
                 Err(s) => {
                     eprintln!("error: {}", s);
                     std::process::exit(2);
@@ -210,7 +213,7 @@ pub fn encode_args(matches: &clap::ArgMatches) -> Message {
             };
 
             match irp::mode2::parse(&input) {
-                Ok(m) => m,
+                Ok(m) => (m, matches),
                 Err(s) => {
                     eprintln!("error: {}", s);
                     std::process::exit(2);
