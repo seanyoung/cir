@@ -10,7 +10,7 @@ use std::path::PathBuf;
 mod commands;
 
 fn main() {
-    let matches = App::new("ir")
+    let matches = App::new("cir")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Sean Young <sean@mess.org>")
         .about("Linux Infrared Control")

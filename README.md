@@ -1,4 +1,4 @@
-# ir - a new implementation of ir-keytable/ir-ctl for linux
+# cir - a new implementation of ir-keytable/ir-ctl for linux
 
 For Linux, there are two tools to interact with any infrared hardware:
 ir-ctl and ir-keytable. These tools can load simple infrared keymaps
