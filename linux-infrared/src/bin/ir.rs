@@ -1,5 +1,5 @@
 use aya::programs::LircMode2;
-use clap::{App, AppSettings, Arg, SubCommand};
+use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use evdev::Device;
 use itertools::Itertools;
 use linux_infrared::{lirc, rcdev};
@@ -94,16 +94,15 @@ fn main() {
                     Arg::with_name("LIRCDEV")
                         .long("device")
                         .short("d")
-                        .takes_value(true)
-                        .conflicts_with("RCDEV"),
+                        .takes_value(true),
                 )
                 .arg(
                     Arg::with_name("RCDEV")
                         .long("rcdev")
                         .short("s")
-                        .takes_value(true)
-                        .conflicts_with("LIRCDEV"),
+                        .takes_value(true),
                 )
+                .group(ArgGroup::with_name("DEVICE").args(&["RCDEV", "LIRCDEV"]))
                 .arg(
                     Arg::with_name("DELAY")
                         .long("delay")
@@ -124,7 +123,17 @@ fn main() {
                         .multiple(true),
                 )
                 .arg(Arg::with_name("CLEAR").long("clear").short("c"))
-                .arg(Arg::with_name("VERBOSE").long("verbose").short("v")),
+                .arg(Arg::with_name("VERBOSE").long("verbose").short("v"))
+                .arg(
+                    Arg::with_name("CFGFILE")
+                        .long("auto-load")
+                        .short("a")
+                        .help("Auto-load keymaps, based on configuration file")
+                        .default_value("/etc/rc_maps.cfg")
+                        .conflicts_with_all(&["DELAY", "PERIOD", "KEYMAP", "CLEAR"])
+                        .requires("DEVICE")
+                        .takes_value(true),
+                ),
         )
         .subcommand(
             SubCommand::with_name("transmit")

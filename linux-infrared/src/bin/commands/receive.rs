@@ -11,7 +11,7 @@ use super::{find_devices, open_lirc, Purpose};
 // Clippy comparison_chain doesn't make any sense. It make the code _worse_
 #[allow(clippy::comparison_chain)]
 pub fn receive(matches: &clap::ArgMatches) {
-    let (lircdev, inputdev) = find_devices(matches, Purpose::Receive);
+    let rcdev = find_devices(matches, Purpose::Receive);
     let raw_token: Token = Token(0);
     let scancodes_token: Token = Token(1);
     let input_token: Token = Token(2);
@@ -21,7 +21,7 @@ pub fn receive(matches: &clap::ArgMatches) {
     let mut rawdev = None;
     let mut eventdev = None;
 
-    if let Some(lircdev) = lircdev {
+    if let Some(lircdev) = rcdev.lircdev {
         let lircpath = PathBuf::from(lircdev);
 
         let mut lircdev = match lirc::open(&lircpath) {
@@ -161,7 +161,7 @@ pub fn receive(matches: &clap::ArgMatches) {
         }
     }
 
-    if let Some(inputdev) = inputdev {
+    if let Some(inputdev) = rcdev.inputdev {
         let inputdev = match Device::open(&inputdev) {
             Ok(l) => l,
             Err(s) => {

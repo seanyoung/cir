@@ -3,7 +3,7 @@
 use std::path::Path;
 use std::{fs, io};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Rcdev {
     pub name: String,
     pub device_name: String,

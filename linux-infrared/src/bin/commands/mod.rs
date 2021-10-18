@@ -1,5 +1,8 @@
 use irp::{Irp, Message, Pronto};
-use linux_infrared::{lirc, rcdev};
+use linux_infrared::{
+    lirc,
+    rcdev::{enumerate_rc_dev, Rcdev},
+};
 
 use std::{fs, path::PathBuf};
 
@@ -14,11 +17,8 @@ pub enum Purpose {
 }
 
 /// Enumerate all rc devices and find the lirc and input devices
-pub fn find_devices(
-    matches: &clap::ArgMatches,
-    purpose: Purpose,
-) -> (Option<String>, Option<String>) {
-    let list = match rcdev::enumerate_rc_dev() {
+pub fn find_devices(matches: &clap::ArgMatches, purpose: Purpose) -> Rcdev {
+    let list = match enumerate_rc_dev() {
         Ok(list) if list.is_empty() => {
             eprintln!("error: no devices found");
             std::process::exit(1);
@@ -73,13 +73,13 @@ pub fn find_devices(
         std::process::exit(1);
     };
 
-    (list[entry].lircdev.clone(), list[entry].inputdev.clone())
+    list[entry].clone()
 }
 
 pub fn open_lirc(matches: &clap::ArgMatches, purpose: Purpose) -> lirc::Lirc {
-    let (lircdev, _) = find_devices(matches, purpose);
+    let rcdev = find_devices(matches, purpose);
 
-    if let Some(lircdev) = lircdev {
+    if let Some(lircdev) = rcdev.lircdev {
         let lircpath = PathBuf::from(lircdev);
 
         match lirc::open(&lircpath) {
