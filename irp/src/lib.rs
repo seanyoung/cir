@@ -6,7 +6,7 @@
 //!
 //! ## About IRP
 //!
-//! [IRP Notation](http://hifi-remote.com/wiki/index.php?title=IRP_Notation) is a mini-language
+//! [IRP Notation](http://hifi-remote.com/wiki/index.php?title=IRP_Notation) is a domain-specific language
 //! which describes [Consumer IR](https://en.wikipedia.org/wiki/Consumer_IR) protocols. There is a extensive
 //! [library](http://hifi-remote.com/wiki/index.php/DecodeIR) of protocols described using IRP.
 //!

@@ -1,8 +1,10 @@
 use super::Message;
 
-/// parse pulse/space type input. This format is produces by lirc's mode2 tool.
+/// Parse pulse/space text. This format is produces by lirc's mode2 tool.
 /// Some lirc drivers sometimes produce consecutive pulses or spaces, rather
-/// than alternating. These have to be folded.
+/// than alternating. These are automatically folded into one.
+///
+/// The return value is the line number and the error string.
 pub fn parse(s: &str) -> Result<Message, (usize, String)> {
     let mut res = Vec::new();
     let mut carrier = None;
