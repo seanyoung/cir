@@ -67,7 +67,7 @@ fn parse_bad() {
 
     assert_eq!(
         format!("{}", e),
-        "testdata/rc_maps/bad.cfg:4: error: invalid parameters"
+        "testdata/rc_maps_cfg/bad.cfg:4: error: invalid parameters"
     );
 }
 
