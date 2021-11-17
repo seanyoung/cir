@@ -13,7 +13,7 @@ fn main() {
     let matches = App::new("cir")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Sean Young <sean@mess.org>")
-        .about("Linux Infrared Control")
+        .about("Consumer Infrared")
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("encode")
@@ -122,6 +122,13 @@ fn main() {
                         .takes_value(true)
                         .multiple(true),
                 )
+                .arg(
+                    Arg::with_name("TIMEOUT")
+                        .help("Set IR timeout")
+                        .long("timeout")
+                        .short("t")
+                        .takes_value(true),
+                )
                 .arg(Arg::with_name("CLEAR").long("clear").short("c"))
                 .arg(Arg::with_name("VERBOSE").long("verbose").short("v"))
                 .arg(
@@ -130,7 +137,7 @@ fn main() {
                         .short("a")
                         .help("Auto-load keymaps, based on configuration file")
                         .default_value("/etc/rc_maps.cfg")
-                        .conflicts_with_all(&["DELAY", "PERIOD", "KEYMAP", "CLEAR"])
+                        .conflicts_with_all(&["DELAY", "PERIOD", "KEYMAP", "CLEAR", "TIMEOUT"])
                         .requires("DEVICE")
                         .takes_value(true),
                 ),
@@ -302,13 +309,6 @@ fn main() {
                         .help("Use short-range learning mode")
                         .long("learning-mode")
                         .short("l"),
-                )
-                .arg(
-                    Arg::with_name("TIMEOUT")
-                        .help("Set IR timeout")
-                        .long("timeout")
-                        .short("t")
-                        .takes_value(true),
                 ),
         )
         .get_matches();
