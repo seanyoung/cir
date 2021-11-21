@@ -295,3 +295,6 @@ struct ParameterSpec {
 pub struct Vartable<'a> {
     vars: HashMap<String, (i64, u8, Option<&'a Expression>)>,
 }
+
+pub use build_nfa::NFA;
+pub use match_nfa::Matcher;
