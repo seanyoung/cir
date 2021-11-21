@@ -1,75 +1,51 @@
 use super::{Expression, Irp, Vartable};
-#[allow(unused_imports)]
-use std::{
-    char,
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{char, fs::File, io::Write, path::Path};
 
 // This is the decoder nfa (non-deterministic finite automation)
+//
+// From the IRP, we build the nfa
+// from the nfa we build the dfa
+// from the dfa we build clif
+// from clif we the BPF decoder (cranelift does this)
+
+// clif is a compiler IR. This means basic blocks with a single
+// flow control instruction at the end of the block. So, we try to model
+// the nfa such this is easy to transform.
+
 #[derive(PartialEq, Debug)]
 pub enum Edge {
     Flash(i64, usize),
     Gap(i64, usize),
-    Repeat(usize),
-    Empty(usize),
-}
-
-#[derive(PartialEq, Debug)]
-pub enum Action {
-    Set {
-        var: String,
+    BranchCond {
         expr: Expression,
+        yes: usize,
+        no: usize,
     },
-    AddBit {
-        var: String,
-        expr: Expression,
-        count: u8,
-        lsb: bool,
-    },
+    Branch(usize),
     Done,
 }
 
 #[derive(PartialEq, Debug)]
+pub enum Action {
+    Set { var: String, expr: Expression },
+}
+
+#[derive(PartialEq, Default, Debug)]
 pub struct Vertex {
-    pub edges: Vec<Edge>,
     pub actions: Vec<Action>,
+    pub edges: Vec<Edge>,
+}
+
+impl Vertex {
+    fn new() -> Self {
+        Default::default()
+    }
 }
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub struct NFA {
     pub verts: Vec<Vertex>,
-}
-
-impl Vertex {
-    fn new() -> Self {
-        Vertex {
-            edges: vec![],
-            actions: vec![],
-        }
-    }
-
-    pub fn get_repeat_edge(&self) -> usize {
-        for e in &self.edges {
-            if let Edge::Repeat(dest) = e {
-                return *dest;
-            }
-        }
-
-        panic!("no repeat edge found");
-    }
-
-    pub fn get_empty_edge(&self) -> Option<usize> {
-        for e in &self.edges {
-            if let Edge::Empty(dest) = e {
-                return Some(*dest);
-            }
-        }
-
-        None
-    }
 }
 
 impl Irp {
@@ -81,15 +57,6 @@ impl Irp {
         for expr in &self.stream {
             self.expression(expr, &mut verts, &mut last, &[])?;
         }
-
-        let pos = verts.len();
-
-        verts.push(Vertex {
-            edges: vec![],
-            actions: vec![Action::Done],
-        });
-
-        verts[last].edges.push(Edge::Empty(pos));
 
         Ok(NFA { verts })
     }
@@ -135,36 +102,122 @@ impl Irp {
                 *last = pos;
             }
             Expression::BitField { length, .. } => {
-                let start = *last;
-
                 let (length, _) = length.eval(&Vartable::new())?;
 
-                let end = verts.len();
+                let entry = verts.len();
 
                 verts.push(Vertex {
-                    actions: vec![Action::AddBit {
-                        var: String::from("F"),
-                        expr: Expression::Identifier(String::from("v")),
-                        lsb: self.general_spec.lsb,
-                        count: length as u8,
-                    }],
-                    edges: vec![Edge::Repeat(start)],
+                    edges: vec![],
+                    actions: vec![],
                 });
 
+                let next = verts.len();
+
+                verts.push(Vertex::new());
+
+                let done = verts.len();
+
+                verts.push(Vertex {
+                    edges: vec![Edge::Done],
+                    actions: vec![],
+                });
+
+                verts[*last].edges.push(Edge::Branch(entry));
+
                 for (bit, e) in bit_spec.iter().enumerate() {
-                    let mut n = start;
+                    let mut n = entry;
 
                     self.expression(e, verts, &mut n, bit_spec)?;
 
                     verts[n].actions.push(Action::Set {
-                        var: String::from("v"),
+                        var: String::from("$v"),
                         expr: Expression::Number(bit as i64),
                     });
 
-                    verts[n].edges.push(Edge::Empty(end));
+                    verts[n].edges.push(Edge::Branch(next));
                 }
 
-                *last = end;
+                if !self.general_spec.lsb {
+                    verts[*last].actions.push(Action::Set {
+                        var: String::from("$b"),
+                        expr: Expression::Number(length),
+                    });
+
+                    verts[*last].actions.push(Action::Set {
+                        var: String::from("$bits"),
+                        expr: Expression::Number(0),
+                    });
+
+                    verts[next] = Vertex {
+                        actions: vec![
+                            Action::Set {
+                                var: String::from("$b"),
+                                expr: Expression::Subtract(
+                                    Box::new(Expression::Identifier(String::from("$b"))),
+                                    Box::new(Expression::Number(1)),
+                                ),
+                            },
+                            Action::Set {
+                                var: String::from("$bits"),
+                                expr: Expression::BitwiseOr(
+                                    Box::new(Expression::Identifier(String::from("$bits"))),
+                                    Box::new(Expression::ShiftLeft(
+                                        Box::new(Expression::Identifier(String::from("$v"))),
+                                        Box::new(Expression::Identifier(String::from("$b"))),
+                                    )),
+                                ),
+                            },
+                        ],
+                        edges: vec![Edge::BranchCond {
+                            expr: Expression::More(
+                                Box::new(Expression::Identifier(String::from("$b"))),
+                                Box::new(Expression::Number(0)),
+                            ),
+                            yes: entry,
+                            no: done,
+                        }],
+                    };
+                } else {
+                    verts[*last].actions.push(Action::Set {
+                        var: String::from("$b"),
+                        expr: Expression::Number(0),
+                    });
+
+                    verts[*last].actions.push(Action::Set {
+                        var: String::from("$bits"),
+                        expr: Expression::Number(0),
+                    });
+
+                    verts[next] = Vertex {
+                        actions: vec![
+                            Action::Set {
+                                var: String::from("$bits"),
+                                expr: Expression::BitwiseOr(
+                                    Box::new(Expression::Identifier(String::from("$bits"))),
+                                    Box::new(Expression::ShiftLeft(
+                                        Box::new(Expression::Identifier(String::from("$v"))),
+                                        Box::new(Expression::Identifier(String::from("$b"))),
+                                    )),
+                                ),
+                            },
+                            Action::Set {
+                                var: String::from("$b"),
+                                expr: Expression::Add(
+                                    Box::new(Expression::Identifier(String::from("$b"))),
+                                    Box::new(Expression::Number(1)),
+                                ),
+                            },
+                        ],
+                        edges: vec![Edge::BranchCond {
+                            expr: Expression::Less(
+                                Box::new(Expression::Identifier(String::from("$b"))),
+                                Box::new(Expression::Number(length)),
+                            ),
+                            yes: entry,
+                            no: done,
+                        }],
+                    };
+                }
             }
             Expression::ExtentConstant(_, _) => {
                 // should really check this is the last entry
@@ -186,29 +239,27 @@ impl NFA {
         let mut vert_names = Vec::new();
 
         for (no, v) in self.verts.iter().enumerate() {
-            let name = if v.actions.iter().any(|a| matches!(a, Action::Done)) {
+            let name = if v.edges.iter().any(|a| matches!(a, Edge::Done)) {
                 String::from("done")
             } else {
                 format!("\"{} ({})\"", no_to_name(vert_names.len()), no)
             };
 
-            let labels: Vec<String> = v
+            let mut labels: Vec<String> = v
                 .actions
                 .iter()
-                .filter_map(|a| match a {
-                    Action::Set { var, expr } => Some(format!("{} = {}", var, expr)),
-                    Action::AddBit {
-                        var,
-                        count,
-                        expr,
-                        lsb,
-                    } => Some(format!(
-                        "bit {} = {} count:{} lsb:{}",
-                        var, expr, count, lsb
-                    )),
-                    Action::Done => None,
+                .map(|a| match a {
+                    Action::Set { var, expr } => format!("{} = {}", var, expr),
                 })
                 .collect::<Vec<String>>();
+
+            if let Some(Edge::BranchCond { expr, .. }) = v
+                .edges
+                .iter()
+                .find(|e| matches!(e, Edge::BranchCond { .. }))
+            {
+                labels.push(format!("cond: {}", expr));
+            }
 
             if !labels.is_empty() {
                 writeln!(&mut file, "\t{} [label=\"{}\"]", name, labels.join("\\n")).unwrap();
@@ -232,13 +283,24 @@ impl NFA {
                         vert_names[i], vert_names[*dest], len
                     )
                     .unwrap(),
-                    Edge::Repeat(dest) => writeln!(
-                        &mut file,
-                        "\t{} -> {} [label=repeat]",
-                        vert_names[i], vert_names[*dest]
-                    )
-                    .unwrap(),
-                    Edge::Empty(dest) => {
+                    Edge::BranchCond { yes, no, .. } => {
+                        writeln!(
+                            &mut file,
+                            "\t{} -> {} [label=\"cond: true\"]",
+                            vert_names[i], vert_names[*yes]
+                        )
+                        .unwrap();
+                        //
+
+                        writeln!(
+                            &mut file,
+                            "\t{} -> {} [label=\"cond: false\"]",
+                            vert_names[i], vert_names[*no]
+                        )
+                        .unwrap();
+                    }
+                    Edge::Done => (),
+                    Edge::Branch(dest) => {
                         writeln!(&mut file, "\t{} -> {}", vert_names[i], vert_names[*dest]).unwrap()
                     }
                 }

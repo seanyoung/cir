@@ -450,6 +450,36 @@ impl Expression {
 
                 Ok((value >> r, len))
             }
+            Expression::Equal(left, right) => {
+                let (left, _) = left.eval(vars)?;
+                let (right, _) = right.eval(vars)?;
+
+                Ok(((left == right) as i64, 1))
+            }
+            Expression::More(left, right) => {
+                let (left, _) = left.eval(vars)?;
+                let (right, _) = right.eval(vars)?;
+
+                Ok(((left > right) as i64, 1))
+            }
+            Expression::MoreEqual(left, right) => {
+                let (left, _) = left.eval(vars)?;
+                let (right, _) = right.eval(vars)?;
+
+                Ok(((left >= right) as i64, 1))
+            }
+            Expression::Less(left, right) => {
+                let (left, _) = left.eval(vars)?;
+                let (right, _) = right.eval(vars)?;
+
+                Ok(((left < right) as i64, 1))
+            }
+            Expression::LessEqual(left, right) => {
+                let (left, _) = left.eval(vars)?;
+                let (right, _) = right.eval(vars)?;
+
+                Ok(((left <= right) as i64, 1))
+            }
             Expression::BitField {
                 value,
                 reverse,

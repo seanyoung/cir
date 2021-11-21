@@ -263,7 +263,20 @@ impl fmt::Display for Expression {
             Expression::Number(v) => write!(f, "{}", v),
             Expression::Identifier(id) => write!(f, "{}", id),
             Expression::Add(left, right) => write!(f, "{} + {}", left, right),
-            _ => unreachable!(),
+            Expression::Subtract(left, right) => write!(f, "{} - {}", left, right),
+            Expression::Multiply(left, right) => write!(f, "{} * {}", left, right),
+            Expression::BitwiseOr(left, right) => write!(f, "{} | {}", left, right),
+            Expression::BitwiseAnd(left, right) => write!(f, "{} & {}", left, right),
+            Expression::ShiftLeft(left, right) => write!(f, "{} << {}", left, right),
+            Expression::ShiftRight(left, right) => write!(f, "{} >> {}", left, right),
+
+            Expression::Equal(left, right) => write!(f, "{} == {}", left, right),
+            Expression::More(left, right) => write!(f, "{} > {}", left, right),
+            Expression::MoreEqual(left, right) => write!(f, "{} >= {}", left, right),
+            Expression::Less(left, right) => write!(f, "{} < {}", left, right),
+            Expression::LessEqual(left, right) => write!(f, "{} <= {}", left, right),
+
+            _ => panic!("expr: {}", self),
         }
     }
 }

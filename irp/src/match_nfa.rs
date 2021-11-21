@@ -104,29 +104,6 @@ impl<'a> Matcher<'a> {
                 changes = false;
                 for a in &self.nfa.verts[pos].actions {
                     match a {
-                        Action::Done => {
-                            let res = self.bits;
-                            self.reset();
-                            return Some(res);
-                        }
-                        Action::AddBit {
-                            expr, count, lsb, ..
-                        } => {
-                            let (val, _) = expr.eval(&vartable).unwrap();
-                            if *lsb {
-                                self.bits >>= 1;
-                                self.bits |= (val as u64) << (count - 1);
-                            } else {
-                                self.bits <<= 1;
-                                self.bits |= val as u64;
-                            }
-                            self.counter += 1;
-
-                            if self.counter < (*count as u32) {
-                                pos = self.nfa.verts[pos].get_repeat_edge();
-                                changes = true;
-                            }
-                        }
                         Action::Set { var, expr } => {
                             let (val, len) = expr.eval(&vartable).unwrap();
                             vartable.vars.insert(var.to_string(), (val, len, None));
@@ -135,10 +112,28 @@ impl<'a> Matcher<'a> {
                     }
                 }
 
-                // follow any empty edge
-                if let Some(dest) = self.nfa.verts[pos].get_empty_edge() {
-                    changes = true;
-                    pos = dest;
+                for edge in &self.nfa.verts[pos].edges {
+                    match edge {
+                        Edge::Branch(dest) => {
+                            changes = true;
+                            pos = *dest;
+                        }
+                        Edge::BranchCond { expr, yes, no } => {
+                            let (cond, _) = expr.eval(&vartable).unwrap();
+
+                            pos = if cond != 0 { *yes } else { *no };
+                            changes = true;
+                        }
+                        Edge::Done => {
+                            let (val, _) = Expression::Identifier(String::from("$bits"))
+                                .eval(&vartable)
+                                .unwrap();
+                            self.reset();
+
+                            return Some(val as u64);
+                        }
+                        _ => (),
+                    }
                 }
             }
 
@@ -149,10 +144,12 @@ impl<'a> Matcher<'a> {
     }
 }
 
+use crate::Expression;
+#[cfg(test)]
+use crate::Irp;
+
 #[test]
 fn sony8() {
-    use crate::Irp;
-
     // sony 8
     let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]").unwrap();
 
@@ -194,4 +191,13 @@ fn sony8() {
     }
 
     assert_eq!(res, Some(196));
+}
+
+#[test]
+fn nec() {
+    let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
+
+    let nfa = irp.build_nfa().unwrap();
+
+    let _matcher = nfa.matcher(100, 3);
 }
