@@ -1,6 +1,4 @@
-use crate::RepeatMarker;
-
-use super::{Expression, Irp, Vartable};
+use super::{Expression, Irp, RepeatMarker, Vartable};
 use std::{char, fs::File, io::Write, path::Path};
 
 // This is the decoder nfa (non-deterministic finite automation)

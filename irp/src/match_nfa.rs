@@ -9,8 +9,6 @@ pub struct Matcher<'a> {
     pos: Vec<(usize, Vartable<'a>)>,
     abs_tolerance: u32,
     rel_tolerance: u32,
-    counter: u32,
-    bits: u64,
     nfa: &'a NFA,
 }
 
@@ -20,8 +18,6 @@ impl NFA {
             pos: Vec::new(),
             abs_tolerance,
             rel_tolerance,
-            bits: 0,
-            counter: 0,
             nfa: self,
         }
     }
@@ -37,8 +33,6 @@ pub enum InfraredData {
 impl<'a> Matcher<'a> {
     pub fn reset(&mut self) {
         self.pos.truncate(0);
-        self.bits = 0;
-        self.counter = 0;
     }
 
     fn duration_matches(&self, expected: u32, received: u32) -> bool {

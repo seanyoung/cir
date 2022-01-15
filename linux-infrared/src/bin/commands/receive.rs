@@ -194,7 +194,7 @@ pub fn receive(matches: &clap::ArgMatches) {
         if let Some(lircdev) = &mut rawdev {
             if let Err(err) = lircdev.receive_raw(&mut rawbuf) {
                 if err.kind() != std::io::ErrorKind::WouldBlock {
-                    eprintln!("error: {}", err.to_string());
+                    eprintln!("error: {}", err);
                     std::process::exit(1);
                 }
             }
@@ -227,7 +227,7 @@ pub fn receive(matches: &clap::ArgMatches) {
         if let Some(lircdev) = &mut scandev {
             if let Err(err) = lircdev.receive_scancodes(&mut scanbuf) {
                 if err.kind() != std::io::ErrorKind::WouldBlock {
-                    eprintln!("error: {}", err.to_string());
+                    eprintln!("error: {}", err);
                     std::process::exit(1);
                 }
             }
@@ -349,7 +349,7 @@ pub fn receive(matches: &clap::ArgMatches) {
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => (),
                 Err(e) => {
-                    eprintln!("error: {}", e.to_string());
+                    eprintln!("error: {}", e);
                     std::process::exit(1);
                 }
             }

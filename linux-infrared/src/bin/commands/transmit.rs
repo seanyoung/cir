@@ -122,7 +122,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
     if let Some(duty_cycle) = duty_cycle {
         if lircdev.can_set_send_duty_cycle() {
             if let Err(s) = lircdev.set_send_duty_cycle(duty_cycle as u32) {
-                eprintln!("error: {}: {}", lircdev, s.to_string());
+                eprintln!("error: {}: {}", lircdev, s);
 
                 std::process::exit(1);
             }
@@ -137,7 +137,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
     if let Some(carrier) = carrier {
         if lircdev.can_set_send_carrier() {
             if let Err(s) = lircdev.set_send_carrier(carrier as u32) {
-                eprintln!("error: {}: {}", lircdev, s.to_string());
+                eprintln!("error: {}: {}", lircdev, s);
 
                 if carrier == 0 {
                     eprintln!("info: not all lirc devices can send unmodulated");
@@ -153,7 +153,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
     }
 
     if let Err(s) = lircdev.send(&message.raw) {
-        eprintln!("error: {}: {}", lircdev, s.to_string());
+        eprintln!("error: {}: {}", lircdev, s);
         std::process::exit(1);
     }
 }

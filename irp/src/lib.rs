@@ -284,6 +284,7 @@ impl fmt::Display for Expression {
 #[derive(Debug)]
 struct ParameterSpec {
     pub name: String,
+    #[allow(unused)]
     pub memory: bool,
     pub min: Expression,
     pub max: Expression,

@@ -319,7 +319,7 @@ fn main() {
         ("list", Some(matches)) => match rcdev::enumerate_rc_dev() {
             Ok(list) => print_rc_dev(&list, matches),
             Err(err) => {
-                eprintln!("error: {}", err.to_string());
+                eprintln!("error: {}", err);
                 std::process::exit(1);
             }
         },
@@ -508,7 +508,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                                             None => print!("{}", info.id()),
                                         },
                                         Err(err) => {
-                                            print!("{}", err.to_string())
+                                            print!("{}", err)
                                         }
                                     }
                                 }
@@ -516,7 +516,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                                 println!();
                             }
                             Err(err) => {
-                                println!("\tBPF protocols\t\t: {}", err.to_string())
+                                println!("\tBPF protocols\t\t: {}", err)
                             }
                         }
                     } else if lircdev.can_receive_scancodes() {
@@ -562,7 +562,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                     }
                 }
                 Err(err) => {
-                    println!("\tLIRC Features\t\t: {}", err.to_string());
+                    println!("\tLIRC Features\t\t: {}", err);
                 }
             }
         }

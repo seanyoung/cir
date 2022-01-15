@@ -25,7 +25,7 @@ pub fn find_devices(matches: &clap::ArgMatches, purpose: Purpose) -> Rcdev {
         }
         Ok(list) => list,
         Err(err) => {
-            eprintln!("error: no devices found: {}", err.to_string());
+            eprintln!("error: no devices found: {}", err);
             std::process::exit(1);
         }
     };
@@ -208,7 +208,7 @@ pub fn encode_args<'a>(matches: &'a clap::ArgMatches<'a>) -> (Message, &'a clap:
             let input = match fs::read_to_string(filename) {
                 Ok(s) => s,
                 Err(s) => {
-                    eprintln!("error: {}", s.to_string());
+                    eprintln!("error: {}", s);
                     std::process::exit(2);
                 }
             };
