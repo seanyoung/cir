@@ -184,7 +184,7 @@ struct BitspecScope<'a> {
     /// The bitspec itself
     bit_spec: &'a [Expression],
     /// The bitstream. This will be populated bit by bit, and then flushed.
-    bitstream: BitVec<LocalBits, usize>,
+    bitstream: BitVec<usize, LocalBits>,
 }
 
 impl<'a> Encoder<'a> {
@@ -255,7 +255,7 @@ impl<'a> Encoder<'a> {
     fn add_bits(&mut self, bits: i64, length: u8, level: Option<usize>) -> Result<(), String> {
         match level {
             Some(level) => {
-                let mut bv = BitVec::<LocalBits, usize>::from_element(bits as usize);
+                let mut bv = BitVec::<usize, LocalBits>::from_element(bits as usize);
 
                 bv.truncate(length as usize);
 
