@@ -21,6 +21,7 @@ serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
 quick-xml = { version = "0.22.0", features = [ "serialize" ] }
 unicode-xid = "0.2"
-serde_json = "1.0"
-rand = "0.8"
 bitvec = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"

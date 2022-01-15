@@ -24,7 +24,6 @@ aya = "0.10"
 [build-dependencies]
 lrpeg = "0.4.1"
 
-
 [workspace]
 members = [
 	"irp",
@@ -35,4 +34,3 @@ members = [
 lto = true
 opt-level = 'z'
 codegen-units = 1
-
