@@ -1,5 +1,5 @@
 use aya::programs::LircMode2;
-use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
+use clap::{App, AppSettings, Arg, ArgGroup};
 use evdev::Device;
 use itertools::Itertools;
 use linux_infrared::{lirc, rcdev};
@@ -16,125 +16,109 @@ fn main() {
         .about("Consumer Infrared")
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
-            SubCommand::with_name("encode")
+            App::new("encode")
                 .about("Encode IR and print to stdout")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
-                    SubCommand::with_name("irp")
+                    App::new("irp")
                         .about("Encode using IRP langauge")
                         .arg(
-                            Arg::with_name("PRONTO")
+                            Arg::new("PRONTO")
                                 .help("Encode IRP to pronto hex")
                                 .long("pronto")
-                                .short("p"),
+                                .short('p'),
                         )
                         .arg(
-                            Arg::with_name("REPEATS")
+                            Arg::new("REPEATS")
                                 .help("Number of IRP repeats to encode")
                                 .long("repeats")
-                                .short("r")
+                                .short('r')
                                 .conflicts_with("PRONTO")
                                 .takes_value(true),
                         )
                         .arg(
-                            Arg::with_name("FIELD")
+                            Arg::new("FIELD")
                                 .help("Set input variable like KEY=VALUE")
                                 .long("field")
-                                .short("f")
+                                .short('f')
                                 .takes_value(true)
-                                .multiple(true)
+                                .multiple_occurrences(true)
                                 .conflicts_with("PRONTO")
                                 .number_of_values(1),
                         )
                         .arg(
-                            Arg::with_name("IRP")
+                            Arg::new("IRP")
                                 .help("IRP protocol")
                                 .required(true)
                                 .last(true),
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("pronto")
+                    App::new("pronto")
                         .about("Parse pronto hex code and print as raw IR")
                         .arg(
-                            Arg::with_name("REPEATS")
+                            Arg::new("REPEATS")
                                 .long("repeats")
-                                .short("r")
+                                .short('r')
                                 .help("Number of times to repeat signal")
                                 .takes_value(true)
                                 .default_value("1"),
                         )
-                        .arg(
-                            Arg::with_name("PRONTO")
-                                .help("Pronto Hex code")
-                                .required(true),
-                        ),
+                        .arg(Arg::new("PRONTO").help("Pronto Hex code").required(true)),
                 )
                 .subcommand(
-                    SubCommand::with_name("mode2")
+                    App::new("mode2")
                         .about("Parse mode2 pulse space file and print as raw IR")
                         .arg(
-                            Arg::with_name("FILE")
+                            Arg::new("FILE")
                                 .help("File to load and parse")
                                 .required(true),
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("rawir").about("Parse raw IR").arg(
-                        Arg::with_name("RAWIR")
-                            .help("Raw IR to parse")
-                            .required(true),
-                    ),
+                    App::new("rawir")
+                        .about("Parse raw IR")
+                        .arg(Arg::new("RAWIR").help("Raw IR to parse").required(true)),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("config")
+            App::new("config")
                 .about("Configure IR decoder")
                 .arg(
-                    Arg::with_name("LIRCDEV")
+                    Arg::new("LIRCDEV")
                         .long("device")
-                        .short("d")
+                        .short('d')
                         .takes_value(true),
                 )
+                .arg(Arg::new("RCDEV").long("rcdev").short('s').takes_value(true))
+                .group(ArgGroup::new("DEVICE").args(&["RCDEV", "LIRCDEV"]))
+                .arg(Arg::new("DELAY").long("delay").short('D').takes_value(true))
                 .arg(
-                    Arg::with_name("RCDEV")
-                        .long("rcdev")
-                        .short("s")
-                        .takes_value(true),
-                )
-                .group(ArgGroup::with_name("DEVICE").args(&["RCDEV", "LIRCDEV"]))
-                .arg(
-                    Arg::with_name("DELAY")
-                        .long("delay")
-                        .short("D")
-                        .takes_value(true),
-                )
-                .arg(
-                    Arg::with_name("PERIOD")
+                    Arg::new("PERIOD")
                         .long("period")
-                        .short("P")
+                        .short('P')
                         .takes_value(true),
                 )
                 .arg(
-                    Arg::with_name("KEYMAP")
+                    Arg::new("KEYMAP")
                         .long("write")
-                        .short("w")
+                        .short('w')
                         .takes_value(true)
-                        .multiple(true),
+                        .multiple_occurrences(true),
                 )
                 .arg(
-                    Arg::with_name("TIMEOUT")
+                    Arg::new("TIMEOUT")
                         .help("Set IR timeout")
                         .long("timeout")
-                        .short("t")
+                        .short('t')
                         .takes_value(true),
                 )
-                .arg(Arg::with_name("CLEAR").long("clear").short("c"))
-                .arg(Arg::with_name("VERBOSE").long("verbose").short("v"))
+                .arg(Arg::new("CLEAR").long("clear").short('c'))
+                .arg(Arg::new("VERBOSE").long("verbose").short('v'))
                 .arg(
-                    Arg::with_name("CFGFILE")
+                    Arg::new("CFGFILE")
                         .long("auto-load")
-                        .short("a")
+                        .short('a')
                         .help("Auto-load keymaps, based on configuration file")
                         .default_value("/etc/rc_maps.cfg")
                         .conflicts_with_all(&["DELAY", "PERIOD", "KEYMAP", "CLEAR", "TIMEOUT"])
@@ -143,188 +127,179 @@ fn main() {
                 ),
         )
         .subcommand(
-            SubCommand::with_name("transmit")
+            App::new("transmit")
                 .about("Transmit IR")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .arg(
-                    Arg::with_name("LIRCDEV")
+                    Arg::new("LIRCDEV")
                         .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .long("device")
-                        .short("d")
+                        .short('d')
                         .global(true)
                         .takes_value(true)
                         .conflicts_with("RCDEV"),
                 )
                 .arg(
-                    Arg::with_name("RCDEV")
+                    Arg::new("RCDEV")
                         .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
-                        .short("s")
+                        .short('s')
                         .global(true)
                         .takes_value(true)
                         .conflicts_with("LIRCDEV"),
                 )
                 .arg(
-                    Arg::with_name("VERBOSE")
+                    Arg::new("VERBOSE")
                         .long("verbose")
-                        .short("v")
+                        .short('v')
                         .global(true)
                         .help("verbose output"),
                 )
                 .arg(
-                    Arg::with_name("TRANSMITTERS")
+                    Arg::new("TRANSMITTERS")
                         .help("Comma separated list of transmitters to use, starting from 1")
                         .long("transmitters")
-                        .short("e")
+                        .short('e')
                         .global(true)
                         .takes_value(true)
-                        .multiple(true)
+                        .multiple_occurrences(true)
                         .require_delimiter(true),
                 )
                 .subcommand(
-                    SubCommand::with_name("irp")
+                    App::new("irp")
                         .about("Encode using IRP langauge and transmit")
                         .arg(
-                            Arg::with_name("IRP")
+                            Arg::new("IRP")
                                 .help("IRP protocol")
                                 .required(true)
                                 .last(true),
                         )
                         .arg(
-                            Arg::with_name("REPEATS")
+                            Arg::new("REPEATS")
                                 .long("repeats")
-                                .short("r")
+                                .short('r')
                                 .takes_value(true)
                                 .default_value("1"),
                         )
-                        .arg(
-                            Arg::with_name("FIELD")
-                                .long("field")
-                                .short("f")
-                                .takes_value(true),
-                        ),
+                        .arg(Arg::new("FIELD").long("field").short('f').takes_value(true)),
                 )
                 .subcommand(
-                    SubCommand::with_name("pronto")
+                    App::new("pronto")
                         .about("Parse pronto hex code and transmit")
                         .arg(
-                            Arg::with_name("REPEATS")
+                            Arg::new("REPEATS")
                                 .long("repeats")
-                                .short("r")
+                                .short('r')
                                 .help("Number of times to repeat signal")
                                 .takes_value(true)
                                 .default_value("1"),
                         )
-                        .arg(
-                            Arg::with_name("PRONTO")
-                                .help("Pronto Hex code")
-                                .required(true),
-                        ),
+                        .arg(Arg::new("PRONTO").help("Pronto Hex code").required(true)),
                 )
                 .subcommand(
-                    SubCommand::with_name("mode2")
+                    App::new("mode2")
                         .about("Parse mode2 pulse space file and transmit")
                         .arg(
-                            Arg::with_name("CARRIER")
+                            Arg::new("CARRIER")
                                 .long("carrier")
-                                .short("c")
+                                .short('c')
                                 .help("Set carrier in Hz, 0 for unmodulated")
                                 .takes_value(true),
                         )
                         .arg(
-                            Arg::with_name("DUTY_CYCLE")
+                            Arg::new("DUTY_CYCLE")
                                 .long("duty-cycle")
-                                .short("u")
+                                .short('u')
                                 .help("Set send duty cycle % (1 to 99)")
                                 .takes_value(true),
                         )
                         .arg(
-                            Arg::with_name("FILE")
+                            Arg::new("FILE")
                                 .help("File to load and parse")
                                 .required(true),
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("rawir")
+                    App::new("rawir")
                         .about("Parse raw IR and transmit")
-                        .arg(Arg::with_name("RAWIR").help("Raw IR").required(true))
+                        .arg(Arg::new("RAWIR").help("Raw IR").required(true))
                         .arg(
-                            Arg::with_name("CARRIER")
+                            Arg::new("CARRIER")
                                 .long("carrier")
-                                .short("c")
+                                .short('c')
                                 .help("Set carrier in Hz, 0 for unmodulated")
                                 .takes_value(true),
                         )
                         .arg(
-                            Arg::with_name("DUTY_CYCLE")
+                            Arg::new("DUTY_CYCLE")
                                 .long("duty-cycle")
-                                .short("u")
+                                .short('u')
                                 .help("Set send duty cycle % (1 to 99)")
                                 .takes_value(true),
                         ),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("list")
+            App::new("list")
                 .about("List IR and CEC devices")
                 .arg(
-                    Arg::with_name("LIRCDEV")
+                    Arg::new("LIRCDEV")
                         .long("device")
-                        .short("d")
+                        .short('d')
                         .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .takes_value(true)
                         .conflicts_with("RCDEV"),
                 )
                 .arg(
-                    Arg::with_name("RCDEV")
+                    Arg::new("RCDEV")
                         .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
-                        .short("s")
+                        .short('s')
                         .takes_value(true)
                         .conflicts_with("LIRCDEV"),
                 )
-                .arg(Arg::with_name("READ").long("read-scancodes").short("l")),
+                .arg(Arg::new("READ").long("read-scancodes").short('l')),
         )
         .subcommand(
-            SubCommand::with_name("receive")
+            App::new("receive")
                 .about("Receive IR and print to stdout")
                 .arg(
-                    Arg::with_name("LIRCDEV")
+                    Arg::new("LIRCDEV")
                         .long("device")
-                        .short("d")
+                        .short('d')
                         .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .takes_value(true)
                         .conflicts_with("RCDEV"),
                 )
                 .arg(
-                    Arg::with_name("RCDEV")
+                    Arg::new("RCDEV")
                         .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
-                        .short("s")
+                        .short('s')
                         .takes_value(true)
                         .conflicts_with("LIRCDEV"),
                 )
                 .arg(
-                    Arg::with_name("LEARNING")
+                    Arg::new("LEARNING")
                         .help("Use short-range learning mode")
                         .long("learning-mode")
-                        .short("l"),
+                        .short('l'),
                 ),
         )
         .get_matches();
 
     match matches.subcommand() {
-        ("encode", Some(matches)) => commands::encode::encode(matches),
-        ("transmit", Some(matches)) => commands::transmit::transmit(matches),
-        ("list", Some(matches)) => match rcdev::enumerate_rc_dev() {
+        Some(("encode", matches)) => commands::encode::encode(matches),
+        Some(("transmit", matches)) => commands::transmit::transmit(matches),
+        Some(("list", matches)) => match rcdev::enumerate_rc_dev() {
             Ok(list) => print_rc_dev(&list, matches),
             Err(err) => {
                 eprintln!("error: {}", err);
                 std::process::exit(1);
             }
         },
-        ("receive", Some(matches)) => commands::receive::receive(matches),
-        ("config", Some(matches)) => commands::config::config(matches),
+        Some(("receive", matches)) => commands::receive::receive(matches),
+        Some(("config", matches)) => commands::config::config(matches),
         _ => unreachable!(),
     }
 }

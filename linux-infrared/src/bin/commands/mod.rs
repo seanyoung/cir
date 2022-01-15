@@ -95,9 +95,9 @@ pub fn open_lirc(matches: &clap::ArgMatches, purpose: Purpose) -> lirc::Lirc {
     }
 }
 
-pub fn encode_args<'a>(matches: &'a clap::ArgMatches<'a>) -> (Message, &'a clap::ArgMatches<'a>) {
+pub fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
     match matches.subcommand() {
-        ("irp", Some(matches)) => {
+        Some(("irp", matches)) => {
             let mut vars = irp::Vartable::new();
 
             let i = matches.value_of("IRP").unwrap();
@@ -161,7 +161,7 @@ pub fn encode_args<'a>(matches: &'a clap::ArgMatches<'a>) -> (Message, &'a clap:
                 }
             }
         }
-        ("pronto", Some(matches)) => {
+        Some(("pronto", matches)) => {
             let pronto = matches.value_of("PRONTO").unwrap();
 
             let repeats = match matches.value_of("REPEATS") {
@@ -185,7 +185,7 @@ pub fn encode_args<'a>(matches: &'a clap::ArgMatches<'a>) -> (Message, &'a clap:
 
             (pronto.encode(repeats), matches)
         }
-        ("rawir", Some(matches)) => {
+        Some(("rawir", matches)) => {
             let rawir = matches.value_of("RAWIR").unwrap();
 
             match irp::rawir::parse(rawir) {
@@ -203,7 +203,7 @@ pub fn encode_args<'a>(matches: &'a clap::ArgMatches<'a>) -> (Message, &'a clap:
                 }
             }
         }
-        ("mode2", Some(matches)) => {
+        Some(("mode2", matches)) => {
             let filename = matches.value_of("FILE").unwrap();
             let input = match fs::read_to_string(filename) {
                 Ok(s) => s,
