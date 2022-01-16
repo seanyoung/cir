@@ -34,7 +34,8 @@ fn main() {
                                 .long("repeats")
                                 .short('r')
                                 .conflicts_with("PRONTO")
-                                .takes_value(true),
+                                .takes_value(true)
+                                .default_value("1"),
                         )
                         .arg(
                             Arg::new("FIELD")
@@ -43,15 +44,9 @@ fn main() {
                                 .short('f')
                                 .takes_value(true)
                                 .multiple_occurrences(true)
-                                .conflicts_with("PRONTO")
-                                .number_of_values(1),
+                                .conflicts_with("PRONTO"),
                         )
-                        .arg(
-                            Arg::new("IRP")
-                                .help("IRP protocol")
-                                .required(true)
-                                .last(true),
-                        ),
+                        .arg(Arg::new("IRP").help("IRP protocol").required(true)),
                 )
                 .subcommand(
                     App::new("pronto")
@@ -163,25 +158,46 @@ fn main() {
                         .global(true)
                         .takes_value(true)
                         .multiple_occurrences(true)
-                        .require_delimiter(true),
+                        .require_delimiter(true)
+                        .use_delimiter(true),
                 )
                 .subcommand(
                     App::new("irp")
                         .about("Encode using IRP langauge and transmit")
+                        .arg(Arg::new("PRONTO").long("pronto").hide(true))
                         .arg(
-                            Arg::new("IRP")
-                                .help("IRP protocol")
-                                .required(true)
-                                .last(true),
+                            Arg::new("CARRIER")
+                                .long("carrier")
+                                .short('c')
+                                .help("Set carrier in Hz, 0 for unmodulated")
+                                .takes_value(true)
+                                .hide(true),
+                        )
+                        .arg(
+                            Arg::new("DUTY_CYCLE")
+                                .long("duty-cycle")
+                                .short('u')
+                                .help("Set send duty cycle % (1 to 99)")
+                                .takes_value(true)
+                                .hide(true),
                         )
                         .arg(
                             Arg::new("REPEATS")
+                                .help("Number of IRP repeats to encode")
                                 .long("repeats")
                                 .short('r')
                                 .takes_value(true)
                                 .default_value("1"),
                         )
-                        .arg(Arg::new("FIELD").long("field").short('f').takes_value(true)),
+                        .arg(
+                            Arg::new("FIELD")
+                                .help("Set input variable like KEY=VALUE")
+                                .long("field")
+                                .short('f')
+                                .takes_value(true)
+                                .multiple_occurrences(true),
+                        )
+                        .arg(Arg::new("IRP").help("IRP protocol").required(true)),
                 )
                 .subcommand(
                     App::new("pronto")

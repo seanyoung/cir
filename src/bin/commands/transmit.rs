@@ -13,24 +13,12 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
     {
         let mut transmitters: Vec<u32> = Vec::new();
         for t in values {
-            let mut found_transmitters = false;
-            for t in t.split(&[' ', ';', ':', ','][..]) {
-                if t.is_empty() {
-                    continue;
+            match t.parse() {
+                Ok(0) | Err(_) => {
+                    eprintln!("error: ‘{}’ is not a valid transmitter number", t);
+                    std::process::exit(1);
                 }
-                match t.parse() {
-                    Ok(0) | Err(_) => {
-                        eprintln!("error: ‘{}’ is not a valid transmitter number", t);
-                        std::process::exit(1);
-                    }
-                    Ok(v) => transmitters.push(v),
-                }
-                found_transmitters = true;
-            }
-
-            if !found_transmitters {
-                eprintln!("error: ‘{}’ is not a valid transmitter number", t);
-                std::process::exit(1);
+                Ok(v) => transmitters.push(v),
             }
         }
 
