@@ -300,6 +300,13 @@ fn main() {
                         .help("Use short-range learning mode")
                         .long("learning-mode")
                         .short('l'),
+                )
+                .arg(
+                    Arg::new("TIMEOUT")
+                        .help("Set IR timeout")
+                        .long("timeout")
+                        .short('t')
+                        .takes_value(true),
                 ),
         )
         .get_matches();
