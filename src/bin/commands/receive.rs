@@ -15,6 +15,7 @@ pub fn receive(matches: &clap::ArgMatches) {
     let raw_token: Token = Token(0);
     let scancodes_token: Token = Token(1);
     let input_token: Token = Token(2);
+    let oneshot = matches.is_present("ONESHOT");
 
     let mut poll = Poll::new().expect("failed to create poll");
     let mut scandev = None;
@@ -190,7 +191,7 @@ pub fn receive(matches: &clap::ArgMatches) {
     let mut last_event_time = None;
     let mut last_lirc_time = None;
 
-    loop {
+    'outer: loop {
         if let Some(lircdev) = &mut rawdev {
             if let Err(err) = lircdev.receive_raw(&mut rawbuf) {
                 if err.kind() != std::io::ErrorKind::WouldBlock {
@@ -218,6 +219,9 @@ pub fn receive(matches: &clap::ArgMatches) {
                         carrier = None;
                     } else {
                         println!(" # timeout {}", entry.value());
+                    }
+                    if oneshot {
+                        break 'outer;
                     }
                     leading_space = true;
                 }

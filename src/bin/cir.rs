@@ -307,6 +307,12 @@ fn main() {
                         .long("timeout")
                         .short('t')
                         .takes_value(true),
+                )
+                .arg(
+                    Arg::new("ONESHOT")
+                        .help("Stop receiving after first timeout message")
+                        .long("one-shot")
+                        .short('1'),
                 ),
         )
         .get_matches();

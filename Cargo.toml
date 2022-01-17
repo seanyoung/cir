@@ -24,11 +24,18 @@ aya = "0.10"
 [build-dependencies]
 lrpeg = "0.4.1"
 
+[dev-dependencies]
+assert_cmd = "2.0"
+
 [workspace]
 members = [
 	"irp",
 	"irp/generate_test_data"
 ]
+
+[features]
+default = []
+loopback-tests = []
 
 [profile.release]
 lto = true
