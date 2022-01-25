@@ -82,7 +82,7 @@ pub fn read_protocols(path: &Path) -> Vec<Protocol> {
                             "alt_name" => {
                                 element = Element::AlternateName;
                             }
-                            "min-leadout" | "minimum-leadout" => {
+                            "minimum-leadout" => {
                                 element = Element::MinimumLeadout;
                             }
                             "reject_repeatless" => {
