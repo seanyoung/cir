@@ -1,9 +1,11 @@
 use irp::{Irp, Message, Pronto};
+use itertools::Itertools;
 use linux_infrared::{
     lirc,
+    lircd_conf::{self, LircRemote},
+    log::Log,
     rcdev::{enumerate_rc_dev, Rcdev},
 };
-
 use std::{fs, path::PathBuf};
 
 pub mod config;
@@ -95,7 +97,10 @@ pub fn open_lirc(matches: &clap::ArgMatches, purpose: Purpose) -> lirc::Lirc {
     }
 }
 
-pub fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
+pub fn encode_args<'a>(
+    matches: &'a clap::ArgMatches,
+    log: &Log,
+) -> (Message, &'a clap::ArgMatches) {
     match matches.subcommand() {
         Some(("irp", matches)) => {
             let mut vars = irp::Vartable::new();
@@ -221,9 +226,56 @@ pub fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                 }
             }
         }
+        Some(("lircd", matches)) => {
+            let filename = matches.value_of_os("CONF").unwrap();
+
+            let remotes = match lircd_conf::parse(filename, log) {
+                Ok(r) => r,
+                Err(_) => std::process::exit(2),
+            };
+
+            if let Some(remote) = matches.value_of("REMOTE") {
+                if let Some(codes) = matches.values_of("CODES") {
+                    let codes: Vec<&str> = codes.collect();
+                    let m = lircd_conf::encode(&remotes, remote, &codes);
+
+                    if let Some(m) = m {
+                        (m, matches)
+                    } else {
+                        log.error("remote or code not found");
+
+                        list_remotes(&remotes);
+
+                        std::process::exit(2);
+                    }
+                } else {
+                    log.error("no code to send specified");
+
+                    list_remotes(&remotes);
+
+                    std::process::exit(2);
+                }
+            } else {
+                list_remotes(&remotes);
+
+                std::process::exit(2);
+            }
+        }
         _ => {
             eprintln!("encode requires a subcommand");
             std::process::exit(2);
         }
+    }
+}
+
+fn list_remotes(remotes: &[LircRemote]) {
+    for remote in remotes {
+        let mut codes = remote
+            .codes
+            .iter()
+            .map(|code| code.name.as_str())
+            .chain(remote.raw_codes.iter().map(|code| code.name.as_str()));
+
+        println!("Remote {}: codes: {}", remote.name, codes.join(", "));
     }
 }

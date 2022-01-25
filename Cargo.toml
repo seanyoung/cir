@@ -30,7 +30,8 @@ assert_cmd = "2.0"
 [workspace]
 members = [
 	"irp",
-	"irp/generate_test_data"
+	"irp/generate_test_data",
+	"generate_lircd_test_data"
 ]
 
 [features]

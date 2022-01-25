@@ -2,7 +2,7 @@ use aya::programs::LircMode2;
 use clap::{App, AppSettings, Arg, ArgGroup};
 use evdev::Device;
 use itertools::Itertools;
-use linux_infrared::{lirc, rcdev};
+use linux_infrared::{lirc, log::Log, rcdev};
 use std::convert::TryInto;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
@@ -15,13 +15,26 @@ fn main() {
         .author("Sean Young <sean@mess.org>")
         .about("Consumer Infrared")
         .setting(AppSettings::SubcommandRequiredElseHelp)
+        .arg(
+            Arg::new("verbosity")
+                .short('v')
+                .global(true)
+                .multiple_occurrences(true)
+                .help("Increase message verbosity"),
+        )
+        .arg(
+            Arg::new("quiet")
+                .short('q')
+                .global(true)
+                .help("Silence all output"),
+        )
         .subcommand(
             App::new("encode")
                 .about("Encode IR and print to stdout")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommand(
                     App::new("irp")
-                        .about("Encode using IRP langauge")
+                        .about("Encode using IRP language")
                         .arg(
                             Arg::new("PRONTO")
                                 .help("Encode IRP to pronto hex")
@@ -109,7 +122,6 @@ fn main() {
                         .takes_value(true),
                 )
                 .arg(Arg::new("CLEAR").long("clear").short('c'))
-                .arg(Arg::new("VERBOSE").long("verbose").short('v'))
                 .arg(
                     Arg::new("CFGFILE")
                         .long("auto-load")
@@ -144,13 +156,6 @@ fn main() {
                         .conflicts_with("LIRCDEV"),
                 )
                 .arg(
-                    Arg::new("VERBOSE")
-                        .long("verbose")
-                        .short('v')
-                        .global(true)
-                        .help("verbose output"),
-                )
-                .arg(
                     Arg::new("TRANSMITTERS")
                         .help("Comma separated list of transmitters to use, starting from 1")
                         .long("transmitters")
@@ -163,7 +168,7 @@ fn main() {
                 )
                 .subcommand(
                     App::new("irp")
-                        .about("Encode using IRP langauge and transmit")
+                        .about("Encode using IRP language and transmit")
                         .arg(Arg::new("PRONTO").long("pronto").hide(true))
                         .arg(
                             Arg::new("CARRIER")
@@ -253,6 +258,23 @@ fn main() {
                                 .help("Set send duty cycle % (1 to 99)")
                                 .takes_value(true),
                         ),
+                )
+                .subcommand(
+                    App::new("lircd")
+                        .about("Parse lircd.conf file and transmit ")
+                        .arg(
+                            Arg::new("CONF")
+                                .help("lircd.conf file")
+                                .allow_invalid_utf8(true)
+                                .required(true),
+                        )
+                        .arg(Arg::new("REMOTE").help("Remote to use").takes_value(true))
+                        .arg(
+                            Arg::new("CODES")
+                                .help("Code to send")
+                                .multiple_occurrences(true)
+                                .takes_value(true),
+                        ),
                 ),
         )
         .subcommand(
@@ -317,9 +339,17 @@ fn main() {
         )
         .get_matches();
 
+    let mut log = Log::new();
+
+    log.verbose(matches.occurrences_of("verbosity"));
+
+    if matches.is_present("quiet") {
+        log.quiet();
+    }
+
     match matches.subcommand() {
-        Some(("encode", matches)) => commands::encode::encode(matches),
-        Some(("transmit", matches)) => commands::transmit::transmit(matches),
+        Some(("encode", matches)) => commands::encode::encode(matches, &log),
+        Some(("transmit", matches)) => commands::transmit::transmit(matches, &log),
         Some(("list", matches)) => match rcdev::enumerate_rc_dev() {
             Ok(list) => print_rc_dev(&list, matches),
             Err(err) => {

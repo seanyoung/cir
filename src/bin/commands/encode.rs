@@ -1,7 +1,8 @@
 use super::encode_args;
+use linux_infrared::log::Log;
 
-pub fn encode(matches: &clap::ArgMatches) {
-    let (message, _) = encode_args(matches);
+pub fn encode(matches: &clap::ArgMatches, log: &Log) {
+    let (message, _) = encode_args(matches, log);
 
     if let Some(carrier) = &message.carrier {
         if *carrier == 0 {

@@ -91,7 +91,11 @@ impl LircRaw {
 }
 
 /// Open a lirc chardev, which should have a path like "/dev/lirc0"
-pub fn open(path: &Path) -> io::Result<Lirc> {
+pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Lirc> {
+    lirc_open(path.as_ref())
+}
+
+fn lirc_open(path: &Path) -> io::Result<Lirc> {
     let file = OpenOptions::new().read(true).write(true).open(path)?;
 
     if let Ok((0, features)) = LIRC_GET_FEATURES.ioctl(&file) {
