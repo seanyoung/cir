@@ -174,35 +174,40 @@ impl<'a> LircParser<'a> {
 
                     remote.driver = second.unwrap().to_owned();
                 }
-                Some("eps")
-                | Some("aeps")
-                | Some("bits")
-                | Some("plead")
-                | Some("ptrail")
-                | Some("pre_data_bits")
-                | Some("pre_data")
-                | Some("post_data_bits")
-                | Some("post_data") => match second {
+                Some(name @ "eps")
+                | Some(name @ "aeps")
+                | Some(name @ "bits")
+                | Some(name @ "plead")
+                | Some(name @ "ptrail")
+                | Some(name @ "pre_data_bits")
+                | Some(name @ "pre_data")
+                | Some(name @ "post_data_bits")
+                | Some(name @ "post_data") => match second {
                     Some(val) => {
-                        if let Ok(val) = u32::from_str(val) {
-                            match first {
-                                Some("eps") => remote.eps = val,
-                                Some("aeps") => remote.aeps = val,
-                                Some("bits") => remote.bits = val,
-                                Some("plead") => remote.plead = val,
-                                Some("ptrail") => remote.ptrail = val,
-                                Some("pre_data_bits") => remote.pre_data_bits = val,
-                                Some("pre_data") => remote.pre_data = val,
-                                Some("post_data_bits") => remote.post_data_bits = val,
-                                Some("post_data") => remote.post_data = val,
+                        if let Ok(val) = if let Some(hex) = val.strip_prefix("0x") {
+                            u32::from_str_radix(hex, 16)
+                        } else {
+                            u32::from_str(val)
+                        } {
+                            match name {
+                                "eps" => remote.eps = val,
+                                "aeps" => remote.aeps = val,
+                                "bits" => remote.bits = val,
+                                "plead" => remote.plead = val,
+                                "ptrail" => remote.ptrail = val,
+                                "pre_data_bits" => remote.pre_data_bits = val,
+                                "pre_data" => remote.pre_data = val,
+                                "post_data_bits" => remote.post_data_bits = val,
+                                "post_data" => remote.post_data = val,
                                 _ => unreachable!(),
                             }
                             remote.bits = val;
                         } else {
                             self.log.error(&format!(
-                                "{}:{}: bits argument '{}' not valid",
+                                "{}:{}: {} argument '{}' not valid",
                                 self.path.display(),
                                 self.line_no,
+                                name,
                                 val
                             ));
                         }
