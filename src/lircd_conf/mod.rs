@@ -1,10 +1,12 @@
 use super::log::Log;
+use bitflags::bitflags;
 use std::{
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Lines},
     path::{Path, PathBuf},
     str::{FromStr, SplitWhitespace},
 };
+
 mod encode;
 
 pub use encode::encode;
@@ -21,10 +23,34 @@ pub struct LircRawCode {
     pub rawir: Vec<u32>,
 }
 
+bitflags! {
+    #[derive(Default)]
+    pub struct Flags: u32 {
+        const RAW_CODES = 0x0001;
+        const RC5 = 0x0002;
+        const SHIFT_ENC = 0x0002;
+        const RC6 = 0x0004;
+        const RCMM = 0x0008;
+        const SPACE_ENC = 0x0010;
+        const SPACE_FIRST = 0x0020;
+        const GRUNDIG = 0x0040;
+        const BO = 0x0080;
+        const SERIAL = 0x0100;
+        const XMP = 0x0400;
+        const REVERSE = 0x0800;
+        const NO_HEAD_REP = 0x1000;
+        const NO_FOOT_REP = 0x2000;
+        const CONST_LENGTH = 0x4000;
+        const REPEAT_HEADER = 0x8000;
+        const COMPAT_REVERSE = 0x10000;
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct LircRemote {
     pub name: String,
     pub driver: String,
+    pub flags: Flags,
     pub eps: u32,
     pub aeps: u32,
     pub bits: u32,
@@ -184,6 +210,83 @@ impl<'a> LircParser<'a> {
                     None => {
                         self.log.error(&format!(
                             "{}:{}: missing bits argument",
+                            self.path.display(),
+                            self.line_no
+                        ));
+                        return Err(());
+                    }
+                },
+                Some("flags") => match second {
+                    Some(val) => {
+                        let mut flags = Flags::empty();
+
+                        for flag in val.split('|') {
+                            match flag {
+                                "RAW_CODES" => {
+                                    flags |= Flags::RAW_CODES;
+                                }
+                                "RC5" => {
+                                    flags |= Flags::RC5;
+                                }
+                                "SHIFT_ENC" => {
+                                    flags |= Flags::SHIFT_ENC;
+                                }
+                                "RC6" => {
+                                    flags |= Flags::RC6;
+                                }
+                                "RCMM" => {
+                                    flags |= Flags::RCMM;
+                                }
+                                "SPACE_ENC" => {
+                                    flags |= Flags::SPACE_ENC;
+                                }
+                                "SPACE_FIRST" => {
+                                    flags |= Flags::SPACE_FIRST;
+                                }
+                                "GRUNDIG" => {
+                                    flags |= Flags::GRUNDIG;
+                                }
+                                "BO" => {
+                                    flags |= Flags::BO;
+                                }
+                                "SERIAL" => {
+                                    flags |= Flags::SERIAL;
+                                }
+                                "XMP" => {
+                                    flags |= Flags::XMP;
+                                }
+                                "REVERSE" => {
+                                    flags |= Flags::REVERSE;
+                                }
+                                "NO_HEAD_REP" => {
+                                    flags |= Flags::NO_HEAD_REP;
+                                }
+                                "NO_FOOT_REP" => {
+                                    flags |= Flags::NO_FOOT_REP;
+                                }
+                                "CONST_LENGTH" => {
+                                    flags |= Flags::CONST_LENGTH;
+                                }
+                                "REPEAT_HEADER" => {
+                                    flags |= Flags::REPEAT_HEADER;
+                                }
+                                _ => {
+                                    self.log.error(&format!(
+                                        "{}:{}: unknown flag {}",
+                                        self.path.display(),
+                                        self.line_no,
+                                        flag
+                                    ));
+                                    return Err(());
+                                }
+                            }
+                        }
+
+                        remote.flags = flags;
+                    }
+                    None => {
+                        self.log.error(&format!(
+                            "{}:{}: missing flags argument",
                             self.path.display(),
                             self.line_no
                         ));
