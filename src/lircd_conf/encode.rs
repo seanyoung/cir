@@ -1,4 +1,3 @@
-use super::irp::convert_to_irp;
 use super::{Flags, LircRemote};
 use crate::log::Log;
 use irp::{Irp, Message, Vartable};
@@ -100,7 +99,7 @@ pub fn encode(
                 // FIXME: should check for multiple definitions of the same code
                 for code in &lirc_remote.codes {
                     if code.name == *send_code {
-                        let irp = match convert_to_irp(lirc_remote, log) {
+                        let irp = match lirc_remote.irp(log) {
                             Ok(s) => s,
                             Err(_) => continue,
                         };

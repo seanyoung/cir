@@ -28,6 +28,7 @@ lrpeg = "0.4.1"
 
 [dev-dependencies]
 assert_cmd = "2.0"
+serde_json = "1.0"
 
 [workspace]
 members = [

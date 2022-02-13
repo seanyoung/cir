@@ -1,84 +1,86 @@
 use super::LircRemote;
 use crate::log::Log;
-
 /// Build an IRP representation for the remote. This can be used both for encoding
 /// and decoding.
-pub fn convert_to_irp(remote: &LircRemote, log: &Log) -> Result<String, ()> {
-    let mut irp = String::from("{");
+impl LircRemote {
+    #[allow(clippy::result_unit_err)]
+    pub fn irp(&self, log: &Log) -> Result<String, ()> {
+        let mut irp = String::from("{");
 
-    if remote.frequency != 0 {
-        irp.push_str(&format!("{}k,", remote.frequency as f64 / 1000f64));
-    }
+        if self.frequency != 0 {
+            irp.push_str(&format!("{}k,", self.frequency as f64 / 1000f64));
+        }
 
-    if remote.duty_cycle != 0 {
-        if remote.duty_cycle >= 99 {
-            log.error(&format!(
-                "remote {} duty_cycle {} is invalid",
-                remote.name, remote.duty_cycle
-            ));
+        if self.duty_cycle != 0 {
+            if self.duty_cycle >= 99 {
+                log.error(&format!(
+                    "remote {} duty_cycle {} is invalid",
+                    self.name, self.duty_cycle
+                ));
+            } else {
+                irp.push_str(&format!("{}%,", self.duty_cycle));
+            }
+        }
+
+        irp.push_str("msb}");
+
+        irp.push_str(&format!(
+            "<{},-{}|{},-{}>(",
+            self.zero.0, self.zero.1, self.one.0, self.one.1
+        ));
+
+        if self.header.0 != 0 && self.header.1 != 0 {
+            irp.push_str(&format!("{},-{},", self.header.0, self.header.1));
+        }
+
+        if self.plead != 0 {
+            irp.push_str(&format!("{},", self.plead));
+        }
+
+        if self.pre_data_bits != 0 {
+            irp.push_str(&format!("{}:{},", self.pre_data, self.pre_data_bits));
+
+            if self.pre.0 != 0 && self.pre.1 != 0 {
+                irp.push_str(&format!("{},-{},", self.pre.0, self.pre.1));
+            }
+        }
+
+        irp.push_str(&format!("CODE:{},", self.bits));
+
+        if self.post_data_bits != 0 {
+            irp.push_str(&format!("{}:{},", self.post_data, self.post_data_bits));
+
+            if self.post.0 != 0 && self.post.1 != 0 {
+                irp.push_str(&format!("{},-{},", self.post.0, self.post.1));
+            }
+        }
+
+        if self.ptrail != 0 {
+            irp.push_str(&format!("{},", self.ptrail));
+        }
+
+        if self.foot.0 != 0 && self.foot.1 != 0 {
+            irp.push_str(&format!("{},-{},", self.foot.0, self.foot.1));
+        }
+
+        if self.gap != 0 {
+            irp.push_str(&format!("^{},", self.gap));
+        }
+
+        if self.repeat.0 != 0 && self.repeat.1 != 0 {
+            irp.push_str(&format!("({},-{},", self.repeat.0, self.repeat.1));
+            if self.ptrail != 0 {
+                irp.push_str(&format!("{},", self.ptrail));
+            }
+            irp.pop();
+            irp.push_str(")*)");
         } else {
-            irp.push_str(&format!("{}%,", remote.duty_cycle));
+            irp.pop();
+            irp.push_str(")*");
         }
+
+        irp.push_str(&format!(" [CODE:0..{}]", (1 << self.bits) - 1));
+
+        Ok(irp)
     }
-
-    irp.push_str("msb}");
-
-    irp.push_str(&format!(
-        "<{},-{}|{},-{}>(",
-        remote.zero.0, remote.zero.1, remote.one.0, remote.one.1
-    ));
-
-    if remote.header.0 != 0 && remote.header.1 != 0 {
-        irp.push_str(&format!("{},-{},", remote.header.0, remote.header.1));
-    }
-
-    if remote.plead != 0 {
-        irp.push_str(&format!("{},", remote.plead));
-    }
-
-    if remote.pre_data_bits != 0 {
-        irp.push_str(&format!("{}:{},", remote.pre_data, remote.pre_data_bits));
-
-        if remote.pre.0 != 0 && remote.pre.1 != 0 {
-            irp.push_str(&format!("{},-{},", remote.pre.0, remote.pre.1));
-        }
-    }
-
-    irp.push_str(&format!("CODE:{},", remote.bits));
-
-    if remote.post_data_bits != 0 {
-        irp.push_str(&format!("{}:{},", remote.post_data, remote.post_data_bits));
-
-        if remote.post.0 != 0 && remote.post.1 != 0 {
-            irp.push_str(&format!("{},-{},", remote.post.0, remote.post.1));
-        }
-    }
-
-    if remote.ptrail != 0 {
-        irp.push_str(&format!("{},", remote.ptrail));
-    }
-
-    if remote.foot.0 != 0 && remote.foot.1 != 0 {
-        irp.push_str(&format!("{},-{},", remote.foot.0, remote.foot.1));
-    }
-
-    if remote.gap != 0 {
-        irp.push_str(&format!("^{},", remote.gap));
-    }
-
-    if remote.repeat.0 != 0 && remote.repeat.1 != 0 {
-        irp.push_str(&format!("({},-{},", remote.repeat.0, remote.repeat.1));
-        if remote.ptrail != 0 {
-            irp.push_str(&format!("{},", remote.ptrail));
-        }
-        irp.pop();
-        irp.push_str(")*)");
-    } else {
-        irp.pop();
-        irp.push_str(")*");
-    }
-
-    irp.push_str(&format!(" [CODE:0..{}]", (1 << remote.bits) - 1));
-
-    Ok(irp)
 }
