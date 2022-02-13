@@ -108,10 +108,11 @@ pub fn encode(
                         log.info(&format!("irp for remote {}: {}", lirc_remote.name, irp));
 
                         let mut vars = Vartable::new();
-                        vars.set(String::from("C"), code.code as i64, 32);
+                        vars.set(String::from("CODE"), code.code as i64, 32);
                         let irp = Irp::parse(&irp).expect("should parse");
 
                         // FIXME: concatenate multiple messages (impl on Message?)
+                        // FIXME: should be possible to specify repeats
                         message = Some(irp.encode(vars, 0).expect("encode should succeed"));
                     }
                 }

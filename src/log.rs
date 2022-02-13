@@ -51,7 +51,7 @@ impl Log {
 
     pub fn info(&self, msg: &str) {
         match self.level {
-            Level::Trace | Level::Success => println!("info: {}", msg),
+            Level::Info | Level::Trace | Level::Success => println!("info: {}", msg),
             _ => (),
         }
     }
