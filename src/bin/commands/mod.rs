@@ -237,7 +237,7 @@ pub fn encode_args<'a>(
             if let Some(remote) = matches.value_of("REMOTE") {
                 if let Some(codes) = matches.values_of("CODES") {
                     let codes: Vec<&str> = codes.collect();
-                    let m = lircd_conf::encode(&remotes, remote, &codes);
+                    let m = lircd_conf::encode(&remotes, remote, &codes, log);
 
                     if let Some(m) = m {
                         (m, matches)
