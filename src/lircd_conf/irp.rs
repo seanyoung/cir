@@ -79,7 +79,7 @@ impl LircRemote {
             irp.push_str(")*");
         }
 
-        irp.push_str(&format!(" [CODE:0..{}]", (1 << self.bits) - 1));
+        irp.push_str(&format!(" [CODE:0..{}]", (1u64 << self.bits) - 1));
 
         Ok(irp)
     }

@@ -1,6 +1,6 @@
 use crate::{lircd_conf::parse, log::Log};
-use irp::{Irp, Vartable};
-use serde::{Deserialize, Serialize};
+use irp::{rawir, Irp, Vartable};
+use serde::Deserialize;
 use std::{
     ffi::OsStr,
     fs::{read_dir, File},
@@ -8,14 +8,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Remote {
+#[derive(Deserialize)]
+struct Remote {
     name: String,
     codes: Vec<Code>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Code {
+#[derive(Deserialize)]
+struct Code {
     name: String,
     code: String,
     rawir: Vec<u32>,
@@ -50,6 +50,8 @@ fn recurse(path: &Path, log: &Log) {
 }
 
 fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
+    println!("Testing {} {}", conf.display(), testdata.display());
+
     let mut file = File::open(testdata).unwrap();
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
@@ -62,6 +64,14 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
         let irp = remote.irp(log).expect("should work");
         let irp = Irp::parse(&irp).expect("should work");
 
+        if testdata[remote_no].name != remote.name {
+            println!(
+                "dispair! remote name {} does not match {}",
+                testdata[remote_no].name, remote.name
+            );
+            continue;
+        }
+
         for (code_no, code) in remote.codes.iter().enumerate() {
             let mut vars = Vartable::new();
             vars.set(String::from("CODE"), code.code as i64, 32);
@@ -71,14 +81,20 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
             message.raw.pop();
 
+            if testdata[remote_no].codes.len() <= code_no {
+                println!("testdata no missing {}", code.name);
+                continue;
+            }
             let testdata = &testdata[remote_no].codes[code_no];
 
-            assert_eq!(testdata.name, code.name);
+            if testdata.name != code.name {
+                println!("testdata no matchy {} {}", testdata.name, code.name);
+                continue;
+            }
 
-            if testdata.rawir == message.raw {
-                println!("MATCH for {}", conf.display());
-            } else {
-                println!("NO MATCH for {}", conf.display());
+            if testdata.rawir != message.raw {
+                println!("lircd {}", rawir::print_to_string(&testdata.rawir));
+                println!("cir {}", rawir::print_to_string(&message.raw));
             }
         }
     }

@@ -51,7 +51,7 @@ pub fn encode(
                         };
                         let mut raw = raw_code.rawir[..length].to_vec();
 
-                        let total_length: u32 = raw.iter().sum();
+                        let total_length: u64 = raw.iter().map(|v| *v as u64).sum();
 
                         let space = if lirc_remote.gap == 0 {
                             log.error(&format!("remote {} does not a specify a gap", remote));
@@ -63,13 +63,13 @@ pub fn encode(
                             lirc_remote.gap - total_length
                         };
 
-                        raw.push(space);
+                        raw.push(space as u32);
 
                         if let Some(message) = &mut message {
                             message.raw.extend_from_slice(&raw);
                         } else {
                             let carrier = if lirc_remote.frequency != 0 {
-                                Some(lirc_remote.frequency.into())
+                                Some(lirc_remote.frequency as i64)
                             } else {
                                 None
                             };

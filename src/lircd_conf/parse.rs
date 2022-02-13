@@ -67,7 +67,10 @@ impl<'a> LircParser<'a> {
     }
 
     fn read_remote(&mut self) -> Result<LircRemote, ()> {
-        let mut remote: LircRemote = Default::default();
+        let mut remote = LircRemote {
+            frequency: 38000,
+            ..Default::default()
+        };
 
         loop {
             let line = self.next_line()?;
@@ -125,7 +128,10 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "gap")
                 | Some(name @ "frequency")
                 | Some(name @ "duty_cycle")
-                | Some(name @ "toggle_bit_mask") => {
+                | Some(name @ "toggle_bit")
+                | Some(name @ "repeat_bit")
+                | Some(name @ "toggle_bit_mask")
+                | Some(name @ "rc6_mask") => {
                     let val = self.parse_number_arg(name, second)?;
                     match name {
                         "eps" => remote.eps = val,
@@ -141,6 +147,9 @@ impl<'a> LircParser<'a> {
                         "frequency" => remote.frequency = val,
                         "duty_cycle" => remote.duty_cycle = val,
                         "toggle_bit_mask" => remote.toggle_bit_mask = val,
+                        "toggle_bit" => remote.toggle_bit = val,
+                        "repeat_bit" => remote.toggle_bit = val,
+                        "rc6_mask" => remote.rc6_mask = val,
                         _ => unreachable!(),
                     }
                 }
@@ -294,12 +303,12 @@ impl<'a> LircParser<'a> {
         }
     }
 
-    fn parse_number_arg(&self, arg_name: &str, arg: Option<&str>) -> Result<u32, ()> {
+    fn parse_number_arg(&self, arg_name: &str, arg: Option<&str>) -> Result<u64, ()> {
         if let Some(val) = arg {
             let no = if let Some(hex) = val.strip_prefix("0x") {
-                u32::from_str_radix(hex, 16)
+                u64::from_str_radix(hex, 16)
             } else {
-                u32::from_str(val)
+                u64::from_str(val)
             };
 
             if let Ok(val) = no {
@@ -527,7 +536,7 @@ impl<'a> LircParser<'a> {
 
             let trimmed = line.trim();
 
-            if !trimmed.is_empty() && !trimmed.starts_with('#') {
+            if !trimmed.is_empty() && !line.starts_with('#') {
                 return Ok(Some(trimmed.to_owned()));
             }
         }
