@@ -121,7 +121,8 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "pre_data_bits")
                 | Some(name @ "pre_data")
                 | Some(name @ "post_data_bits")
-                | Some(name @ "post_data") => match second {
+                | Some(name @ "post_data")
+                | Some(name @ "gap") => match second {
                     Some(val) => {
                         if let Ok(val) = if let Some(hex) = val.strip_prefix("0x") {
                             u32::from_str_radix(hex, 16)
@@ -138,6 +139,7 @@ impl<'a> LircParser<'a> {
                                 "pre_data" => remote.pre_data = val,
                                 "post_data_bits" => remote.post_data_bits = val,
                                 "post_data" => remote.post_data = val,
+                                "gap" => remote.gap = val,
                                 _ => unreachable!(),
                             }
                             remote.bits = val;

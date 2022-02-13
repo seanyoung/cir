@@ -87,6 +87,23 @@ fn main() {
                     App::new("rawir")
                         .about("Parse raw IR")
                         .arg(Arg::new("RAWIR").help("Raw IR to parse").required(true)),
+                )
+                .subcommand(
+                    App::new("lircd")
+                        .about("Parse lircd.conf file and print as raw IR")
+                        .arg(
+                            Arg::new("CONF")
+                                .help("lircd.conf file")
+                                .allow_invalid_utf8(true)
+                                .required(true),
+                        )
+                        .arg(Arg::new("REMOTE").help("Remote to use").takes_value(true))
+                        .arg(
+                            Arg::new("CODES")
+                                .help("Code to send")
+                                .multiple_occurrences(true)
+                                .takes_value(true),
+                        ),
                 ),
         )
         .subcommand(
