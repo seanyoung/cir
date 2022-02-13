@@ -1,6 +1,7 @@
+use super::irp::convert_to_irp;
 use super::{Flags, LircRemote};
 use crate::log::Log;
-use irp::Message;
+use irp::{Irp, Message, Vartable};
 use num_integer::Integer;
 
 pub fn encode(
@@ -11,7 +12,7 @@ pub fn encode(
 ) -> Option<Message> {
     let mut message: Option<Message> = None;
 
-    for code in codes {
+    for send_code in codes {
         for lirc_remote in lirc_remotes {
             if lirc_remote.name != remote {
                 continue;
@@ -33,13 +34,14 @@ pub fn encode(
                 continue;
             }
 
+            // FIXME: should check for multiple definitions of the same code
             if lirc_remote.flags.contains(Flags::RAW_CODES) {
                 for raw_code in &lirc_remote.raw_codes {
-                    if raw_code.name == *code {
+                    if raw_code.name == *send_code {
                         if raw_code.rawir.is_empty() {
                             log.error(&format!(
                                 "remote {} code {} is missing raw codes",
-                                remote, code
+                                remote, send_code
                             ));
                             continue;
                         }
@@ -67,15 +69,52 @@ pub fn encode(
                         if let Some(message) = &mut message {
                             message.raw.extend_from_slice(&raw);
                         } else {
+                            let carrier = if lirc_remote.frequency != 0 {
+                                Some(lirc_remote.frequency.into())
+                            } else {
+                                None
+                            };
+
+                            let duty_cycle = if lirc_remote.duty_cycle != 0 {
+                                if lirc_remote.duty_cycle < 99 {
+                                    Some(lirc_remote.duty_cycle as u8)
+                                } else {
+                                    log.error(&format!(
+                                        "remote {} duty_cycle {} is invalid",
+                                        remote, lirc_remote.duty_cycle
+                                    ));
+                                    None
+                                }
+                            } else {
+                                None
+                            };
                             message = Some(Message {
-                                carrier: None,
-                                duty_cycle: None,
+                                carrier,
+                                duty_cycle,
                                 raw,
                             });
                         }
                     }
                 }
             } else {
+                // FIXME: should check for multiple definitions of the same code
+                for code in &lirc_remote.codes {
+                    if code.name == *send_code {
+                        let irp = match convert_to_irp(lirc_remote, log) {
+                            Ok(s) => s,
+                            Err(_) => continue,
+                        };
+
+                        log.info(&format!("irp for remote {}: {}", lirc_remote.name, irp));
+
+                        let mut vars = Vartable::new();
+                        vars.set(String::from("C"), code.code as i64, 32);
+                        let irp = Irp::parse(&irp).expect("should parse");
+
+                        // FIXME: concatenate multiple messages (impl on Message?)
+                        message = Some(irp.encode(vars, 0).expect("encode should succeed"));
+                    }
+                }
             }
         }
     }

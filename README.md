@@ -6,10 +6,11 @@ and load decoders, and transmit simple IR. The IR decoders are hardcoded
 and a small set is included.
 
 This project plans to completely replace both those tools, but with
-two major new features:
+three major new features:
 
  - Pronto hex codes
  - IRP support
+ - lircd.conf remote definition support
 
 Pronto hex codes are a fairly straightforward way of encoding raw IR,
 NEC, RC-5 and a few others.

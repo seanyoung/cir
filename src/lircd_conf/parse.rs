@@ -122,46 +122,55 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "pre_data")
                 | Some(name @ "post_data_bits")
                 | Some(name @ "post_data")
-                | Some(name @ "gap") => match second {
-                    Some(val) => {
-                        if let Ok(val) = if let Some(hex) = val.strip_prefix("0x") {
-                            u32::from_str_radix(hex, 16)
-                        } else {
-                            u32::from_str(val)
-                        } {
-                            match name {
-                                "eps" => remote.eps = val,
-                                "aeps" => remote.aeps = val,
-                                "bits" => remote.bits = val,
-                                "plead" => remote.plead = val,
-                                "ptrail" => remote.ptrail = val,
-                                "pre_data_bits" => remote.pre_data_bits = val,
-                                "pre_data" => remote.pre_data = val,
-                                "post_data_bits" => remote.post_data_bits = val,
-                                "post_data" => remote.post_data = val,
-                                "gap" => remote.gap = val,
-                                _ => unreachable!(),
-                            }
-                            remote.bits = val;
-                        } else {
-                            self.log.error(&format!(
-                                "{}:{}: {} argument '{}' not valid",
-                                self.path.display(),
-                                self.line_no,
-                                name,
-                                val
-                            ));
-                        }
+                | Some(name @ "gap")
+                | Some(name @ "frequency")
+                | Some(name @ "duty_cycle")
+                | Some(name @ "toggle_bit_mask") => {
+                    let val = self.parse_number_arg(name, second)?;
+                    match name {
+                        "eps" => remote.eps = val,
+                        "aeps" => remote.aeps = val,
+                        "bits" => remote.bits = val,
+                        "plead" => remote.plead = val,
+                        "ptrail" => remote.ptrail = val,
+                        "pre_data_bits" => remote.pre_data_bits = val,
+                        "pre_data" => remote.pre_data = val,
+                        "post_data_bits" => remote.post_data_bits = val,
+                        "post_data" => remote.post_data = val,
+                        "gap" => remote.gap = val,
+                        "frequency" => remote.frequency = val,
+                        "duty_cycle" => remote.duty_cycle = val,
+                        "toggle_bit_mask" => remote.toggle_bit_mask = val,
+                        _ => unreachable!(),
                     }
-                    None => {
-                        self.log.error(&format!(
-                            "{}:{}: missing bits argument",
-                            self.path.display(),
-                            self.line_no
-                        ));
-                        return Err(());
+                }
+                Some(name @ "header")
+                | Some(name @ "three")
+                | Some(name @ "four")
+                | Some(name @ "two")
+                | Some(name @ "one")
+                | Some(name @ "zero")
+                | Some(name @ "foot")
+                | Some(name @ "repeat")
+                | Some(name @ "pre")
+                | Some(name @ "post") => {
+                    let first = self.parse_number_arg(name, second)?;
+                    let second = self.parse_number_arg(name, words.next())?;
+
+                    match name {
+                        "header" => remote.header = (first, second),
+                        "three" => remote.three = (first, second),
+                        "four" => remote.four = (first, second),
+                        "two" => remote.two = (first, second),
+                        "one" => remote.one = (first, second),
+                        "zero" => remote.zero = (first, second),
+                        "foot" => remote.foot = (first, second),
+                        "repeat" => remote.repeat = (first, second),
+                        "pre" => remote.pre = (first, second),
+                        "post" => remote.post = (first, second),
+                        _ => unreachable!(),
                     }
-                },
+                }
                 Some("flags") => match second {
                     Some(val) => {
                         let mut flags = Flags::empty();
@@ -282,6 +291,37 @@ impl<'a> LircParser<'a> {
                 }
                 None => (),
             }
+        }
+    }
+
+    fn parse_number_arg(&self, arg_name: &str, arg: Option<&str>) -> Result<u32, ()> {
+        if let Some(val) = arg {
+            let no = if let Some(hex) = val.strip_prefix("0x") {
+                u32::from_str_radix(hex, 16)
+            } else {
+                u32::from_str(val)
+            };
+
+            if let Ok(val) = no {
+                Ok(val)
+            } else {
+                self.log.error(&format!(
+                    "{}:{}: {} argument {} is not a number",
+                    self.path.display(),
+                    self.line_no,
+                    arg_name,
+                    val
+                ));
+                Err(())
+            }
+        } else {
+            self.log.error(&format!(
+                "{}:{}: missing {} argument",
+                self.path.display(),
+                self.line_no,
+                arg_name
+            ));
+            Err(())
         }
     }
 

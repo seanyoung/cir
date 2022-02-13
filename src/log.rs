@@ -32,7 +32,7 @@ impl Log {
         let mut level = self.level;
 
         for _ in 0..verbose {
-            level = match self.level {
+            level = match level {
                 Level::Success | Level::Trace => Level::Trace,
                 Level::Info => Level::Success,
                 Level::Warning => Level::Info,

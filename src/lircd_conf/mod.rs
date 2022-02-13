@@ -3,6 +3,7 @@ use bitflags::bitflags;
 use std::path::Path;
 
 mod encode;
+mod irp;
 mod parse;
 
 pub use encode::encode;
@@ -56,10 +57,20 @@ pub struct LircRemote {
     pub pre_data: u32,
     pub post_data_bits: u32,
     pub post_data: u32,
+    pub toggle_bit_mask: u32,
     pub header: (u32, u32),
     pub one: (u32, u32),
     pub zero: (u32, u32),
+    pub two: (u32, u32),
+    pub three: (u32, u32),
+    pub four: (u32, u32),
+    pub foot: (u32, u32),
+    pub repeat: (u32, u32),
+    pub pre: (u32, u32),
+    pub post: (u32, u32),
     pub gap: u32,
+    pub frequency: u32,
+    pub duty_cycle: u32,
     pub codes: Vec<LircCode>,
     pub raw_codes: Vec<LircRawCode>,
 }
