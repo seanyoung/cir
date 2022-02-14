@@ -22,12 +22,29 @@ impl LircRemote {
             }
         }
 
-        irp.push_str("msb}");
+        irp.push_str("msb}<");
 
-        irp.push_str(&format!(
-            "<{},-{}|{},-{}>(",
-            self.zero.0, self.zero.1, self.one.0, self.one.1
-        ));
+        if self.zero.0 > 0 {
+            irp.push_str(&format!("{},", self.zero.0));
+        }
+
+        if self.zero.1 > 0 {
+            irp.push_str(&format!("-{},", self.zero.1));
+        }
+
+        irp.pop();
+        irp.push('|');
+
+        if self.one.0 > 0 {
+            irp.push_str(&format!("{},", self.one.0));
+        }
+
+        if self.one.1 > 0 {
+            irp.push_str(&format!("-{},", self.one.1));
+        }
+
+        irp.pop();
+        irp.push_str(">(");
 
         if self.header.0 != 0 && self.header.1 != 0 {
             irp.push_str(&format!("{},-{},", self.header.0, self.header.1));
@@ -76,7 +93,7 @@ impl LircRemote {
             irp.push_str(")*)");
         } else {
             irp.pop();
-            irp.push_str(")*");
+            irp.push_str(")+");
         }
 
         irp.push_str(&format!(" [CODE:0..{}]", (1u64 << self.bits) - 1));

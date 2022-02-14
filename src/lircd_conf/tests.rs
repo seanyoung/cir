@@ -1,4 +1,7 @@
-use crate::{lircd_conf::parse, log::Log};
+use crate::{
+    lircd_conf::{parse, Flags},
+    log::Log,
+};
 use irp::{rawir, Irp, Vartable};
 use serde::Deserialize;
 use std::{
@@ -59,44 +62,87 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
     let lircd_conf = parse(conf, log).expect("parse should work");
 
-    for remote in &lircd_conf {
-        let irp = remote.irp(log).expect("should work");
-        let irp = Irp::parse(&irp).expect("should work");
+    let mut all_pass = true;
 
+    for remote in &lircd_conf {
         let testdata = if let Some(testdata) = testdata
             .iter()
             .find(|testdata| testdata.name == remote.name)
         {
             testdata
         } else {
-            println!("cannot find testdata for {}", remote.name);
+            println!("cannot find testdata for remote {}", remote.name);
+            all_pass = false;
             continue;
         };
 
-        for (code_no, code) in remote.codes.iter().enumerate() {
-            let mut vars = Vartable::new();
-            vars.set(String::from("CODE"), code.code as i64, 32);
+        if remote.flags.contains(Flags::RAW_CODES) {
+            for code in &remote.raw_codes {
+                let testdata = if let Some(testdata) = testdata
+                    .codes
+                    .iter()
+                    .find(|testdata| testdata.name == code.name)
+                {
+                    testdata
+                } else {
+                    println!("cannot find testdata for code {}", code.name);
+                    all_pass = false;
+                    continue;
+                };
 
-            // FIXME: should be possible to test repeats
-            let mut message = irp.encode(vars, 0).expect("encode should succeed");
-
-            message.raw.pop();
-
-            if testdata.codes.len() <= code_no {
-                println!("testdata no missing {}", code.name);
-                continue;
+                if testdata.rawir != code.rawir {
+                    all_pass = false;
+                    println!("RAW CODE: {}", code.name);
+                    println!("lircd {}", rawir::print_to_string(&testdata.rawir));
+                    println!("cir {}", rawir::print_to_string(&code.rawir));
+                }
             }
-            let testdata = &testdata.codes[code_no];
+        } else {
+            let irp = remote.irp(log).expect("should work");
+            println!("remote {} irp:{}", remote.name, irp);
+            let irp = Irp::parse(&irp).expect("should work");
 
-            if testdata.name != code.name {
-                println!("testdata no matchy {} {}", testdata.name, code.name);
-                continue;
-            }
+            for code in &remote.codes {
+                let mut vars = Vartable::new();
+                vars.set(String::from("CODE"), code.code as i64, 32);
 
-            if testdata.rawir != message.raw {
-                println!("lircd {}", rawir::print_to_string(&testdata.rawir));
-                println!("cir {}", rawir::print_to_string(&message.raw));
+                // FIXME: should be possible to test repeats
+                let mut message = irp.encode(vars, 0).expect("encode should succeed");
+
+                message.raw.pop();
+
+                let testdata = if let Some(testdata) = testdata
+                    .codes
+                    .iter()
+                    .find(|testdata| testdata.name == code.name)
+                {
+                    testdata
+                } else {
+                    println!("cannot find testdata for code {}", code.name);
+                    all_pass = false;
+                    continue;
+                };
+
+                let testdata_code = u64::from_str_radix(&testdata.code, 16).unwrap();
+
+                if testdata_code != code.code {
+                    println!(
+                        "CODE: {} {:x} testdata {:x}",
+                        code.name, code.code, testdata_code
+                    );
+                    all_pass = false;
+                    continue;
+                }
+
+                if testdata.rawir != message.raw {
+                    all_pass = false;
+                    println!("CODE: {} {:x}", code.name, code.code);
+                    println!("lircd {}", rawir::print_to_string(&testdata.rawir));
+                    println!("cir {}", rawir::print_to_string(&message.raw));
+                }
             }
         }
     }
+
+    println!("ALL PASS: {}", all_pass);
 }
