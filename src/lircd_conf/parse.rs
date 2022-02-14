@@ -20,7 +20,7 @@ pub struct LircParser<'a> {
 /// garbage is permitted when 'begin remote' is expected, and most lines can have
 /// trailing characters after the first two tokens.
 impl<'a> LircParser<'a> {
-    pub fn from(path: &Path, log: &'a Log) -> Result<Vec<LircRemote>, ()> {
+    pub fn parse(path: &Path, log: &'a Log) -> Result<Vec<LircRemote>, ()> {
         let mut file = OpenOptions::new()
             .read(true)
             .open(path)
@@ -42,10 +42,10 @@ impl<'a> LircParser<'a> {
             log,
         };
 
-        parser.parse()
+        parser.read()
     }
 
-    fn parse(&mut self) -> Result<Vec<LircRemote>, ()> {
+    fn read(&mut self) -> Result<Vec<LircRemote>, ()> {
         let mut remotes = Vec::new();
 
         loop {

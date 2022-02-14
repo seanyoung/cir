@@ -98,7 +98,7 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                 }
             }
         } else {
-            let irp = remote.irp(log).expect("should work");
+            let irp = remote.irp(log);
             println!("remote {} irp:{}", remote.name, irp);
             let irp = Irp::parse(&irp).expect("should work");
 

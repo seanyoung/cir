@@ -1,10 +1,10 @@
 use super::LircRemote;
 use crate::log::Log;
-/// Build an IRP representation for the remote. This can be used both for encoding
-/// and decoding.
+
 impl LircRemote {
-    #[allow(clippy::result_unit_err)]
-    pub fn irp(&self, log: &Log) -> Result<String, ()> {
+    /// Build an IRP representation for the remote. This can be used both for encoding
+    /// and decoding.
+    pub fn irp(&self, log: &Log) -> String {
         let mut irp = String::from("{");
 
         if self.frequency != 0 {
@@ -98,6 +98,6 @@ impl LircRemote {
 
         irp.push_str(&format!(" [CODE:0..{}]", (1u64 << self.bits) - 1));
 
-        Ok(irp)
+        irp
     }
 }

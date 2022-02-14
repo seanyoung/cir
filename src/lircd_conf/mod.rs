@@ -83,20 +83,5 @@ pub struct LircRemote {
 /// remotes. Any parse errors or warnings are send to the log crate.
 #[allow(clippy::result_unit_err)]
 pub fn parse<P: AsRef<Path>>(path: P, log: &Log) -> Result<Vec<LircRemote>, ()> {
-    parse::LircParser::from(path.as_ref(), log)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn parse_all_of_them() {
-        let log = Log::new();
-
-        println!(
-            "{:?}",
-            parse("testdata/lircd_conf/pioneer/CU-VSX107.lircd.conf", &log)
-        );
-    }
+    parse::LircParser::parse(path.as_ref(), log)
 }
