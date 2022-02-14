@@ -27,8 +27,6 @@ fn lircd_testdata() {
     let log = Log::new();
 
     recurse(&PathBuf::from("testdata/lircd_conf"), &log);
-
-    panic!("meh");
 }
 
 fn recurse(path: &Path, log: &Log) {

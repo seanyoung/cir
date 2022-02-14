@@ -1,8 +1,9 @@
 use super::{Flags, LircCode, LircRawCode, LircRemote};
 use crate::log::Log;
+use std::str::Lines;
 use std::{
-    fs::{File, OpenOptions},
-    io::{BufRead, BufReader, Lines},
+    fs::OpenOptions,
+    io::Read,
     path::{Path, PathBuf},
     str::{FromStr, SplitWhitespace},
 };
@@ -10,7 +11,7 @@ use std::{
 pub struct LircParser<'a> {
     path: PathBuf,
     line_no: u32,
-    lines: Lines<BufReader<File>>,
+    lines: Lines<'a>,
     log: &'a Log,
 }
 
@@ -19,24 +20,32 @@ pub struct LircParser<'a> {
 /// garbage is permitted when 'begin remote' is expected, and most lines can have
 /// trailing characters after the first two tokens.
 impl<'a> LircParser<'a> {
-    pub fn new(path: &Path, log: &'a Log) -> Result<Self, ()> {
-        let file = OpenOptions::new()
+    pub fn from(path: &Path, log: &'a Log) -> Result<Vec<LircRemote>, ()> {
+        let mut file = OpenOptions::new()
             .read(true)
             .open(path)
             .map_err(|e| log.error(&format!("failed to open '{}': {}", path.display(), e)))?;
-        let reader = BufReader::new(file);
+
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf)
+            .map_err(|e| log.error(&format!("failed to read '{}': {}", path.display(), e)))?;
+
+        let contents = String::from_utf8_lossy(&buf);
+        let lines = contents.lines();
 
         log.info(&format!("parsing '{}' as lircd.conf file", path.display()));
 
-        Ok(LircParser {
+        let mut parser = LircParser {
             path: PathBuf::from(path),
             line_no: 0,
-            lines: reader.lines(),
+            lines,
             log,
-        })
+        };
+
+        parser.parse()
     }
 
-    pub fn parse(&mut self) -> Result<Vec<LircRemote>, ()> {
+    fn parse(&mut self) -> Result<Vec<LircRemote>, ()> {
         let mut remotes = Vec::new();
 
         loop {
@@ -527,19 +536,7 @@ impl<'a> LircParser<'a> {
 
             let line = line.unwrap();
 
-            if let Err(err) = line {
-                self.log.error(&format!(
-                    "failed to read '{}' line {}: {}",
-                    self.path.display(),
-                    self.line_no,
-                    err
-                ));
-                return Err(());
-            }
-
             self.line_no += 1;
-
-            let line = line.unwrap();
 
             let trimmed = line.trim();
 
