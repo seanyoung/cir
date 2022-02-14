@@ -54,7 +54,11 @@ impl<'a> LircParser<'a> {
             let second = words.next();
 
             if let (Some("begin"), Some("remote")) = (first, second) {
-                remotes.push(self.read_remote()?);
+                let mut remote = self.read_remote()?;
+
+                if self.sanity_checks(&mut remote) {
+                    remotes.push(remote);
+                }
             } else {
                 self.log.warning(&format!(
                     "{}:{}: expected 'begin remote', got '{}'",
@@ -259,7 +263,6 @@ impl<'a> LircParser<'a> {
                 },
                 Some("end") => {
                     if let Some("remote") = second {
-                        // TODO: sanity check
                         return Ok(remote);
                     }
 
@@ -306,6 +309,8 @@ impl<'a> LircParser<'a> {
     fn parse_number_arg(&self, arg_name: &str, arg: Option<&str>) -> Result<u64, ()> {
         if let Some(val) = arg {
             let no = if let Some(hex) = val.strip_prefix("0x") {
+                u64::from_str_radix(hex, 16)
+            } else if let Some(hex) = val.strip_prefix("0X") {
                 u64::from_str_radix(hex, 16)
             } else {
                 u64::from_str(val)
@@ -374,6 +379,8 @@ impl<'a> LircParser<'a> {
                 Some(name) => {
                     if let Some(scancode) = second {
                         match if let Some(hex_scancode) = scancode.strip_prefix("0x") {
+                            u64::from_str_radix(hex_scancode, 16)
+                        } else if let Some(hex_scancode) = scancode.strip_prefix("0X") {
                             u64::from_str_radix(hex_scancode, 16)
                         } else {
                             u64::from_str(scancode)
@@ -541,4 +548,110 @@ impl<'a> LircParser<'a> {
             }
         }
     }
+
+    /// Do some sanity checks and cleanups. Returns false for invalid
+    fn sanity_checks(&self, remote: &mut LircRemote) -> bool {
+        if remote.name.is_empty() {
+            self.log.error(&format!(
+                "{}:{}: missing remote name",
+                self.path.display(),
+                self.line_no,
+            ));
+            return false;
+        }
+
+        if remote.gap == 0 {
+            self.log.warning(&format!(
+                "{}:{}: missing gap",
+                self.path.display(),
+                self.line_no,
+            ));
+        }
+
+        if remote.flags.contains(Flags::RAW_CODES) {
+            if remote.raw_codes.is_empty() {
+                self.log.error(&format!(
+                    "{}:{}: missing raw codes",
+                    self.path.display(),
+                    self.line_no,
+                ));
+                return false;
+            }
+
+            if !remote.codes.is_empty() {
+                self.log.error(&format!(
+                    "{}:{}: non-raw codes specified for raw remote",
+                    self.path.display(),
+                    self.line_no,
+                ));
+                return false;
+            }
+
+            return true;
+        }
+
+        if !remote.raw_codes.is_empty() {
+            self.log.error(&format!(
+                "{}:{}: raw codes specified for non-raw remote",
+                self.path.display(),
+                self.line_no,
+            ));
+            return false;
+        }
+
+        if remote.codes.is_empty() {
+            self.log.error(&format!(
+                "{}:{}: missing codes",
+                self.path.display(),
+                self.line_no,
+            ));
+            return false;
+        }
+
+        // Can we generate a sensible irp for this remote
+        if (remote.zero.0 == 0 && remote.zero.1 == 0) || (remote.one.0 == 0 && remote.one.1 == 0) {
+            self.log.error(&format!(
+                "{}:{}: no bit encoding provided",
+                self.path.display(),
+                self.line_no,
+            ));
+            return false;
+        }
+
+        if (remote.pre_data & !gen_mask(remote.pre_data_bits)) != 0 {
+            self.log.warning(&format!(
+                "{}:{}: invalid pre_data",
+                self.path.display(),
+                self.line_no,
+            ));
+            remote.pre_data &= gen_mask(remote.pre_data_bits);
+        }
+
+        if (remote.post_data & !gen_mask(remote.post_data_bits)) != 0 {
+            self.log.warning(&format!(
+                "{}:{}: invalid post_data",
+                self.path.display(),
+                self.line_no,
+            ));
+            remote.post_data &= gen_mask(remote.post_data_bits);
+        }
+
+        for code in &mut remote.codes {
+            if (code.code & !gen_mask(remote.bits)) != 0 {
+                self.log.warning(&format!(
+                    "{}:{}: invalid code {:x}",
+                    self.path.display(),
+                    self.line_no,
+                    code.code
+                ));
+                code.code &= gen_mask(remote.bits);
+            }
+        }
+
+        true
+    }
+}
+
+fn gen_mask(v: u64) -> u64 {
+    (1u64 << v) - 1
 }

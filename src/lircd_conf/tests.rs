@@ -15,6 +15,7 @@ struct Remote {
 }
 
 #[derive(Deserialize)]
+#[allow(unused)]
 struct Code {
     name: String,
     code: String,
@@ -60,17 +61,19 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
     let lircd_conf = parse(conf, log).expect("parse should work");
 
-    for (remote_no, remote) in lircd_conf.iter().enumerate() {
+    for remote in &lircd_conf {
         let irp = remote.irp(log).expect("should work");
         let irp = Irp::parse(&irp).expect("should work");
 
-        if testdata[remote_no].name != remote.name {
-            println!(
-                "dispair! remote name {} does not match {}",
-                testdata[remote_no].name, remote.name
-            );
+        let testdata = if let Some(testdata) = testdata
+            .iter()
+            .find(|testdata| testdata.name == remote.name)
+        {
+            testdata
+        } else {
+            println!("cannot find testdata for {}", remote.name);
             continue;
-        }
+        };
 
         for (code_no, code) in remote.codes.iter().enumerate() {
             let mut vars = Vartable::new();
@@ -81,11 +84,11 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
             message.raw.pop();
 
-            if testdata[remote_no].codes.len() <= code_no {
+            if testdata.codes.len() <= code_no {
                 println!("testdata no missing {}", code.name);
                 continue;
             }
-            let testdata = &testdata[remote_no].codes[code_no];
+            let testdata = &testdata.codes[code_no];
 
             if testdata.name != code.name {
                 println!("testdata no matchy {} {}", testdata.name, code.name);
