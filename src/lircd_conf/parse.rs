@@ -594,15 +594,8 @@ impl<'a> LircParser<'a> {
             remote.duty_cycle = 0;
         }
 
-        if remote.flags.contains(Flags::RAW_CODES) {
-            if remote.raw_codes.is_empty() {
-                self.log.error(&format!(
-                    "{}:{}: missing raw codes",
-                    self.path.display(),
-                    self.line_no,
-                ));
-                return false;
-            }
+        if !remote.raw_codes.is_empty() {
+            remote.flags.set(Flags::RAW_CODES, true);
 
             if !remote.codes.is_empty() {
                 self.log.error(&format!(
@@ -616,9 +609,9 @@ impl<'a> LircParser<'a> {
             return true;
         }
 
-        if !remote.raw_codes.is_empty() {
+        if remote.flags.contains(Flags::RAW_CODES) {
             self.log.error(&format!(
-                "{}:{}: raw codes specified for non-raw remote",
+                "{}:{}: missing raw codes",
                 self.path.display(),
                 self.line_no,
             ));
