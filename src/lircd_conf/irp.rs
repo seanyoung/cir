@@ -16,33 +16,41 @@ impl LircRemote {
 
         irp.push_str("msb}<");
 
-        for (bit_no, (pulse, space)) in self.bit.iter().enumerate() {
-            if (bit_no == 1 && (self.flags.contains(Flags::RC5) || self.flags.contains(Flags::RC6)))
-                || self.flags.contains(Flags::SPACE_FIRST)
-            {
-                if *space > 0 {
-                    irp.push_str(&format!("-{},", space))
-                }
-
-                if *pulse > 0 {
-                    irp.push_str(&format!("{},", pulse))
-                }
-            } else {
-                if *pulse > 0 {
-                    irp.push_str(&format!("{},", pulse))
-                }
-
-                if *space > 0 {
-                    irp.push_str(&format!("-{},", space))
-                }
+        if self.flags.contains(Flags::XMP) {
+            for i in 0..16 {
+                irp.push_str(&format!("{},", self.bit[0].0));
+                irp.push_str(&format!("-{}|", self.bit[0].1 + i * self.bit[1].1));
             }
+        } else {
+            for (bit_no, (pulse, space)) in self.bit.iter().enumerate() {
+                if (bit_no == 1
+                    && (self.flags.contains(Flags::RC5) || self.flags.contains(Flags::RC6)))
+                    || self.flags.contains(Flags::SPACE_FIRST)
+                {
+                    if *space > 0 {
+                        irp.push_str(&format!("-{},", space))
+                    }
 
-            if *pulse == 0 && *space == 0 {
-                break;
+                    if *pulse > 0 {
+                        irp.push_str(&format!("{},", pulse))
+                    }
+                } else {
+                    if *pulse > 0 {
+                        irp.push_str(&format!("{},", pulse))
+                    }
+
+                    if *space > 0 {
+                        irp.push_str(&format!("-{},", space))
+                    }
+                }
+
+                if *pulse == 0 && *space == 0 {
+                    break;
+                }
+
+                irp.pop();
+                irp.push('|');
             }
-
-            irp.pop();
-            irp.push('|');
         }
 
         irp.pop();
@@ -57,7 +65,11 @@ impl LircRemote {
         }
 
         if self.pre_data_bits != 0 {
-            irp.push_str(&format!("0x{:x}:{},", self.pre_data, self.pre_data_bits));
+            if self.pre_data > 9 {
+                irp.push_str(&format!("0x{:x}:{},", self.pre_data, self.pre_data_bits));
+            } else {
+                irp.push_str(&format!("{}:{},", self.pre_data, self.pre_data_bits));
+            }
 
             if self.pre.0 != 0 && self.pre.1 != 0 {
                 irp.push_str(&format!("{},-{},", self.pre.0, self.pre.1));
@@ -67,7 +79,11 @@ impl LircRemote {
         irp.push_str(&format!("CODE:{},", self.bits));
 
         if self.post_data_bits != 0 {
-            irp.push_str(&format!("0x{:x}:{},", self.post_data, self.post_data_bits));
+            if self.post_data > 9 {
+                irp.push_str(&format!("0x{:x}:{},", self.post_data, self.post_data_bits));
+            } else {
+                irp.push_str(&format!("{}:{},", self.post_data, self.post_data_bits));
+            }
 
             if self.post.0 != 0 && self.post.1 != 0 {
                 irp.push_str(&format!("{},-{},", self.post.0, self.post.1));
