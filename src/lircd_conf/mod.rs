@@ -5,8 +5,6 @@ use std::path::Path;
 mod encode;
 mod irp;
 mod parse;
-#[cfg(test)]
-mod tests;
 
 pub use encode::encode;
 

@@ -1,8 +1,8 @@
-use crate::{
+use irp::{rawir, Irp, Vartable};
+use linux_infrared::{
     lircd_conf::{parse, Flags},
     log::Log,
 };
-use irp::{rawir, Irp, Vartable};
 use num_integer::Integer;
 use serde::Deserialize;
 use std::{
