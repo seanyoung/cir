@@ -24,23 +24,23 @@ impl LircRemote {
 
         irp.push_str("msb}<");
 
-        if self.zero.0 > 0 {
-            irp.push_str(&format!("{},", self.zero.0));
-        }
+        let bits = self
+            .bit
+            .iter()
+            .take_while(|bit| bit.0 != 0 || bit.1 != 0)
+            .count();
 
-        if self.zero.1 > 0 {
-            irp.push_str(&format!("-{},", self.zero.1));
-        }
+        for (pulse, space) in &self.bit[..bits] {
+            if *pulse > 0 {
+                irp.push_str(&format!("{},", pulse))
+            }
 
-        irp.pop();
-        irp.push('|');
+            if *space > 0 {
+                irp.push_str(&format!("-{},", space))
+            }
 
-        if self.one.0 > 0 {
-            irp.push_str(&format!("{},", self.one.0));
-        }
-
-        if self.one.1 > 0 {
-            irp.push_str(&format!("-{},", self.one.1));
+            irp.pop();
+            irp.push('|');
         }
 
         irp.pop();

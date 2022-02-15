@@ -179,7 +179,6 @@ impl<'a> LircParser<'a> {
                 }
                 Some(name @ "header")
                 | Some(name @ "three")
-                | Some(name @ "four")
                 | Some(name @ "two")
                 | Some(name @ "one")
                 | Some(name @ "zero")
@@ -192,11 +191,10 @@ impl<'a> LircParser<'a> {
 
                     match name {
                         "header" => remote.header = (first, second),
-                        "three" => remote.three = (first, second),
-                        "four" => remote.four = (first, second),
-                        "two" => remote.two = (first, second),
-                        "one" => remote.one = (first, second),
-                        "zero" => remote.zero = (first, second),
+                        "three" => remote.bit[3] = (first, second),
+                        "two" => remote.bit[2] = (first, second),
+                        "one" => remote.bit[1] = (first, second),
+                        "zero" => remote.bit[0] = (first, second),
                         "foot" => remote.foot = (first, second),
                         "repeat" => remote.repeat = (first, second),
                         "pre" => remote.pre = (first, second),
@@ -627,7 +625,9 @@ impl<'a> LircParser<'a> {
         }
 
         // Can we generate a sensible irp for this remote
-        if (remote.zero.0 == 0 && remote.zero.1 == 0) || (remote.one.0 == 0 && remote.one.1 == 0) {
+        if (remote.bit[0].0 == 0 && remote.bit[0].1 == 0)
+            || (remote.bit[1].0 == 0 && remote.bit[1].1 == 0)
+        {
             self.log.error(&format!(
                 "{}:{}: no bit encoding provided",
                 self.path.display(),
