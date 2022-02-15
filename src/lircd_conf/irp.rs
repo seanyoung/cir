@@ -16,19 +16,17 @@ impl LircRemote {
 
         irp.push_str("msb}<");
 
-        let bits = self
-            .bit
-            .iter()
-            .take_while(|bit| bit.0 != 0 || bit.1 != 0)
-            .count();
-
-        for (pulse, space) in &self.bit[..bits] {
-            if *pulse > 0 {
+        for (pulse, space) in self.bit {
+            if pulse > 0 {
                 irp.push_str(&format!("{},", pulse))
             }
 
-            if *space > 0 {
+            if space > 0 {
                 irp.push_str(&format!("-{},", space))
+            }
+
+            if pulse == 0 && space == 0 {
+                break;
             }
 
             irp.pop();
