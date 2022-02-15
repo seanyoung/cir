@@ -99,7 +99,7 @@ pub fn encode(
                 // FIXME: should check for multiple definitions of the same code
                 for code in &lirc_remote.codes {
                     if code.name == *send_code {
-                        let irp = lirc_remote.irp(log);
+                        let irp = lirc_remote.irp();
 
                         log.info(&format!("irp for remote {}: {}", lirc_remote.name, irp));
 

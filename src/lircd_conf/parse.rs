@@ -584,6 +584,16 @@ impl<'a> LircParser<'a> {
             ));
         }
 
+        if remote.duty_cycle > 99 {
+            self.log.warning(&format!(
+                "{}:{}: duty_cycle {} is not valid",
+                self.path.display(),
+                self.line_no,
+                remote.duty_cycle
+            ));
+            remote.duty_cycle = 0;
+        }
+
         if remote.flags.contains(Flags::RAW_CODES) {
             if remote.raw_codes.is_empty() {
                 self.log.error(&format!(

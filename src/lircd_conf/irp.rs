@@ -1,10 +1,9 @@
 use super::LircRemote;
-use crate::log::Log;
 
 impl LircRemote {
     /// Build an IRP representation for the remote. This can be used both for encoding
     /// and decoding.
-    pub fn irp(&self, log: &Log) -> String {
+    pub fn irp(&self) -> String {
         let mut irp = String::from("{");
 
         if self.frequency != 0 {
@@ -12,14 +11,7 @@ impl LircRemote {
         }
 
         if self.duty_cycle != 0 {
-            if self.duty_cycle >= 99 {
-                log.error(&format!(
-                    "remote {} duty_cycle {} is invalid",
-                    self.name, self.duty_cycle
-                ));
-            } else {
-                irp.push_str(&format!("{}%,", self.duty_cycle));
-            }
+            irp.push_str(&format!("{}%,", self.duty_cycle));
         }
 
         irp.push_str("msb}<");
