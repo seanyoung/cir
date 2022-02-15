@@ -660,7 +660,7 @@ impl<'a> LircParser<'a> {
         for code in &mut remote.codes {
             if (code.code & !gen_mask(remote.bits)) != 0 {
                 self.log.warning(&format!(
-                    "{}:{}: invalid code {:x}",
+                    "{}:{}: invalid code 0x{:x} truncated",
                     self.path.display(),
                     self.line_no,
                     code.code
@@ -681,6 +681,24 @@ impl<'a> LircParser<'a> {
             for code in &mut remote.codes {
                 code.code = reverse(code.code, remote.bits);
             }
+        }
+
+        if remote.flags.contains(Flags::RC6) && remote.rc6_mask == 0 && remote.toggle_bit > 0 {
+            remote.rc6_mask = 1u64 << (remote.all_bits() - remote.toggle_bit);
+        }
+
+        if remote.toggle_bit > 0 {
+            if remote.toggle_bit_mask > 0 {
+                self.log.warning(&format!(
+                    "{}:{}: remote {} uses both toggle_bit and toggle_bit_mask",
+                    self.path.display(),
+                    self.line_no,
+                    remote.name
+                ));
+            } else {
+                remote.toggle_bit_mask = 1u64 << (remote.all_bits() - remote.toggle_bit);
+            }
+            remote.toggle_bit = 0;
         }
 
         true

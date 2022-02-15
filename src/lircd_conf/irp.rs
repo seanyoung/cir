@@ -67,25 +67,35 @@ impl LircRemote {
         }
 
         if self.pre_data_bits != 0 {
-            if self.pre_data > 9 {
-                irp.push_str(&format!("0x{:x}:{},", self.pre_data, self.pre_data_bits));
-            } else {
-                irp.push_str(&format!("{}:{},", self.pre_data, self.pre_data_bits));
-            }
+            add_stream_with_rc6_mask(
+                self,
+                Stream::Constant(self.pre_data),
+                self.pre_data_bits,
+                self.rc6_mask >> (self.bits + self.post_data_bits),
+                &mut irp,
+            );
 
             if self.pre.0 != 0 && self.pre.1 != 0 {
                 irp.push_str(&format!("{},-{},", self.pre.0, self.pre.1));
             }
         }
 
-        irp.push_str(&format!("CODE:{},", self.bits));
+        add_stream_with_rc6_mask(
+            self,
+            Stream::Variable("CODE"),
+            self.bits,
+            self.rc6_mask >> self.post_data_bits,
+            &mut irp,
+        );
 
         if self.post_data_bits != 0 {
-            if self.post_data > 9 {
-                irp.push_str(&format!("0x{:x}:{},", self.post_data, self.post_data_bits));
-            } else {
-                irp.push_str(&format!("{}:{},", self.post_data, self.post_data_bits));
-            }
+            add_stream_with_rc6_mask(
+                self,
+                Stream::Constant(self.post_data),
+                self.post_data_bits,
+                self.rc6_mask,
+                &mut irp,
+            );
 
             if self.post.0 != 0 && self.post.1 != 0 {
                 irp.push_str(&format!("{},-{},", self.post.0, self.post.1));
@@ -120,4 +130,83 @@ impl LircRemote {
 
         irp
     }
+
+    /// How many bits are there in the definition
+    pub fn all_bits(&self) -> u64 {
+        self.pre_data_bits + self.bits + self.post_data_bits
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Stream<'a> {
+    Constant(u64),
+    Variable(&'a str),
+}
+
+fn add_stream_with_rc6_mask(
+    remote: &LircRemote,
+    stream: Stream,
+    bits: u64,
+    mask: u64,
+    irp: &mut String,
+) {
+    let mask = mask & gen_mask(bits);
+
+    if mask == 0 {
+        add_bits(irp, stream, bits, 0);
+        return;
+    }
+
+    let leading_bits = bits - highest_bit(mask) - 1;
+
+    if leading_bits > 0 {
+        add_bits(irp, stream, leading_bits, bits - leading_bits);
+    }
+
+    irp.push_str(&format!(
+        "<{},-{}|-{},{}>(",
+        remote.bit[0].0 * 2,
+        remote.bit[0].1 * 2,
+        remote.bit[1].1 * 2,
+        remote.bit[1].0 * 2
+    ));
+
+    let trailing_bits = mask.trailing_zeros() as u64;
+
+    add_bits(irp, stream, mask.count_ones() as u64, leading_bits);
+
+    irp.pop();
+    irp.push_str("),");
+
+    if trailing_bits > 0 {
+        add_bits(irp, stream, trailing_bits, 0);
+    }
+}
+
+fn add_bits(irp: &mut String, stream: Stream, bits: u64, offset: u64) {
+    match stream {
+        Stream::Constant(v) => {
+            let v = (v >> offset) & gen_mask(bits);
+
+            if v <= 9 {
+                irp.push_str(&format!("{}:{},", v, bits));
+            } else {
+                irp.push_str(&format!("0x{:x}:{},", v, bits));
+            }
+        }
+        Stream::Variable(v) if offset == 0 => {
+            irp.push_str(&format!("{}:{},", v, bits));
+        }
+        Stream::Variable(v) => {
+            irp.push_str(&format!("{}:{}:{},", v, bits, offset));
+        }
+    }
+}
+
+fn gen_mask(v: u64) -> u64 {
+    (1u64 << v) - 1
+}
+
+fn highest_bit(v: u64) -> u64 {
+    63u64 - v.leading_zeros() as u64
 }

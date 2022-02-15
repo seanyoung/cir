@@ -278,7 +278,21 @@ fn main() {
                 )
                 .subcommand(
                     App::new("lircd")
-                        .about("Parse lircd.conf file and transmit ")
+                        .about("Parse lircd.conf file and transmit")
+                        .arg(
+                            Arg::new("CARRIER")
+                                .long("carrier")
+                                .short('c')
+                                .help("Set carrier in Hz, 0 for unmodulated")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            Arg::new("DUTY_CYCLE")
+                                .long("duty-cycle")
+                                .short('u')
+                                .help("Set send duty cycle % (1 to 99)")
+                                .takes_value(true),
+                        )
                         .arg(
                             Arg::new("CONF")
                                 .help("lircd.conf file")
