@@ -74,7 +74,7 @@ pub struct LircRemote {
 }
 
 /// Read a lircd.conf file at the path specified. Such a file may contain multiple
-/// remotes. Any parse errors or warnings are send to the log crate.
+/// remotes. Any parse errors or warnings are send to the log.
 #[allow(clippy::result_unit_err)]
 pub fn parse<P: AsRef<Path>>(path: P, log: &Log) -> Result<Vec<LircRemote>, ()> {
     parse::LircParser::parse(path.as_ref(), log)

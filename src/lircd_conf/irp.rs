@@ -18,13 +18,19 @@ impl LircRemote {
 
         if self.flags.contains(Flags::XMP) {
             for i in 0..16 {
-                irp.push_str(&format!("{},", self.bit[0].0));
-                irp.push_str(&format!("-{}|", self.bit[0].1 + i * self.bit[1].1));
+                irp.push_str(&format!(
+                    "{},-{}|",
+                    self.bit[0].0,
+                    self.bit[0].1 + i * self.bit[1].1
+                ));
             }
         } else {
             for (bit_no, (pulse, space)) in self.bit.iter().enumerate() {
-                if (bit_no == 1
-                    && (self.flags.contains(Flags::RC5) || self.flags.contains(Flags::RC6)))
+                if *pulse == 0 && *space == 0 {
+                    break;
+                }
+
+                if (self.flags.intersects(Flags::RC5 | Flags::RC6) && bit_no == 1)
                     || self.flags.contains(Flags::SPACE_FIRST)
                 {
                     if *space > 0 {
@@ -42,10 +48,6 @@ impl LircRemote {
                     if *space > 0 {
                         irp.push_str(&format!("-{},", space))
                     }
-                }
-
-                if *pulse == 0 && *space == 0 {
-                    break;
                 }
 
                 irp.pop();
