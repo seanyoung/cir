@@ -16,26 +16,28 @@ impl LircRemote {
 
         irp.push_str("msb}<");
 
-        for (pulse, space) in self.bit {
-            if self.flags.contains(Flags::SPACE_FIRST) {
-                if space > 0 {
+        for (bit_no, (pulse, space)) in self.bit.iter().enumerate() {
+            if (bit_no == 1 && (self.flags.contains(Flags::RC5) || self.flags.contains(Flags::RC6)))
+                || self.flags.contains(Flags::SPACE_FIRST)
+            {
+                if *space > 0 {
                     irp.push_str(&format!("-{},", space))
                 }
 
-                if pulse > 0 {
+                if *pulse > 0 {
                     irp.push_str(&format!("{},", pulse))
                 }
             } else {
-                if pulse > 0 {
+                if *pulse > 0 {
                     irp.push_str(&format!("{},", pulse))
                 }
 
-                if space > 0 {
+                if *space > 0 {
                     irp.push_str(&format!("-{},", space))
                 }
             }
 
-            if pulse == 0 && space == 0 {
+            if *pulse == 0 && *space == 0 {
                 break;
             }
 
