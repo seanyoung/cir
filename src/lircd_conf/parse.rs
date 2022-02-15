@@ -32,6 +32,14 @@ impl<'a> LircParser<'a> {
             .map_err(|e| log.error(&format!("failed to read '{}': {}", path.display(), e)))?;
 
         let contents = String::from_utf8_lossy(&buf);
+
+        // strip bom
+        let contents = if let Some(contents) = contents.strip_prefix('\u{feff}') {
+            contents
+        } else {
+            &contents
+        };
+
         let lines = contents.lines();
 
         log.info(&format!("parsing '{}' as lircd.conf file", path.display()));
@@ -69,13 +77,15 @@ impl<'a> LircParser<'a> {
                 if self.sanity_checks(&mut remote) {
                     remotes.push(remote);
                 }
-            } else {
-                self.log.warning(&format!(
-                    "{}:{}: expected 'begin remote', got '{}'",
-                    self.path.display(),
-                    self.line_no,
-                    line
-                ));
+            } else if let Some(first) = first {
+                if !first.starts_with('#') {
+                    self.log.warning(&format!(
+                        "{}:{}: expected 'begin remote', got '{}'",
+                        self.path.display(),
+                        self.line_no,
+                        line
+                    ));
+                }
             }
         }
     }
