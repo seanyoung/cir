@@ -55,7 +55,7 @@ impl LircRemote {
         }
 
         if self.pre_data_bits != 0 {
-            irp.push_str(&format!("{}:{},", self.pre_data, self.pre_data_bits));
+            irp.push_str(&format!("0x{:x}:{},", self.pre_data, self.pre_data_bits));
 
             if self.pre.0 != 0 && self.pre.1 != 0 {
                 irp.push_str(&format!("{},-{},", self.pre.0, self.pre.1));
@@ -65,7 +65,7 @@ impl LircRemote {
         irp.push_str(&format!("CODE:{},", self.bits));
 
         if self.post_data_bits != 0 {
-            irp.push_str(&format!("{}:{},", self.post_data, self.post_data_bits));
+            irp.push_str(&format!("0x{:x}:{},", self.post_data, self.post_data_bits));
 
             if self.post.0 != 0 && self.post.1 != 0 {
                 irp.push_str(&format!("{},-{},", self.post.0, self.post.1));

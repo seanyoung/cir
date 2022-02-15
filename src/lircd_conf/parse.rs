@@ -645,10 +645,36 @@ impl<'a> LircParser<'a> {
             }
         }
 
+        if remote.flags.contains(Flags::REVERSE) {
+            if remote.pre_data_bits > 0 {
+                remote.pre_data = reverse(remote.pre_data, remote.pre_data_bits);
+            }
+
+            if remote.post_data_bits > 0 {
+                remote.post_data = reverse(remote.post_data, remote.post_data_bits);
+            }
+
+            for code in &mut remote.codes {
+                code.code = reverse(code.code, remote.bits);
+            }
+        }
+
         true
     }
 }
 
 fn gen_mask(v: u64) -> u64 {
     (1u64 << v) - 1
+}
+
+fn reverse(val: u64, bits: u64) -> u64 {
+    let mut res = 0u64;
+
+    for i in 0..bits {
+        if val & (1u64 << i) != 0 {
+            res |= 1u64 << (bits - 1 - i);
+        }
+    }
+
+    res
 }

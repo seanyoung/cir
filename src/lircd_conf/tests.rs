@@ -3,6 +3,7 @@ use crate::{
     log::Log,
 };
 use irp::{rawir, Irp, Vartable};
+use num_integer::Integer;
 use serde::Deserialize;
 use std::{
     ffi::OsStr,
@@ -72,7 +73,6 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
             testdata
         } else {
             println!("cannot find testdata for remote {}", remote.name);
-            all_pass = false;
             continue;
         };
 
@@ -86,7 +86,6 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                     testdata
                 } else {
                     println!("cannot find testdata for code {}", code.name);
-                    all_pass = false;
                     continue;
                 };
 
@@ -109,30 +108,23 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                 // FIXME: should be possible to test repeats
                 let mut message = irp.encode(vars, 0).expect("encode should succeed");
 
-                message.raw.pop();
+                if message.raw.len().is_even() {
+                    message.raw.pop();
+                }
 
-                let testdata = if let Some(testdata) = testdata
-                    .codes
-                    .iter()
-                    .find(|testdata| testdata.name == code.name)
-                {
+                let testdata = if let Some(testdata) = testdata.codes.iter().find(|testdata| {
+                    let scancode = u64::from_str_radix(&testdata.code, 16).unwrap();
+
+                    code.name == testdata.name && code.code == scancode
+                }) {
                     testdata
                 } else {
-                    println!("cannot find testdata for code {}", code.name);
-                    all_pass = false;
+                    println!(
+                        "cannot find testdata for code {} 0x{:}",
+                        code.name, code.code
+                    );
                     continue;
                 };
-
-                let testdata_code = u64::from_str_radix(&testdata.code, 16).unwrap();
-
-                if testdata_code != code.code {
-                    println!(
-                        "CODE: {} {:x} testdata {:x}",
-                        code.name, code.code, testdata_code
-                    );
-                    all_pass = false;
-                    continue;
-                }
 
                 if testdata.rawir != message.raw {
                     all_pass = false;
