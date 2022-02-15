@@ -1,5 +1,6 @@
 use super::{Flags, LircCode, LircRawCode, LircRemote};
 use crate::log::Log;
+use std::num::ParseIntError;
 use std::str::Lines;
 use std::{
     fs::OpenOptions,
@@ -317,15 +318,7 @@ impl<'a> LircParser<'a> {
 
     fn parse_number_arg(&self, arg_name: &str, arg: Option<&str>) -> Result<u64, ()> {
         if let Some(val) = arg {
-            let no = if let Some(hex) = val.strip_prefix("0x") {
-                u64::from_str_radix(hex, 16)
-            } else if let Some(hex) = val.strip_prefix("0X") {
-                u64::from_str_radix(hex, 16)
-            } else {
-                u64::from_str(val)
-            };
-
-            if let Ok(val) = no {
+            if let Ok(val) = maybe_hex_number(val) {
                 Ok(val)
             } else {
                 self.log.error(&format!(
@@ -387,13 +380,7 @@ impl<'a> LircParser<'a> {
                 }
                 Some(name) => {
                     if let Some(scancode) = second {
-                        match if let Some(hex_scancode) = scancode.strip_prefix("0x") {
-                            u64::from_str_radix(hex_scancode, 16)
-                        } else if let Some(hex_scancode) = scancode.strip_prefix("0X") {
-                            u64::from_str_radix(hex_scancode, 16)
-                        } else {
-                            u64::from_str(scancode)
-                        } {
+                        match maybe_hex_number(scancode) {
                             Ok(scancode) => {
                                 codes.push(LircCode {
                                     name: name.to_owned(),
@@ -417,6 +404,30 @@ impl<'a> LircParser<'a> {
                             self.line_no
                         ));
                         return Err(());
+                    }
+
+                    for scancode in words {
+                        if scancode.starts_with('#') {
+                            break;
+                        }
+
+                        match maybe_hex_number(scancode) {
+                            Ok(scancode) => {
+                                codes.push(LircCode {
+                                    name: name.to_owned(),
+                                    code: scancode,
+                                });
+                            }
+                            Err(_) => {
+                                self.log.error(&format!(
+                                    "{}:{}: scancode '{}' is not valid",
+                                    self.path.display(),
+                                    self.line_no,
+                                    scancode,
+                                ));
+                                return Err(());
+                            }
+                        }
                     }
                 }
                 None => (),
@@ -677,4 +688,14 @@ fn reverse(val: u64, bits: u64) -> u64 {
     }
 
     res
+}
+
+fn maybe_hex_number(val: &str) -> Result<u64, ParseIntError> {
+    if let Some(hex) = val.strip_prefix("0x") {
+        u64::from_str_radix(hex, 16)
+    } else if let Some(hex) = val.strip_prefix("0X") {
+        u64::from_str_radix(hex, 16)
+    } else {
+        u64::from_str(val)
+    }
 }
