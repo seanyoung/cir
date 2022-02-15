@@ -1,4 +1,4 @@
-use super::LircRemote;
+use super::{Flags, LircRemote};
 
 impl LircRemote {
     /// Build an IRP representation for the remote. This can be used both for encoding
@@ -17,12 +17,22 @@ impl LircRemote {
         irp.push_str("msb}<");
 
         for (pulse, space) in self.bit {
-            if pulse > 0 {
-                irp.push_str(&format!("{},", pulse))
-            }
+            if self.flags.contains(Flags::SPACE_FIRST) {
+                if space > 0 {
+                    irp.push_str(&format!("-{},", space))
+                }
 
-            if space > 0 {
-                irp.push_str(&format!("-{},", space))
+                if pulse > 0 {
+                    irp.push_str(&format!("{},", pulse))
+                }
+            } else {
+                if pulse > 0 {
+                    irp.push_str(&format!("{},", pulse))
+                }
+
+                if space > 0 {
+                    irp.push_str(&format!("-{},", space))
+                }
             }
 
             if pulse == 0 && space == 0 {
