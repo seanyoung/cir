@@ -150,36 +150,32 @@ fn add_stream_with_rc6_mask(
     mask: u64,
     irp: &mut String,
 ) {
-    let mask = mask & gen_mask(bits);
+    let mut edges = edges(mask, bits);
+    edges.push(0);
 
-    if mask == 0 {
-        add_bits(irp, stream, bits, 0);
-        return;
-    }
+    let mut highest_bit = bits;
 
-    let leading_bits = bits - highest_bit(mask) - 1;
+    for bit in edges {
+        let is_rc6 = (mask & (1 << bit)) != 0;
 
-    if leading_bits > 0 {
-        add_bits(irp, stream, leading_bits, bits - leading_bits);
-    }
+        if is_rc6 {
+            irp.push_str(&format!(
+                "<{},-{}|-{},{}>(",
+                remote.bit[0].0 * 2,
+                remote.bit[0].1 * 2,
+                remote.bit[1].1 * 2,
+                remote.bit[1].0 * 2
+            ));
+        }
 
-    irp.push_str(&format!(
-        "<{},-{}|-{},{}>(",
-        remote.bit[0].0 * 2,
-        remote.bit[0].1 * 2,
-        remote.bit[1].1 * 2,
-        remote.bit[1].0 * 2
-    ));
+        add_bits(irp, stream, highest_bit - bit, bit);
 
-    let trailing_bits = mask.trailing_zeros() as u64;
+        if is_rc6 {
+            irp.pop();
+            irp.push_str("),");
+        }
 
-    add_bits(irp, stream, mask.count_ones() as u64, leading_bits);
-
-    irp.pop();
-    irp.push_str("),");
-
-    if trailing_bits > 0 {
-        add_bits(irp, stream, trailing_bits, 0);
+        highest_bit = bit;
     }
 }
 
@@ -209,4 +205,28 @@ fn gen_mask(v: u64) -> u64 {
 
 fn highest_bit(v: u64) -> u64 {
     63u64 - v.leading_zeros() as u64
+}
+
+fn edges(v: u64, bits: u64) -> Vec<u64> {
+    let mut v = v & gen_mask(bits);
+    let mut edges = Vec::new();
+
+    while v != 0 {
+        let bit = highest_bit(v) + 1;
+
+        edges.push(bit);
+
+        v = !v & gen_mask(bit);
+    }
+
+    edges
+}
+
+#[test]
+fn test_edges() {
+    assert_eq!(edges(0, 32), vec![]);
+    assert_eq!(edges(1, 32), vec![1]);
+    assert_eq!(edges(2, 32), vec![2, 1]);
+    assert_eq!(edges(8, 32), vec![4, 3]);
+    assert_eq!(edges(0xf0, 32), vec![8, 4]);
 }
