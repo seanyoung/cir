@@ -67,10 +67,11 @@ impl LircRemote {
         }
 
         if self.pre_data_bits != 0 {
-            add_stream_with_rc6_mask(
+            add_bit_stream(
                 self,
                 Stream::Constant(self.pre_data),
                 self.pre_data_bits,
+                self.toggle_bit_mask >> (self.bits + self.post_data_bits),
                 self.rc6_mask >> (self.bits + self.post_data_bits),
                 &mut irp,
             );
@@ -80,19 +81,21 @@ impl LircRemote {
             }
         }
 
-        add_stream_with_rc6_mask(
+        add_bit_stream(
             self,
             Stream::Variable("CODE"),
             self.bits,
+            self.toggle_bit_mask >> self.post_data_bits,
             self.rc6_mask >> self.post_data_bits,
             &mut irp,
         );
 
         if self.post_data_bits != 0 {
-            add_stream_with_rc6_mask(
+            add_bit_stream(
                 self,
                 Stream::Constant(self.post_data),
                 self.post_data_bits,
+                self.toggle_bit_mask,
                 self.rc6_mask,
                 &mut irp,
             );
@@ -126,7 +129,13 @@ impl LircRemote {
             irp.push_str(")+");
         }
 
-        irp.push_str(&format!(" [CODE:0..{}]", (1u64 << self.bits) - 1));
+        irp.push_str(&format!(" [CODE:0..{}", (1u64 << self.bits) - 1));
+
+        if self.toggle_bit_mask != 0 {
+            irp.push_str(",T@:0..1=0");
+        }
+
+        irp.push(']');
 
         irp
     }
@@ -141,22 +150,28 @@ impl LircRemote {
 enum Stream<'a> {
     Constant(u64),
     Variable(&'a str),
+    Toggle,
 }
 
-fn add_stream_with_rc6_mask(
+fn add_bit_stream(
     remote: &LircRemote,
     stream: Stream,
     bits: u64,
-    mask: u64,
+    toggle_mask: u64,
+    rc6_mask: u64,
     irp: &mut String,
 ) {
-    let mut edges = edges(mask, bits);
+    let mut edges = mask_edges(rc6_mask, bits);
+    edges.extend_from_slice(&mask_edges(toggle_mask, bits));
+    edges.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    edges.dedup();
     edges.push(0);
 
     let mut highest_bit = bits;
 
     for bit in edges {
-        let is_rc6 = (mask & (1 << bit)) != 0;
+        let is_toggle = (toggle_mask & (1 << bit)) != 0;
+        let is_rc6 = (rc6_mask & (1 << bit)) != 0;
 
         if is_rc6 {
             irp.push_str(&format!(
@@ -167,6 +182,8 @@ fn add_stream_with_rc6_mask(
                 remote.bit[1].0 * 2
             ));
         }
+
+        let stream = if is_toggle { Stream::Toggle } else { stream };
 
         add_bits(irp, stream, highest_bit - bit, bit);
 
@@ -196,6 +213,11 @@ fn add_bits(irp: &mut String, stream: Stream, bits: u64, offset: u64) {
         Stream::Variable(v) => {
             irp.push_str(&format!("{}:{}:{},", v, bits, offset));
         }
+        Stream::Toggle => {
+            for _ in 0..bits {
+                irp.push_str("T:1,");
+            }
+        }
     }
 }
 
@@ -207,8 +229,9 @@ fn highest_bit(v: u64) -> u64 {
     63u64 - v.leading_zeros() as u64
 }
 
-fn edges(v: u64, bits: u64) -> Vec<u64> {
-    let mut v = v & gen_mask(bits);
+/// For given bitmask, produce an array of edges of bit numbers where the mask changes
+fn mask_edges(mask: u64, bits: u64) -> Vec<u64> {
+    let mut v = mask & gen_mask(bits);
     let mut edges = Vec::new();
 
     while v != 0 {
@@ -224,9 +247,9 @@ fn edges(v: u64, bits: u64) -> Vec<u64> {
 
 #[test]
 fn test_edges() {
-    assert_eq!(edges(0, 32), vec![]);
-    assert_eq!(edges(1, 32), vec![1]);
-    assert_eq!(edges(2, 32), vec![2, 1]);
-    assert_eq!(edges(8, 32), vec![4, 3]);
-    assert_eq!(edges(0xf0, 32), vec![8, 4]);
+    assert_eq!(mask_edges(0, 32), vec![]);
+    assert_eq!(mask_edges(1, 32), vec![1]);
+    assert_eq!(mask_edges(2, 32), vec![2, 1]);
+    assert_eq!(mask_edges(8, 32), vec![4, 3]);
+    assert_eq!(mask_edges(0xf0, 32), vec![8, 4]);
 }
