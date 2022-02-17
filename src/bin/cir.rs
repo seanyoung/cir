@@ -97,7 +97,13 @@ fn main() {
                                 .allow_invalid_utf8(true)
                                 .required(true),
                         )
-                        .arg(Arg::new("REMOTE").help("Remote to use").takes_value(true))
+                        .arg(
+                            Arg::new("REMOTE")
+                                .long("remote")
+                                .short('r')
+                                .help("Remote to use")
+                                .takes_value(true),
+                        )
                         .arg(
                             Arg::new("CODES")
                                 .help("Code to send")
@@ -299,7 +305,13 @@ fn main() {
                                 .allow_invalid_utf8(true)
                                 .required(true),
                         )
-                        .arg(Arg::new("REMOTE").help("Remote to use").takes_value(true))
+                        .arg(
+                            Arg::new("REMOTE")
+                                .long("remote")
+                                .short('r')
+                                .help("Remote to use")
+                                .takes_value(true),
+                        )
                         .arg(
                             Arg::new("CODES")
                                 .help("Code to send")

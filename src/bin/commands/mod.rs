@@ -1,12 +1,12 @@
 use irp::{Irp, Message, Pronto};
-use itertools::Itertools;
 use linux_infrared::{
     lirc,
     lircd_conf::{self, LircRemote},
     log::Log,
     rcdev::{enumerate_rc_dev, Rcdev},
 };
-use std::{fs, path::PathBuf};
+use std::{ffi::OsStr, fs, path::PathBuf};
+use terminal_size::{terminal_size, Width};
 
 pub mod config;
 pub mod encode;
@@ -234,29 +234,24 @@ pub fn encode_args<'a>(
                 Err(_) => std::process::exit(2),
             };
 
-            if let Some(remote) = matches.value_of("REMOTE") {
-                if let Some(codes) = matches.values_of("CODES") {
-                    let codes: Vec<&str> = codes.collect();
-                    let m = lircd_conf::encode(&remotes, remote, &codes, log);
+            let remote = matches.value_of("REMOTE");
 
-                    if let Some(m) = m {
-                        (m, matches)
-                    } else {
-                        log.error("remote or code not found");
+            if let Some(codes) = matches.values_of("CODES") {
+                let codes: Vec<&str> = codes.collect();
+                let m = lircd_conf::encode(&remotes, remote, &codes, log);
 
-                        list_remotes(&remotes);
+                match m {
+                    Ok(m) => (m, matches),
+                    Err(e) => {
+                        log.error(&e);
+
+                        list_remotes(filename, &remotes, remote, log);
 
                         std::process::exit(2);
                     }
-                } else {
-                    log.error("no code to send specified");
-
-                    list_remotes(&remotes);
-
-                    std::process::exit(2);
                 }
             } else {
-                list_remotes(&remotes);
+                list_remotes(filename, &remotes, remote, log);
 
                 std::process::exit(2);
             }
@@ -268,14 +263,58 @@ pub fn encode_args<'a>(
     }
 }
 
-fn list_remotes(remotes: &[LircRemote]) {
+fn list_remotes(filename: &OsStr, remotes: &[LircRemote], needle: Option<&str>, log: &Log) {
+    let size = terminal_size();
+
+    if size.is_some() {
+        println!(
+            "\nAvailable remotes and codes in {}:\n",
+            filename.to_string_lossy()
+        );
+    }
+
+    let mut remote_found = false;
+
     for remote in remotes {
-        let mut codes = remote
+        if let Some(needle) = needle {
+            if remote.name != needle {
+                continue;
+            }
+        }
+        remote_found = true;
+
+        let codes = remote
             .codes
             .iter()
             .map(|code| code.name.as_str())
             .chain(remote.raw_codes.iter().map(|code| code.name.as_str()));
 
-        println!("Remote {}: codes: {}", remote.name, codes.join(", "));
+        if let Some((Width(term_witdh), _)) = size {
+            let mut pos = 2;
+            let mut res = String::new();
+
+            for code in codes {
+                if pos + code.len() + 2 < term_witdh as usize {
+                    res.push_str(code);
+                    res.push_str(", ");
+                    pos += code.len() + 2;
+                } else {
+                    res.push_str("\n  ");
+                    res.push_str(code);
+                    res.push_str(", ");
+                    pos = code.len() + 4;
+                }
+            }
+
+            println!("Remote:\n  {}\nCodes:\n  {}", remote.name, res);
+        } else {
+            for code in codes {
+                println!("{}", code);
+            }
+        }
+    }
+
+    if !remote_found {
+        log.error("not remote found");
     }
 }

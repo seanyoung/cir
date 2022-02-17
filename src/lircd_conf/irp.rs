@@ -1,5 +1,10 @@
 use super::{Flags, LircRemote};
 
+// TODO:
+// - B&O
+// - Grundig
+// - Repeats
+
 impl LircRemote {
     /// Build an IRP representation for the remote. This can be used both for encoding
     /// and decoding.

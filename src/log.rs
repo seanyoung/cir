@@ -71,6 +71,6 @@ impl Log {
     }
 
     pub fn error(&self, msg: &str) {
-        println!("warning: {}", msg);
+        println!("error: {}", msg);
     }
 }
