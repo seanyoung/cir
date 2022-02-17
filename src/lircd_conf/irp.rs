@@ -63,7 +63,74 @@ impl LircRemote {
         irp.pop();
         irp.push_str(">(");
 
-        if self.header.0 != 0 && self.header.1 != 0 {
+        self.add_irp_body(&mut irp, false, false);
+
+        if self.repeat.0 != 0 && self.repeat.1 != 0 {
+            irp.push('(');
+            if self.flags.contains(Flags::REPEAT_HEADER) && self.header.0 != 0 && self.header.1 != 0
+            {
+                irp.push_str(&format!("{},-{},", self.header.0, self.header.1));
+            }
+            if self.plead != 0 {
+                irp.push_str(&format!("{},", self.plead));
+            }
+            irp.push_str(&format!("{},-{},", self.repeat.0, self.repeat.1));
+            if self.ptrail != 0 {
+                irp.push_str(&format!("{},", self.ptrail));
+            }
+            if self.gap != 0 {
+                if self.gap % 1000 == 0 {
+                    irp.push_str(&format!("^{}m,", self.gap / 1000));
+                } else {
+                    irp.push_str(&format!("^{},", self.gap));
+                }
+            }
+            irp.pop();
+            match self.min_repeat {
+                0 => irp.push_str(")*)"),
+                1 => irp.push_str(")+)"),
+                _ => irp.push_str(&format!("){}+)", self.min_repeat)),
+            }
+        } else if self
+            .flags
+            .intersects(Flags::NO_HEAD_REP | Flags::NO_FOOT_REP)
+        {
+            irp.push('(');
+
+            self.add_irp_body(
+                &mut irp,
+                self.flags.contains(Flags::NO_HEAD_REP),
+                self.flags.contains(Flags::NO_FOOT_REP),
+            );
+
+            irp.pop();
+            match self.min_repeat {
+                0 => irp.push_str(")*)"),
+                1 => irp.push_str(")+)"),
+                _ => irp.push_str(&format!("){}+)", self.min_repeat)),
+            }
+        } else {
+            irp.pop();
+            if self.min_repeat > 0 {
+                irp.push_str(&format!("){}+", self.min_repeat + 1));
+            } else {
+                irp.push_str(")+");
+            }
+        }
+
+        irp.push_str(&format!(" [CODE:0..{}", (1u64 << self.bits) - 1));
+
+        if self.toggle_bit_mask != 0 {
+            irp.push_str(",T@:0..1=0");
+        }
+
+        irp.push(']');
+
+        irp
+    }
+
+    fn add_irp_body(&self, irp: &mut String, supress_header: bool, supress_footer: bool) {
+        if !supress_header && self.header.0 != 0 && self.header.1 != 0 {
             irp.push_str(&format!("{},-{},", self.header.0, self.header.1));
         }
 
@@ -78,7 +145,7 @@ impl LircRemote {
                 self.pre_data_bits,
                 self.toggle_bit_mask >> (self.bits + self.post_data_bits),
                 self.rc6_mask >> (self.bits + self.post_data_bits),
-                &mut irp,
+                irp,
             );
 
             if self.pre.0 != 0 && self.pre.1 != 0 {
@@ -92,7 +159,7 @@ impl LircRemote {
             self.bits,
             self.toggle_bit_mask >> self.post_data_bits,
             self.rc6_mask >> self.post_data_bits,
-            &mut irp,
+            irp,
         );
 
         if self.post_data_bits != 0 {
@@ -102,7 +169,7 @@ impl LircRemote {
                 self.post_data_bits,
                 self.toggle_bit_mask,
                 self.rc6_mask,
-                &mut irp,
+                irp,
             );
 
             if self.post.0 != 0 && self.post.1 != 0 {
@@ -114,35 +181,17 @@ impl LircRemote {
             irp.push_str(&format!("{},", self.ptrail));
         }
 
-        if self.foot.0 != 0 && self.foot.1 != 0 {
+        if !supress_footer && self.foot.0 != 0 && self.foot.1 != 0 {
             irp.push_str(&format!("{},-{},", self.foot.0, self.foot.1));
         }
 
         if self.gap != 0 {
-            irp.push_str(&format!("^{},", self.gap));
-        }
-
-        if self.repeat.0 != 0 && self.repeat.1 != 0 {
-            irp.push_str(&format!("({},-{},", self.repeat.0, self.repeat.1));
-            if self.ptrail != 0 {
-                irp.push_str(&format!("{},", self.ptrail));
+            if self.gap % 1000 == 0 {
+                irp.push_str(&format!("^{}m,", self.gap / 1000));
+            } else {
+                irp.push_str(&format!("^{},", self.gap));
             }
-            irp.pop();
-            irp.push_str(")*)");
-        } else {
-            irp.pop();
-            irp.push_str(")+");
         }
-
-        irp.push_str(&format!(" [CODE:0..{}", (1u64 << self.bits) - 1));
-
-        if self.toggle_bit_mask != 0 {
-            irp.push_str(",T@:0..1=0");
-        }
-
-        irp.push(']');
-
-        irp
     }
 
     /// How many bits are there in the definition

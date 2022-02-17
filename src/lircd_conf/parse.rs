@@ -152,6 +152,7 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "gap")
                 | Some(name @ "frequency")
                 | Some(name @ "duty_cycle")
+                | Some(name @ "min_repeat")
                 | Some(name @ "toggle_bit")
                 | Some(name @ "repeat_bit")
                 | Some(name @ "toggle_bit_mask")
@@ -170,6 +171,7 @@ impl<'a> LircParser<'a> {
                         "gap" => remote.gap = val,
                         "frequency" => remote.frequency = val,
                         "duty_cycle" => remote.duty_cycle = val,
+                        "min_repeat" => remote.min_repeat = val,
                         "toggle_bit_mask" => remote.toggle_bit_mask = val,
                         "toggle_bit" => remote.toggle_bit = val,
                         "repeat_bit" => remote.toggle_bit = val,

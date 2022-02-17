@@ -69,6 +69,7 @@ pub struct LircRemote {
     pub gap: u64,
     pub frequency: u64,
     pub duty_cycle: u64,
+    pub min_repeat: u64,
     pub codes: Vec<LircCode>,
     pub raw_codes: Vec<LircRawCode>,
 }
