@@ -63,7 +63,7 @@ impl LircRemote {
         irp.pop();
         irp.push_str(">(");
 
-        self.add_irp_body(&mut irp, false, false);
+        add_irp_body(self, &mut irp, false, false);
 
         if self.repeat.0 != 0 && self.repeat.1 != 0 {
             irp.push('(');
@@ -97,7 +97,8 @@ impl LircRemote {
         {
             irp.push('(');
 
-            self.add_irp_body(
+            add_irp_body(
+                self,
                 &mut irp,
                 self.flags.contains(Flags::NO_HEAD_REP),
                 self.flags.contains(Flags::NO_FOOT_REP),
@@ -118,7 +119,7 @@ impl LircRemote {
             }
         }
 
-        irp.push_str(&format!(" [CODE:0..{}", (1u64 << self.bits) - 1));
+        irp.push_str(&format!(" [CODE:0..{}", gen_mask(self.bits)));
 
         if self.toggle_bit_mask != 0 {
             irp.push_str(",T@:0..1=0");
@@ -129,74 +130,74 @@ impl LircRemote {
         irp
     }
 
-    fn add_irp_body(&self, irp: &mut String, supress_header: bool, supress_footer: bool) {
-        if !supress_header && self.header.0 != 0 && self.header.1 != 0 {
-            irp.push_str(&format!("{},-{},", self.header.0, self.header.1));
-        }
-
-        if self.plead != 0 {
-            irp.push_str(&format!("{},", self.plead));
-        }
-
-        if self.pre_data_bits != 0 {
-            add_bit_stream(
-                self,
-                Stream::Constant(self.pre_data),
-                self.pre_data_bits,
-                self.toggle_bit_mask >> (self.bits + self.post_data_bits),
-                self.rc6_mask >> (self.bits + self.post_data_bits),
-                irp,
-            );
-
-            if self.pre.0 != 0 && self.pre.1 != 0 {
-                irp.push_str(&format!("{},-{},", self.pre.0, self.pre.1));
-            }
-        }
-
-        add_bit_stream(
-            self,
-            Stream::Variable("CODE"),
-            self.bits,
-            self.toggle_bit_mask >> self.post_data_bits,
-            self.rc6_mask >> self.post_data_bits,
-            irp,
-        );
-
-        if self.post_data_bits != 0 {
-            add_bit_stream(
-                self,
-                Stream::Constant(self.post_data),
-                self.post_data_bits,
-                self.toggle_bit_mask,
-                self.rc6_mask,
-                irp,
-            );
-
-            if self.post.0 != 0 && self.post.1 != 0 {
-                irp.push_str(&format!("{},-{},", self.post.0, self.post.1));
-            }
-        }
-
-        if self.ptrail != 0 {
-            irp.push_str(&format!("{},", self.ptrail));
-        }
-
-        if !supress_footer && self.foot.0 != 0 && self.foot.1 != 0 {
-            irp.push_str(&format!("{},-{},", self.foot.0, self.foot.1));
-        }
-
-        if self.gap != 0 {
-            if self.gap % 1000 == 0 {
-                irp.push_str(&format!("^{}m,", self.gap / 1000));
-            } else {
-                irp.push_str(&format!("^{},", self.gap));
-            }
-        }
-    }
-
     /// How many bits are there in the definition
     pub fn all_bits(&self) -> u64 {
         self.pre_data_bits + self.bits + self.post_data_bits
+    }
+}
+
+fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, supress_footer: bool) {
+    if !supress_header && remote.header.0 != 0 && remote.header.1 != 0 {
+        irp.push_str(&format!("{},-{},", remote.header.0, remote.header.1));
+    }
+
+    if remote.plead != 0 {
+        irp.push_str(&format!("{},", remote.plead));
+    }
+
+    if remote.pre_data_bits != 0 {
+        add_bit_stream(
+            remote,
+            Stream::Constant(remote.pre_data),
+            remote.pre_data_bits,
+            remote.toggle_bit_mask >> (remote.bits + remote.post_data_bits),
+            remote.rc6_mask >> (remote.bits + remote.post_data_bits),
+            irp,
+        );
+
+        if remote.pre.0 != 0 && remote.pre.1 != 0 {
+            irp.push_str(&format!("{},-{},", remote.pre.0, remote.pre.1));
+        }
+    }
+
+    add_bit_stream(
+        remote,
+        Stream::Variable("CODE"),
+        remote.bits,
+        remote.toggle_bit_mask >> remote.post_data_bits,
+        remote.rc6_mask >> remote.post_data_bits,
+        irp,
+    );
+
+    if remote.post_data_bits != 0 {
+        add_bit_stream(
+            remote,
+            Stream::Constant(remote.post_data),
+            remote.post_data_bits,
+            remote.toggle_bit_mask,
+            remote.rc6_mask,
+            irp,
+        );
+
+        if remote.post.0 != 0 && remote.post.1 != 0 {
+            irp.push_str(&format!("{},-{},", remote.post.0, remote.post.1));
+        }
+    }
+
+    if remote.ptrail != 0 {
+        irp.push_str(&format!("{},", remote.ptrail));
+    }
+
+    if !supress_footer && remote.foot.0 != 0 && remote.foot.1 != 0 {
+        irp.push_str(&format!("{},-{},", remote.foot.0, remote.foot.1));
+    }
+
+    if remote.gap != 0 {
+        if remote.gap % 1000 == 0 {
+            irp.push_str(&format!("^{}m,", remote.gap / 1000));
+        } else {
+            irp.push_str(&format!("^{},", remote.gap));
+        }
     }
 }
 
@@ -239,7 +240,31 @@ fn add_bit_stream(
 
         let stream = if is_toggle { Stream::Toggle } else { stream };
 
-        add_bits(irp, stream, highest_bit - bit, bit);
+        let bit_count = highest_bit - bit;
+        let offset = bit;
+
+        match stream {
+            Stream::Constant(v) => {
+                let v = (v >> offset) & gen_mask(bit_count);
+
+                if v <= 9 {
+                    irp.push_str(&format!("{}:{},", v, bit_count));
+                } else {
+                    irp.push_str(&format!("0x{:x}:{},", v, bit_count));
+                }
+            }
+            Stream::Variable(v) if offset == 0 => {
+                irp.push_str(&format!("{}:{},", v, bit_count));
+            }
+            Stream::Variable(v) => {
+                irp.push_str(&format!("{}:{}:{},", v, bit_count, offset));
+            }
+            Stream::Toggle => {
+                for _ in 0..bit_count {
+                    irp.push_str("T:1,");
+                }
+            }
+        }
 
         if is_rc6 {
             irp.pop();
@@ -247,31 +272,6 @@ fn add_bit_stream(
         }
 
         highest_bit = bit;
-    }
-}
-
-fn add_bits(irp: &mut String, stream: Stream, bits: u64, offset: u64) {
-    match stream {
-        Stream::Constant(v) => {
-            let v = (v >> offset) & gen_mask(bits);
-
-            if v <= 9 {
-                irp.push_str(&format!("{}:{},", v, bits));
-            } else {
-                irp.push_str(&format!("0x{:x}:{},", v, bits));
-            }
-        }
-        Stream::Variable(v) if offset == 0 => {
-            irp.push_str(&format!("{}:{},", v, bits));
-        }
-        Stream::Variable(v) => {
-            irp.push_str(&format!("{}:{}:{},", v, bits, offset));
-        }
-        Stream::Toggle => {
-            for _ in 0..bits {
-                irp.push_str("T:1,");
-            }
-        }
     }
 }
 

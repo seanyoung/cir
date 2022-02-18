@@ -71,7 +71,11 @@ fn recurse(path: &Path) {
         } else if !path.ends_with(".lircmd.conf") && !path.ends_with(".testdata") {
             let mut testdata = path.clone();
 
-            testdata.set_extension("testdata");
+            let mut filename = testdata.file_name().unwrap().to_os_string();
+
+            filename.push(".testdata");
+
+            testdata.set_file_name(filename);
 
             if testdata.exists() {
                 continue;
@@ -99,6 +103,8 @@ fn recurse(path: &Path) {
 
                 if !remotes.is_empty() {
                     let test_data = serde_json::to_string(&remotes).unwrap();
+
+                    println!("writing {}", testdata.display());
 
                     let mut file = File::create(&testdata).unwrap();
 

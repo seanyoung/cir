@@ -39,8 +39,14 @@ fn recurse(path: &Path, log: &Log) {
         let path = e.path();
         if e.metadata().unwrap().file_type().is_dir() {
             recurse(&path, log);
-        } else if path.extension() != Some(OsStr::new("testdata")) {
-            let conf = path.clone();
+        } else if path.extension() == Some(OsStr::new("testdata")) {
+            let mut conf = path.clone();
+
+            let filename = path.file_name().unwrap().to_string_lossy();
+            let filename = filename.strip_suffix(".testdata").unwrap();
+
+            conf.set_file_name(OsStr::new(filename));
+
             let mut testdata = path;
 
             testdata.set_extension("testdata");
@@ -61,11 +67,11 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
     let testdata: Vec<Remote> = serde_json::from_str(&data).expect("failed to deserialize");
 
-    let lircd_conf = parse(conf, log).expect("parse should work");
+    let mut lircd_conf = parse(conf, log).expect("parse should work");
 
     let mut all_pass = true;
 
-    for remote in &lircd_conf {
+    for remote in &mut lircd_conf {
         let testdata = if let Some(testdata) = testdata
             .iter()
             .find(|testdata| testdata.name == remote.name)
@@ -97,6 +103,9 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                 }
             }
         } else {
+            // lircd does not honour the min_repeat parameter, at least in our data set
+            // FIXME: this is not entirely correct. It does repeat sometimes
+            remote.min_repeat = 0;
             let irp = remote.irp();
             println!("remote {} irp:{}", remote.name, irp);
             let irp = Irp::parse(&irp).expect("should work");
@@ -128,7 +137,7 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
                 if testdata.rawir != message.raw {
                     all_pass = false;
-                    println!("CODE: {} {:x}", code.name, code.code);
+                    println!("CODE: {} 0x{:x}", code.name, code.code);
                     println!("lircd {}", rawir::print_to_string(&testdata.rawir));
                     println!("cir {}", rawir::print_to_string(&message.raw));
                 }
