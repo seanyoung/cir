@@ -37,7 +37,6 @@ fn encode_lircd_raw_test() {
             "encode",
             "lircd",
             "testdata/lircd_conf/pace/DC420N.lircd.conf",
-            "Foxtel_Digital_Cable_STB",
             "1",
         ])
         .assert();
@@ -67,7 +66,6 @@ fn encode_lircd_aiwa_test() {
             "encode",
             "lircd",
             "testdata/lircd_conf/aiwa/RC-5VP05.lircd.conf",
-            "AIWA-RC-5VP05",
             "AUTO",
         ])
         .assert();
