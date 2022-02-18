@@ -392,8 +392,11 @@ impl<'a> LircParser<'a> {
                     if let Some(scancode) = second {
                         match maybe_hex_number(scancode) {
                             Ok(scancode) => {
+                                let dup = codes.iter().any(|c| c.name == name);
+
                                 codes.push(LircCode {
                                     name: name.to_owned(),
+                                    dup,
                                     code: scancode,
                                 });
                             }
@@ -425,6 +428,7 @@ impl<'a> LircParser<'a> {
                             Ok(scancode) => {
                                 codes.push(LircCode {
                                     name: name.to_owned(),
+                                    dup: true,
                                     code: scancode,
                                 });
                             }
@@ -489,8 +493,11 @@ impl<'a> LircParser<'a> {
                             raw_codes.push(raw_code);
                         }
 
+                        let dup = raw_codes.iter().any(|c| c.name == name);
+
                         raw_code = Some(LircRawCode {
                             name: name.to_owned(),
+                            dup,
                             rawir: self.read_lengths(words)?,
                         });
                     } else {
@@ -530,8 +537,8 @@ impl<'a> LircParser<'a> {
                 break;
             }
 
-            match u32::from_str(no) {
-                Ok(v) => rawir.push(v),
+            match maybe_hex_number(no) {
+                Ok(v) => rawir.push(v as u32),
                 Err(_) => {
                     self.log.error(&format!(
                         "{}:{}: invalid duration '{}'",
@@ -728,6 +735,12 @@ fn maybe_hex_number(val: &str) -> Result<u64, ParseIntError> {
         u64::from_str_radix(hex, 16)
     } else if let Some(hex) = val.strip_prefix("0X") {
         u64::from_str_radix(hex, 16)
+    } else if let Some(oct) = val.strip_prefix('0') {
+        if oct.is_empty() {
+            Ok(0)
+        } else {
+            u64::from_str_radix(oct, 8)
+        }
     } else {
         u64::from_str(val)
     }

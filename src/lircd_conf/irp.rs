@@ -184,12 +184,12 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, sup
         }
     }
 
-    if remote.ptrail != 0 {
-        irp.push_str(&format!("{},", remote.ptrail));
-    }
-
     if !supress_footer && remote.foot.0 != 0 && remote.foot.1 != 0 {
         irp.push_str(&format!("{},-{},", remote.foot.0, remote.foot.1));
+    }
+
+    if remote.ptrail != 0 {
+        irp.push_str(&format!("{},", remote.ptrail));
     }
 
     if remote.gap != 0 {

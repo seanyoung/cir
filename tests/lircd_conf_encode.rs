@@ -84,6 +84,10 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
         if remote.flags.contains(Flags::RAW_CODES) {
             for code in &remote.raw_codes {
+                if code.dup {
+                    continue;
+                }
+
                 let testdata = if let Some(testdata) = testdata
                     .codes
                     .iter()
@@ -111,6 +115,10 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
             let irp = Irp::parse(&irp).expect("should work");
 
             for code in &remote.codes {
+                if code.dup {
+                    continue;
+                }
+
                 let mut vars = Vartable::new();
                 vars.set(String::from("CODE"), code.code as i64, 32);
 

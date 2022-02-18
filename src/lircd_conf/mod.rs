@@ -11,12 +11,14 @@ pub use encode::encode;
 #[derive(Debug)]
 pub struct LircCode {
     pub name: String,
+    pub dup: bool,
     pub code: u64,
 }
 
 #[derive(Debug)]
 pub struct LircRawCode {
     pub name: String,
+    pub dup: bool,
     pub rawir: Vec<u32>,
 }
 
