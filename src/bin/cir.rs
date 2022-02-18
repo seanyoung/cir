@@ -1,5 +1,5 @@
 use aya::programs::LircMode2;
-use clap::{App, AppSettings, Arg, ArgGroup};
+use clap::{Arg, ArgGroup, Command};
 use evdev::Device;
 use itertools::Itertools;
 use linux_infrared::{lirc, log::Log, rcdev};
@@ -10,11 +10,11 @@ use std::path::PathBuf;
 mod commands;
 
 fn main() {
-    let matches = App::new("cir")
+    let matches = Command::new("cir")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Sean Young <sean@mess.org>")
         .about("Consumer Infrared")
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .arg_required_else_help(true)
         .arg(
             Arg::new("verbosity")
                 .short('v')
@@ -29,11 +29,11 @@ fn main() {
                 .help("Silence all output"),
         )
         .subcommand(
-            App::new("encode")
+            Command::new("encode")
                 .about("Encode IR and print to stdout")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .arg_required_else_help(true)
                 .subcommand(
-                    App::new("irp")
+                    Command::new("irp")
                         .about("Encode using IRP language")
                         .arg(
                             Arg::new("PRONTO")
@@ -62,7 +62,7 @@ fn main() {
                         .arg(Arg::new("IRP").help("IRP protocol").required(true)),
                 )
                 .subcommand(
-                    App::new("pronto")
+                    Command::new("pronto")
                         .about("Parse pronto hex code and print as raw IR")
                         .arg(
                             Arg::new("REPEATS")
@@ -75,7 +75,7 @@ fn main() {
                         .arg(Arg::new("PRONTO").help("Pronto Hex code").required(true)),
                 )
                 .subcommand(
-                    App::new("mode2")
+                    Command::new("mode2")
                         .about("Parse mode2 pulse space file and print as raw IR")
                         .arg(
                             Arg::new("FILE")
@@ -84,12 +84,12 @@ fn main() {
                         ),
                 )
                 .subcommand(
-                    App::new("rawir")
+                    Command::new("rawir")
                         .about("Parse raw IR")
                         .arg(Arg::new("RAWIR").help("Raw IR to parse").required(true)),
                 )
                 .subcommand(
-                    App::new("lircd")
+                    Command::new("lircd")
                         .about("Parse lircd.conf file and print as raw IR")
                         .arg(
                             Arg::new("CONF")
@@ -113,7 +113,7 @@ fn main() {
                 ),
         )
         .subcommand(
-            App::new("config")
+            Command::new("config")
                 .about("Configure IR decoder")
                 .arg(
                     Arg::new("LIRCDEV")
@@ -157,9 +157,9 @@ fn main() {
                 ),
         )
         .subcommand(
-            App::new("transmit")
+            Command::new("transmit")
                 .about("Transmit IR")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .arg_required_else_help(true)
                 .arg(
                     Arg::new("LIRCDEV")
                         .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
@@ -186,11 +186,11 @@ fn main() {
                         .global(true)
                         .takes_value(true)
                         .multiple_occurrences(true)
-                        .require_delimiter(true)
-                        .use_delimiter(true),
+                        .require_value_delimiter(true)
+                        .use_value_delimiter(true),
                 )
                 .subcommand(
-                    App::new("irp")
+                    Command::new("irp")
                         .about("Encode using IRP language and transmit")
                         .arg(Arg::new("PRONTO").long("pronto").hide(true))
                         .arg(
@@ -228,7 +228,7 @@ fn main() {
                         .arg(Arg::new("IRP").help("IRP protocol").required(true)),
                 )
                 .subcommand(
-                    App::new("pronto")
+                    Command::new("pronto")
                         .about("Parse pronto hex code and transmit")
                         .arg(
                             Arg::new("REPEATS")
@@ -241,7 +241,7 @@ fn main() {
                         .arg(Arg::new("PRONTO").help("Pronto Hex code").required(true)),
                 )
                 .subcommand(
-                    App::new("mode2")
+                    Command::new("mode2")
                         .about("Parse mode2 pulse space file and transmit")
                         .arg(
                             Arg::new("CARRIER")
@@ -264,7 +264,7 @@ fn main() {
                         ),
                 )
                 .subcommand(
-                    App::new("rawir")
+                    Command::new("rawir")
                         .about("Parse raw IR and transmit")
                         .arg(Arg::new("RAWIR").help("Raw IR").required(true))
                         .arg(
@@ -283,7 +283,7 @@ fn main() {
                         ),
                 )
                 .subcommand(
-                    App::new("lircd")
+                    Command::new("lircd")
                         .about("Parse lircd.conf file and transmit")
                         .arg(
                             Arg::new("CARRIER")
@@ -321,7 +321,7 @@ fn main() {
                 ),
         )
         .subcommand(
-            App::new("list")
+            Command::new("list")
                 .about("List IR and CEC devices")
                 .arg(
                     Arg::new("LIRCDEV")
@@ -342,7 +342,7 @@ fn main() {
                 .arg(Arg::new("READ").long("read-scancodes").short('l')),
         )
         .subcommand(
-            App::new("receive")
+            Command::new("receive")
                 .about("Receive IR and print to stdout")
                 .arg(
                     Arg::new("LIRCDEV")
