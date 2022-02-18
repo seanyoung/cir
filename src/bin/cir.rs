@@ -18,6 +18,7 @@ fn main() {
         .arg(
             Arg::new("verbosity")
                 .short('v')
+                .long("verbose")
                 .global(true)
                 .multiple_occurrences(true)
                 .help("Increase message verbosity"),
@@ -25,6 +26,7 @@ fn main() {
         .arg(
             Arg::new("quiet")
                 .short('q')
+                .long("quiet")
                 .global(true)
                 .help("Silence all output"),
         )
@@ -101,7 +103,7 @@ fn main() {
                             Arg::new("REMOTE")
                                 .long("remote")
                                 .short('r')
-                                .help("Remote to use")
+                                .help("Use codes from specific remote")
                                 .takes_value(true),
                         )
                         .arg(
@@ -309,7 +311,7 @@ fn main() {
                             Arg::new("REMOTE")
                                 .long("remote")
                                 .short('r')
-                                .help("Remote to use")
+                                .help("Use codes from specific remote")
                                 .takes_value(true),
                         )
                         .arg(
