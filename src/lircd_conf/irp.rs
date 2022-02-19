@@ -127,7 +127,7 @@ impl LircRemote {
 
         irp.push_str(&format!(" [CODE:0..{}", gen_mask(self.bits)));
 
-        if self.toggle_bit_mask != 0 {
+        if self.toggle_bit_mask.count_ones() == 1 {
             irp.push_str(",T@:0..1=0");
         }
 
@@ -151,12 +151,18 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, sup
         irp.push_str(&format!("{},", remote.plead));
     }
 
+    let toggle_bit_mask = if remote.toggle_bit_mask.count_ones() == 1 {
+        remote.toggle_bit_mask
+    } else {
+        0
+    };
+
     if remote.pre_data_bits != 0 {
         add_bit_stream(
             remote,
             Stream::Constant(remote.pre_data),
             remote.pre_data_bits,
-            remote.toggle_bit_mask >> (remote.bits + remote.post_data_bits),
+            toggle_bit_mask >> (remote.bits + remote.post_data_bits),
             remote.rc6_mask >> (remote.bits + remote.post_data_bits),
             irp,
         );
@@ -170,7 +176,7 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, sup
         remote,
         Stream::Variable("CODE"),
         remote.bits,
-        remote.toggle_bit_mask >> remote.post_data_bits,
+        toggle_bit_mask >> remote.post_data_bits,
         remote.rc6_mask >> remote.post_data_bits,
         irp,
     );
@@ -180,7 +186,7 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, sup
             remote,
             Stream::Constant(remote.post_data),
             remote.post_data_bits,
-            remote.toggle_bit_mask,
+            toggle_bit_mask,
             remote.rc6_mask,
             irp,
         );
@@ -210,6 +216,14 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, sup
         } else {
             irp.push_str(&format!("{},", remote.gap));
         }
+    }
+
+    if remote.toggle_mask != 0 {
+        irp.push_str(&format!("CODE=CODE^0x{:x},", remote.toggle_mask));
+    }
+
+    if remote.toggle_bit_mask.count_ones() > 1 {
+        irp.push_str(&format!("CODE=CODE^0x{:x},", remote.toggle_bit_mask));
     }
 }
 
@@ -272,9 +286,9 @@ fn add_bit_stream(
                 irp.push_str(&format!("{}:{}:{},", v, bit_count, offset));
             }
             Stream::Toggle => {
-                for _ in 0..bit_count {
-                    irp.push_str("T:1,");
-                }
+                assert_eq!(bit_count, 1);
+
+                irp.push_str("T:1,");
             }
         }
 

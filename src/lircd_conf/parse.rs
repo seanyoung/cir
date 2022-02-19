@@ -156,6 +156,7 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "toggle_bit")
                 | Some(name @ "repeat_bit")
                 | Some(name @ "toggle_bit_mask")
+                | Some(name @ "toggle_mask")
                 | Some(name @ "rc6_mask") => {
                     let val = self.parse_number_arg(name, second)?;
                     match name {
@@ -175,6 +176,7 @@ impl<'a> LircParser<'a> {
                         "toggle_bit_mask" => remote.toggle_bit_mask = val,
                         "toggle_bit" => remote.toggle_bit = val,
                         "repeat_bit" => remote.toggle_bit = val,
+                        "toggle_mask" => remote.toggle_mask = val,
                         "rc6_mask" => remote.rc6_mask = val,
                         _ => unreachable!(),
                     }

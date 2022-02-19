@@ -61,6 +61,7 @@ pub struct LircRemote {
     pub post_data: u64,
     pub toggle_bit_mask: u64,
     pub toggle_bit: u64,
+    pub toggle_mask: u64,
     pub rc6_mask: u64,
     pub header: (u64, u64),
     pub bit: [(u64, u64); 4],
