@@ -1,6 +1,6 @@
 use irp::{rawir, Irp, Message, Vartable};
 use linux_infrared::{
-    lircd_conf::{parse, LircRemote},
+    lircd_conf::{parse, Flags, LircRemote},
     log::Log,
 };
 use num_integer::Integer;
@@ -135,6 +135,21 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                         let mut vars = Vartable::new();
                         vars.set(String::from("CODE"), *code as i64, 32);
 
+                        // lircd does not honour toggle bit in RCMM transmit
+                        if remote.flags.contains(Flags::RCMM)
+                            && remote.toggle_bit_mask.count_ones() == 1
+                        {
+                            vars.set(
+                                String::from("T"),
+                                if (*code & remote.toggle_bit_mask) != 0 {
+                                    1
+                                } else {
+                                    0
+                                },
+                                32,
+                            );
+                        }
+
                         // FIXME: should be possible to test repeats
                         let m = irp.encode(vars, 0).expect("encode should succeed");
 
@@ -174,6 +189,12 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 }
 
 fn compare_output(remote: &LircRemote, lircd: &[u32], our: &[u32]) -> bool {
+    if lircd.len() < our.len() {
+        let len = lircd.len();
+        if our[len] > 100000 && lircd == &our[..len] {
+            return true;
+        }
+    }
     if lircd.len() != our.len() {
         return false;
     }
@@ -190,11 +211,11 @@ fn compare_output(remote: &LircRemote, lircd: &[u32], our: &[u32]) -> bool {
             continue;
         }
 
-        if lircd > 10000 && (lircd - remote.bit[0].1 as u32) == our {
+        if lircd > 4500 && (lircd - remote.bit[0].1 as u32) == our {
             continue;
         }
 
-        if lircd > 10000 && (lircd - remote.bit[1].1 as u32) == our {
+        if lircd > 4500 && (lircd - remote.bit[1].1 as u32) == our {
             continue;
         }
 
