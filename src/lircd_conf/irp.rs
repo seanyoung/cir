@@ -109,6 +109,10 @@ impl LircRemote {
             }
         }
 
+        if needs_post_variable(self) {
+            irp.push_str(&format!("{{POST=0x{:x}}}", self.post_data));
+        }
+
         irp.push_str(&format!(" [CODE:0..{}", gen_mask(self.bits)));
 
         if self.toggle_bit_mask.count_ones() == 1 {
@@ -169,9 +173,15 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, repeat: bool) {
     );
 
     if remote.post_data_bits != 0 {
+        let stream = if needs_post_variable(remote) {
+            Stream::Variable("POST")
+        } else {
+            Stream::Constant(remote.post_data)
+        };
+
         add_bit_stream(
             remote,
-            Stream::Constant(remote.post_data),
+            stream,
             remote.post_data_bits,
             toggle_bit_mask,
             remote.rc6_mask,
@@ -194,11 +204,24 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, repeat: bool) {
     add_gap(remote, irp, repeat);
 
     if remote.toggle_mask != 0 {
-        irp.push_str(&format!("CODE=CODE^0x{:x},", remote.toggle_mask));
+        irp.push_str(&format!(
+            "CODE=CODE^0x{:x},",
+            remote.toggle_mask >> remote.post_data_bits
+        ));
     }
 
     if remote.toggle_bit_mask.count_ones() > 1 {
-        irp.push_str(&format!("CODE=CODE^0x{:x},", remote.toggle_bit_mask));
+        irp.push_str(&format!(
+            "CODE=CODE^0x{:x},",
+            remote.toggle_bit_mask >> remote.post_data_bits
+        ));
+    }
+
+    if needs_post_variable(remote) {
+        irp.push_str(&format!(
+            "POST=POST^0x{:x},",
+            remote.toggle_mask & gen_mask(remote.post_data_bits)
+        ));
     }
 }
 
@@ -226,6 +249,10 @@ fn add_gap(remote: &LircRemote, irp: &mut String, repeat: bool) {
             irp.push_str(&format!("{},", gap));
         }
     }
+}
+
+fn needs_post_variable(remote: &LircRemote) -> bool {
+    remote.toggle_mask != 0 && highest_bit(remote.toggle_mask) >= remote.post_data_bits
 }
 
 #[derive(Clone, Copy)]
