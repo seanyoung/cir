@@ -1,4 +1,4 @@
-use super::{Flags, LircRemote};
+use super::{Flags, LircRawCode, LircRemote};
 use crate::log::Log;
 use irp::{Irp, Message, Vartable};
 use num_integer::Integer;
@@ -30,71 +30,12 @@ pub fn encode(
                         break;
                     }
 
-                    if raw_code.rawir.is_empty() {
-                        log.error(&format!(
-                            "remote {} code {} is missing raw codes",
-                            lirc_remote.name, send_code
-                        ));
-                        continue;
-                    }
-                    let length = if raw_code.rawir.len().is_even() {
-                        raw_code.rawir.len() - 1
-                    } else {
-                        raw_code.rawir.len()
-                    };
-
-                    let mut raw = raw_code.rawir[..length].to_vec();
-
-                    let space = if lirc_remote.gap == 0 {
-                        log.error(&format!(
-                            "remote {} does not a specify a gap",
-                            lirc_remote.name
-                        ));
-                        20000
-                    } else if lirc_remote.flags.contains(Flags::CONST_LENGTH) {
-                        let total_length: u32 = raw.iter().sum();
-
-                        lirc_remote.gap as u32 - total_length
-                    } else {
-                        lirc_remote.gap as u32
-                    };
-
-                    raw.push(space);
-
-                    if lirc_remote.min_repeat != 0 {
-                        for _ in 0..lirc_remote.min_repeat {
-                            raw.extend(&raw_code.rawir[..length]);
-                            raw.push(space);
-                        }
-                    }
+                    let encoded = lirc_remote.encode_raw(raw_code, 0);
 
                     if let Some(message) = &mut message {
-                        message.raw.extend_from_slice(&raw);
+                        message.raw.extend_from_slice(&encoded.raw);
                     } else {
-                        let carrier = if lirc_remote.frequency != 0 {
-                            Some(lirc_remote.frequency as i64)
-                        } else {
-                            None
-                        };
-
-                        let duty_cycle = if lirc_remote.duty_cycle != 0 {
-                            if lirc_remote.duty_cycle < 99 {
-                                Some(lirc_remote.duty_cycle as u8)
-                            } else {
-                                log.error(&format!(
-                                    "remote {} duty_cycle {} is invalid",
-                                    lirc_remote.name, lirc_remote.duty_cycle
-                                ));
-                                None
-                            }
-                        } else {
-                            None
-                        };
-                        message = Some(Message {
-                            carrier,
-                            duty_cycle,
-                            raw,
-                        });
+                        message = Some(encoded);
                     }
                     code_found = true;
                 }
@@ -107,17 +48,15 @@ pub fn encode(
                         break;
                     }
 
-                    let irp = lirc_remote.irp();
-
-                    log.info(&format!("irp for remote {}: {}", lirc_remote.name, irp));
-
-                    let mut vars = Vartable::new();
-                    vars.set(String::from("CODE"), code.code as i64, 32);
-                    let irp = Irp::parse(&irp).expect("should parse");
+                    let encoded = lirc_remote.encode(code.code, 0, log);
 
                     // FIXME: concatenate multiple messages (impl on Message?)
                     // FIXME: should be possible to specify repeats
-                    message = Some(irp.encode(vars, 0).expect("encode should succeed"));
+                    if let Some(message) = &mut message {
+                        message.raw.extend_from_slice(&encoded.raw);
+                    } else {
+                        message = Some(encoded);
+                    }
 
                     code_found = true;
                 }
@@ -139,5 +78,70 @@ pub fn encode(
         }
 
         Err(String::from("Nothing to send"))
+    }
+}
+
+impl LircRemote {
+    /// Encode code for this remote, with the given repeats
+    pub fn encode(&self, code: u64, repeats: i64, log: &Log) -> Message {
+        let irp = self.irp();
+
+        log.info(&format!("irp for remote {}: {}", self.name, irp));
+
+        let mut vars = Vartable::new();
+
+        vars.set(String::from("CODE"), code as i64, 32);
+        let irp = Irp::parse(&irp).expect("should parse");
+
+        irp.encode(vars, repeats).expect("encode should succeed")
+    }
+
+    /// Encode raw code for this remote, with the given repeats
+    pub fn encode_raw(&self, raw_code: &LircRawCode, repeats: u64) -> Message {
+        // remove trailing space
+        let length = if raw_code.rawir.len().is_even() {
+            raw_code.rawir.len() - 1
+        } else {
+            raw_code.rawir.len()
+        };
+
+        let mut raw = raw_code.rawir[..length].to_vec();
+
+        let space = if self.gap == 0 {
+            20000
+        } else if self.flags.contains(Flags::CONST_LENGTH) {
+            let total_length: u32 = raw.iter().sum();
+
+            self.gap as u32 - total_length
+        } else {
+            self.gap as u32
+        };
+
+        raw.push(space);
+
+        if self.min_repeat != 0 || repeats != 0 {
+            for _ in 0..(self.min_repeat + repeats) {
+                raw.extend(&raw_code.rawir[..length]);
+                raw.push(space);
+            }
+        }
+
+        let carrier = if self.frequency != 0 {
+            Some(self.frequency as i64)
+        } else {
+            None
+        };
+
+        let duty_cycle = if self.duty_cycle != 0 {
+            Some(self.duty_cycle as u8)
+        } else {
+            None
+        };
+
+        Message {
+            carrier,
+            duty_cycle,
+            raw,
+        }
     }
 }

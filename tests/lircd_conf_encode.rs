@@ -1,6 +1,6 @@
 use irp::{rawir, Irp, Vartable};
 use linux_infrared::{
-    lircd_conf::{parse, Flags, LircRemote},
+    lircd_conf::{parse, LircRemote},
     log::Log,
 };
 use num_integer::Integer;
@@ -82,52 +82,35 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
             continue;
         };
 
-        if remote.flags.contains(Flags::RAW_CODES) {
-            for code in &remote.raw_codes {
-                if code.dup {
-                    continue;
-                }
-
-                let testdata = if let Some(testdata) = testdata
-                    .codes
-                    .iter()
-                    .find(|testdata| testdata.name == code.name)
-                {
-                    testdata
-                } else {
-                    println!("cannot find testdata for code {}", code.name);
-                    continue;
-                };
-
-                let mut raw = code.rawir.clone();
-
-                let space = if remote.flags.contains(Flags::CONST_LENGTH) {
-                    let total_length: u32 = raw.iter().sum();
-
-                    remote.gap as u32 - total_length
-                } else {
-                    remote.gap as u32
-                };
-
-                raw.push(space);
-
-                if remote.min_repeat != 0 {
-                    for _ in 0..remote.min_repeat {
-                        raw.extend(&code.rawir);
-                        raw.push(space);
-                    }
-                }
-
-                raw.pop();
-
-                if testdata.rawir != raw {
-                    all_pass = false;
-                    println!("RAW CODE: {}", code.name);
-                    println!("lircd {}", rawir::print_to_string(&testdata.rawir));
-                    println!("cir {}", rawir::print_to_string(&code.rawir));
-                }
+        for code in &remote.raw_codes {
+            if code.dup {
+                continue;
             }
-        } else {
+
+            let testdata = if let Some(testdata) = testdata
+                .codes
+                .iter()
+                .find(|testdata| testdata.name == code.name)
+            {
+                testdata
+            } else {
+                println!("cannot find testdata for code {}", code.name);
+                continue;
+            };
+
+            let mut message = remote.encode_raw(code, 0);
+
+            message.raw.pop();
+
+            if testdata.rawir != message.raw {
+                all_pass = false;
+                println!("RAW CODE: {}", code.name);
+                println!("lircd {}", rawir::print_to_string(&testdata.rawir));
+                println!("cir {}", rawir::print_to_string(&message.raw));
+            }
+        }
+
+        if !remote.codes.is_empty() {
             let irp = remote.irp();
             println!("remote {} irp:{}", remote.name, irp);
             let irp = Irp::parse(&irp).expect("should work");
