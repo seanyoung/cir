@@ -12,7 +12,7 @@ pub use encode::encode;
 pub struct LircCode {
     pub name: String,
     pub dup: bool,
-    pub code: u64,
+    pub code: Vec<u64>,
 }
 
 #[derive(Debug)]

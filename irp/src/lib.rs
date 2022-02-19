@@ -144,9 +144,37 @@ pub struct Message {
 }
 
 impl Message {
+    /// Create an empty packet
+    pub fn new() -> Self {
+        Message {
+            carrier: None,
+            duty_cycle: None,
+            raw: Vec::new(),
+        }
+    }
+
+    /// Concatenate to packets
+    pub fn extend(&mut self, other: &Message) {
+        if self.carrier.is_none() {
+            self.carrier = other.carrier;
+        }
+
+        if self.duty_cycle.is_none() {
+            self.duty_cycle = other.duty_cycle;
+        }
+
+        self.raw.extend_from_slice(&other.raw);
+    }
+
     /// Print the flash and gap information as an raw ir string
     pub fn print_rawir(&self) -> String {
         rawir::print_to_string(&self.raw)
+    }
+}
+
+impl Default for Message {
+    fn default() -> Self {
+        Message::new()
     }
 }
 

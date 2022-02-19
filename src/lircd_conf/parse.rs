@@ -391,16 +391,16 @@ impl<'a> LircParser<'a> {
                     return Err(());
                 }
                 Some(name) => {
-                    if let Some(scancode) = second {
+                    let mut code = if let Some(scancode) = second {
                         match maybe_hex_number(scancode) {
                             Ok(scancode) => {
                                 let dup = codes.iter().any(|c| c.name == name);
 
-                                codes.push(LircCode {
+                                LircCode {
                                     name: name.to_owned(),
                                     dup,
-                                    code: scancode,
-                                });
+                                    code: vec![scancode],
+                                }
                             }
                             Err(_) => {
                                 self.log.error(&format!(
@@ -419,7 +419,7 @@ impl<'a> LircParser<'a> {
                             self.line_no
                         ));
                         return Err(());
-                    }
+                    };
 
                     for scancode in words {
                         if scancode.starts_with('#') {
@@ -428,11 +428,7 @@ impl<'a> LircParser<'a> {
 
                         match maybe_hex_number(scancode) {
                             Ok(scancode) => {
-                                codes.push(LircCode {
-                                    name: name.to_owned(),
-                                    dup: true,
-                                    code: scancode,
-                                });
+                                code.code.push(scancode);
                             }
                             Err(_) => {
                                 self.log.error(&format!(
@@ -445,6 +441,8 @@ impl<'a> LircParser<'a> {
                             }
                         }
                     }
+
+                    codes.push(code);
                 }
                 None => (),
             }
@@ -669,14 +667,16 @@ impl<'a> LircParser<'a> {
         }
 
         for code in &mut remote.codes {
-            if (code.code & !gen_mask(remote.bits)) != 0 {
-                self.log.warning(&format!(
-                    "{}:{}: invalid code 0x{:x} truncated",
-                    self.path.display(),
-                    self.line_no,
-                    code.code
-                ));
-                code.code &= gen_mask(remote.bits);
+            for code in &mut code.code {
+                if (*code & !gen_mask(remote.bits)) != 0 {
+                    self.log.warning(&format!(
+                        "{}:{}: invalid code 0x{:x} truncated",
+                        self.path.display(),
+                        self.line_no,
+                        code
+                    ));
+                    *code &= gen_mask(remote.bits);
+                }
             }
         }
 
@@ -690,7 +690,9 @@ impl<'a> LircParser<'a> {
             }
 
             for code in &mut remote.codes {
-                code.code = reverse(code.code, remote.bits);
+                for code in &mut code.code {
+                    *code = reverse(*code, remote.bits)
+                }
             }
         }
 

@@ -1,4 +1,4 @@
-use super::{Flags, LircRawCode, LircRemote};
+use super::{Flags, LircCode, LircRawCode, LircRemote};
 use crate::log::Log;
 use irp::{Irp, Message, Vartable};
 use num_integer::Integer;
@@ -48,7 +48,7 @@ pub fn encode(
                         break;
                     }
 
-                    let encoded = lirc_remote.encode(code.code, 0, log);
+                    let encoded = lirc_remote.encode(code, 0, log);
 
                     // FIXME: concatenate multiple messages (impl on Message?)
                     // FIXME: should be possible to specify repeats
@@ -83,17 +83,25 @@ pub fn encode(
 
 impl LircRemote {
     /// Encode code for this remote, with the given repeats
-    pub fn encode(&self, code: u64, repeats: i64, log: &Log) -> Message {
+    pub fn encode(&self, code: &LircCode, repeats: i64, log: &Log) -> Message {
         let irp = self.irp();
 
         log.info(&format!("irp for remote {}: {}", self.name, irp));
 
-        let mut vars = Vartable::new();
+        let mut message = Message::new();
 
-        vars.set(String::from("CODE"), code as i64, 32);
-        let irp = Irp::parse(&irp).expect("should parse");
+        for code in &code.code {
+            let mut vars = Vartable::new();
 
-        irp.encode(vars, repeats).expect("encode should succeed")
+            vars.set(String::from("CODE"), *code as i64, 32);
+            let irp = Irp::parse(&irp).expect("should parse");
+
+            let m = irp.encode(vars, repeats).expect("encode should succeed");
+
+            message.extend(&m);
+        }
+
+        message
     }
 
     /// Encode raw code for this remote, with the given repeats

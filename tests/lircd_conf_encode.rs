@@ -1,4 +1,4 @@
-use irp::{rawir, Irp, Vartable};
+use irp::{rawir, Irp, Message, Vartable};
 use linux_infrared::{
     lircd_conf::{parse, LircRemote},
     log::Log,
@@ -120,11 +120,17 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                     continue;
                 }
 
-                let mut vars = Vartable::new();
-                vars.set(String::from("CODE"), code.code as i64, 32);
+                let mut message = Message::new();
 
-                // FIXME: should be possible to test repeats
-                let mut message = irp.encode(vars, 0).expect("encode should succeed");
+                for code in &code.code {
+                    let mut vars = Vartable::new();
+                    vars.set(String::from("CODE"), *code as i64, 32);
+
+                    // FIXME: should be possible to test repeats
+                    let m = irp.encode(vars, 0).expect("encode should succeed");
+
+                    message.extend(&m);
+                }
 
                 if message.raw.len().is_even() {
                     message.raw.pop();
@@ -133,20 +139,20 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                 let testdata = if let Some(testdata) = testdata.codes.iter().find(|testdata| {
                     let scancode = u64::from_str_radix(&testdata.code, 16).unwrap();
 
-                    code.name == testdata.name && code.code == scancode
+                    code.name == testdata.name && code.code[0] == scancode
                 }) {
                     testdata
                 } else {
                     println!(
                         "cannot find testdata for code {} 0x{:}",
-                        code.name, code.code
+                        code.name, code.code[0]
                     );
                     continue;
                 };
 
                 if !compare_output(remote, &testdata.rawir, &message.raw) {
                     all_pass = false;
-                    println!("CODE: {} 0x{:x}", code.name, code.code);
+                    println!("CODE: {} 0x{:x}", code.name, code.code[0]);
                     println!("lircd {}", rawir::print_to_string(&testdata.rawir));
                     println!("cir {}", rawir::print_to_string(&message.raw));
                 }
