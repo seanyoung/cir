@@ -7,9 +7,10 @@ pub fn encode(
     lirc_remotes: &[LircRemote],
     remote: Option<&str>,
     codes: &[&str],
+    repeats: u64,
     log: &Log,
 ) -> Result<Message, String> {
-    let mut message: Option<Message> = None;
+    let mut message = Message::new();
     let mut remote_found = false;
 
     for send_code in codes {
@@ -20,8 +21,9 @@ pub fn encode(
                 if lirc_remote.name != remote {
                     continue;
                 }
-                remote_found = true;
             }
+
+            remote_found = true;
 
             for raw_code in &lirc_remote.raw_codes {
                 if raw_code.name == *send_code {
@@ -30,13 +32,10 @@ pub fn encode(
                         break;
                     }
 
-                    let encoded = lirc_remote.encode_raw(raw_code, 0);
+                    let encoded = lirc_remote.encode_raw(raw_code, repeats);
 
-                    if let Some(message) = &mut message {
-                        message.raw.extend_from_slice(&encoded.raw);
-                    } else {
-                        message = Some(encoded);
-                    }
+                    message.extend(&encoded);
+
                     code_found = true;
                 }
             }
@@ -48,27 +47,21 @@ pub fn encode(
                         break;
                     }
 
-                    let encoded = lirc_remote.encode(code, 0, log);
+                    let encoded = lirc_remote.encode(code, repeats as i64, log);
 
-                    // FIXME: concatenate multiple messages (impl on Message?)
-                    // FIXME: should be possible to specify repeats
-                    if let Some(message) = &mut message {
-                        message.raw.extend_from_slice(&encoded.raw);
-                    } else {
-                        message = Some(encoded);
-                    }
+                    message.extend(&encoded);
 
                     code_found = true;
                 }
             }
         }
 
-        if !code_found {
+        if remote_found && !code_found {
             return Err(format!("code {} not found", send_code));
         }
     }
 
-    if let Some(message) = message {
+    if !message.raw.is_empty() {
         Ok(message)
     } else {
         if let Some(remote) = remote {

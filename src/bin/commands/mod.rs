@@ -235,17 +235,27 @@ pub fn encode_args<'a>(
             };
 
             let remote = matches.value_of("REMOTE");
+            let repeats = match matches.value_of("REPEATS") {
+                None => 1,
+                Some(s) => match s.parse() {
+                    Ok(num) => num,
+                    Err(_) => {
+                        eprintln!("error: {} is not numeric", s);
+                        std::process::exit(2);
+                    }
+                },
+            };
 
             if let Some(codes) = matches.values_of("CODES") {
                 let codes: Vec<&str> = codes.collect();
-                let m = lircd_conf::encode(&remotes, remote, &codes, log);
+                let m = lircd_conf::encode(&remotes, remote, &codes, repeats, log);
 
                 match m {
                     Ok(m) => (m, matches),
                     Err(e) => {
                         log.error(&e);
 
-                        list_remotes(filename, &remotes, remote, log);
+                        list_remotes(filename, &remotes, None, log);
 
                         std::process::exit(2);
                     }
@@ -292,16 +302,21 @@ fn list_remotes(filename: &OsStr, remotes: &[LircRemote], needle: Option<&str>, 
         if let Some((Width(term_witdh), _)) = size {
             let mut pos = 2;
             let mut res = String::new();
+            let mut first = true;
 
             for code in codes {
+                if first {
+                    first = false
+                } else {
+                    res.push_str(", ");
+                }
+
                 if pos + code.len() + 2 < term_witdh as usize {
                     res.push_str(code);
-                    res.push_str(", ");
                     pos += code.len() + 2;
                 } else {
                     res.push_str("\n  ");
                     res.push_str(code);
-                    res.push_str(", ");
                     pos = code.len() + 4;
                 }
             }

@@ -102,9 +102,17 @@ fn main() {
                         .arg(
                             Arg::new("REMOTE")
                                 .long("remote")
-                                .short('r')
+                                .short('m')
                                 .help("Use codes from specific remote")
                                 .takes_value(true),
+                        )
+                        .arg(
+                            Arg::new("REPEATS")
+                                .long("repeats")
+                                .short('r')
+                                .help("Number of times to repeat signal")
+                                .takes_value(true)
+                                .default_value("0"),
                         )
                         .arg(
                             Arg::new("CODES")
@@ -310,9 +318,17 @@ fn main() {
                         .arg(
                             Arg::new("REMOTE")
                                 .long("remote")
-                                .short('r')
+                                .short('m')
                                 .help("Use codes from specific remote")
                                 .takes_value(true),
+                        )
+                        .arg(
+                            Arg::new("REPEATS")
+                                .long("repeats")
+                                .short('r')
+                                .help("Number of times to repeat signal")
+                                .takes_value(true)
+                                .default_value("0"),
                         )
                         .arg(
                             Arg::new("CODES")
