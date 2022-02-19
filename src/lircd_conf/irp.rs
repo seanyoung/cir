@@ -3,7 +3,6 @@ use super::{Flags, LircRemote};
 // TODO:
 // - B&O
 // - Grundig
-// - Repeats
 
 impl LircRemote {
     /// Build an IRP representation for the remote. This can be used both for encoding
@@ -109,7 +108,7 @@ impl LircRemote {
             }
         }
 
-        if needs_post_variable(self) {
+        if toggle_post_data(self) {
             irp.push_str(&format!("{{POST=0x{:x}}}", self.post_data));
         }
 
@@ -173,7 +172,7 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, repeat: bool) {
     );
 
     if remote.post_data_bits != 0 {
-        let stream = if needs_post_variable(remote) {
+        let stream = if toggle_post_data(remote) {
             Stream::Variable("POST")
         } else {
             Stream::Constant(remote.post_data)
@@ -217,7 +216,7 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, repeat: bool) {
         ));
     }
 
-    if needs_post_variable(remote) {
+    if toggle_post_data(remote) {
         irp.push_str(&format!(
             "POST=POST^0x{:x},",
             remote.toggle_mask & gen_mask(remote.post_data_bits)
@@ -251,8 +250,8 @@ fn add_gap(remote: &LircRemote, irp: &mut String, repeat: bool) {
     }
 }
 
-fn needs_post_variable(remote: &LircRemote) -> bool {
-    remote.toggle_mask != 0 && highest_bit(remote.toggle_mask) >= remote.post_data_bits
+fn toggle_post_data(remote: &LircRemote) -> bool {
+    remote.toggle_mask != 0 && (remote.toggle_mask & gen_mask(remote.post_data_bits)) != 0
 }
 
 #[derive(Clone, Copy)]

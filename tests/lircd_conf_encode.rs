@@ -69,8 +69,6 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
     let lircd_conf = parse(conf, log).expect("parse should work");
 
-    let mut all_pass = true;
-
     for remote in &lircd_conf {
         let testdata = if let Some(testdata) = testdata
             .iter()
@@ -103,10 +101,9 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
             message.raw.pop();
 
             if testdata.rawir != message.raw {
-                all_pass = false;
-                println!("RAW CODE: {}", code.name);
                 println!("lircd {}", rawir::print_to_string(&testdata.rawir));
                 println!("cir {}", rawir::print_to_string(&message.raw));
+                panic!("RAW CODE: {}", code.name);
             }
         }
 
@@ -176,16 +173,13 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                 };
 
                 if !compare_output(remote, &testdata.rawir, &message.raw) {
-                    all_pass = false;
-                    println!("CODE: {} 0x{:x}", code.name, code.code[0]);
                     println!("lircd {}", rawir::print_to_string(&testdata.rawir));
                     println!("cir {}", rawir::print_to_string(&message.raw));
+                    panic!("CODE: {} 0x{:x}", code.name, code.code[0]);
                 }
             }
         }
     }
-
-    println!("ALL PASS: {}", all_pass);
 }
 
 fn compare_output(remote: &LircRemote, lircd: &[u32], our: &[u32]) -> bool {
