@@ -1,4 +1,4 @@
-use super::LircRemote;
+use super::{Flags, LircRemote};
 use crate::log::Log;
 use irp::{Irp, Message, Vartable};
 use num_integer::Integer;
@@ -42,9 +42,8 @@ pub fn encode(
                     } else {
                         raw_code.rawir.len()
                     };
-                    let mut raw = raw_code.rawir[..length].to_vec();
 
-                    let total_length: u64 = raw.iter().map(|v| *v as u64).sum();
+                    let mut raw = raw_code.rawir[..length].to_vec();
 
                     let space = if lirc_remote.gap == 0 {
                         log.error(&format!(
@@ -52,14 +51,22 @@ pub fn encode(
                             lirc_remote.name
                         ));
                         20000
-                    } else if total_length >= lirc_remote.gap {
-                        log.error(&format!("remote {} has a gap of {} which is smaller than the length of the IR {}", lirc_remote.name, lirc_remote.gap, total_length));
-                        20000
+                    } else if lirc_remote.flags.contains(Flags::CONST_LENGTH) {
+                        let total_length: u32 = raw.iter().sum();
+
+                        lirc_remote.gap as u32 - total_length
                     } else {
-                        lirc_remote.gap - total_length
+                        lirc_remote.gap as u32
                     };
 
-                    raw.push(space as u32);
+                    raw.push(space);
+
+                    if lirc_remote.min_repeat != 0 {
+                        for _ in 0..lirc_remote.min_repeat {
+                            raw.extend(&raw_code.rawir[..length]);
+                            raw.push(space);
+                        }
+                    }
 
                     if let Some(message) = &mut message {
                         message.raw.extend_from_slice(&raw);

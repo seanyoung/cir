@@ -1,6 +1,6 @@
 use irp::{rawir, Irp, Vartable};
 use linux_infrared::{
-    lircd_conf::{parse, Flags},
+    lircd_conf::{parse, Flags, LircRemote},
     log::Log,
 };
 use num_integer::Integer;
@@ -67,11 +67,11 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
     let testdata: Vec<Remote> = serde_json::from_str(&data).expect("failed to deserialize");
 
-    let mut lircd_conf = parse(conf, log).expect("parse should work");
+    let lircd_conf = parse(conf, log).expect("parse should work");
 
     let mut all_pass = true;
 
-    for remote in &mut lircd_conf {
+    for remote in &lircd_conf {
         let testdata = if let Some(testdata) = testdata
             .iter()
             .find(|testdata| testdata.name == remote.name)
@@ -99,7 +99,28 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                     continue;
                 };
 
-                if testdata.rawir != code.rawir {
+                let mut raw = code.rawir.clone();
+
+                let space = if remote.flags.contains(Flags::CONST_LENGTH) {
+                    let total_length: u32 = raw.iter().sum();
+
+                    remote.gap as u32 - total_length
+                } else {
+                    remote.gap as u32
+                };
+
+                raw.push(space);
+
+                if remote.min_repeat != 0 {
+                    for _ in 0..remote.min_repeat {
+                        raw.extend(&code.rawir);
+                        raw.push(space);
+                    }
+                }
+
+                raw.pop();
+
+                if testdata.rawir != raw {
                     all_pass = false;
                     println!("RAW CODE: {}", code.name);
                     println!("lircd {}", rawir::print_to_string(&testdata.rawir));
@@ -107,9 +128,6 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                 }
             }
         } else {
-            // lircd does not honour the min_repeat parameter, at least in our data set
-            // FIXME: this is not entirely correct. It does repeat sometimes
-            remote.min_repeat = 0;
             let irp = remote.irp();
             println!("remote {} irp:{}", remote.name, irp);
             let irp = Irp::parse(&irp).expect("should work");
@@ -143,7 +161,7 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                     continue;
                 };
 
-                if testdata.rawir != message.raw {
+                if !compare_output(remote, &testdata.rawir, &message.raw) {
                     all_pass = false;
                     println!("CODE: {} 0x{:x}", code.name, code.code);
                     println!("lircd {}", rawir::print_to_string(&testdata.rawir));
@@ -154,4 +172,35 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
     }
 
     println!("ALL PASS: {}", all_pass);
+}
+
+fn compare_output(remote: &LircRemote, lircd: &[u32], our: &[u32]) -> bool {
+    if lircd.len() != our.len() {
+        return false;
+    }
+
+    if lircd == our {
+        return true;
+    }
+
+    for (lircd, our) in lircd.iter().zip(our.iter()) {
+        let lircd = *lircd;
+        let our = *our;
+
+        if lircd == our {
+            continue;
+        }
+
+        if lircd > 10000 && (lircd - remote.bit[0].1 as u32) == our {
+            continue;
+        }
+
+        if lircd > 10000 && (lircd - remote.bit[1].1 as u32) == our {
+            continue;
+        }
+
+        return false;
+    }
+
+    true
 }

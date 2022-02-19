@@ -79,10 +79,16 @@ impl LircRemote {
                 irp.push_str(&format!("{},", self.ptrail));
             }
             if self.gap != 0 {
-                if self.gap % 1000 == 0 {
-                    irp.push_str(&format!("^{}m,", self.gap / 1000));
+                irp.push(if self.flags.contains(Flags::CONST_LENGTH) {
+                    '^'
                 } else {
-                    irp.push_str(&format!("^{},", self.gap));
+                    '-'
+                });
+
+                if self.gap % 1000 == 0 {
+                    irp.push_str(&format!("{}m,", self.gap / 1000));
+                } else {
+                    irp.push_str(&format!("{},", self.gap));
                 }
             }
             irp.pop();
@@ -193,10 +199,16 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, sup
     }
 
     if remote.gap != 0 {
-        if remote.gap % 1000 == 0 {
-            irp.push_str(&format!("^{}m,", remote.gap / 1000));
+        irp.push(if remote.flags.contains(Flags::CONST_LENGTH) {
+            '^'
         } else {
-            irp.push_str(&format!("^{},", remote.gap));
+            '-'
+        });
+
+        if remote.gap % 1000 == 0 {
+            irp.push_str(&format!("{}m,", remote.gap / 1000));
+        } else {
+            irp.push_str(&format!("{},", remote.gap));
         }
     }
 }
