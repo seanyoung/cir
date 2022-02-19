@@ -147,7 +147,6 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                             );
                         }
 
-                        // FIXME: should be possible to test repeats
                         let m = irp.encode(vars, 0).expect("encode should succeed");
 
                         message.extend(&m);

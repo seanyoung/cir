@@ -281,7 +281,7 @@ fn compare_encode_to_transmogrifier() {
     pub struct TestData {
         pub protocol: String,
         #[serde(default)]
-        pub repeats: i64,
+        pub repeats: u64,
         pub params: Vec<Param>,
         #[serde(default)]
         pub pronto: String,

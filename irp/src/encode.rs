@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 impl Irp {
     /// Render it to raw IR with the given variables
-    pub fn encode<'a>(&'a self, mut vars: Vartable<'a>, repeats: i64) -> Result<Message, String> {
+    pub fn encode<'a>(&'a self, mut vars: Vartable<'a>, repeats: u64) -> Result<Message, String> {
         self.check_parameters(&mut vars)?;
 
         let mut encoder = Encoder::new(&self.general_spec);
@@ -553,7 +553,7 @@ fn eval_stream<'a>(
     level: Option<usize>,
     vars: &mut Vartable,
     gs: &GeneralSpec,
-    repeats: i64,
+    repeats: u64,
     alternative: usize,
 ) -> Result<(), String> {
     for expr in stream {

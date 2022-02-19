@@ -47,7 +47,7 @@ pub fn encode(
                         break;
                     }
 
-                    let encoded = lirc_remote.encode(code, repeats as i64, log);
+                    let encoded = lirc_remote.encode(code, repeats, log);
 
                     message.extend(&encoded);
 
@@ -76,7 +76,7 @@ pub fn encode(
 
 impl LircRemote {
     /// Encode code for this remote, with the given repeats
-    pub fn encode(&self, code: &LircCode, repeats: i64, log: &Log) -> Message {
+    pub fn encode(&self, code: &LircCode, repeats: u64, log: &Log) -> Message {
         let irp = self.irp();
 
         log.info(&format!("irp for remote {}: {}", self.name, irp));
