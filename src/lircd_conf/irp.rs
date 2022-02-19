@@ -63,7 +63,7 @@ impl LircRemote {
         irp.pop();
         irp.push_str(">(");
 
-        add_irp_body(self, &mut irp, false, false);
+        add_irp_body(self, &mut irp, false);
 
         if self.repeat.0 != 0 && self.repeat.1 != 0 {
             irp.push('(');
@@ -78,19 +78,8 @@ impl LircRemote {
             if self.ptrail != 0 {
                 irp.push_str(&format!("{},", self.ptrail));
             }
-            if self.gap != 0 {
-                irp.push(if self.flags.contains(Flags::CONST_LENGTH) {
-                    '^'
-                } else {
-                    '-'
-                });
+            add_gap(self, &mut irp, true);
 
-                if self.gap % 1000 == 0 {
-                    irp.push_str(&format!("{}m,", self.gap / 1000));
-                } else {
-                    irp.push_str(&format!("{},", self.gap));
-                }
-            }
             irp.pop();
             match self.min_repeat {
                 0 => irp.push_str(")*)"),
@@ -103,12 +92,7 @@ impl LircRemote {
         {
             irp.push('(');
 
-            add_irp_body(
-                self,
-                &mut irp,
-                self.flags.contains(Flags::NO_HEAD_REP),
-                self.flags.contains(Flags::NO_FOOT_REP),
-            );
+            add_irp_body(self, &mut irp, true);
 
             irp.pop();
             match self.min_repeat {
@@ -142,7 +126,10 @@ impl LircRemote {
     }
 }
 
-fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, supress_footer: bool) {
+fn add_irp_body(remote: &LircRemote, irp: &mut String, repeat: bool) {
+    let supress_header = repeat && remote.flags.contains(Flags::NO_HEAD_REP);
+    let supress_footer = repeat && remote.flags.contains(Flags::NO_FOOT_REP);
+
     if !supress_header && remote.header.0 != 0 && remote.header.1 != 0 {
         irp.push_str(&format!("{},-{},", remote.header.0, remote.header.1));
     }
@@ -204,19 +191,7 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, sup
         irp.push_str(&format!("{},", remote.ptrail));
     }
 
-    if remote.gap != 0 {
-        irp.push(if remote.flags.contains(Flags::CONST_LENGTH) {
-            '^'
-        } else {
-            '-'
-        });
-
-        if remote.gap % 1000 == 0 {
-            irp.push_str(&format!("{}m,", remote.gap / 1000));
-        } else {
-            irp.push_str(&format!("{},", remote.gap));
-        }
-    }
+    add_gap(remote, irp, repeat);
 
     if remote.toggle_mask != 0 {
         irp.push_str(&format!("CODE=CODE^0x{:x},", remote.toggle_mask));
@@ -224,6 +199,32 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, supress_header: bool, sup
 
     if remote.toggle_bit_mask.count_ones() > 1 {
         irp.push_str(&format!("CODE=CODE^0x{:x},", remote.toggle_bit_mask));
+    }
+}
+
+fn add_gap(remote: &LircRemote, irp: &mut String, repeat: bool) {
+    if remote.gap != 0 {
+        let gap = if !repeat
+            && remote
+                .flags
+                .contains(Flags::NO_HEAD_REP | Flags::CONST_LENGTH)
+        {
+            remote.gap + remote.header.0 + remote.header.1
+        } else {
+            remote.gap
+        };
+
+        irp.push(if remote.flags.contains(Flags::CONST_LENGTH) {
+            '^'
+        } else {
+            '-'
+        });
+
+        if remote.gap % 1000 == 0 {
+            irp.push_str(&format!("{}m,", gap / 1000));
+        } else {
+            irp.push_str(&format!("{},", gap));
+        }
     }
 }
 
