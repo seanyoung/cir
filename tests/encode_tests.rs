@@ -86,6 +86,34 @@ rawir: +9137 -4360 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -
 }
 
 #[test]
+fn encode_rawir_test() {
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args(&[
+            "encode",
+            "rawir",
+            r#"1000
+            200
+            1000"#,
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stderr, "");
+
+    assert_eq!(
+        stdout,
+        r#"rawir: +1000 -200 +1000
+"#
+    );
+}
+
+#[test]
 fn encode_lircd_grundig_test() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 

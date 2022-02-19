@@ -5,6 +5,10 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
     let mut res = Vec::new();
 
     for (i, e) in s.split(|c: char| c.is_whitespace() || c == ',').enumerate() {
+        if e.is_empty() {
+            continue;
+        }
+
         let mut chars = e.chars().peekable();
 
         match chars.peek() {
@@ -67,7 +71,7 @@ fn parse_test() {
 
     assert_eq!(parse("+100 -100"), Ok(vec!(100, 100)));
 
-    assert_eq!(parse(""), Err("invalid number ‘’".to_string()));
+    assert_eq!(parse(""), Err("missing length".to_string()));
 
     assert_eq!(parse("+a"), Err("invalid number ‘a’".to_string()));
 
