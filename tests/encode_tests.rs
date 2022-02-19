@@ -84,6 +84,36 @@ rawir: +9137 -4360 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -
 "#
     );
 }
+
+#[test]
+fn encode_lircd_grundig_test() {
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args(&[
+            "encode",
+            "lircd",
+            "testdata/lircd_conf/grundig/RP75_LCD.lircd.conf",
+            "-m",
+            "grundig_rp75",
+            "0",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stderr, "");
+
+    assert_eq!(
+        stdout,
+        r#"carrier: 38000Hz
+rawir: +871 -2894 +1363 -2188 +1229 -2192 +1230 -1102 +637 -1098 +638 -1094 +637 -1098 +638 -1723 +638 -435 +638 -443 +638 -1735 +638 -444 +637 -1736 +638 -443 +638 -1735 +638 -57449
+"#
+    );
+}
 ///
 /// This tests needs a /dev/lirc0 rc-loopback device
 #[test]

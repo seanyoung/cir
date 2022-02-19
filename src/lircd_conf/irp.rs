@@ -2,7 +2,6 @@ use super::{Flags, LircRemote};
 
 // TODO:
 // - B&O
-// - Grundig
 
 impl LircRemote {
     /// Build an IRP representation for the remote. This can be used both for encoding
@@ -28,6 +27,24 @@ impl LircRemote {
                     self.bit[0].1 + i * self.bit[1].1
                 ));
             }
+        } else if self.flags.contains(Flags::GRUNDIG) {
+            // bit 0
+            irp.push_str(&format!("-{},{}|", self.bit[3].1, self.bit[3].0));
+            // bit 1
+            irp.push_str(&format!(
+                "-{},{},-{},{}|",
+                self.bit[2].1, self.bit[2].0, self.bit[0].1, self.bit[0].0
+            ));
+            // bit 2
+            irp.push_str(&format!(
+                "-{},{},-{},{}|",
+                self.bit[1].1, self.bit[1].0, self.bit[1].1, self.bit[1].0
+            ));
+            // bit 3
+            irp.push_str(&format!(
+                "-{},{},-{},{}|",
+                self.bit[0].1, self.bit[0].0, self.bit[2].1, self.bit[2].0
+            ));
         } else {
             for (bit_no, (pulse, space)) in self.bit.iter().enumerate() {
                 if *pulse == 0 && *space == 0 {
