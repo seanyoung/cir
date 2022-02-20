@@ -81,13 +81,14 @@ impl LircRemote {
 
         log.info(&format!("irp for remote {}: {}", self.name, irp));
 
+        let irp = Irp::parse(&irp).expect("should parse");
+
         let mut message = Message::new();
 
         for code in &code.code {
             let mut vars = Vartable::new();
 
             vars.set(String::from("CODE"), *code as i64, 32);
-            let irp = Irp::parse(&irp).expect("should parse");
 
             let m = irp.encode(vars, repeats).expect("encode should succeed");
 
