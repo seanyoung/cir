@@ -77,6 +77,10 @@ pub struct LircRemote {
     pub frequency: u64,
     pub duty_cycle: u64,
     pub min_repeat: u64,
+    /// Decoding-only features
+    pub manual_sort: u64,
+    pub min_code_repeat: u64,
+    pub ignore_mask: u64,
     pub codes: Vec<LircCode>,
     pub raw_codes: Vec<LircRawCode>,
 }

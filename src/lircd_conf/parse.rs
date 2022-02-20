@@ -172,7 +172,10 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "rc6_mask")
                 | Some(name @ "baud")
                 | Some(name @ "repeat_gap")
-                | Some(name @ "suppress_repeat") => {
+                | Some(name @ "suppress_repeat")
+                | Some(name @ "manual_sort")
+                | Some(name @ "min_code_repeat")
+                | Some(name @ "ignore_mask") => {
                     let val = self.parse_number_arg(name, second)?;
                     match name {
                         "eps" => remote.eps = val,
@@ -196,6 +199,9 @@ impl<'a> LircParser<'a> {
                         "baud" => remote.baud = val,
                         "repeat_gap" => remote.repeat_gap = val,
                         "suppress_repeat" => remote.suppress_repeat = val,
+                        "manual_sort" => remote.manual_sort = val,
+                        "min_code_repeat" => remote.min_code_repeat = val,
+                        "ignore_mask" => remote.ignore_mask = val,
                         _ => unreachable!(),
                     }
                 }
