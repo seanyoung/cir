@@ -242,8 +242,10 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, repeat: bool) {
 }
 
 fn add_gap(remote: &LircRemote, irp: &mut String, repeat: bool) {
-    if remote.gap != 0 {
-        let gap = if !repeat
+    if remote.gap != 0 || remote.repeat_gap != 0 {
+        let gap = if remote.repeat_gap != 0 {
+            remote.repeat_gap
+        } else if !repeat
             && remote
                 .flags
                 .contains(Flags::NO_HEAD_REP | Flags::CONST_LENGTH)

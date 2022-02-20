@@ -140,6 +140,18 @@ impl<'a> LircParser<'a> {
 
                     remote.driver = second.unwrap().to_owned();
                 }
+                Some("serial_mode") => {
+                    if second.is_none() {
+                        self.log.error(&format!(
+                            "{}:{}: missing serial_mode argument",
+                            self.path.display(),
+                            self.line_no
+                        ));
+                        return Err(());
+                    }
+
+                    remote.serial_mode = second.unwrap().to_owned();
+                }
                 Some(name @ "eps")
                 | Some(name @ "aeps")
                 | Some(name @ "bits")
@@ -157,7 +169,10 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "repeat_bit")
                 | Some(name @ "toggle_bit_mask")
                 | Some(name @ "toggle_mask")
-                | Some(name @ "rc6_mask") => {
+                | Some(name @ "rc6_mask")
+                | Some(name @ "baud")
+                | Some(name @ "repeat_gap")
+                | Some(name @ "suppress_repeat") => {
                     let val = self.parse_number_arg(name, second)?;
                     match name {
                         "eps" => remote.eps = val,
@@ -178,6 +193,9 @@ impl<'a> LircParser<'a> {
                         "repeat_bit" => remote.toggle_bit = val,
                         "toggle_mask" => remote.toggle_mask = val,
                         "rc6_mask" => remote.rc6_mask = val,
+                        "baud" => remote.baud = val,
+                        "repeat_gap" => remote.repeat_gap = val,
+                        "suppress_repeat" => remote.suppress_repeat = val,
                         _ => unreachable!(),
                     }
                 }

@@ -49,7 +49,9 @@ bitflags! {
 pub struct LircRemote {
     pub name: String,
     pub driver: String,
+    pub serial_mode: String,
     pub flags: Flags,
+    pub baud: u64,
     pub eps: u64,
     pub aeps: u64,
     pub bits: u64,
@@ -70,6 +72,8 @@ pub struct LircRemote {
     pub pre: (u64, u64),
     pub post: (u64, u64),
     pub gap: u64,
+    pub repeat_gap: u64,
+    pub suppress_repeat: u64,
     pub frequency: u64,
     pub duty_cycle: u64,
     pub min_repeat: u64,
