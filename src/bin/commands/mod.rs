@@ -116,10 +116,20 @@ pub fn encode_args<'a>(
                         std::process::exit(2);
                     }
 
-                    let value = if list[1].starts_with("0x") {
-                        i64::from_str_radix(&list[1][2..], 16).unwrap()
+                    let value = match if list[1].starts_with("0x") {
+                        i64::from_str_radix(&list[1][2..], 16)
+                    } else if list[1].starts_with("0o") {
+                        i64::from_str_radix(&list[1][2..], 8)
+                    } else if list[1].starts_with("0b") {
+                        i64::from_str_radix(&list[1][2..], 2)
                     } else {
-                        list[1].parse().unwrap()
+                        list[1].parse()
+                    } {
+                        Ok(v) => v,
+                        Err(_) => {
+                            eprintln!("'{}' is not a valid number", list[1]);
+                            std::process::exit(2);
+                        }
                     };
 
                     vars.set(list[0].to_string(), value, 8);
@@ -236,7 +246,7 @@ pub fn encode_args<'a>(
 
             let remote = matches.value_of("REMOTE");
             let repeats = match matches.value_of("REPEATS") {
-                None => 1,
+                None => 0,
                 Some(s) => match s.parse() {
                     Ok(num) => num,
                     Err(_) => {
