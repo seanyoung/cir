@@ -28,7 +28,7 @@ fn main() {
                 .short('q')
                 .long("quiet")
                 .global(true)
-                .help("Silence all output"),
+                .help("Silence all warnings"),
         )
         .subcommand(
             Command::new("encode")
@@ -77,22 +77,34 @@ fn main() {
                         .arg(Arg::new("PRONTO").help("Pronto Hex code").required(true)),
                 )
                 .subcommand(
-                    Command::new("mode2")
-                        .about("Parse mode2 pulse space file and print as raw IR")
+                    Command::new("rawir")
+                        .about("Parse raw IR and print")
                         .arg(
                             Arg::new("FILE")
-                                .help("File to load and parse")
-                                .required(true),
+                                .long("file")
+                                .short('f')
+                                .help("Read from rawir or mode2 file")
+                                .takes_value(true)
+                                .allow_invalid_utf8(true)
+                                .multiple_occurrences(true),
+                        )
+                        .arg(
+                            Arg::new("GAP")
+                                .long("gap")
+                                .short('g')
+                                .help("Set gap after each file")
+                                .takes_value(true)
+                                .multiple_occurrences(true),
+                        )
+                        .arg(
+                            Arg::new("RAWIR")
+                                .help("Raw IR text")
+                                .multiple_occurrences(true),
                         ),
                 )
                 .subcommand(
-                    Command::new("rawir")
-                        .about("Parse raw IR")
-                        .arg(Arg::new("RAWIR").help("Raw IR to parse").required(true)),
-                )
-                .subcommand(
                     Command::new("lircd")
-                        .about("Parse lircd.conf file and print as raw IR")
+                        .about("Parse lircd.conf file and print codes as raw IR")
                         .arg(
                             Arg::new("CONF")
                                 .help("lircd.conf file")
@@ -251,32 +263,30 @@ fn main() {
                         .arg(Arg::new("PRONTO").help("Pronto Hex code").required(true)),
                 )
                 .subcommand(
-                    Command::new("mode2")
-                        .about("Parse mode2 pulse space file and transmit")
-                        .arg(
-                            Arg::new("CARRIER")
-                                .long("carrier")
-                                .short('c')
-                                .help("Set carrier in Hz, 0 for unmodulated")
-                                .takes_value(true),
-                        )
-                        .arg(
-                            Arg::new("DUTY_CYCLE")
-                                .long("duty-cycle")
-                                .short('u')
-                                .help("Set send duty cycle % (1 to 99)")
-                                .takes_value(true),
-                        )
-                        .arg(
-                            Arg::new("FILE")
-                                .help("File to load and parse")
-                                .required(true),
-                        ),
-                )
-                .subcommand(
                     Command::new("rawir")
                         .about("Parse raw IR and transmit")
-                        .arg(Arg::new("RAWIR").help("Raw IR").required(true))
+                        .arg(
+                            Arg::new("FILE")
+                                .long("file")
+                                .short('f')
+                                .help("Read from rawir or mode2 file")
+                                .takes_value(true)
+                                .allow_invalid_utf8(true)
+                                .multiple_occurrences(true),
+                        )
+                        .arg(
+                            Arg::new("GAP")
+                                .long("gap")
+                                .short('g')
+                                .help("Set gap after each file")
+                                .takes_value(true)
+                                .multiple_occurrences(true),
+                        )
+                        .arg(
+                            Arg::new("RAWIR")
+                                .help("Raw IR text")
+                                .multiple_occurrences(true),
+                        )
                         .arg(
                             Arg::new("CARRIER")
                                 .long("carrier")
@@ -294,7 +304,7 @@ fn main() {
                 )
                 .subcommand(
                     Command::new("lircd")
-                        .about("Parse lircd.conf file and transmit")
+                        .about("Parse lircd.conf file codes and transmit")
                         .arg(
                             Arg::new("CARRIER")
                                 .long("carrier")

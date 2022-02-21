@@ -108,7 +108,39 @@ fn encode_rawir_test() {
 
     assert_eq!(
         stdout,
-        r#"rawir: +1000 -200 +1000
+        r#"rawir: +1000 -200 +1000 -125000
+"#
+    );
+
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args(&[
+            "encode",
+            "rawir",
+            "-f",
+            "testdata/rawir/mode2",
+            "345",
+            "-g",
+            "30000",
+            "+123 40 124",
+            "-g",
+            "40000",
+            "-f",
+            "testdata/rawir/rawir",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stderr, "");
+
+    assert_eq!(
+        stdout,
+        r#"rawir: +1000 -700 +1200 -125000 +345 -30000 +123 -40 +124 -40000 +2000 -500 +2000 -40000
 "#
     );
 }

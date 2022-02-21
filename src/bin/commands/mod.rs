@@ -5,7 +5,11 @@ use linux_infrared::{
     log::Log,
     rcdev::{enumerate_rc_dev, Rcdev},
 };
-use std::{ffi::OsStr, fs, path::PathBuf};
+use std::{
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+};
 use terminal_size::{terminal_size, Width};
 
 pub mod config;
@@ -200,42 +204,7 @@ pub fn encode_args<'a>(
 
             (pronto.encode(repeats), matches)
         }
-        Some(("rawir", matches)) => {
-            let rawir = matches.value_of("RAWIR").unwrap();
-
-            match irp::rawir::parse(rawir) {
-                Ok(raw) => (
-                    Message {
-                        carrier: None,
-                        duty_cycle: None,
-                        raw,
-                    },
-                    matches,
-                ),
-                Err(s) => {
-                    eprintln!("error: {}", s);
-                    std::process::exit(2);
-                }
-            }
-        }
-        Some(("mode2", matches)) => {
-            let filename = matches.value_of("FILE").unwrap();
-            let input = match fs::read_to_string(filename) {
-                Ok(s) => s,
-                Err(s) => {
-                    eprintln!("error: {}", s);
-                    std::process::exit(2);
-                }
-            };
-
-            match irp::mode2::parse(&input) {
-                Ok(m) => (m, matches),
-                Err((line_no, error)) => {
-                    eprintln!("{}:{}: error: {}", filename, line_no, error);
-                    std::process::exit(2);
-                }
-            }
-        }
+        Some(("rawir", matches)) => encode_rawir(matches, log),
         Some(("lircd", matches)) => {
             let filename = matches.value_of_os("CONF").unwrap();
 
@@ -281,6 +250,131 @@ pub fn encode_args<'a>(
             std::process::exit(2);
         }
     }
+}
+
+fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a clap::ArgMatches) {
+    enum Part {
+        Raw(Message),
+        Gap(u32),
+    }
+
+    let mut part = Vec::new();
+
+    if let Some(files) = matches.values_of_os("FILE") {
+        let mut indices = matches.indices_of("FILE").unwrap();
+
+        for filename in files {
+            let input = match fs::read_to_string(filename) {
+                Ok(s) => s,
+                Err(s) => {
+                    log.error(&format!("{}: {}", Path::new(filename).display(), s));
+                    std::process::exit(2);
+                }
+            };
+
+            match irp::rawir::parse(&input) {
+                Ok(raw) => {
+                    part.push((
+                        Part::Raw(Message {
+                            carrier: None,
+                            duty_cycle: None,
+                            raw,
+                        }),
+                        indices.next().unwrap(),
+                    ));
+                }
+                Err(msg) => match irp::mode2::parse(&input) {
+                    Ok(m) => {
+                        part.push((Part::Raw(m), indices.next().unwrap()));
+                    }
+                    Err((line_no, error)) => {
+                        log.error(&format!(
+                            "{}: parse as rawir: {}",
+                            Path::new(filename).display(),
+                            msg
+                        ));
+                        log.error(&format!(
+                            "{}:{}: parse as mode2: {}",
+                            Path::new(filename).display(),
+                            line_no,
+                            error
+                        ));
+                        std::process::exit(2);
+                    }
+                },
+            }
+        }
+    }
+
+    if let Some(rawirs) = matches.values_of("RAWIR") {
+        let mut indices = matches.indices_of("RAWIR").unwrap();
+
+        for rawir in rawirs {
+            match irp::rawir::parse(rawir) {
+                Ok(raw) => {
+                    part.push((
+                        Part::Raw(Message {
+                            carrier: None,
+                            duty_cycle: None,
+                            raw,
+                        }),
+                        indices.next().unwrap(),
+                    ));
+                }
+                Err(msg) => {
+                    log.error(&msg);
+                    std::process::exit(2);
+                }
+            }
+        }
+    }
+
+    if let Some(gaps) = matches.values_of("GAP") {
+        let mut indices = matches.indices_of("GAP").unwrap();
+
+        for gap in gaps {
+            match gap.parse() {
+                Ok(0) | Err(_) => {
+                    log.error(&format!("{} is not a valid gap", gap));
+                    std::process::exit(2);
+                }
+                Ok(num) => {
+                    part.push((Part::Gap(num), indices.next().unwrap()));
+                }
+            }
+        }
+    }
+
+    part.sort_by(|a, b| a.1.cmp(&b.1));
+
+    let mut message = Message::new();
+    let mut gap = 125000;
+
+    for (part, _) in part {
+        match part {
+            Part::Gap(v) => {
+                gap = v;
+            }
+            Part::Raw(raw) => {
+                if !message.raw.is_empty() && !message.has_trailing_space() {
+                    message.raw.push(gap);
+                }
+
+                message.extend(&raw);
+            }
+        }
+    }
+
+    if message.raw.is_empty() {
+        log.error("nothing to send");
+        std::process::exit(2);
+    }
+
+    if !message.has_trailing_space() {
+        message.raw.push(gap);
+    }
+
+    (message, matches)
 }
 
 fn list_remotes(filename: &OsStr, remotes: &[LircRemote], needle: Option<&str>, log: &Log) {

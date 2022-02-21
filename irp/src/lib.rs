@@ -166,6 +166,20 @@ impl Message {
         self.raw.extend_from_slice(&other.raw);
     }
 
+    /// Do we have a trailing space
+    pub fn has_trailing_space(&self) -> bool {
+        let len = self.raw.len();
+
+        len > 0 && (len % 2) == 0
+    }
+
+    /// Remove any trailing space
+    pub fn remove_trailing_space(&mut self) {
+        if self.has_trailing_space() {
+            self.raw.pop();
+        }
+    }
+
     /// Print the flash and gap information as an raw ir string
     pub fn print_rawir(&self) -> String {
         rawir::print_to_string(&self.raw)
