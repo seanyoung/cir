@@ -1,6 +1,7 @@
 use super::{Flags, LircCode, LircRawCode, LircRemote};
 use crate::log::Log;
 use irp::{Irp, Message, Vartable};
+use itertools::Itertools;
 use num_integer::Integer;
 
 pub fn encode(
@@ -11,67 +12,94 @@ pub fn encode(
     log: &Log,
 ) -> Result<Message, String> {
     let mut message = Message::new();
-    let mut remote_found = false;
+
+    let remotes: Vec<&LircRemote> = lirc_remotes
+        .iter()
+        .filter(|r| {
+            if let Some(needle) = remote {
+                needle == r.name
+            } else {
+                true
+            }
+        })
+        .collect();
+
+    if remotes.is_empty() {
+        if let Some(needle) = remote {
+            return Err(format!("remote {} not found", needle));
+        } else {
+            return Err(String::from("no remote found"));
+        }
+    }
 
     for send_code in codes {
-        let mut code_found = false;
+        let remotes: Vec<(&LircRemote, usize)> = remotes
+            .iter()
+            .filter_map(|r| {
+                let count = r
+                    .codes
+                    .iter()
+                    .filter(|code| code.name == *send_code)
+                    .count()
+                    + r.raw_codes
+                        .iter()
+                        .filter(|code| code.name == *send_code)
+                        .count();
 
-        for lirc_remote in lirc_remotes {
-            if let Some(remote) = remote {
-                if lirc_remote.name != remote {
-                    continue;
+                if count > 0 {
+                    Some((*r, count))
+                } else {
+                    None
                 }
-            }
+            })
+            .collect();
 
-            remote_found = true;
-
-            for raw_code in &lirc_remote.raw_codes {
-                if raw_code.name == *send_code {
-                    if code_found {
-                        log.warning(&format!("multiple definitions of code {} found", send_code));
-                        break;
-                    }
-
-                    let encoded = lirc_remote.encode_raw(raw_code, repeats);
-
-                    message.extend(&encoded);
-
-                    code_found = true;
-                }
-            }
-
-            for code in &lirc_remote.codes {
-                if code.name == *send_code {
-                    if code_found {
-                        log.warning(&format!("multiple definitions of code {} found", send_code));
-                        break;
-                    }
-
-                    let encoded = lirc_remote.encode(code, repeats, log);
-
-                    message.extend(&encoded);
-
-                    code_found = true;
-                }
-            }
+        if remotes.len() > 1 {
+            log.warning(&format!(
+                "multiple remotes have a definition of code {}: {}",
+                send_code,
+                remotes
+                    .iter()
+                    .map(|remote| remote.0.name.as_str())
+                    .join(", ")
+            ));
         }
 
-        if remote_found && !code_found {
+        if remotes.is_empty() {
             return Err(format!("code {} not found", send_code));
         }
-    }
 
-    if !message.raw.is_empty() {
-        Ok(message)
-    } else {
-        if let Some(remote) = remote {
-            if !remote_found {
-                return Err(format!("remote {} not found", remote));
+        let (lirc_remote, count) = remotes[0];
+
+        if count > 1 {
+            log.warning(&format!(
+                "remote {} has {} definitions of the code {}",
+                lirc_remote.name, count, *send_code
+            ));
+        }
+
+        for raw_code in &lirc_remote.raw_codes {
+            if raw_code.name == *send_code {
+                let encoded = lirc_remote.encode_raw(raw_code, repeats);
+
+                message.extend(&encoded);
+
+                break;
             }
         }
 
-        Err(String::from("Nothing to send"))
+        for code in &lirc_remote.codes {
+            if code.name == *send_code {
+                let encoded = lirc_remote.encode(code, repeats, log);
+
+                message.extend(&encoded);
+
+                break;
+            }
+        }
     }
+
+    Ok(message)
 }
 
 impl LircRemote {
