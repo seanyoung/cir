@@ -61,7 +61,15 @@ impl<'a> LircParser<'a> {
             let line = self.next_line()?;
 
             if line.is_none() {
-                return Ok(remotes);
+                return if remotes.is_empty() {
+                    self.log.error(&format!(
+                        "{}: no remote definitions found",
+                        self.path.display()
+                    ));
+                    Err(())
+                } else {
+                    Ok(remotes)
+                };
             }
 
             let line = line.unwrap();

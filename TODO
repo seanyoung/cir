@@ -13,7 +13,8 @@
 - Need ir-ctl and ir-keytable command line parsing
 - localization of cli messages
 - scancode <=> irp mapping
-- lircd.conf reader/encoder/decoder generator
+- lircd.conf B&O support
+- lircd.conf generate -> send to lircd -> correct result?
 
 
   linux scancode  -> irp

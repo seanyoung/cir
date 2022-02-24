@@ -174,6 +174,29 @@ rawir: +871 -2894 +1363 -2188 +1229 -2192 +1230 -1102 +637 -1098 +638 -1094 +637
 "#
     );
 }
+
+#[test]
+fn empty_lircd_conf() {
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args(&["encode", "lircd", "testdata/lircd_conf/empty"])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stdout, "");
+
+    assert_eq!(
+        stderr,
+        r#"error: testdata/lircd_conf/empty: no remote definitions found
+"#
+    );
+}
+
 ///
 /// This tests needs a /dev/lirc0 rc-loopback device
 #[test]

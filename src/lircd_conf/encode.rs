@@ -138,6 +138,7 @@ impl LircRemote {
         let mut raw = raw_code.rawir[..length].to_vec();
 
         let space = if self.gap == 0 {
+            // TODO: is this right?
             20000
         } else if self.flags.contains(Flags::CONST_LENGTH) {
             let total_length: u32 = raw.iter().sum();
@@ -149,6 +150,7 @@ impl LircRemote {
 
         raw.push(space);
 
+        // what about repeat_gap?
         if self.min_repeat != 0 || repeats != 0 {
             for _ in 0..(self.min_repeat + repeats) {
                 raw.extend(&raw_code.rawir[..length]);

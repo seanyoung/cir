@@ -45,32 +45,32 @@ impl Log {
 
     pub fn trace(&self, msg: &str) {
         if self.level == Level::Trace {
-            println!("trace: {}", msg);
+            eprintln!("trace: {}", msg);
         }
     }
 
     pub fn info(&self, msg: &str) {
         match self.level {
-            Level::Info | Level::Trace | Level::Success => println!("info: {}", msg),
+            Level::Info | Level::Trace | Level::Success => eprintln!("info: {}", msg),
             _ => (),
         }
     }
 
     pub fn success(&self, msg: &str) {
         match self.level {
-            Level::Trace | Level::Success => println!("success: {}", msg),
+            Level::Trace | Level::Success => eprintln!("success: {}", msg),
             _ => (),
         }
     }
 
     pub fn warning(&self, msg: &str) {
         match self.level {
-            Level::Trace | Level::Success | Level::Warning => println!("warning: {}", msg),
+            Level::Trace | Level::Success | Level::Warning => eprintln!("warning: {}", msg),
             _ => (),
         }
     }
 
     pub fn error(&self, msg: &str) {
-        println!("error: {}", msg);
+        eprintln!("error: {}", msg);
     }
 }
