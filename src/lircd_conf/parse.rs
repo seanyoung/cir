@@ -362,7 +362,7 @@ impl<'a> LircParser<'a> {
 
     fn parse_number_arg(&self, arg_name: &str, arg: Option<&str>) -> Result<u64, ()> {
         if let Some(val) = arg {
-            if let Ok(val) = maybe_hex_number(val) {
+            if let Ok(val) = parse_number(val) {
                 Ok(val)
             } else {
                 self.log.error(&format!(
@@ -427,7 +427,7 @@ impl<'a> LircParser<'a> {
                             break;
                         }
 
-                        match maybe_hex_number(code) {
+                        match parse_number(code) {
                             Ok(code) => {
                                 values.push(code);
                             }
@@ -553,9 +553,9 @@ impl<'a> LircParser<'a> {
                 break;
             }
 
-            match maybe_hex_number(no) {
-                Ok(v) => rawir.push(v as u32),
-                Err(_) => {
+            match parse_number(no) {
+                Ok(v) if v <= u32::MAX as u64 => rawir.push(v as u32),
+                _ => {
                     self.log.error(&format!(
                         "{}:{}: invalid duration '{}'",
                         self.path.display(),
@@ -750,7 +750,8 @@ fn reverse(val: u64, bits: u64) -> u64 {
     res
 }
 
-fn maybe_hex_number(val: &str) -> Result<u64, ParseIntError> {
+/// Parse a number like strtoull in lirc daemon
+fn parse_number(val: &str) -> Result<u64, ParseIntError> {
     if let Some(hex) = val.strip_prefix("0x") {
         u64::from_str_radix(hex, 16)
     } else if let Some(hex) = val.strip_prefix("0X") {
