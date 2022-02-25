@@ -404,12 +404,9 @@ impl<'a> LircParser<'a> {
 
             let mut words = line.split_whitespace();
 
-            let first = words.next();
-            let second = words.next();
-
-            match first {
+            match words.next() {
                 Some("end") => {
-                    if let Some("codes") = second {
+                    if let Some("codes") = words.next() {
                         return Ok(codes);
                     }
 
@@ -423,58 +420,45 @@ impl<'a> LircParser<'a> {
                     return Err(());
                 }
                 Some(name) => {
-                    let mut code = if let Some(scancode) = second {
-                        match maybe_hex_number(scancode) {
-                            Ok(scancode) => {
-                                let dup = codes.iter().any(|c| c.name == name);
+                    let mut values = Vec::new();
 
-                                LircCode {
-                                    name: name.to_owned(),
-                                    dup,
-                                    code: vec![scancode],
-                                }
-                            }
-                            Err(_) => {
-                                self.log.error(&format!(
-                                    "{}:{}: scancode '{}' is not valid",
-                                    self.path.display(),
-                                    self.line_no,
-                                    scancode,
-                                ));
-                                return Err(());
-                            }
-                        }
-                    } else {
-                        self.log.error(&format!(
-                            "{}:{}: missing scancode",
-                            self.path.display(),
-                            self.line_no
-                        ));
-                        return Err(());
-                    };
-
-                    for scancode in words {
-                        if scancode.starts_with('#') {
+                    for code in words {
+                        if code.starts_with('#') {
                             break;
                         }
 
-                        match maybe_hex_number(scancode) {
-                            Ok(scancode) => {
-                                code.code.push(scancode);
+                        match maybe_hex_number(code) {
+                            Ok(code) => {
+                                values.push(code);
                             }
                             Err(_) => {
                                 self.log.error(&format!(
-                                    "{}:{}: scancode '{}' is not valid",
+                                    "{}:{}: code '{}' is not valid",
                                     self.path.display(),
                                     self.line_no,
-                                    scancode,
+                                    code,
                                 ));
                                 return Err(());
                             }
                         }
                     }
 
-                    codes.push(code);
+                    if values.is_empty() {
+                        self.log.error(&format!(
+                            "{}:{}: missing code",
+                            self.path.display(),
+                            self.line_no
+                        ));
+                        return Err(());
+                    }
+
+                    let dup = codes.iter().any(|c| c.name == name);
+
+                    codes.push(LircCode {
+                        name: name.to_owned(),
+                        dup,
+                        code: values,
+                    });
                 }
                 None => (),
             }
