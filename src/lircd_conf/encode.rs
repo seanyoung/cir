@@ -32,22 +32,23 @@ pub fn encode(
         }
     }
 
-    for send_code in codes {
+    for encode_code in codes {
         let remotes: Vec<(&Remote, usize)> = remotes
             .iter()
-            .filter_map(|r| {
-                let count = r
+            .filter_map(|remote| {
+                let count = remote
                     .codes
                     .iter()
-                    .filter(|code| code.name == *send_code)
+                    .filter(|code| code.name == *encode_code)
                     .count()
-                    + r.raw_codes
+                    + remote
+                        .raw_codes
                         .iter()
-                        .filter(|code| code.name == *send_code)
+                        .filter(|code| code.name == *encode_code)
                         .count();
 
                 if count > 0 {
-                    Some((*r, count))
+                    Some((*remote, count))
                 } else {
                     None
                 }
@@ -57,7 +58,7 @@ pub fn encode(
         if remotes.len() > 1 {
             log.warning(&format!(
                 "multiple remotes have a definition of code {}: {}",
-                send_code,
+                encode_code,
                 remotes
                     .iter()
                     .map(|remote| remote.0.name.as_str())
@@ -66,21 +67,21 @@ pub fn encode(
         }
 
         if remotes.is_empty() {
-            return Err(format!("code {} not found", send_code));
+            return Err(format!("code {} not found", encode_code));
         }
 
-        let (lirc_remote, count) = remotes[0];
+        let (remote, count) = remotes[0];
 
         if count > 1 {
             log.warning(&format!(
                 "remote {} has {} definitions of the code {}",
-                lirc_remote.name, count, *send_code
+                remote.name, count, *encode_code
             ));
         }
 
-        for raw_code in &lirc_remote.raw_codes {
-            if raw_code.name == *send_code {
-                let encoded = lirc_remote.encode_raw(raw_code, repeats);
+        for raw_code in &remote.raw_codes {
+            if raw_code.name == *encode_code {
+                let encoded = remote.encode_raw(raw_code, repeats);
 
                 message.extend(&encoded);
 
@@ -88,9 +89,9 @@ pub fn encode(
             }
         }
 
-        for code in &lirc_remote.codes {
-            if code.name == *send_code {
-                let encoded = lirc_remote.encode(code, repeats, log);
+        for code in &remote.codes {
+            if code.name == *encode_code {
+                let encoded = remote.encode(code, repeats, log);
 
                 message.extend(&encoded);
 
