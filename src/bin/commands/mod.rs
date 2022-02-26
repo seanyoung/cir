@@ -383,7 +383,7 @@ fn list_remotes(filename: &OsStr, remotes: &[Remote], needle: Option<&str>, log:
     if size.is_some() {
         println!(
             "\nAvailable remotes and codes in {}:\n",
-            filename.to_string_lossy()
+            Path::new(filename).display()
         );
     }
 
