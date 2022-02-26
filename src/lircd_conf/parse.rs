@@ -58,7 +58,7 @@ impl<'a> LircParser<'a> {
         let mut remotes = Vec::new();
 
         loop {
-            let line = self.next_line()?;
+            let line = self.next_line();
 
             if line.is_none() {
                 return if remotes.is_empty() {
@@ -105,7 +105,7 @@ impl<'a> LircParser<'a> {
         };
 
         loop {
-            let line = self.next_line()?;
+            let line = self.next_line();
 
             if line.is_none() {
                 self.log.error(&format!(
@@ -389,7 +389,7 @@ impl<'a> LircParser<'a> {
         let mut codes = Vec::new();
 
         loop {
-            let line = self.next_line()?;
+            let line = self.next_line();
 
             if line.is_none() {
                 self.log.error(&format!(
@@ -470,7 +470,7 @@ impl<'a> LircParser<'a> {
         let mut raw_code = None;
 
         loop {
-            let line = self.next_line()?;
+            let line = self.next_line();
 
             if line.is_none() {
                 self.log.error(&format!(
@@ -570,22 +570,16 @@ impl<'a> LircParser<'a> {
         Ok(rawir)
     }
 
-    fn next_line(&mut self) -> Result<Option<String>, ()> {
+    fn next_line(&mut self) -> Option<String> {
         loop {
-            let line = self.lines.next();
-
-            if line.is_none() {
-                return Ok(None);
-            }
-
-            let line = line.unwrap();
+            let line = self.lines.next()?;
 
             self.line_no += 1;
 
             let trimmed = line.trim();
 
             if !trimmed.is_empty() && !line.starts_with('#') {
-                return Ok(Some(trimmed.to_owned()));
+                return Some(trimmed.to_owned());
             }
         }
     }
