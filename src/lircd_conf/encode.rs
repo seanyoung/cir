@@ -1,11 +1,11 @@
-use super::{Flags, LircCode, LircRawCode, LircRemote};
+use super::{Code, Flags, RawCode, Remote};
 use crate::log::Log;
 use irp::{Irp, Message, Vartable};
 use itertools::Itertools;
 use num_integer::Integer;
 
 pub fn encode(
-    lirc_remotes: &[LircRemote],
+    lirc_remotes: &[Remote],
     remote: Option<&str>,
     codes: &[&str],
     repeats: u64,
@@ -13,7 +13,7 @@ pub fn encode(
 ) -> Result<Message, String> {
     let mut message = Message::new();
 
-    let remotes: Vec<&LircRemote> = lirc_remotes
+    let remotes: Vec<&Remote> = lirc_remotes
         .iter()
         .filter(|r| {
             if let Some(needle) = remote {
@@ -33,7 +33,7 @@ pub fn encode(
     }
 
     for send_code in codes {
-        let remotes: Vec<(&LircRemote, usize)> = remotes
+        let remotes: Vec<(&Remote, usize)> = remotes
             .iter()
             .filter_map(|r| {
                 let count = r
@@ -102,9 +102,9 @@ pub fn encode(
     Ok(message)
 }
 
-impl LircRemote {
+impl Remote {
     /// Encode code for this remote, with the given repeats
-    pub fn encode(&self, code: &LircCode, repeats: u64, log: &Log) -> Message {
+    pub fn encode(&self, code: &Code, repeats: u64, log: &Log) -> Message {
         let irp = self.irp();
 
         log.info(&format!("irp for remote {}: {}", self.name, irp));
@@ -127,7 +127,7 @@ impl LircRemote {
     }
 
     /// Encode raw code for this remote, with the given repeats
-    pub fn encode_raw(&self, raw_code: &LircRawCode, repeats: u64) -> Message {
+    pub fn encode_raw(&self, raw_code: &RawCode, repeats: u64) -> Message {
         // remove trailing space
         let length = if raw_code.rawir.len().is_even() {
             raw_code.rawir.len() - 1

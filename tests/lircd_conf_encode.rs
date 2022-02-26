@@ -1,6 +1,6 @@
 use irp::{rawir, Irp, Message, Vartable};
 use linux_infrared::{
-    lircd_conf::{parse, Flags, LircRemote},
+    lircd_conf::{parse, Flags, Remote},
     log::Log,
 };
 use num_integer::Integer;
@@ -13,7 +13,7 @@ use std::{
 };
 
 #[derive(Deserialize)]
-struct Remote {
+struct RemoteTestData {
     name: String,
     codes: Vec<Code>,
 }
@@ -65,7 +65,7 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
 
-    let testdata: Vec<Remote> = serde_json::from_str(&data).expect("failed to deserialize");
+    let testdata: Vec<RemoteTestData> = serde_json::from_str(&data).expect("failed to deserialize");
 
     let lircd_conf = parse(conf, log).expect("parse should work");
 
@@ -181,7 +181,7 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
     }
 }
 
-fn compare_output(remote: &LircRemote, lircd: &[u32], our: &[u32]) -> bool {
+fn compare_output(remote: &Remote, lircd: &[u32], our: &[u32]) -> bool {
     if lircd.len() < our.len() {
         let len = lircd.len();
         if our[len] > 100000 && lircd == &our[..len] {

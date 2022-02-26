@@ -9,14 +9,14 @@ mod parse;
 pub use encode::encode;
 
 #[derive(Debug)]
-pub struct LircCode {
+pub struct Code {
     pub name: String,
     pub dup: bool,
     pub code: Vec<u64>,
 }
 
 #[derive(Debug)]
-pub struct LircRawCode {
+pub struct RawCode {
     pub name: String,
     pub dup: bool,
     pub rawir: Vec<u32>,
@@ -46,7 +46,7 @@ bitflags! {
 }
 
 #[derive(Debug, Default)]
-pub struct LircRemote {
+pub struct Remote {
     pub name: String,
     pub driver: String,
     pub serial_mode: String,
@@ -81,13 +81,13 @@ pub struct LircRemote {
     pub manual_sort: u64,
     pub min_code_repeat: u64,
     pub ignore_mask: u64,
-    pub codes: Vec<LircCode>,
-    pub raw_codes: Vec<LircRawCode>,
+    pub codes: Vec<Code>,
+    pub raw_codes: Vec<RawCode>,
 }
 
 /// Read a lircd.conf file at the path specified. Such a file may contain multiple
 /// remotes. Any parse errors or warnings are send to the log.
 #[allow(clippy::result_unit_err)]
-pub fn parse<P: AsRef<Path>>(path: P, log: &Log) -> Result<Vec<LircRemote>, ()> {
+pub fn parse<P: AsRef<Path>>(path: P, log: &Log) -> Result<Vec<Remote>, ()> {
     parse::LircParser::parse(path.as_ref(), log)
 }

@@ -1,9 +1,9 @@
-use super::{Flags, LircRemote};
+use super::{Flags, Remote};
 
 // TODO:
 // - B&O
 
-impl LircRemote {
+impl Remote {
     /// Build an IRP representation for the remote. This can be used both for encoding
     /// and decoding.
     pub fn irp(&self) -> String {
@@ -146,7 +146,7 @@ impl LircRemote {
     }
 }
 
-fn add_irp_body(remote: &LircRemote, irp: &mut String, repeat: bool) {
+fn add_irp_body(remote: &Remote, irp: &mut String, repeat: bool) {
     let supress_header = repeat && remote.flags.contains(Flags::NO_HEAD_REP);
     let supress_footer = repeat && remote.flags.contains(Flags::NO_FOOT_REP);
 
@@ -241,7 +241,7 @@ fn add_irp_body(remote: &LircRemote, irp: &mut String, repeat: bool) {
     }
 }
 
-fn add_gap(remote: &LircRemote, irp: &mut String, repeat: bool) {
+fn add_gap(remote: &Remote, irp: &mut String, repeat: bool) {
     if remote.gap != 0 || remote.repeat_gap != 0 {
         let gap = if remote.repeat_gap != 0 {
             remote.repeat_gap
@@ -269,7 +269,7 @@ fn add_gap(remote: &LircRemote, irp: &mut String, repeat: bool) {
     }
 }
 
-fn toggle_post_data(remote: &LircRemote) -> bool {
+fn toggle_post_data(remote: &Remote) -> bool {
     remote.toggle_mask != 0 && (remote.toggle_mask & gen_mask(remote.post_data_bits)) != 0
 }
 
@@ -281,7 +281,7 @@ enum Stream<'a> {
 }
 
 fn add_bit_stream(
-    remote: &LircRemote,
+    remote: &Remote,
     stream: Stream,
     bits: u64,
     toggle_mask: u64,

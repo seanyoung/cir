@@ -1,7 +1,7 @@
 use irp::{Irp, Message, Pronto};
 use linux_infrared::{
     lirc,
-    lircd_conf::{self, LircRemote},
+    lircd_conf::{self, Remote},
     log::Log,
     rcdev::{enumerate_rc_dev, Rcdev},
 };
@@ -377,7 +377,7 @@ fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a c
     (message, matches)
 }
 
-fn list_remotes(filename: &OsStr, remotes: &[LircRemote], needle: Option<&str>, log: &Log) {
+fn list_remotes(filename: &OsStr, remotes: &[Remote], needle: Option<&str>, log: &Log) {
     let size = terminal_size();
 
     if size.is_some() {

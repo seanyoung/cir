@@ -1,4 +1,4 @@
-use super::{Flags, LircCode, LircRawCode, LircRemote};
+use super::{Code, Flags, RawCode, Remote};
 use crate::log::Log;
 use std::num::ParseIntError;
 use std::str::Lines;
@@ -21,7 +21,7 @@ pub struct LircParser<'a> {
 /// garbage is permitted when 'begin remote' is expected, and most lines can have
 /// trailing characters after the first two tokens.
 impl<'a> LircParser<'a> {
-    pub fn parse(path: &Path, log: &'a Log) -> Result<Vec<LircRemote>, ()> {
+    pub fn parse(path: &Path, log: &'a Log) -> Result<Vec<Remote>, ()> {
         let mut file = OpenOptions::new()
             .read(true)
             .open(path)
@@ -54,7 +54,7 @@ impl<'a> LircParser<'a> {
         parser.read()
     }
 
-    fn read(&mut self) -> Result<Vec<LircRemote>, ()> {
+    fn read(&mut self) -> Result<Vec<Remote>, ()> {
         let mut remotes = Vec::new();
 
         loop {
@@ -98,8 +98,8 @@ impl<'a> LircParser<'a> {
         }
     }
 
-    fn read_remote(&mut self) -> Result<LircRemote, ()> {
-        let mut remote = LircRemote {
+    fn read_remote(&mut self) -> Result<Remote, ()> {
+        let mut remote = Remote {
             frequency: 38000,
             ..Default::default()
         };
@@ -385,7 +385,7 @@ impl<'a> LircParser<'a> {
         }
     }
 
-    fn read_codes(&mut self) -> Result<Vec<LircCode>, ()> {
+    fn read_codes(&mut self) -> Result<Vec<Code>, ()> {
         let mut codes = Vec::new();
 
         loop {
@@ -454,7 +454,7 @@ impl<'a> LircParser<'a> {
 
                     let dup = codes.iter().any(|c| c.name == name);
 
-                    codes.push(LircCode {
+                    codes.push(Code {
                         name: name.to_owned(),
                         dup,
                         code: values,
@@ -465,7 +465,7 @@ impl<'a> LircParser<'a> {
         }
     }
 
-    fn read_raw_codes(&mut self) -> Result<Vec<LircRawCode>, ()> {
+    fn read_raw_codes(&mut self) -> Result<Vec<RawCode>, ()> {
         let mut raw_codes = Vec::new();
         let mut raw_code = None;
 
@@ -511,7 +511,7 @@ impl<'a> LircParser<'a> {
 
                         let dup = raw_codes.iter().any(|c| c.name == name);
 
-                        raw_code = Some(LircRawCode {
+                        raw_code = Some(RawCode {
                             name: name.to_owned(),
                             dup,
                             rawir: self.read_lengths(words)?,
@@ -585,7 +585,7 @@ impl<'a> LircParser<'a> {
     }
 
     /// Do some sanity checks and cleanups. Returns false for invalid
-    fn sanity_checks(&self, remote: &mut LircRemote) -> bool {
+    fn sanity_checks(&self, remote: &mut Remote) -> bool {
         if remote.name.is_empty() {
             self.log.error(&format!(
                 "{}:{}: missing remote name",
