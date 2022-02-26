@@ -3,9 +3,7 @@ use clap::{Arg, ArgGroup, Command};
 use evdev::Device;
 use itertools::Itertools;
 use linux_infrared::{lirc, log::Log, rcdev};
-use std::convert::TryInto;
-use std::os::unix::io::AsRawFd;
-use std::path::PathBuf;
+use std::{convert::TryInto, os::unix::io::AsRawFd, path::PathBuf};
 
 mod commands;
 
@@ -304,19 +302,19 @@ fn main() {
                 )
                 .subcommand(
                     Command::new("lircd")
-                        .about("Parse lircd.conf file codes and transmit")
+                        .about("Transmit codes from lircd.conf file")
                         .arg(
                             Arg::new("CARRIER")
                                 .long("carrier")
                                 .short('c')
-                                .help("Set carrier in Hz, 0 for unmodulated")
+                                .help("Override carrier in Hz, 0 for unmodulated")
                                 .takes_value(true),
                         )
                         .arg(
                             Arg::new("DUTY_CYCLE")
                                 .long("duty-cycle")
                                 .short('u')
-                                .help("Set send duty cycle % (1 to 99)")
+                                .help("Override duty cycle % (1 to 99)")
                                 .takes_value(true),
                         )
                         .arg(
@@ -342,7 +340,7 @@ fn main() {
                         )
                         .arg(
                             Arg::new("CODES")
-                                .help("Code to send")
+                                .help("Code to send, leave empty to list codes")
                                 .multiple_occurrences(true)
                                 .takes_value(true),
                         ),

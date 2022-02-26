@@ -1,7 +1,7 @@
 use irp::{Irp, Message, Pronto};
 use linux_infrared::{
     lirc,
-    lircd_conf::{self, Remote},
+    lircd_conf::{encode, parse, Remote},
     log::Log,
     rcdev::{enumerate_rc_dev, Rcdev},
 };
@@ -208,7 +208,7 @@ pub fn encode_args<'a>(
         Some(("lircd", matches)) => {
             let filename = matches.value_of_os("CONF").unwrap();
 
-            let remotes = match lircd_conf::parse(filename, log) {
+            let remotes = match parse(filename, log) {
                 Ok(r) => r,
                 Err(_) => std::process::exit(2),
             };
@@ -227,7 +227,7 @@ pub fn encode_args<'a>(
 
             if let Some(codes) = matches.values_of("CODES") {
                 let codes: Vec<&str> = codes.collect();
-                let m = lircd_conf::encode(&remotes, remote, &codes, repeats, log);
+                let m = encode(&remotes, remote, &codes, repeats, log);
 
                 match m {
                     Ok(m) => (m, matches),
