@@ -734,11 +734,12 @@ fn gen_mask(v: u64) -> u64 {
 
 fn reverse(val: u64, bits: u64) -> u64 {
     let mut res = 0u64;
+    let mut val = val;
 
-    for i in 0..bits {
-        if val & (1u64 << i) != 0 {
-            res |= 1u64 << (bits - 1 - i);
-        }
+    for _ in 0..bits {
+        res <<= 1;
+        res |= val & 1;
+        val >>= 1;
     }
 
     res
