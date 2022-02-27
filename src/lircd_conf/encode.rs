@@ -138,24 +138,30 @@ impl Remote {
 
         let mut raw = raw_code.rawir[..length].to_vec();
 
-        let space = if self.gap == 0 {
+        // TODO: use gap2
+        let mut gap = if self.gap == 0 {
             // TODO: is this right?
             20000
-        } else if self.flags.contains(Flags::CONST_LENGTH) {
+        } else {
             let total_length: u32 = raw.iter().sum();
 
-            self.gap as u32 - total_length
-        } else {
-            self.gap as u32
+            if self.flags.contains(Flags::CONST_LENGTH) && (total_length as u64) < self.gap {
+                self.gap as u32 - total_length
+            } else {
+                self.gap as u32
+            }
         };
 
-        raw.push(space);
+        raw.push(gap);
 
-        // what about repeat_gap?
         if self.min_repeat != 0 || repeats != 0 {
+            if self.repeat_gap != 0 {
+                gap = self.repeat_gap as u32;
+            }
+
             for _ in 0..(self.min_repeat + repeats) {
                 raw.extend(&raw_code.rawir[..length]);
-                raw.push(space);
+                raw.push(gap);
             }
         }
 

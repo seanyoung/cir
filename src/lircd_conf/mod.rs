@@ -72,6 +72,7 @@ pub struct Remote {
     pub pre: (u64, u64),
     pub post: (u64, u64),
     pub gap: u64,
+    pub gap2: u64,
     pub repeat_gap: u64,
     pub suppress_repeat: u64,
     pub frequency: u64,

@@ -242,8 +242,8 @@ fn add_irp_body(remote: &Remote, irp: &mut String, repeat: bool) {
 }
 
 fn add_gap(remote: &Remote, irp: &mut String, repeat: bool) {
-    if remote.gap != 0 || remote.repeat_gap != 0 {
-        let gap = if remote.repeat_gap != 0 {
+    if remote.gap != 0 || (remote.repeat_gap != 0 && repeat) {
+        let gap = if repeat && remote.repeat_gap != 0 {
             remote.repeat_gap
         } else if !repeat
             && remote

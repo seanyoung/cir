@@ -169,7 +169,6 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "pre_data")
                 | Some(name @ "post_data_bits")
                 | Some(name @ "post_data")
-                | Some(name @ "gap")
                 | Some(name @ "frequency")
                 | Some(name @ "duty_cycle")
                 | Some(name @ "min_repeat")
@@ -195,7 +194,6 @@ impl<'a> LircParser<'a> {
                         "pre_data" => remote.pre_data = val,
                         "post_data_bits" => remote.post_data_bits = val,
                         "post_data" => remote.post_data = val,
-                        "gap" => remote.gap = val,
                         "frequency" => remote.frequency = val,
                         "duty_cycle" => remote.duty_cycle = val,
                         "min_repeat" => remote.min_repeat = val,
@@ -211,6 +209,14 @@ impl<'a> LircParser<'a> {
                         "min_code_repeat" => remote.min_code_repeat = val,
                         "ignore_mask" => remote.ignore_mask = val,
                         _ => unreachable!(),
+                    }
+                }
+                Some(name @ "gap") => {
+                    remote.gap = self.parse_number_arg(name, second)?;
+
+                    let gap2 = words.next();
+                    if gap2.is_some() {
+                        remote.gap2 = self.parse_number_arg(name, gap2)?;
                     }
                 }
                 Some(name @ "header")
