@@ -2,11 +2,11 @@
 name = "linux-infrared"
 version = "0.1.0"
 authors = ["Sean Young <sean@mess.org>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 irp = { path = "irp" }
-clap = "3.0"
+clap = "3.1"
 toml = "0.5"
 serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
