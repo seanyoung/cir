@@ -1,8 +1,5 @@
 use super::{Flags, Remote};
 
-// TODO:
-// - B&O
-
 impl Remote {
     /// Build an IRP representation for the remote. This can be used both for encoding
     /// and decoding.
@@ -19,14 +16,16 @@ impl Remote {
 
         irp.push_str("msb}<");
 
-        if self.flags.contains(Flags::XMP) {
-            for i in 0..16 {
-                irp.push_str(&format!(
-                    "{},-{}|",
-                    self.bit[0].0,
-                    self.bit[0].1 + i * self.bit[1].1
-                ));
-            }
+        if self.flags.contains(Flags::BO) {
+            irp.push_str(&format!(
+                "<{},-zeroGap,zeroGap={},oneGap={}|{},-oneGap,zeroGap={},oneGap={},",
+                self.bit[1].0,
+                self.bit[2].1,
+                self.bit[3].1,
+                self.bit[2].0,
+                self.bit[1].1,
+                self.bit[2].1,
+            ));
         } else if self.flags.contains(Flags::GRUNDIG) {
             // bit 0
             irp.push_str(&format!("-{},{}|", self.bit[3].1, self.bit[3].0));
@@ -45,6 +44,14 @@ impl Remote {
                 "-{},{},-{},{}|",
                 self.bit[0].1, self.bit[0].0, self.bit[2].1, self.bit[2].0
             ));
+        } else if self.flags.contains(Flags::XMP) {
+            for i in 0..16 {
+                irp.push_str(&format!(
+                    "{},-{}|",
+                    self.bit[0].0,
+                    self.bit[0].1 + i * self.bit[1].1
+                ));
+            }
         } else {
             for (bit_no, (pulse, space)) in self.bit.iter().enumerate() {
                 if *pulse == 0 && *space == 0 {
@@ -125,8 +132,22 @@ impl Remote {
             }
         }
 
-        if toggle_post_data(self) {
-            irp.push_str(&format!("{{POST=0x{:x}}}", self.post_data));
+        if toggle_post_data(self) || self.flags.contains(Flags::BO) {
+            irp.push('{');
+
+            if toggle_post_data(self) {
+                irp.push_str(&format!("POST=0x{:x},", self.post_data));
+            }
+
+            if self.flags.contains(Flags::BO) {
+                irp.push_str(&format!(
+                    "zeroGap={},oneGap={},",
+                    self.bit[1].1, self.bit[3].1
+                ));
+            }
+
+            irp.pop();
+            irp.push('}');
         }
 
         irp.push_str(&format!(" [CODE:0..{}", gen_mask(self.bits)));
@@ -149,6 +170,13 @@ impl Remote {
 fn add_irp_body(remote: &Remote, irp: &mut String, repeat: bool) {
     let supress_header = repeat && remote.flags.contains(Flags::NO_HEAD_REP);
     let supress_footer = repeat && remote.flags.contains(Flags::NO_FOOT_REP);
+
+    if remote.flags.contains(Flags::BO) {
+        irp.push_str(&format!(
+            "{},-{},{},-{},",
+            remote.bit[1].0, remote.bit[1].1, remote.bit[1].0, remote.bit[1].1
+        ));
+    }
 
     if !supress_header && remote.header.0 != 0 && remote.header.1 != 0 {
         irp.push_str(&format!("{},-{},", remote.header.0, remote.header.1));

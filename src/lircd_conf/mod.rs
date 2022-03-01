@@ -27,6 +27,7 @@ bitflags! {
     pub struct Flags: u32 {
         const RAW_CODES = 0x0001;
         const RC5 = 0x0002;
+        // SHIFT_ENC is an alias for RC5
         const SHIFT_ENC = 0x0002;
         const RC6 = 0x0004;
         const RCMM = 0x0008;
@@ -41,7 +42,6 @@ bitflags! {
         const NO_FOOT_REP = 0x2000;
         const CONST_LENGTH = 0x4000;
         const REPEAT_HEADER = 0x8000;
-        const COMPAT_REVERSE = 0x10000;
     }
 }
 
