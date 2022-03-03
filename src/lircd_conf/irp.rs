@@ -27,22 +27,29 @@ impl Remote {
                 self.bit[2].1,
             ));
         } else if self.flags.contains(Flags::GRUNDIG) {
-            // bit 0
-            irp.push_str(&format!("-{},{}|", self.bit[3].1, self.bit[3].0));
-            // bit 1
             irp.push_str(&format!(
-                "-{},{},-{},{}|",
-                self.bit[2].1, self.bit[2].0, self.bit[0].1, self.bit[0].0
-            ));
-            // bit 2
-            irp.push_str(&format!(
-                "-{},{},-{},{}|",
-                self.bit[1].1, self.bit[1].0, self.bit[1].1, self.bit[1].0
-            ));
-            // bit 3
-            irp.push_str(&format!(
-                "-{},{},-{},{}|",
-                self.bit[0].1, self.bit[0].0, self.bit[2].1, self.bit[2].0
+                "-{},{}|\
+                -{},{},-{},{}|\
+                -{},{},-{},{}|\
+                -{},{},-{},{}|",
+                // bit 0
+                self.bit[3].1,
+                self.bit[3].0,
+                // bit 1
+                self.bit[2].1,
+                self.bit[2].0,
+                self.bit[0].1,
+                self.bit[0].0,
+                // bit 2
+                self.bit[1].1,
+                self.bit[1].0,
+                self.bit[1].1,
+                self.bit[1].0,
+                // bit 3
+                self.bit[0].1,
+                self.bit[0].0,
+                self.bit[2].1,
+                self.bit[2].0,
             ));
         } else if self.flags.contains(Flags::XMP) {
             for i in 0..16 {

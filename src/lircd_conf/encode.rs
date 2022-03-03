@@ -117,7 +117,7 @@ impl Remote {
         for code in &code.code {
             let mut vars = Vartable::new();
 
-            vars.set(String::from("CODE"), *code as i64, 32);
+            vars.set(String::from("CODE"), *code as i64, self.bits as u8);
 
             let m = irp.encode(vars, repeats).expect("encode should succeed");
 
