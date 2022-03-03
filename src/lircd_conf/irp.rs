@@ -18,7 +18,7 @@ impl Remote {
 
         if self.flags.contains(Flags::BO) {
             irp.push_str(&format!(
-                "<{},-zeroGap,zeroGap={},oneGap={}|{},-oneGap,zeroGap={},oneGap={},",
+                "{},-zeroGap,zeroGap={},oneGap={}|{},-oneGap,zeroGap={},oneGap={}|",
                 self.bit[1].0,
                 self.bit[2].1,
                 self.bit[3].1,
