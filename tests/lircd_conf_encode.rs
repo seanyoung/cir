@@ -1,8 +1,8 @@
-use irp::{rawir, Irp, Message, Vartable};
-use linux_infrared::{
+use cir::{
     lircd_conf::{parse, Flags, Remote},
     log::Log,
 };
+use irp::{rawir, Irp, Message, Vartable};
 use num_integer::Integer;
 use serde::Deserialize;
 use std::{

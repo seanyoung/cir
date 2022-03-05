@@ -1,9 +1,9 @@
+use cir::keymap;
 use evdev::{Device, Key};
-use linux_infrared::keymap;
 use std::{convert::TryFrom, fs, path::PathBuf, str::FromStr};
 
 use super::{find_devices, Purpose};
-use linux_infrared::rc_maps::parse_rc_maps_file;
+use cir::rc_maps::parse_rc_maps_file;
 
 pub fn config(matches: &clap::ArgMatches) {
     let rcdev = find_devices(matches, Purpose::Receive);

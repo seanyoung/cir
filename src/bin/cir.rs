@@ -1,8 +1,8 @@
 use aya::programs::LircMode2;
+use cir::{lirc, log::Log, rcdev};
 use clap::{Arg, ArgGroup, Command};
 use evdev::Device;
 use itertools::Itertools;
-use linux_infrared::{lirc, log::Log, rcdev};
 use std::{convert::TryInto, os::unix::io::AsRawFd, path::PathBuf};
 
 mod commands;

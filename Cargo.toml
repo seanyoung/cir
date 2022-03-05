@@ -1,5 +1,5 @@
 [package]
-name = "linux-infrared"
+name = "cir"
 version = "0.1.0"
 authors = ["Sean Young <sean@mess.org>"]
 edition = "2021"

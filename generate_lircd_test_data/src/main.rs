@@ -1,4 +1,4 @@
-use linux_infrared::lirc;
+use cir::lirc;
 use nix::{
     sys::signal::{self, Signal},
     unistd::Pid,
@@ -24,7 +24,7 @@ use std::{
  * and codes, and then asks lircd to transmit. The IR is captured over rc-loopback. All this
  * data is saved to a json file.
  *
- * The purpose of this is to ensure that the IR encoder of linux-infrared matches what lircd
+ * The purpose of this is to ensure that the IR encoder of cir matches what lircd
  * would send.
  *
  * There are a few bugs in lircd which make this very awkward

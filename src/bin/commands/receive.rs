@@ -1,5 +1,5 @@
+use cir::lirc;
 use evdev::{Device, InputEventKind};
-use linux_infrared::lirc;
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
 use nix::fcntl::{FcntlArg, OFlag};
 use std::os::unix::io::AsRawFd;

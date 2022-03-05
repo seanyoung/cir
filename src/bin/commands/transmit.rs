@@ -1,5 +1,5 @@
 use super::{encode_args, open_lirc, Purpose};
-use linux_infrared::log::Log;
+use cir::log::Log;
 
 pub fn transmit(global_matches: &clap::ArgMatches, log: &Log) {
     let (message, matches) = encode_args(global_matches, log);

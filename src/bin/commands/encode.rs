@@ -1,5 +1,5 @@
 use super::encode_args;
-use linux_infrared::log::Log;
+use cir::log::Log;
 
 pub fn encode(matches: &clap::ArgMatches, log: &Log) {
     let (message, _) = encode_args(matches, log);
