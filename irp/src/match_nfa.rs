@@ -156,12 +156,14 @@ impl<'a> Matcher<'a> {
                         work.push((ir, dest, vartab));
                     }
                     Edge::Done => {
-                        let (val, _) = Expression::Identifier(String::from("$bits"))
-                            .eval(&vartab)
-                            .unwrap();
-                        self.reset();
+                        if vartab.is_defined("$bits") {
+                            let (val, _) = Expression::Identifier(String::from("$bits"))
+                                .eval(&vartab)
+                                .unwrap();
+                            self.reset();
 
-                        return Some(val as u64);
+                            return Some(val as u64);
+                        }
                     }
                 }
             }
@@ -260,7 +262,6 @@ mod test {
     }
 
     #[test]
-    #[ignore] // broken
     fn rc5() {
         // RC5
         let irp = Irp::parse("{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)[D:0..31,F:0..127,T@:0..1=0]").unwrap();
@@ -274,6 +275,6 @@ mod test {
         let  res = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");
 
-        assert_eq!(res, Some(196));
+        assert_eq!(res, Some(6017));
     }
 }

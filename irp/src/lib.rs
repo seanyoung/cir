@@ -230,7 +230,7 @@ pub enum Unit {
     Pulses,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum RepeatMarker {
     Any,
     OneOrMore,
@@ -238,14 +238,14 @@ pub enum RepeatMarker {
     CountOrMore(i64),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct IrStream {
     bit_spec: Vec<Expression>,
     stream: Vec<Expression>,
     repeat: Option<RepeatMarker>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Expression {
     FlashConstant(f64, Unit),
     GapConstant(f64, Unit),
@@ -304,13 +304,13 @@ impl fmt::Display for Expression {
         match self {
             Expression::Number(v) => write!(f, "{}", v),
             Expression::Identifier(id) => write!(f, "{}", id),
-            Expression::Add(left, right) => write!(f, "{} + {}", left, right),
-            Expression::Subtract(left, right) => write!(f, "{} - {}", left, right),
-            Expression::Multiply(left, right) => write!(f, "{} * {}", left, right),
-            Expression::BitwiseOr(left, right) => write!(f, "{} | {}", left, right),
-            Expression::BitwiseAnd(left, right) => write!(f, "{} & {}", left, right),
-            Expression::ShiftLeft(left, right) => write!(f, "{} << {}", left, right),
-            Expression::ShiftRight(left, right) => write!(f, "{} >> {}", left, right),
+            Expression::Add(left, right) => write!(f, "({} + {})", left, right),
+            Expression::Subtract(left, right) => write!(f, "({} - {})", left, right),
+            Expression::Multiply(left, right) => write!(f, "({} * {})", left, right),
+            Expression::BitwiseOr(left, right) => write!(f, "({} | {})", left, right),
+            Expression::BitwiseAnd(left, right) => write!(f, "({} & {})", left, right),
+            Expression::ShiftLeft(left, right) => write!(f, "({} << {})", left, right),
+            Expression::ShiftRight(left, right) => write!(f, "({} >> {})", left, right),
 
             Expression::Equal(left, right) => write!(f, "{} == {}", left, right),
             Expression::More(left, right) => write!(f, "{} > {}", left, right),
@@ -318,7 +318,9 @@ impl fmt::Display for Expression {
             Expression::Less(left, right) => write!(f, "{} < {}", left, right),
             Expression::LessEqual(left, right) => write!(f, "{} <= {}", left, right),
 
-            _ => panic!("expr: {}", self),
+            Expression::Complement(expr) => write!(f, "~{}", expr),
+
+            _ => panic!(),
         }
     }
 }

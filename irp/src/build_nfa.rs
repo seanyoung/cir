@@ -1,5 +1,5 @@
 use super::{Expression, Irp, RepeatMarker, Vartable};
-use std::{char, fs::File, io::Write, path::Path};
+use std::{char, collections::HashMap, fs::File, io::Write, path::Path};
 
 // This is the decoder nfa (non-deterministic finite automation)
 //
@@ -12,7 +12,7 @@ use std::{char, fs::File, io::Write, path::Path};
 // flow control instruction at the end of the block. So, we try to model
 // the nfa such that it is easy to transform.
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Edge {
     Flash(i64, usize),
     Gap(i64, usize),
@@ -25,12 +25,12 @@ pub enum Edge {
     Done,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Action {
     Set { var: String, expr: Expression },
 }
 
-#[derive(PartialEq, Default, Debug)]
+#[derive(PartialEq, Default, Clone, Debug)]
 pub struct Vertex {
     pub actions: Vec<Action>,
     pub edges: Vec<Edge>,
@@ -74,6 +74,7 @@ impl Irp {
         bit_spec: &[Expression],
     ) -> Result<(), String> {
         let mut pos = 0;
+        let mut tracker = VarTracker::new();
 
         while pos < list.len() {
             let mut bit_count = 0;
@@ -93,10 +94,110 @@ impl Irp {
                 self.bit_field(bit_count, verts, last, bit_spec)?;
 
                 // now do stuff with bitfields
+                let mut offset = bit_count;
+                for i in 0..expr_count {
+                    if let Expression::BitField {
+                        value,
+                        length,
+                        skip,
+                        ..
+                    } = &list[i + pos]
+                    {
+                        let (length, _) = length.eval(&Vartable::new())?;
+
+                        match value.as_ref() {
+                            Expression::Complement(expr) => match expr.as_ref() {
+                                Expression::Identifier(name) => {
+                                    self.store_bits_in_var(
+                                        name,
+                                        offset,
+                                        true,
+                                        length,
+                                        skip,
+                                        &mut verts[*last],
+                                        &mut tracker,
+                                    )?;
+                                }
+                                _ => unimplemented!(),
+                            },
+                            Expression::Identifier(name) => {
+                                self.store_bits_in_var(
+                                    name,
+                                    offset,
+                                    false,
+                                    length,
+                                    skip,
+                                    &mut verts[*last],
+                                    &mut tracker,
+                                )?;
+                            }
+                            _ => unimplemented!(""),
+                        }
+
+                        offset -= length;
+                    }
+                }
 
                 pos += expr_count;
             }
         }
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn store_bits_in_var(
+        &self,
+        name: &str,
+        offset: i64,
+        complement: bool,
+        length: i64,
+        skip: &Option<Box<Expression>>,
+        vert: &mut Vertex,
+        tracker: &mut VarTracker,
+    ) -> Result<(), String> {
+        let skip = if let Some(skip) = skip {
+            let (skip, _) = skip.eval(&Vartable::new())?;
+
+            skip
+        } else {
+            0
+        };
+
+        let expr = Expression::Identifier(String::from("$bits"));
+
+        let expr = if complement {
+            Expression::Complement(Box::new(expr))
+        } else {
+            expr
+        };
+
+        #[allow(clippy::comparison_chain)]
+        let expr = if offset > skip {
+            Expression::ShiftRight(Box::new(expr), Box::new(Expression::Number(offset - skip)))
+        } else if offset < skip {
+            Expression::ShiftLeft(Box::new(expr), Box::new(Expression::Number(skip - offset)))
+        } else {
+            expr
+        };
+
+        let mask = gen_mask(length) << skip;
+
+        let expr = if tracker.is_any_set(name) {
+            Expression::BitwiseOr(
+                Box::new(Expression::Identifier(name.to_owned())),
+                Box::new(expr),
+            )
+        } else {
+            expr
+        };
+
+        tracker.set(name, mask);
+
+        vert.actions.push(Action::Set {
+            var: name.to_owned(),
+            expr: Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask))),
+        });
 
         Ok(())
     }
@@ -110,10 +211,7 @@ impl Irp {
     ) -> Result<(), String> {
         let entry = verts.len();
 
-        verts.push(Vertex {
-            edges: vec![],
-            actions: vec![],
-        });
+        verts.push(Vertex::new());
 
         let next = verts.len();
 
@@ -234,14 +332,20 @@ impl Irp {
     ) -> Result<(), String> {
         match expr {
             Expression::Stream(irstream) => {
-                if irstream.repeat == Some(RepeatMarker::Any) {
-                    let mut last = 0;
-
-                    self.expression_list(&irstream.stream, verts, &mut last, &irstream.bit_spec)?;
-
-                    verts[last].edges.push(Edge::Done);
+                let bit_spec = if irstream.bit_spec.is_empty() {
+                    bit_spec
                 } else {
-                    self.expression_list(&irstream.stream, verts, last, &irstream.bit_spec)?;
+                    &irstream.bit_spec
+                };
+
+                if irstream.repeat == Some(RepeatMarker::Any) {
+                    let begin = *last;
+
+                    self.expression_list(&irstream.stream, verts, last, bit_spec)?;
+
+                    verts[begin].edges.push(Edge::Branch(*last));
+                } else {
+                    self.expression_list(&irstream.stream, verts, last, bit_spec)?;
                 }
             }
             Expression::List(list) => {
@@ -379,5 +483,51 @@ fn no_to_name(no: usize) -> String {
         if no == 0 {
             return res;
         }
+    }
+}
+
+fn gen_mask(v: i64) -> i64 {
+    (1i64 << v) - 1
+}
+
+/// track which
+struct VarTracker {
+    vars: HashMap<String, i64>,
+}
+
+#[allow(dead_code)]
+impl VarTracker {
+    fn new() -> Self {
+        VarTracker {
+            vars: HashMap::new(),
+        }
+    }
+
+    fn set(&mut self, name: &str, fields: i64) {
+        if let Some(e) = self.vars.get_mut(name) {
+            *e |= 64;
+        } else {
+            self.vars.insert(name.to_owned(), fields);
+        }
+    }
+
+    fn is_set(&self, name: &str, fields: i64) -> bool {
+        if let Some(e) = self.vars.get(name) {
+            (e & fields) != 0
+        } else {
+            false
+        }
+    }
+
+    fn is_any_set(&self, name: &str) -> bool {
+        if let Some(e) = self.vars.get(name) {
+            *e != 0
+        } else {
+            false
+        }
+    }
+
+    fn clear(&mut self) {
+        self.vars.clear();
     }
 }
