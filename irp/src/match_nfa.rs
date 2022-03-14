@@ -1,7 +1,6 @@
 use super::build_nfa::{Action, Edge, NFA};
 use super::Vartable;
-use crate::Expression;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug)]
 pub struct Matcher<'a> {
@@ -84,7 +83,7 @@ impl<'a> Matcher<'a> {
         }
     }
 
-    pub fn input(&mut self, ir: InfraredData) -> Option<u64> {
+    pub fn input(&mut self, ir: InfraredData) -> Option<HashMap<String, i64>> {
         if ir == InfraredData::Reset {
             self.reset();
             return None;
@@ -155,15 +154,18 @@ impl<'a> Matcher<'a> {
 
                         work.push((ir, dest, vartab));
                     }
-                    Edge::Done => {
-                        if vartab.is_defined("$bits") {
-                            let (val, _) = Expression::Identifier(String::from("$bits"))
-                                .eval(&vartab)
-                                .unwrap();
-                            self.reset();
+                    Edge::Done(include) => {
+                        let vartab = self.run_actions(pos, &vartab);
 
-                            return Some(val as u64);
+                        let mut res: HashMap<String, i64> = HashMap::new();
+
+                        for (name, (val, _, _)) in &vartab.vars {
+                            if include.contains(name) {
+                                res.insert(name.to_owned(), *val);
+                            }
                         }
+
+                        return Some(res);
                     }
                 }
             }
@@ -196,9 +198,9 @@ mod test {
 
     use super::{InfraredData, Matcher};
     use crate::{rawir, Irp};
-    use std::path::PathBuf;
+    use std::{collections::HashMap, path::PathBuf};
 
-    fn munge(matcher: &mut Matcher, s: &str) -> Option<u64> {
+    fn munge(matcher: &mut Matcher, s: &str) -> HashMap<String, i64> {
         let mut res = None;
 
         for ir in rawir::parse(s)
@@ -222,7 +224,7 @@ mod test {
             }
         }
 
-        res
+        res.unwrap()
     }
 
     #[test]
@@ -232,12 +234,13 @@ mod test {
 
         let nfa = irp.build_nfa().unwrap();
 
+        nfa.dotgraphviz(&PathBuf::from("test.dot"));
         let mut matcher = nfa.matcher(100, 3);
 
-        let  res = munge(&mut matcher,
+        let res = munge(&mut matcher,
             "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200");
 
-        assert_eq!(res, Some(196));
+        assert_eq!(res["F"], 196);
     }
 
     #[test]
@@ -245,6 +248,7 @@ mod test {
         let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
 
         let nfa = irp.build_nfa().unwrap();
+        nfa.dotgraphviz(&PathBuf::from("test.dot"));
 
         let mut matcher = nfa.matcher(100, 3);
 
@@ -258,7 +262,9 @@ mod test {
             "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756");
 
         // not quite
-        assert_eq!(res, Some(1002749760));
+        assert_eq!(res["F"], 191);
+        assert_eq!(res["D"], 59);
+        assert_eq!(res["S"], 196);
     }
 
     #[test]
@@ -268,13 +274,13 @@ mod test {
 
         let nfa = irp.build_nfa().unwrap();
 
-        nfa.dotgraphviz(&PathBuf::from("test.dot"));
-
         let mut matcher = nfa.matcher(100, 3);
 
         let  res = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");
 
-        assert_eq!(res, Some(6017));
+        assert_eq!(res["F"], 1);
+        assert_eq!(res["D"], 30);
+        assert_eq!(res["T"], 0);
     }
 }
