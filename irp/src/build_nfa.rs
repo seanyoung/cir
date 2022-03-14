@@ -28,6 +28,7 @@ pub enum Edge {
 #[derive(PartialEq, Debug, Clone)]
 pub enum Action {
     Set { var: String, expr: Expression },
+    Assert { var: String, expr: Expression },
 }
 
 #[derive(PartialEq, Default, Clone, Debug)]
@@ -183,21 +184,30 @@ impl Irp {
         let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
 
         for head in heads {
-            let expr = if head.is_any_set(name) {
-                Expression::BitwiseOr(
-                    Box::new(Expression::Identifier(name.to_owned())),
-                    Box::new(expr.clone()),
-                )
+            let expr = expr.clone();
+
+            if head.is_set(name, mask) {
+                verts[head.head].actions.push(Action::Assert {
+                    var: name.to_owned(),
+                    expr,
+                });
             } else {
-                expr.clone()
-            };
+                let expr = if head.is_any_set(name) {
+                    Expression::BitwiseOr(
+                        Box::new(Expression::Identifier(name.to_owned())),
+                        Box::new(expr),
+                    )
+                } else {
+                    expr
+                };
 
-            head.set(name, mask);
+                head.set(name, mask);
 
-            verts[head.head].actions.push(Action::Set {
-                var: name.to_owned(),
-                expr,
-            });
+                verts[head.head].actions.push(Action::Set {
+                    var: name.to_owned(),
+                    expr,
+                });
+            }
         }
 
         Ok(())
@@ -432,6 +442,7 @@ impl NFA {
                 .iter()
                 .map(|a| match a {
                     Action::Set { var, expr } => format!("{} = {}", var, expr),
+                    Action::Assert { var, expr } => format!("assert {} = {}", var, expr),
                 })
                 .collect::<Vec<String>>();
 

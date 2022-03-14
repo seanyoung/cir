@@ -113,13 +113,17 @@ impl<'a> Matcher<'a> {
                     Edge::Flash(expected, dest) => {
                         if let Some(ir @ InfraredData::Flash(received)) = ir {
                             if self.tolerance_eq(*expected as u32, received) {
-                                let vartab = self.run_actions(pos, &vartab);
+                                let (success, vartab) = self.run_actions(pos, &vartab);
 
-                                work.push((None, *dest, vartab));
+                                if success {
+                                    work.push((None, *dest, vartab));
+                                }
                             } else if received > *expected as u32 {
-                                let vartab = self.run_actions(pos, &vartab);
+                                let (success, vartab) = self.run_actions(pos, &vartab);
 
-                                work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
+                                if success {
+                                    work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
+                                }
                             }
                         } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
                             new_pos.push((pos, vartab.clone()));
@@ -128,44 +132,54 @@ impl<'a> Matcher<'a> {
                     Edge::Gap(expected, dest) => {
                         if let Some(ir @ InfraredData::Gap(received)) = ir {
                             if self.tolerance_eq(*expected as u32, received) {
-                                let vartab = self.run_actions(pos, &vartab);
+                                let (success, vartab) = self.run_actions(pos, &vartab);
 
-                                work.push((None, *dest, vartab));
+                                if success {
+                                    work.push((None, *dest, vartab));
+                                }
                             } else if received > *expected as u32 {
-                                let vartab = self.run_actions(pos, &vartab);
+                                let (success, vartab) = self.run_actions(pos, &vartab);
 
-                                work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
+                                if success {
+                                    work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
+                                }
                             }
                         } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
                             new_pos.push((pos, vartab.clone()));
                         }
                     }
                     Edge::Branch(dest) => {
-                        let vartab = self.run_actions(pos, &vartab);
+                        let (success, vartab) = self.run_actions(pos, &vartab);
 
-                        work.push((ir, *dest, vartab));
+                        if success {
+                            work.push((ir, *dest, vartab));
+                        }
                     }
                     Edge::BranchCond { expr, yes, no } => {
-                        let vartab = self.run_actions(pos, &vartab);
+                        let (success, vartab) = self.run_actions(pos, &vartab);
 
-                        let (cond, _) = expr.eval(&vartab).unwrap();
+                        if success {
+                            let (cond, _) = expr.eval(&vartab).unwrap();
 
-                        let dest = if cond != 0 { *yes } else { *no };
+                            let dest = if cond != 0 { *yes } else { *no };
 
-                        work.push((ir, dest, vartab));
+                            work.push((ir, dest, vartab));
+                        }
                     }
                     Edge::Done(include) => {
-                        let vartab = self.run_actions(pos, &vartab);
+                        let (success, vartab) = self.run_actions(pos, &vartab);
 
-                        let mut res: HashMap<String, i64> = HashMap::new();
+                        if success {
+                            let mut res: HashMap<String, i64> = HashMap::new();
 
-                        for (name, (val, _, _)) in &vartab.vars {
-                            if include.contains(name) {
-                                res.insert(name.to_owned(), *val);
+                            for (name, (val, _, _)) in &vartab.vars {
+                                if include.contains(name) {
+                                    res.insert(name.to_owned(), *val);
+                                }
                             }
-                        }
 
-                        return Some(res);
+                            return Some(res);
+                        }
                     }
                 }
             }
@@ -176,7 +190,7 @@ impl<'a> Matcher<'a> {
         None
     }
 
-    fn run_actions<'v>(&self, pos: usize, vartab: &Vartable<'v>) -> Vartable<'v> {
+    fn run_actions<'v>(&self, pos: usize, vartab: &Vartable<'v>) -> (bool, Vartable<'v>) {
         let mut vartable = vartab.clone();
 
         for a in &self.nfa.verts[pos].actions {
@@ -185,10 +199,17 @@ impl<'a> Matcher<'a> {
                     let (val, len) = expr.eval(&vartable).unwrap();
                     vartable.vars.insert(var.to_string(), (val, len, None));
                 }
+                Action::Assert { var, expr } => {
+                    let (val, _) = expr.eval(&vartable).unwrap();
+
+                    if vartable.vars[var].0 != val {
+                        return (false, vartable);
+                    }
+                }
             }
         }
 
-        vartable
+        (true, vartable)
     }
 }
 
@@ -234,7 +255,6 @@ mod test {
 
         let nfa = irp.build_nfa().unwrap();
 
-        nfa.dotgraphviz(&PathBuf::from("test.dot"));
         let mut matcher = nfa.matcher(100, 3);
 
         let res = munge(&mut matcher,
