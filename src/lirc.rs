@@ -1,11 +1,16 @@
 use iocuddle::*;
-use std::fs::{File, OpenOptions};
-use std::io;
-use std::io::{Error, ErrorKind, Read, Write};
-use std::ops::Range;
-use std::os::unix::io::{AsRawFd, RawFd};
-use std::path::{Path, PathBuf};
-use std::{fmt, mem};
+use num_integer::Integer;
+use std::{
+    fs::{File, OpenOptions},
+    io,
+    io::{Error, ErrorKind, Read, Write},
+    ops::Range,
+    os::unix::io::{AsRawFd, RawFd},
+    path::{Path, PathBuf},
+    thread::sleep,
+    time::{Duration, Instant},
+    {fmt, mem},
+};
 
 const LIRC: Group = Group::new(b'i');
 
@@ -120,30 +125,75 @@ impl Lirc {
         assert!(!data.is_empty());
 
         if (self.features & LIRC_CAN_SEND_PULSE) != 0 {
-            let bs_length = if (data.len() % 2) == 0 {
-                // remove trailing space
-                (data.len() - 1) * mem::size_of::<u32>()
-            } else {
-                data.len() * mem::size_of::<u32>()
-            };
+            match self.write(data) {
+                Err(err) if err.kind() == io::ErrorKind::InvalidInput => {
+                    // The hardware may not be capable of sending long IR, so split it into smaller chunks.
+                    let mut data = data;
 
-            // there must be a nicer way to write an array of u32s..
-            let data = unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, bs_length) };
-            let res = self.file.write(data)?;
+                    while !data.is_empty() {
+                        // find a space of at least 20 microseconds
+                        let chunk = if let Some(pos) = data
+                            .iter()
+                            .enumerate()
+                            .position(|(i, val)| i.is_odd() && *val > 20000)
+                        {
+                            &data[..pos + 1]
+                        } else {
+                            data
+                        };
 
-            if res != bs_length {
-                Err(Error::new(
-                    ErrorKind::Other,
-                    String::from("send incomplete"),
-                ))
-            } else {
-                Ok(())
+                        let start = Instant::now();
+
+                        // this duraction will include the trailing space
+                        let chunk_duration =
+                            Duration::from_micros(chunk.iter().sum::<u32>() as u64);
+
+                        // The write syscall on a lirc chardev waits until the IR is transmitted. There might
+                        // be some time to set up this transmission, so we measure the time it takes to do
+                        // the entire transmission and sleep if the transmission is faster (we remove trailing
+                        // space during send)
+                        self.write(chunk)?;
+
+                        let elapsed = start.elapsed();
+
+                        if elapsed < chunk_duration {
+                            sleep(chunk_duration - elapsed);
+                        }
+
+                        data = &data[chunk.len()..];
+                    }
+                    Ok(())
+                }
+                res => res,
             }
         } else {
             Err(Error::new(
                 ErrorKind::Other,
                 String::from("device does not support sending"),
             ))
+        }
+    }
+
+    /// transmit some data
+    fn write(&mut self, data: &[u32]) -> io::Result<()> {
+        let bs_length = if (data.len() % 2) == 0 {
+            // remove trailing space
+            (data.len() - 1) * mem::size_of::<u32>()
+        } else {
+            data.len() * mem::size_of::<u32>()
+        };
+
+        // there must be a nicer way to write an array of u32s..
+        let data = unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, bs_length) };
+        let res = self.file.write(data)?;
+
+        if res != bs_length {
+            Err(Error::new(
+                ErrorKind::Other,
+                String::from("send incomplete"),
+            ))
+        } else {
+            Ok(())
         }
     }
 
