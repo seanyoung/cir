@@ -213,6 +213,17 @@ pub fn receive(matches: &clap::ArgMatches) {
                     print!("+{} ", entry.value());
                 } else if entry.is_frequency() {
                     carrier = Some(entry.value());
+                } else if entry.is_overflow() {
+                    if let Some(freq) = carrier {
+                        println!(" # receiver overflow, carrier {}Hz", freq);
+                        carrier = None;
+                    } else {
+                        println!(" # receiver overflow");
+                    }
+                    if oneshot {
+                        break 'outer;
+                    }
+                    leading_space = true;
                 } else if entry.is_timeout() {
                     if let Some(freq) = carrier {
                         println!(" # timeout {}, carrier {}Hz", entry.value(), freq);

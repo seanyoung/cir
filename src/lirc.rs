@@ -45,6 +45,7 @@ const LIRC_MODE2_SPACE: u32 = 0x00000000;
 const LIRC_MODE2_PULSE: u32 = 0x01000000;
 const LIRC_MODE2_FREQUENCY: u32 = 0x02000000;
 const LIRC_MODE2_TIMEOUT: u32 = 0x03000000;
+const LIRC_MODE2_OVERFLOW: u32 = 0x04000000;
 
 const LIRC_VALUE_MASK: u32 = 0x00FFFFFF;
 const LIRC_MODE2_MASK: u32 = 0xFF000000;
@@ -88,6 +89,10 @@ impl LircRaw {
 
     pub fn is_timeout(&self) -> bool {
         (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_TIMEOUT
+    }
+
+    pub fn is_overflow(&self) -> bool {
+        (self.0 & LIRC_MODE2_MASK) == LIRC_MODE2_OVERFLOW
     }
 
     pub fn value(&self) -> u32 {
