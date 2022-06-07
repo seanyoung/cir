@@ -168,7 +168,7 @@ impl Lirc {
             }
         } else {
             Err(Error::new(
-                ErrorKind::Other,
+                ErrorKind::Unsupported,
                 String::from("device does not support sending"),
             ))
         }
@@ -245,7 +245,7 @@ impl Lirc {
 
         if res != 0 {
             Err(Error::new(
-                ErrorKind::Other,
+                ErrorKind::Unsupported,
                 format!("device only supports {} transmitters", res),
             ))
         } else {
