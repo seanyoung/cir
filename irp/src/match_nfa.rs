@@ -1,6 +1,6 @@
 use super::build_nfa::{Action, Edge, NFA};
 use super::Vartable;
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, fmt::Write};
 
 #[derive(Debug)]
 pub struct Matcher<'a> {
@@ -54,9 +54,9 @@ impl<'a> fmt::Display for Vartable<'a> {
         let mut s = String::new();
         for (name, (val, _, expr)) in &self.vars {
             if let Some(expr) = expr {
-                s.push_str(&format!(" {} = {}", name, expr));
+                write!(s, " {} = {}", name, expr).unwrap();
             } else {
-                s.push_str(&format!(" {} = {}", name, val));
+                write!(s, " {} = {}", name, val).unwrap();
             }
         }
 

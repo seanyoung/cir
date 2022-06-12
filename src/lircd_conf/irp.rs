@@ -1,4 +1,5 @@
 use super::{Flags, Remote};
+use std::fmt::Write;
 
 impl Remote {
     /// Build an IRP representation for the remote. This can be used both for encoding
@@ -7,17 +8,18 @@ impl Remote {
         let mut irp = String::from("{");
 
         if self.frequency != 0 {
-            irp.push_str(&format!("{}k,", self.frequency as f64 / 1000f64));
+            write!(irp, "{}k,", self.frequency as f64 / 1000f64).unwrap();
         }
 
         if self.duty_cycle != 0 {
-            irp.push_str(&format!("{}%,", self.duty_cycle));
+            write!(irp, "{}%,", self.duty_cycle).unwrap();
         }
 
         irp.push_str("msb}<");
 
         if self.flags.contains(Flags::BO) {
-            irp.push_str(&format!(
+            write!(
+                irp,
                 "{},-zeroGap,zeroGap={},oneGap={}|{},-oneGap,zeroGap={},oneGap={}|",
                 self.bit[1].0,
                 self.bit[2].1,
@@ -25,9 +27,11 @@ impl Remote {
                 self.bit[2].0,
                 self.bit[1].1,
                 self.bit[2].1,
-            ));
+            )
+            .unwrap();
         } else if self.flags.contains(Flags::GRUNDIG) {
-            irp.push_str(&format!(
+            write!(
+                irp,
                 "-{},{}|\
                 -{},{},-{},{}|\
                 -{},{},-{},{}|\
@@ -50,14 +54,17 @@ impl Remote {
                 self.bit[0].0,
                 self.bit[2].1,
                 self.bit[2].0,
-            ));
+            )
+            .unwrap();
         } else if self.flags.contains(Flags::XMP) {
             for i in 0..16 {
-                irp.push_str(&format!(
+                write!(
+                    irp,
                     "{},-{}|",
                     self.bit[0].0,
                     self.bit[0].1 + i * self.bit[1].1
-                ));
+                )
+                .unwrap();
             }
         } else {
             for (bit_no, (pulse, space)) in self.bit.iter().enumerate() {
@@ -69,19 +76,19 @@ impl Remote {
                     || self.flags.contains(Flags::SPACE_FIRST)
                 {
                     if *space > 0 {
-                        irp.push_str(&format!("-{},", space))
+                        write!(irp, "-{},", space).unwrap();
                     }
 
                     if *pulse > 0 {
-                        irp.push_str(&format!("{},", pulse))
+                        write!(irp, "{},", pulse).unwrap();
                     }
                 } else {
                     if *pulse > 0 {
-                        irp.push_str(&format!("{},", pulse))
+                        write!(irp, "{},", pulse).unwrap();
                     }
 
                     if *space > 0 {
-                        irp.push_str(&format!("-{},", space))
+                        write!(irp, "-{},", space).unwrap();
                     }
                 }
 
@@ -99,14 +106,14 @@ impl Remote {
             irp.push('(');
             if self.flags.contains(Flags::REPEAT_HEADER) && self.header.0 != 0 && self.header.1 != 0
             {
-                irp.push_str(&format!("{},-{},", self.header.0, self.header.1));
+                write!(irp, "{},-{},", self.header.0, self.header.1).unwrap();
             }
             if self.plead != 0 {
-                irp.push_str(&format!("{},", self.plead));
+                write!(irp, "{},", self.plead).unwrap();
             }
-            irp.push_str(&format!("{},-{},", self.repeat.0, self.repeat.1));
+            write!(irp, "{},-{},", self.repeat.0, self.repeat.1).unwrap();
             if self.ptrail != 0 {
-                irp.push_str(&format!("{},", self.ptrail));
+                write!(irp, "{},", self.ptrail).unwrap();
             }
             add_gap(self, &mut irp, true);
 
@@ -114,7 +121,7 @@ impl Remote {
             match self.min_repeat {
                 0 => irp.push_str(")*)"),
                 1 => irp.push_str(")+)"),
-                _ => irp.push_str(&format!("){}+)", self.min_repeat)),
+                _ => write!(irp, "){}+)", self.min_repeat).unwrap(),
             }
         } else if self
             .flags
@@ -128,12 +135,12 @@ impl Remote {
             match self.min_repeat {
                 0 => irp.push_str(")*)"),
                 1 => irp.push_str(")+)"),
-                _ => irp.push_str(&format!("){}+)", self.min_repeat)),
+                _ => write!(irp, "){}+)", self.min_repeat).unwrap(),
             }
         } else {
             irp.pop();
             if self.min_repeat > 0 {
-                irp.push_str(&format!("){}+", self.min_repeat + 1));
+                write!(irp, "){}+", self.min_repeat + 1).unwrap();
             } else {
                 irp.push_str(")+");
             }
@@ -143,21 +150,18 @@ impl Remote {
             irp.push('{');
 
             if toggle_post_data(self) {
-                irp.push_str(&format!("POST=0x{:x},", self.post_data));
+                write!(irp, "POST=0x{:x},", self.post_data).unwrap();
             }
 
             if self.flags.contains(Flags::BO) {
-                irp.push_str(&format!(
-                    "zeroGap={},oneGap={},",
-                    self.bit[1].1, self.bit[3].1
-                ));
+                write!(irp, "zeroGap={},oneGap={},", self.bit[1].1, self.bit[3].1).unwrap();
             }
 
             irp.pop();
             irp.push('}');
         }
 
-        irp.push_str(&format!(" [CODE:0..{}", gen_mask(self.bits)));
+        write!(irp, " [CODE:0..{}", gen_mask(self.bits)).unwrap();
 
         if self.toggle_bit_mask.count_ones() == 1 {
             irp.push_str(",T@:0..1=0");
@@ -179,18 +183,20 @@ fn add_irp_body(remote: &Remote, irp: &mut String, repeat: bool) {
     let supress_footer = repeat && remote.flags.contains(Flags::NO_FOOT_REP);
 
     if remote.flags.contains(Flags::BO) {
-        irp.push_str(&format!(
+        write!(
+            irp,
             "{},-{},{},-{},",
             remote.bit[1].0, remote.bit[1].1, remote.bit[1].0, remote.bit[1].1
-        ));
+        )
+        .unwrap();
     }
 
     if !supress_header && remote.header.0 != 0 && remote.header.1 != 0 {
-        irp.push_str(&format!("{},-{},", remote.header.0, remote.header.1));
+        write!(irp, "{},-{},", remote.header.0, remote.header.1).unwrap();
     }
 
     if remote.plead != 0 {
-        irp.push_str(&format!("{},", remote.plead));
+        write!(irp, "{},", remote.plead).unwrap();
     }
 
     let toggle_bit_mask = if remote.toggle_bit_mask.count_ones() == 1 {
@@ -210,7 +216,7 @@ fn add_irp_body(remote: &Remote, irp: &mut String, repeat: bool) {
         );
 
         if remote.pre.0 != 0 && remote.pre.1 != 0 {
-            irp.push_str(&format!("{},-{},", remote.pre.0, remote.pre.1));
+            write!(irp, "{},-{},", remote.pre.0, remote.pre.1).unwrap();
         }
     }
 
@@ -240,39 +246,45 @@ fn add_irp_body(remote: &Remote, irp: &mut String, repeat: bool) {
         );
 
         if remote.post.0 != 0 && remote.post.1 != 0 {
-            irp.push_str(&format!("{},-{},", remote.post.0, remote.post.1));
+            write!(irp, "{},-{},", remote.post.0, remote.post.1).unwrap();
         }
     }
 
     if !supress_footer && remote.foot.0 != 0 && remote.foot.1 != 0 {
-        irp.push_str(&format!("{},-{},", remote.foot.0, remote.foot.1));
+        write!(irp, "{},-{},", remote.foot.0, remote.foot.1).unwrap();
     }
 
     if remote.ptrail != 0 {
-        irp.push_str(&format!("{},", remote.ptrail));
+        write!(irp, "{},", remote.ptrail).unwrap();
     }
 
     add_gap(remote, irp, repeat);
 
     if remote.toggle_mask != 0 {
-        irp.push_str(&format!(
+        write!(
+            irp,
             "CODE=CODE^0x{:x},",
             remote.toggle_mask >> remote.post_data_bits
-        ));
+        )
+        .unwrap();
     }
 
     if remote.toggle_bit_mask.count_ones() > 1 {
-        irp.push_str(&format!(
+        write!(
+            irp,
             "CODE=CODE^0x{:x},",
             remote.toggle_bit_mask >> remote.post_data_bits
-        ));
+        )
+        .unwrap();
     }
 
     if toggle_post_data(remote) {
-        irp.push_str(&format!(
+        write!(
+            irp,
             "POST=POST^0x{:x},",
             remote.toggle_mask & gen_mask(remote.post_data_bits)
-        ));
+        )
+        .unwrap();
     }
 }
 
@@ -297,9 +309,9 @@ fn add_gap(remote: &Remote, irp: &mut String, repeat: bool) {
         });
 
         if remote.gap % 1000 == 0 {
-            irp.push_str(&format!("{}m,", gap / 1000));
+            write!(irp, "{}m,", gap / 1000).unwrap();
         } else {
-            irp.push_str(&format!("{},", gap));
+            write!(irp, "{},", gap).unwrap();
         }
     }
 }
@@ -336,13 +348,15 @@ fn add_bit_stream(
         let is_rc6 = (rc6_mask & (1 << bit)) != 0;
 
         if is_rc6 {
-            irp.push_str(&format!(
+            write!(
+                irp,
                 "<{},-{}|-{},{}>(",
                 remote.bit[0].0 * 2,
                 remote.bit[0].1 * 2,
                 remote.bit[1].1 * 2,
                 remote.bit[1].0 * 2
-            ));
+            )
+            .unwrap();
         }
 
         let stream = if is_toggle { Stream::Toggle } else { stream };
@@ -355,16 +369,16 @@ fn add_bit_stream(
                 let v = (v >> offset) & gen_mask(bit_count);
 
                 if v <= 9 {
-                    irp.push_str(&format!("{}:{},", v, bit_count));
+                    write!(irp, "{}:{},", v, bit_count).unwrap();
                 } else {
-                    irp.push_str(&format!("0x{:x}:{},", v, bit_count));
+                    write!(irp, "0x{:x}:{},", v, bit_count).unwrap();
                 }
             }
             Stream::Variable(v) if offset == 0 => {
-                irp.push_str(&format!("{}:{},", v, bit_count));
+                write!(irp, "{}:{},", v, bit_count).unwrap();
             }
             Stream::Variable(v) => {
-                irp.push_str(&format!("{}:{}:{},", v, bit_count, offset));
+                write!(irp, "{}:{}:{},", v, bit_count, offset).unwrap();
             }
             Stream::Toggle => {
                 assert_eq!(bit_count, 1);

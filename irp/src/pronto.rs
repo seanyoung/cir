@@ -1,5 +1,5 @@
 use super::{Message, Pronto};
-use std::fmt;
+use std::{fmt, fmt::Write};
 
 impl Pronto {
     /// Parse a pronto hex string
@@ -141,7 +141,7 @@ impl fmt::Display for Pronto {
         let mut s = String::new();
 
         for c in codes {
-            s.push_str(&format!("{:04X} ", c));
+            write!(s, "{:04X} ", c).unwrap();
         }
 
         // return last space
