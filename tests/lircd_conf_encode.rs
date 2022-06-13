@@ -96,7 +96,7 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                 continue;
             };
 
-            let mut message = remote.encode_raw(code, 0);
+            let mut message = remote.encode_raw(code, 0, log);
 
             message.raw.pop();
 

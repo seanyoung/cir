@@ -81,7 +81,7 @@ pub fn encode(
 
         for raw_code in &remote.raw_codes {
             if raw_code.name == *encode_code {
-                let encoded = remote.encode_raw(raw_code, repeats);
+                let encoded = remote.encode_raw(raw_code, repeats, log);
 
                 message.extend(&encoded);
 
@@ -113,9 +113,12 @@ impl Remote {
         let irp = Irp::parse(&irp).expect("should parse");
 
         let mut message = Message::new();
+        let name = &code.name;
 
         for code in &code.code {
             let mut vars = Vartable::new();
+
+            log.info(&format!("encoding {} ({})", name, code));
 
             vars.set(String::from("CODE"), *code as i64, self.bits as u8);
 
@@ -128,7 +131,9 @@ impl Remote {
     }
 
     /// Encode raw code for this remote, with the given repeats
-    pub fn encode_raw(&self, raw_code: &RawCode, repeats: u64) -> Message {
+    pub fn encode_raw(&self, raw_code: &RawCode, repeats: u64, log: &Log) -> Message {
+        log.info(&format!("encoding {}", raw_code.name));
+
         // remove trailing space
         let length = if raw_code.rawir.len().is_even() {
             raw_code.rawir.len() - 1
