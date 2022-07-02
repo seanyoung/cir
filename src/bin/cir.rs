@@ -29,6 +29,71 @@ fn main() {
                 .help("Silence all warnings"),
         )
         .subcommand(
+            Command::new("decode")
+                .about("Decode IR")
+                .arg_required_else_help(true)
+                .arg(
+                    Arg::new("LIRCDEV")
+                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
+                        .long("device")
+                        .short('d')
+                        .global(true)
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::new("RCDEV")
+                        .help("Select device to use by rc core device (e.g. rc0)")
+                        .long("rcdev")
+                        .short('s')
+                        .global(true)
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::new("LEARNING")
+                        .help("Use short-range learning mode")
+                        .long("learning-mode")
+                        .global(true)
+                        .short('l'),
+                )
+                .group(ArgGroup::new("DEVICE").args(&["RCDEV", "LIRCDEV"]))
+                .arg(
+                    Arg::new("FILE")
+                        .long("file")
+                        .short('f')
+                        .global(true)
+                        .help("Read from rawir or mode2 file")
+                        .takes_value(true)
+                        .allow_invalid_utf8(true)
+                        .multiple_occurrences(true)
+                        .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV"]),
+                )
+                .arg(
+                    Arg::new("RAWIR")
+                        .long("raw")
+                        .short('r')
+                        .global(true)
+                        .help("Raw IR text")
+                        .takes_value(true)
+                        .multiple_occurrences(true)
+                        .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV"]),
+                )
+                .subcommand(
+                    Command::new("irp")
+                        .about("Decode using IRP language")
+                        .arg(Arg::new("IRP").help("IRP protocol").required(true)),
+                )
+                .subcommand(
+                    Command::new("lircd")
+                        .about("Decode IR using lircd.conf file and print codes")
+                        .arg(
+                            Arg::new("CONF")
+                                .help("lircd.conf file")
+                                .allow_invalid_utf8(true)
+                                .required(true),
+                        ),
+                ),
+        )
+        .subcommand(
             Command::new("encode")
                 .about("Encode IR and print to stdout")
                 .arg_required_else_help(true)
@@ -137,11 +202,18 @@ fn main() {
                 .about("Configure IR decoder")
                 .arg(
                     Arg::new("LIRCDEV")
+                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .long("device")
                         .short('d')
                         .takes_value(true),
                 )
-                .arg(Arg::new("RCDEV").long("rcdev").short('s').takes_value(true))
+                .arg(
+                    Arg::new("RCDEV")
+                        .help("Select device to use by rc core device (e.g. rc0)")
+                        .long("rcdev")
+                        .short('s')
+                        .takes_value(true),
+                )
                 .group(ArgGroup::new("DEVICE").args(&["RCDEV", "LIRCDEV"]))
                 .arg(Arg::new("DELAY").long("delay").short('D').takes_value(true))
                 .arg(
@@ -417,6 +489,7 @@ fn main() {
     }
 
     match matches.subcommand() {
+        Some(("decode", matches)) => commands::decode::decode(matches, &log),
         Some(("encode", matches)) => commands::encode::encode(matches, &log),
         Some(("transmit", matches)) => commands::transmit::transmit(matches, &log),
         Some(("list", matches)) => match rcdev::enumerate_rc_dev() {

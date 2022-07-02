@@ -13,6 +13,7 @@ use std::{
 use terminal_size::{terminal_size, Width};
 
 pub mod config;
+pub mod decode;
 pub mod encode;
 pub mod receive;
 pub mod transmit;
@@ -154,7 +155,7 @@ pub fn encode_args<'a>(
             let irp = match Irp::parse(i) {
                 Ok(m) => m,
                 Err(s) => {
-                    eprintln!("parse error: {}", s);
+                    eprintln!("unable to parse irp ‘{}’: {}", i, s);
                     std::process::exit(2);
                 }
             };

@@ -342,4 +342,5 @@ pub struct Vartable<'a> {
 }
 
 pub use build_nfa::NFA;
+pub use match_nfa::InfraredData;
 pub use match_nfa::Matcher;
