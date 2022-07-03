@@ -4,7 +4,7 @@ use cir::{
     lircd_conf::{parse, Remote},
     log::Log,
 };
-use irp::{InfraredData, Irp, Matcher, NFA};
+use irp::{mode2, rawir, InfraredData, Irp, Matcher, NFA};
 use itertools::Itertools;
 use num_integer::Integer;
 use std::{
@@ -81,29 +81,43 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                 }
             };
 
-            match irp::rawir::parse(&input) {
+            log.info(&format!(
+                "parsing ‘{}’ as rawir",
+                filename.to_string_lossy()
+            ));
+
+            match rawir::parse(&input) {
                 Ok(raw) => {
+                    log.info(&format!("decoding: {}", rawir::print_to_string(&raw)));
                     process(&raw, &irps);
                 }
-                Err(msg) => match irp::mode2::parse(&input) {
-                    Ok(m) => {
-                        process(&m.raw, &irps);
+                Err(msg) => {
+                    log.info(&format!(
+                        "parsing ‘{}’ as mode2",
+                        filename.to_string_lossy()
+                    ));
+
+                    match mode2::parse(&input) {
+                        Ok(m) => {
+                            log.info(&format!("decoding: {}", rawir::print_to_string(&m.raw)));
+                            process(&m.raw, &irps);
+                        }
+                        Err((line_no, error)) => {
+                            log.error(&format!(
+                                "{}: parse as rawir: {}",
+                                Path::new(filename).display(),
+                                msg
+                            ));
+                            log.error(&format!(
+                                "{}:{}: parse as mode2: {}",
+                                Path::new(filename).display(),
+                                line_no,
+                                error
+                            ));
+                            std::process::exit(2);
+                        }
                     }
-                    Err((line_no, error)) => {
-                        log.error(&format!(
-                            "{}: parse as rawir: {}",
-                            Path::new(filename).display(),
-                            msg
-                        ));
-                        log.error(&format!(
-                            "{}:{}: parse as mode2: {}",
-                            Path::new(filename).display(),
-                            line_no,
-                            error
-                        ));
-                        std::process::exit(2);
-                    }
-                },
+                }
             }
         }
     }
@@ -112,12 +126,13 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
         input_on_cli = true;
 
         for rawir in rawirs {
-            match irp::rawir::parse(rawir) {
+            match rawir::parse(rawir) {
                 Ok(raw) => {
+                    log.info(&format!("decoding: {}", rawir::print_to_string(&raw)));
                     process(&raw, &irps);
                 }
                 Err(msg) => {
-                    log.error(&msg);
+                    log.error(&format!("parsing ‘{}’: {}", rawir, msg));
                     std::process::exit(2);
                 }
             }
@@ -187,6 +202,8 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                         eprintln!("error: {}", err);
                         std::process::exit(1);
                     }
+
+                    // TODO: print rawbuf to log.info()
 
                     for raw in &rawbuf {
                         let data = if raw.is_pulse() {
