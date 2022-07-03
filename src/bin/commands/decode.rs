@@ -16,61 +16,55 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
     let remotes;
     let graphviz = matches.is_present("GRAPHVIZ");
 
-    let irps: Vec<(Option<&Remote>, NFA)> = match matches.subcommand() {
-        Some(("irp", matches)) => {
-            let i = matches.value_of("IRP").unwrap();
-
-            let irp = match Irp::parse(i) {
-                Ok(m) => m,
-                Err(s) => {
-                    eprintln!("unable to parse irp ‘{}’: {}", i, s);
-                    std::process::exit(2);
-                }
-            };
-
-            let nfa = irp.build_nfa().unwrap();
-
-            if graphviz {
-                let filename = "irp_nfa.dot";
-                log.info(&format!("saving nfa as {}", filename));
-
-                nfa.dotgraphviz(&PathBuf::from(&filename));
+    let irps = if let Some(i) = matches.value_of("IRP") {
+        let irp = match Irp::parse(i) {
+            Ok(m) => m,
+            Err(s) => {
+                eprintln!("unable to parse irp ‘{}’: {}", i, s);
+                std::process::exit(2);
             }
+        };
 
-            vec![(None, nfa)]
+        let nfa = irp.build_nfa().unwrap();
+
+        if graphviz {
+            let filename = "irp_nfa.dot";
+            log.info(&format!("saving nfa as {}", filename));
+
+            nfa.dotgraphviz(&PathBuf::from(&filename));
         }
-        Some(("lircd", matches)) => {
-            let filename = matches.value_of_os("CONF").unwrap();
 
-            remotes = match parse(filename, log) {
-                Ok(r) => r,
-                Err(_) => std::process::exit(2),
-            };
+        vec![(None, nfa)]
+    } else if let Some(filename) = matches.value_of_os("LIRCDCONF") {
+        remotes = match parse(filename, log) {
+            Ok(r) => r,
+            Err(_) => std::process::exit(2),
+        };
 
-            remotes
-                .iter()
-                .map(|remote| {
-                    let irp = remote.irp();
+        remotes
+            .iter()
+            .map(|remote| {
+                let irp = remote.irp();
 
-                    log.info(&format!("found remote {}", remote.name));
-                    log.info(&format!("IRP {}", irp));
+                log.info(&format!("found remote {}", remote.name));
+                log.info(&format!("IRP {}", irp));
 
-                    let irp = Irp::parse(&irp).unwrap();
+                let irp = Irp::parse(&irp).unwrap();
 
-                    let nfa = irp.build_nfa().unwrap();
+                let nfa = irp.build_nfa().unwrap();
 
-                    if graphviz {
-                        let filename = format!("{}_nfa.dot", remote.name);
-                        log.info(&format!("saving nfa as {}", filename));
+                if graphviz {
+                    let filename = format!("{}_nfa.dot", remote.name);
+                    log.info(&format!("saving nfa as {}", filename));
 
-                        nfa.dotgraphviz(&PathBuf::from(filename));
-                    }
+                    nfa.dotgraphviz(&PathBuf::from(filename));
+                }
 
-                    (Some(remote), nfa)
-                })
-                .collect()
-        }
-        _ => unreachable!(),
+                (Some(remote), nfa)
+            })
+            .collect()
+    } else {
+        unreachable!();
     };
 
     let mut input_on_cli = false;

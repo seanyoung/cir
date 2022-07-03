@@ -32,71 +32,73 @@ fn main() {
             Command::new("decode")
                 .about("Decode IR")
                 .arg_required_else_help(true)
+                .next_help_heading("INPUT")
                 .arg(
                     Arg::new("LIRCDEV")
                         .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .long("device")
                         .short('d')
-                        .global(true)
-                        .takes_value(true),
+                        .takes_value(true)
+                        .conflicts_with_all(&["RCDEV", "RAWIR", "FILE"]),
                 )
                 .arg(
                     Arg::new("RCDEV")
                         .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
                         .short('s')
-                        .global(true)
-                        .takes_value(true),
+                        .takes_value(true)
+                        .conflicts_with_all(&["LIRCDEV", "RAWIR", "FILE"]),
                 )
                 .arg(
                     Arg::new("LEARNING")
                         .help("Use short-range learning mode")
                         .long("learning-mode")
-                        .global(true)
                         .short('l'),
-                )
-                .arg(
-                    Arg::new("GRAPHVIZ")
-                        .help("Save the nfa state machine as graphviz dot files")
-                        .long("graphviz")
-                        .global(true),
                 )
                 .group(ArgGroup::new("DEVICE").args(&["RCDEV", "LIRCDEV"]))
                 .arg(
                     Arg::new("FILE")
                         .long("file")
                         .short('f')
-                        .global(true)
                         .help("Read from rawir or mode2 file")
                         .takes_value(true)
                         .allow_invalid_utf8(true)
                         .multiple_occurrences(true)
-                        .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV"]),
+                        .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV", "RAWIR"]),
                 )
                 .arg(
                     Arg::new("RAWIR")
                         .long("raw")
                         .short('r')
-                        .global(true)
                         .help("Raw IR text")
                         .takes_value(true)
                         .multiple_occurrences(true)
-                        .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV"]),
+                        .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV", "FILE"]),
                 )
-                .subcommand(
-                    Command::new("irp")
-                        .about("Decode using IRP language")
-                        .arg(Arg::new("IRP").help("IRP protocol").required(true)),
+                .next_help_heading("PROTOCOL")
+                .arg(
+                    Arg::new("IRP")
+                        .long("irp")
+                        .short('i')
+                        .help("Decode using IRP language")
+                        .takes_value(true)
+                        .required(true)
+                        .conflicts_with("LIRCDCONF"),
                 )
-                .subcommand(
-                    Command::new("lircd")
-                        .about("Decode IR using lircd.conf file and print codes")
-                        .arg(
-                            Arg::new("CONF")
-                                .help("lircd.conf file")
-                                .allow_invalid_utf8(true)
-                                .required(true),
-                        ),
+                .arg(
+                    Arg::new("LIRCDCONF")
+                        .long("lircd")
+                        .short('c')
+                        .help("Decode using lircd.conf file and print codes")
+                        .allow_invalid_utf8(true)
+                        .takes_value(true)
+                        .required(true)
+                        .conflicts_with("IRP"),
+                )
+                .arg(
+                    Arg::new("GRAPHVIZ")
+                        .help("Save the nfa state machine as graphviz dot files (debugging)")
+                        .long("graphviz"),
                 ),
         )
         .subcommand(
