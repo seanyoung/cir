@@ -31,7 +31,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
             let filename = "irp_nfa.dot";
             log.info(&format!("saving nfa as {}", filename));
 
-            nfa.dotgraphviz(&PathBuf::from(&filename));
+            nfa.dotgraphviz(filename);
         }
 
         vec![(None, nfa)]
@@ -57,7 +57,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                     let filename = format!("{}_nfa.dot", remote.name);
                     log.info(&format!("saving nfa as {}", filename));
 
-                    nfa.dotgraphviz(&PathBuf::from(filename));
+                    nfa.dotgraphviz(&filename);
                 }
 
                 (Some(remote), nfa)
@@ -89,7 +89,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
             match rawir::parse(&input) {
                 Ok(raw) => {
                     log.info(&format!("decoding: {}", rawir::print_to_string(&raw)));
-                    process(&raw, &irps);
+                    process(&raw, &irps, matches, log);
                 }
                 Err(msg) => {
                     log.info(&format!(
@@ -100,7 +100,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                     match mode2::parse(&input) {
                         Ok(m) => {
                             log.info(&format!("decoding: {}", rawir::print_to_string(&m.raw)));
-                            process(&m.raw, &irps);
+                            process(&m.raw, &irps, matches, log);
                         }
                         Err((line_no, error)) => {
                             log.error(&format!(
@@ -129,7 +129,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
             match rawir::parse(rawir) {
                 Ok(raw) => {
                     log.info(&format!("decoding: {}", rawir::print_to_string(&raw)));
-                    process(&raw, &irps);
+                    process(&raw, &irps, matches, log);
                 }
                 Err(msg) => {
                     log.error(&format!("parsing ‘{}’: {}", rawir, msg));
@@ -206,7 +206,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                     // TODO: print rawbuf to log.info()
 
                     for raw in &rawbuf {
-                        let data = if raw.is_pulse() {
+                        let ir = if raw.is_pulse() {
                             InfraredData::Flash(raw.value())
                         } else if raw.is_space() || raw.is_timeout() {
                             InfraredData::Gap(raw.value())
@@ -217,7 +217,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                         };
 
                         for (remote, matcher) in &mut matchers {
-                            if let Some(var) = matcher.input(data) {
+                            if let Some(var) = matcher.input(ir) {
                                 if let Some(remote) = remote {
                                     // lirc
                                     let decoded_code = var["CODE"] as u64;
@@ -256,18 +256,20 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
     }
 }
 
-fn process(raw: &[u32], irps: &[(Option<&Remote>, NFA)]) {
+fn process(raw: &[u32], irps: &[(Option<&Remote>, NFA)], matches: &clap::ArgMatches, log: &Log) {
+    let graphviz = matches.is_present("GRAPHVIZ");
+
     for (remote, nfa) in irps {
         let mut matcher = nfa.matcher(100, 100);
 
         for (index, raw) in raw.iter().enumerate() {
-            let data = if index.is_odd() {
+            let ir = if index.is_odd() {
                 InfraredData::Gap(*raw)
             } else {
                 InfraredData::Flash(*raw)
             };
 
-            if let Some(var) = matcher.input(data) {
+            if let Some(var) = matcher.input(ir) {
                 if let Some(remote) = remote {
                     // lirc
                     let decoded_code = var["CODE"] as u64;
@@ -291,6 +293,22 @@ fn process(raw: &[u32], irps: &[(Option<&Remote>, NFA)]) {
                             .join(", ")
                     );
                 }
+            }
+
+            if graphviz {
+                let filename = format!(
+                    "{}_nfa_step_{:04}.dot",
+                    if let Some(remote) = remote {
+                        &remote.name
+                    } else {
+                        "irp"
+                    },
+                    index
+                );
+
+                log.info(&format!("saving nfa at step {} as {}", index, filename));
+
+                matcher.dotgraphviz(&filename);
             }
         }
     }

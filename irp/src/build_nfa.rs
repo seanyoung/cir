@@ -1,5 +1,5 @@
 use super::{Expression, Irp, RepeatMarker, Vartable};
-use std::{char, collections::HashMap, fs::File, io::Write, path::Path};
+use std::collections::HashMap;
 
 // This is the decoder nfa (non-deterministic finite automation)
 //
@@ -423,100 +423,8 @@ impl Irp {
 
 impl NFA {
     /// Generate a GraphViz dot file and write to the given path
-    pub fn dotgraphviz(&self, path: &Path) {
-        let mut file = File::create(path).expect("create file");
-
-        writeln!(&mut file, "strict digraph NFA {{").unwrap();
-
-        let mut vert_names = Vec::new();
-
-        for (no, v) in self.verts.iter().enumerate() {
-            let name = if v.edges.iter().any(|a| matches!(a, Edge::Done(_))) {
-                format!("\"done ({})\"", no)
-            } else {
-                format!("\"{} ({})\"", no_to_name(vert_names.len()), no)
-            };
-
-            let mut labels: Vec<String> = v
-                .actions
-                .iter()
-                .map(|a| match a {
-                    Action::Set { var, expr } => format!("{} = {}", var, expr),
-                    Action::Assert { var, expr } => format!("assert {} = {}", var, expr),
-                })
-                .collect::<Vec<String>>();
-
-            if let Some(Edge::BranchCond { expr, .. }) = v
-                .edges
-                .iter()
-                .find(|e| matches!(e, Edge::BranchCond { .. }))
-            {
-                labels.push(format!("cond: {}", expr));
-            }
-
-            if !labels.is_empty() {
-                writeln!(&mut file, "\t{} [label=\"{}\"]", name, labels.join("\\n")).unwrap();
-            }
-
-            vert_names.push(name);
-        }
-
-        for (i, v) in self.verts.iter().enumerate() {
-            for edge in &v.edges {
-                match edge {
-                    Edge::Flash(len, dest) => writeln!(
-                        &mut file,
-                        "\t{} -> {} [label=\"flash {}μs\"]",
-                        vert_names[i], vert_names[*dest], len
-                    )
-                    .unwrap(),
-                    Edge::Gap(len, dest) => writeln!(
-                        &mut file,
-                        "\t{} -> {} [label=\"gap {}μs\"]",
-                        vert_names[i], vert_names[*dest], len
-                    )
-                    .unwrap(),
-                    Edge::BranchCond { yes, no, .. } => {
-                        writeln!(
-                            &mut file,
-                            "\t{} -> {} [label=\"cond: true\"]",
-                            vert_names[i], vert_names[*yes]
-                        )
-                        .unwrap();
-                        //
-
-                        writeln!(
-                            &mut file,
-                            "\t{} -> {} [label=\"cond: false\"]",
-                            vert_names[i], vert_names[*no]
-                        )
-                        .unwrap();
-                    }
-                    Edge::Done(_) => (),
-                    Edge::Branch(dest) => {
-                        writeln!(&mut file, "\t{} -> {}", vert_names[i], vert_names[*dest]).unwrap()
-                    }
-                }
-            }
-        }
-
-        writeln!(&mut file, "}}").unwrap();
-    }
-}
-
-fn no_to_name(no: usize) -> String {
-    let mut no = no;
-    let mut res = String::new();
-
-    loop {
-        let ch = char::from_u32((65 + no % 26) as u32).unwrap();
-
-        res.insert(0, ch);
-
-        no /= 26;
-        if no == 0 {
-            return res;
-        }
+    pub fn dotgraphviz(&self, path: &str) {
+        crate::graphviz::graphviz(self, &[], path);
     }
 }
 
