@@ -3,8 +3,9 @@ use num::Integer;
 /// Parse a raw IR string of the form "+9000 -45000 +2250"
 pub fn parse(s: &str) -> Result<Vec<u32>, String> {
     let mut res = Vec::new();
+    let mut flash = true;
 
-    for (i, e) in s.split(|c: char| c.is_whitespace() || c == ',').enumerate() {
+    for e in s.split(|c: char| c.is_whitespace() || c == ',') {
         if e.is_empty() {
             continue;
         }
@@ -13,13 +14,13 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
 
         match chars.peek() {
             Some('+') => {
-                if i.is_odd() {
+                if !flash {
                     return Err("unexpected ‘+’ encountered".to_string());
                 }
                 chars.next();
             }
             Some('-') => {
-                if i.is_even() {
+                if flash {
                     return Err("unexpected ‘-’ encountered".to_string());
                 }
                 chars.next();
@@ -39,6 +40,8 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
         }
 
         res.push(v);
+
+        flash = !flash;
     }
 
     if res.is_empty() {
@@ -77,7 +80,7 @@ fn parse_test() {
 
     assert_eq!(parse("+0"), Err("nonsensical 0 length".to_string()));
 
-    assert_eq!(parse("100 100 +1"), Ok(vec!(100u32, 100u32, 1u32)));
+    assert_eq!(parse("100  \n100\r +1"), Ok(vec!(100u32, 100u32, 1u32)));
     assert_eq!(
         parse("100,100,+1,-20000"),
         Ok(vec!(100u32, 100u32, 1u32, 20000u32))
