@@ -14,6 +14,7 @@ use std::{
 
 pub fn decode(matches: &clap::ArgMatches, log: &Log) {
     let remotes;
+    let graphviz = matches.is_present("GRAPHVIZ");
 
     let irps: Vec<(Option<&Remote>, NFA)> = match matches.subcommand() {
         Some(("irp", matches)) => {
@@ -27,7 +28,16 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                 }
             };
 
-            vec![(None, irp.build_nfa().unwrap())]
+            let nfa = irp.build_nfa().unwrap();
+
+            if graphviz {
+                let filename = "irp_nfa.dot";
+                log.info(&format!("saving nfa as {}", filename));
+
+                nfa.dotgraphviz(&PathBuf::from(&filename));
+            }
+
+            vec![(None, nfa)]
         }
         Some(("lircd", matches)) => {
             let filename = matches.value_of_os("CONF").unwrap();
@@ -47,7 +57,16 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 
                     let irp = Irp::parse(&irp).unwrap();
 
-                    (Some(remote), irp.build_nfa().unwrap())
+                    let nfa = irp.build_nfa().unwrap();
+
+                    if graphviz {
+                        let filename = format!("{}_nfa.dot", remote.name);
+                        log.info(&format!("saving nfa as {}", filename));
+
+                        nfa.dotgraphviz(&PathBuf::from(filename));
+                    }
+
+                    (Some(remote), nfa)
                 })
                 .collect()
         }

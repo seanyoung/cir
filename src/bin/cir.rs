@@ -55,6 +55,12 @@ fn main() {
                         .global(true)
                         .short('l'),
                 )
+                .arg(
+                    Arg::new("GRAPHVIZ")
+                        .help("Save the nfa state machine as graphviz dot files")
+                        .long("graphviz")
+                        .global(true),
+                )
                 .group(ArgGroup::new("DEVICE").args(&["RCDEV", "LIRCDEV"]))
                 .arg(
                     Arg::new("FILE")
