@@ -97,7 +97,9 @@ fn main() {
                 )
                 .arg(
                     Arg::new("GRAPHVIZ")
-                        .help("Save the nfa state machine as graphviz dot files (debugging)")
+                        .help("Save the state machine as graphviz dot files")
+                        .takes_value(true)
+                        .value_parser(["nfa", "nfa-step"])
                         .long("graphviz"),
                 ),
         )

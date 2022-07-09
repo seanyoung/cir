@@ -14,7 +14,7 @@ use std::{
 
 pub fn decode(matches: &clap::ArgMatches, log: &Log) {
     let remotes;
-    let graphviz = matches.is_present("GRAPHVIZ");
+    let nfa_graphviz = matches.value_of("GRAPHVIZ") == Some("nfa");
 
     let irps = if let Some(i) = matches.value_of("IRP") {
         let irp = match Irp::parse(i) {
@@ -27,7 +27,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 
         let nfa = irp.build_nfa().unwrap();
 
-        if graphviz {
+        if nfa_graphviz {
             let filename = "irp_nfa.dot";
             log.info(&format!("saving nfa as {}", filename));
 
@@ -53,7 +53,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 
                 let nfa = irp.build_nfa().unwrap();
 
-                if graphviz {
+                if nfa_graphviz {
                     let filename = format!("{}_nfa.dot", remote.name);
                     log.info(&format!("saving nfa as {}", filename));
 
@@ -257,7 +257,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 }
 
 fn process(raw: &[u32], irps: &[(Option<&Remote>, NFA)], matches: &clap::ArgMatches, log: &Log) {
-    let graphviz = matches.is_present("GRAPHVIZ");
+    let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa-step");
 
     for (remote, nfa) in irps {
         let mut matcher = nfa.matcher(100, 100);
