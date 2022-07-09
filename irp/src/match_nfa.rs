@@ -119,7 +119,7 @@ impl<'a> Matcher<'a> {
                 .trace(&format!("pos:{} ir:{:?} vars:{}", pos, ir, vartab));
 
             for edge in edges {
-                //println!("edge:{:?}", edge);
+                //self.log.trace(&format!("edge:{:?}", edge));
 
                 match edge {
                     Edge::Flash(expected, dest) => {
@@ -127,25 +127,25 @@ impl<'a> Matcher<'a> {
                             if self.tolerance_eq(*expected as u32, received) {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
+                                self.log.trace(&format!(
+                                    "matched flash {} (expected {}) => {}",
+                                    received, *expected, dest
+                                ));
+
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
-
-                                self.log.trace(&format!(
-                                    "matched flash {} (expected {})",
-                                    received, *expected
-                                ));
                             } else if received > *expected as u32 {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
+
+                                self.log.trace(&format!(
+                                    "matched flash {} (expected {}) (incomplete consume) => {}",
+                                    received, *expected, dest
+                                ));
 
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
                                 }
-
-                                self.log.trace(&format!(
-                                    "matched flash {} (expected {})",
-                                    received, *expected
-                                ));
                             }
                         } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
                             new_pos.push((pos, vartab.clone()));
@@ -156,25 +156,25 @@ impl<'a> Matcher<'a> {
                             if self.tolerance_eq(*expected as u32, received) {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
+                                self.log.trace(&format!(
+                                    "matched gap {} (expected {}) => {}",
+                                    received, *expected, dest
+                                ));
+
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
-
-                                self.log.trace(&format!(
-                                    "matched gap {} (expected {})",
-                                    received, *expected
-                                ));
                             } else if received > *expected as u32 {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
+
+                                self.log.trace(&format!(
+                                    "matched gap {} (expected {}) (incomplete consume) => {}",
+                                    received, *expected, dest
+                                ));
 
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
                                 }
-
-                                self.log.trace(&format!(
-                                    "matched gap {} (expected {})",
-                                    received, *expected
-                                ));
                             }
                         } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
                             new_pos.push((pos, vartab.clone()));
@@ -238,12 +238,14 @@ impl<'a> Matcher<'a> {
             match a {
                 Action::Set { var, expr } => {
                     let (val, len) = expr.eval(&vartable).unwrap();
+                    self.log.trace(&format!("set {} = {} = {}", var, expr, val));
                     vartable.vars.insert(var.to_string(), (val, len, None));
                 }
                 Action::Assert { var, expr } => {
                     let (val, _) = expr.eval(&vartable).unwrap();
 
                     if vartable.vars[var].0 != val {
+                        self.log.trace(&format!("assert FAIL {} != {}", var, val));
                         return (false, vartable);
                     }
                 }

@@ -9,11 +9,15 @@ use num_integer::Integer;
 use std::{
     fs,
     path::{Path, PathBuf},
+    str,
 };
 
 pub fn decode(matches: &clap::ArgMatches, log: &Log) {
     let remotes;
     let nfa_graphviz = matches.value_of("GRAPHVIZ") == Some("nfa");
+
+    let abs_tolerance = str::parse(matches.value_of("AEPS").unwrap()).expect("number expected");
+    let rel_tolerance = str::parse(matches.value_of("EPS").unwrap()).expect("number expected");
 
     let irps = if let Some(i) = matches.value_of("IRP") {
         let irp = match Irp::parse(i) {
@@ -88,7 +92,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
             match rawir::parse(&input) {
                 Ok(raw) => {
                     log.info(&format!("decoding: {}", rawir::print_to_string(&raw)));
-                    process(&raw, &irps, matches, log);
+                    process(&raw, &irps, matches, abs_tolerance, rel_tolerance, log);
                 }
                 Err(msg) => {
                     log.info(&format!(
@@ -99,7 +103,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                     match mode2::parse(&input) {
                         Ok(m) => {
                             log.info(&format!("decoding: {}", rawir::print_to_string(&m.raw)));
-                            process(&m.raw, &irps, matches, log);
+                            process(&m.raw, &irps, matches, abs_tolerance, rel_tolerance, log);
                         }
                         Err((line_no, error)) => {
                             log.error(&format!(
@@ -128,7 +132,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
             match rawir::parse(rawir) {
                 Ok(raw) => {
                     log.info(&format!("decoding: {}", rawir::print_to_string(&raw)));
-                    process(&raw, &irps, matches, log);
+                    process(&raw, &irps, matches, abs_tolerance, rel_tolerance, log);
                 }
                 Err(msg) => {
                     log.error(&format!("parsing ‘{}’: {}", rawir, msg));
@@ -189,11 +193,26 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 
             if lircdev.can_receive_raw() {
                 let mut rawbuf = Vec::with_capacity(1024);
-                let resolution = lircdev.receiver_resolution().unwrap_or(100);
 
+                let abs_tolerance = if let Ok(resolution) = lircdev.receiver_resolution() {
+                    if resolution > abs_tolerance {
+                        log.info(&format!(
+                            "{} resolution is {}, using absolute tolerance {} rather than {}",
+                            lircdev, resolution, resolution, abs_tolerance
+                        ));
+
+                        resolution
+                    } else {
+                        abs_tolerance
+                    }
+                } else {
+                    abs_tolerance
+                };
+
+                // TODO: for each remote, use eps/aeps from lircd.conf if it was NOT specified on the command line
                 let mut matchers = irps
                     .iter()
-                    .map(|(remote, nfa)| (remote, nfa.matcher(resolution, 100, log)))
+                    .map(|(remote, nfa)| (remote, nfa.matcher(abs_tolerance, rel_tolerance, log)))
                     .collect::<Vec<(&Option<&Remote>, Matcher)>>();
 
                 loop {
@@ -255,11 +274,18 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
     }
 }
 
-fn process(raw: &[u32], irps: &[(Option<&Remote>, NFA)], matches: &clap::ArgMatches, log: &Log) {
+fn process(
+    raw: &[u32],
+    irps: &[(Option<&Remote>, NFA)],
+    matches: &clap::ArgMatches,
+    abs_tolerance: u32,
+    rel_tolerance: u32,
+    log: &Log,
+) {
     let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa-step");
 
     for (remote, nfa) in irps {
-        let mut matcher = nfa.matcher(100, 100, log);
+        let mut matcher = nfa.matcher(abs_tolerance, rel_tolerance, log);
 
         for (index, raw) in raw.iter().enumerate() {
             let ir = if index.is_odd() {

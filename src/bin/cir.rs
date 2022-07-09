@@ -84,7 +84,8 @@ fn main() {
                         .help("Decode using IRP language")
                         .takes_value(true)
                         .required(true)
-                        .conflicts_with("LIRCDCONF"),
+                        .conflicts_with("LIRCDCONF")
+                        .display_order(1),
                 )
                 .arg(
                     Arg::new("LIRCDCONF")
@@ -94,14 +95,32 @@ fn main() {
                         .allow_invalid_utf8(true)
                         .takes_value(true)
                         .required(true)
-                        .conflicts_with("IRP"),
+                        .conflicts_with("IRP")
+                        .display_order(2),
+                )
+                .arg(
+                    Arg::new("AEPS")
+                        .long("absolute-tolerance")
+                        .help("Absolute tolerance in microseconds")
+                        .takes_value(true)
+                        .default_value("100")
+                        .display_order(3),
+                )
+                .arg(
+                    Arg::new("EPS")
+                        .long("relative-tolerance")
+                        .help("Relative tolerance in %")
+                        .takes_value(true)
+                        .default_value("30")
+                        .display_order(4),
                 )
                 .arg(
                     Arg::new("GRAPHVIZ")
                         .help("Save the state machine as graphviz dot files")
                         .takes_value(true)
                         .value_parser(["nfa", "nfa-step"])
-                        .long("graphviz"),
+                        .long("graphviz")
+                        .display_order(5),
                 ),
         )
         .subcommand(
