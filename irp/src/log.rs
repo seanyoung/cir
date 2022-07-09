@@ -1,4 +1,4 @@
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Level {
     Error,
     Warning,
@@ -13,6 +13,7 @@ impl Default for Log {
     }
 }
 
+#[derive(Debug)]
 pub struct Log {
     level: Level,
 }

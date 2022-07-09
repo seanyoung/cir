@@ -1,5 +1,8 @@
-use super::build_nfa::{Action, Edge, NFA};
-use super::Vartable;
+use super::{
+    build_nfa::{Action, Edge, NFA},
+    log::Log,
+    Vartable,
+};
 use std::{collections::HashMap, fmt, fmt::Write};
 
 #[derive(Debug)]
@@ -8,15 +11,22 @@ pub struct Matcher<'a> {
     abs_tolerance: u32,
     rel_tolerance: u32,
     nfa: &'a NFA,
+    log: &'a Log,
 }
 
 impl NFA {
-    pub fn matcher(&self, abs_tolerance: u32, rel_tolerance: u32) -> Matcher {
+    pub fn matcher<'a>(
+        &'a self,
+        abs_tolerance: u32,
+        rel_tolerance: u32,
+        log: &'a Log,
+    ) -> Matcher<'a> {
         Matcher {
             pos: Vec::new(),
             abs_tolerance,
             rel_tolerance,
             nfa: self,
+            log,
         }
     }
 }
@@ -85,6 +95,7 @@ impl<'a> Matcher<'a> {
 
     pub fn input(&mut self, ir: InfraredData) -> Option<HashMap<String, i64>> {
         if ir == InfraredData::Reset {
+            self.log.trace("decoder reset");
             self.reset();
             return None;
         }
@@ -104,7 +115,8 @@ impl<'a> Matcher<'a> {
         while let Some((ir, pos, vartab)) = work.pop() {
             let edges = &self.nfa.verts[pos].edges;
 
-            //println!("pos:{} ir:{:?} vars:{}", pos, ir, vartab);
+            self.log
+                .trace(&format!("pos:{} ir:{:?} vars:{}", pos, ir, vartab));
 
             for edge in edges {
                 //println!("edge:{:?}", edge);
@@ -118,12 +130,22 @@ impl<'a> Matcher<'a> {
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
+
+                                self.log.trace(&format!(
+                                    "matched flash {} (expected {})",
+                                    received, *expected
+                                ));
                             } else if received > *expected as u32 {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
                                 }
+
+                                self.log.trace(&format!(
+                                    "matched flash {} (expected {})",
+                                    received, *expected
+                                ));
                             }
                         } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
                             new_pos.push((pos, vartab.clone()));
@@ -137,12 +159,22 @@ impl<'a> Matcher<'a> {
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
+
+                                self.log.trace(&format!(
+                                    "matched gap {} (expected {})",
+                                    received, *expected
+                                ));
                             } else if received > *expected as u32 {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
                                 }
+
+                                self.log.trace(&format!(
+                                    "matched gap {} (expected {})",
+                                    received, *expected
+                                ));
                             }
                         } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
                             new_pos.push((pos, vartab.clone()));
@@ -163,6 +195,13 @@ impl<'a> Matcher<'a> {
 
                             let dest = if cond != 0 { *yes } else { *no };
 
+                            self.log.trace(&format!(
+                                "conditional branch {}: {}: destination {}",
+                                expr,
+                                cond != 0,
+                                dest
+                            ));
+
                             work.push((ir, dest, vartab));
                         }
                     }
@@ -174,6 +213,8 @@ impl<'a> Matcher<'a> {
 
                             for (name, (val, _, _)) in &vartab.vars {
                                 if include.contains(name) {
+                                    self.log.trace("done");
+
                                     res.insert(name.to_owned(), *val);
                                 }
                             }
@@ -220,10 +261,9 @@ impl<'a> Matcher<'a> {
 
 #[cfg(test)]
 mod test {
-    use num::Integer;
-
     use super::{InfraredData, Matcher};
-    use crate::{rawir, Irp};
+    use crate::{log::Log, rawir, Irp};
+    use num::Integer;
     use std::collections::HashMap;
 
     fn munge(matcher: &mut Matcher, s: &str) -> HashMap<String, i64> {
@@ -255,12 +295,13 @@ mod test {
 
     #[test]
     fn sony8() {
+        let log = Log::new();
         // sony 8
         let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]").unwrap();
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3);
+        let mut matcher = nfa.matcher(100, 3, &log);
 
         let res = munge(&mut matcher,
             "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200");
@@ -270,11 +311,13 @@ mod test {
 
     #[test]
     fn nec() {
+        let log = Log::new();
+
         let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3);
+        let mut matcher = nfa.matcher(100, 3, &log);
 
         // let res = munge(&mut matcher, "+9024 -2256 +564 -96156");
 
@@ -293,12 +336,13 @@ mod test {
 
     #[test]
     fn rc5() {
+        let log = Log::new();
         // RC5
         let irp = Irp::parse("{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)[D:0..31,F:0..127,T@:0..1=0]").unwrap();
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3);
+        let mut matcher = nfa.matcher(100, 3, &log);
 
         let  res = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");

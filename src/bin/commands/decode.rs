@@ -193,7 +193,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 
                 let mut matchers = irps
                     .iter()
-                    .map(|(remote, nfa)| (remote, nfa.matcher(resolution, 100)))
+                    .map(|(remote, nfa)| (remote, nfa.matcher(resolution, 100, log)))
                     .collect::<Vec<(&Option<&Remote>, Matcher)>>();
 
                 loop {
@@ -259,7 +259,7 @@ fn process(raw: &[u32], irps: &[(Option<&Remote>, NFA)], matches: &clap::ArgMatc
     let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa-step");
 
     for (remote, nfa) in irps {
-        let mut matcher = nfa.matcher(100, 100);
+        let mut matcher = nfa.matcher(100, 100, log);
 
         for (index, raw) in raw.iter().enumerate() {
             let ir = if index.is_odd() {
