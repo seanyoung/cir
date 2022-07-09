@@ -1,10 +1,9 @@
 use cir::{
     lirc,
     lircd_conf::{encode, parse, Remote},
-    log::Log,
     rcdev::{enumerate_rc_dev, Rcdev},
 };
-use irp::{Irp, Message, Pronto};
+use irp::{log::Log, Irp, Message, Pronto};
 use std::{
     ffi::OsStr,
     fs,

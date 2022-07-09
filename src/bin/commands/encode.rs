@@ -1,5 +1,5 @@
 use super::encode_args;
-use cir::log::Log;
+use irp::log::Log;
 
 pub fn encode(matches: &clap::ArgMatches, log: &Log) {
     let (message, _) = encode_args(matches, log);

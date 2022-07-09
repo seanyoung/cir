@@ -2,9 +2,8 @@ use super::{find_devices, Purpose};
 use cir::{
     lirc,
     lircd_conf::{parse, Remote},
-    log::Log,
 };
-use irp::{mode2, rawir, InfraredData, Irp, Matcher, NFA};
+use irp::{log::Log, mode2, rawir, InfraredData, Irp, Matcher, NFA};
 use itertools::Itertools;
 use num_integer::Integer;
 use std::{

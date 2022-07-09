@@ -1,4 +1,4 @@
-use super::log::Log;
+use ::irp::log::Log;
 use bitflags::bitflags;
 use std::path::Path;
 

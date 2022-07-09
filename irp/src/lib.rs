@@ -119,6 +119,7 @@
 mod build_nfa;
 mod encode;
 mod graphviz;
+pub mod log;
 mod match_nfa;
 pub mod mode2;
 mod parser;

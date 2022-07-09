@@ -1,6 +1,5 @@
 use super::{Code, Flags, RawCode, Remote};
-use crate::log::Log;
-use irp::{Irp, Message, Vartable};
+use irp::{log::Log, Irp, Message, Vartable};
 use itertools::Itertools;
 use num_integer::Integer;
 

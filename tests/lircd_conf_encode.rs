@@ -1,8 +1,5 @@
-use cir::{
-    lircd_conf::{parse, Flags, Remote},
-    log::Log,
-};
-use irp::{rawir, Irp, Message, Vartable};
+use cir::lircd_conf::{parse, Flags, Remote};
+use irp::{log::Log, rawir, Irp, Message, Vartable};
 use num_integer::Integer;
 use serde::Deserialize;
 use std::{

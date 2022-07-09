@@ -1,5 +1,5 @@
 use super::{Code, Flags, RawCode, Remote};
-use crate::log::Log;
+use irp::log::Log;
 use std::num::ParseIntError;
 use std::str::Lines;
 use std::{
