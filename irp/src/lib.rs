@@ -216,7 +216,7 @@ pub struct Irp {
     parameters: Vec<ParameterSpec>,
 }
 
-pub struct GeneralSpec {
+struct GeneralSpec {
     duty_cycle: Option<u8>,
     carrier: Option<i64>,
     lsb: bool,
@@ -224,7 +224,7 @@ pub struct GeneralSpec {
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
-pub enum Unit {
+enum Unit {
     Units,
     Microseconds,
     Milliseconds,
@@ -232,7 +232,7 @@ pub enum Unit {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum RepeatMarker {
+enum RepeatMarker {
     Any,
     OneOrMore,
     Count(i64),
@@ -240,14 +240,14 @@ pub enum RepeatMarker {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct IrStream {
+struct IrStream {
     bit_spec: Vec<Expression>,
     stream: Vec<Expression>,
     repeat: Option<RepeatMarker>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Expression {
+enum Expression {
     FlashConstant(f64, Unit),
     GapConstant(f64, Unit),
     ExtentConstant(f64, Unit),

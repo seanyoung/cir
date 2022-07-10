@@ -13,7 +13,7 @@ use std::collections::HashMap;
 // the nfa such that it is easy to transform.
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Edge {
+pub(crate) enum Edge {
     Flash(i64, usize),
     Gap(i64, usize),
     BranchCond {
@@ -26,13 +26,13 @@ pub enum Edge {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Action {
+pub(crate) enum Action {
     Set { var: String, expr: Expression },
     Assert { var: String, expr: Expression },
 }
 
 #[derive(PartialEq, Default, Clone, Debug)]
-pub struct Vertex {
+pub(crate) struct Vertex {
     pub actions: Vec<Action>,
     pub edges: Vec<Edge>,
 }
@@ -49,7 +49,7 @@ impl Vertex {
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub struct NFA {
-    pub verts: Vec<Vertex>,
+    pub(crate) verts: Vec<Vertex>,
 }
 
 impl Irp {
