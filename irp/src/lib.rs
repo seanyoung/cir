@@ -308,6 +308,7 @@ impl fmt::Display for Expression {
             Expression::Add(left, right) => write!(f, "({} + {})", left, right),
             Expression::Subtract(left, right) => write!(f, "({} - {})", left, right),
             Expression::Multiply(left, right) => write!(f, "({} * {})", left, right),
+            Expression::Modulo(left, right) => write!(f, "({} % {})", left, right),
             Expression::BitwiseOr(left, right) => write!(f, "({} | {})", left, right),
             Expression::BitwiseAnd(left, right) => write!(f, "({} & {})", left, right),
             Expression::ShiftLeft(left, right) => write!(f, "({} << {})", left, right),
@@ -320,8 +321,9 @@ impl fmt::Display for Expression {
             Expression::LessEqual(left, right) => write!(f, "{} <= {}", left, right),
 
             Expression::Complement(expr) => write!(f, "~{}", expr),
+            Expression::BitCount(expr) => write!(f, "#({})", expr),
 
-            _ => panic!(),
+            _ => panic!("{:?}", self),
         }
     }
 }

@@ -197,6 +197,18 @@ impl Irp {
                     left: Expression::Identifier(name.to_owned()),
                     right: expr,
                 });
+            } else if let Some(def) = self.definitions.iter().find_map(|def| {
+                if let Expression::Assignment(var, expr) = def {
+                    if name == var {
+                        return Some(expr);
+                    }
+                }
+                None
+            }) {
+                verts[head.head].actions.push(Action::AssertEq {
+                    left: def.as_ref().clone(),
+                    right: expr,
+                });
             } else {
                 let expr = if head.is_any_set(name) {
                     Expression::BitwiseOr(
