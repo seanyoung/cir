@@ -241,11 +241,12 @@ impl<'a> Matcher<'a> {
                     trace!("set {} = {} = {}", var, expr, val);
                     vartable.vars.insert(var.to_string(), (val, len, None));
                 }
-                Action::Assert { var, expr } => {
-                    let (val, _) = expr.eval(&vartable).unwrap();
+                Action::AssertEq { left, right } => {
+                    let (left_val, _) = left.eval(&vartable).unwrap();
+                    let (right_val, _) = right.eval(&vartable).unwrap();
 
-                    if vartable.vars[var].0 != val {
-                        trace!("assert FAIL {} != {}", var, val);
+                    if left_val != right_val {
+                        trace!("assert FAIL {} != {}", left, right);
                         return (false, vartable);
                     }
                 }

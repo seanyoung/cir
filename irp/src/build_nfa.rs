@@ -28,7 +28,7 @@ pub(crate) enum Edge {
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum Action {
     Set { var: String, expr: Expression },
-    Assert { var: String, expr: Expression },
+    AssertEq { left: Expression, right: Expression },
 }
 
 #[derive(PartialEq, Default, Clone, Debug)]
@@ -117,6 +117,14 @@ impl Irp {
 
                         offset -= length;
 
+                        let skip = if let Some(skip) = skip {
+                            let (skip, _) = skip.eval(&Vartable::new())?;
+
+                            skip
+                        } else {
+                            0
+                        };
+
                         match value.as_ref() {
                             Expression::Complement(expr) => match expr.as_ref() {
                                 Expression::Identifier(name) => {
@@ -124,14 +132,20 @@ impl Irp {
                                         name, offset, true, length, skip, verts, heads,
                                     )?;
                                 }
-                                _ => unimplemented!(),
+                                Expression::Number(_) => self.check_bits_in_var(
+                                    value, offset, true, length, skip, verts, heads,
+                                )?,
+                                _ => unimplemented!("{:?}", expr),
                             },
                             Expression::Identifier(name) => {
                                 self.store_bits_in_var(
                                     name, offset, false, length, skip, verts, heads,
                                 )?;
                             }
-                            _ => unimplemented!(""),
+                            Expression::Number(_) => self.check_bits_in_var(
+                                value, offset, false, length, skip, verts, heads,
+                            )?,
+                            _ => unimplemented!("{:?}", value),
                         }
                     }
                 }
@@ -150,18 +164,10 @@ impl Irp {
         offset: i64,
         complement: bool,
         length: i64,
-        skip: &Option<Box<Expression>>,
+        skip: i64,
         verts: &mut Vec<Vertex>,
         heads: &mut Vec<BuilderPos>,
     ) -> Result<(), String> {
-        let skip = if let Some(skip) = skip {
-            let (skip, _) = skip.eval(&Vartable::new())?;
-
-            skip
-        } else {
-            0
-        };
-
         let expr = Expression::Identifier(String::from("$bits"));
 
         let expr = if complement {
@@ -187,9 +193,9 @@ impl Irp {
             let expr = expr.clone();
 
             if head.is_set(name, mask) {
-                verts[head.head].actions.push(Action::Assert {
-                    var: name.to_owned(),
-                    expr,
+                verts[head.head].actions.push(Action::AssertEq {
+                    left: Expression::Identifier(name.to_owned()),
+                    right: expr,
                 });
             } else {
                 let expr = if head.is_any_set(name) {
@@ -208,6 +214,50 @@ impl Irp {
                     expr,
                 });
             }
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments, clippy::ptr_arg)]
+    fn check_bits_in_var(
+        &self,
+        value: &Expression,
+        offset: i64,
+        complement: bool,
+        length: i64,
+        skip: i64,
+        verts: &mut Vec<Vertex>,
+        heads: &mut Vec<BuilderPos>,
+    ) -> Result<(), String> {
+        let expr = Expression::Identifier(String::from("$bits"));
+
+        let expr = if complement {
+            Expression::Complement(Box::new(expr))
+        } else {
+            expr
+        };
+
+        #[allow(clippy::comparison_chain)]
+        let expr = if offset > skip {
+            Expression::ShiftRight(Box::new(expr), Box::new(Expression::Number(offset - skip)))
+        } else if offset < skip {
+            Expression::ShiftLeft(Box::new(expr), Box::new(Expression::Number(skip - offset)))
+        } else {
+            expr
+        };
+
+        let mask = gen_mask(length) << skip;
+
+        let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
+
+        for head in heads {
+            let expr = expr.clone();
+
+            verts[head.head].actions.push(Action::AssertEq {
+                left: expr,
+                right: value.clone(),
+            });
         }
 
         Ok(())

@@ -25,7 +25,7 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
             .iter()
             .map(|a| match a {
                 Action::Set { var, expr } => format!("{} = {}", var, expr),
-                Action::Assert { var, expr } => format!("assert {} = {}", var, expr),
+                Action::AssertEq { left, right } => format!("assert {} = {}", left, right),
             })
             .collect::<Vec<String>>();
 
