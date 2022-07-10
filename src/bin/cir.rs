@@ -2,8 +2,8 @@ use aya::programs::LircMode2;
 use cir::{lirc, rcdev};
 use clap::{Arg, ArgGroup, Command};
 use evdev::Device;
-use irp::log::Log;
 use itertools::Itertools;
+use log::{Level, LevelFilter, Metadata, Record};
 use std::{convert::TryInto, os::unix::io::AsRawFd, path::PathBuf};
 
 mod commands;
@@ -20,14 +20,16 @@ fn main() {
                 .long("verbose")
                 .global(true)
                 .multiple_occurrences(true)
-                .help("Increase message verbosity"),
+                .help("Increase message verbosity")
+                .conflicts_with("quiet"),
         )
         .arg(
             Arg::new("quiet")
                 .short('q')
                 .long("quiet")
                 .global(true)
-                .help("Silence all warnings"),
+                .help("Silence all warnings")
+                .conflicts_with("verbosity"),
         )
         .subcommand(
             Command::new("decode")
@@ -510,18 +512,25 @@ fn main() {
         )
         .get_matches();
 
-    let mut log = Log::new();
+    log::set_logger(&CLI_LOGGER).unwrap();
 
-    log.verbose(matches.occurrences_of("verbosity"));
+    let level = if matches.is_present("quiet") {
+        LevelFilter::Error
+    } else {
+        match matches.occurrences_of("verbosity") {
+            0 => LevelFilter::Warn,
+            1 => LevelFilter::Info,
+            2 => LevelFilter::Debug,
+            _ => LevelFilter::Trace,
+        }
+    };
 
-    if matches.is_present("quiet") {
-        log.quiet();
-    }
+    log::set_max_level(level);
 
     match matches.subcommand() {
-        Some(("decode", matches)) => commands::decode::decode(matches, &log),
-        Some(("encode", matches)) => commands::encode::encode(matches, &log),
-        Some(("transmit", matches)) => commands::transmit::transmit(matches, &log),
+        Some(("decode", matches)) => commands::decode::decode(matches),
+        Some(("encode", matches)) => commands::encode::encode(matches),
+        Some(("transmit", matches)) => commands::transmit::transmit(matches),
         Some(("list", matches)) => match rcdev::enumerate_rc_dev() {
             Ok(list) => print_rc_dev(&list, matches),
             Err(err) => {
@@ -802,4 +811,32 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
         }
         std::process::exit(1);
     }
+}
+
+static CLI_LOGGER: CliLogger = CliLogger;
+
+struct CliLogger;
+
+impl log::Log for CliLogger {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            eprintln!(
+                "{}: {}",
+                match record.level() {
+                    Level::Trace => "trace",
+                    Level::Debug => "debug",
+                    Level::Info => "info",
+                    Level::Warn => "warn",
+                    Level::Error => "error",
+                },
+                record.args()
+            );
+        }
+    }
+
+    fn flush(&self) {}
 }

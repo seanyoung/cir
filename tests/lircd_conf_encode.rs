@@ -1,5 +1,5 @@
 use cir::lircd_conf::{parse, Flags, Remote};
-use irp::{log::Log, rawir, Irp, Message, Vartable};
+use irp::{rawir, Irp, Message, Vartable};
 use num_integer::Integer;
 use serde::Deserialize;
 use std::{
@@ -25,17 +25,15 @@ struct Code {
 
 #[test]
 fn lircd_testdata() {
-    let log = Log::new();
-
-    recurse(&PathBuf::from("testdata/lircd_conf"), &log);
+    recurse(&PathBuf::from("testdata/lircd_conf"));
 }
 
-fn recurse(path: &Path, log: &Log) {
+fn recurse(path: &Path) {
     for entry in read_dir(path).unwrap() {
         let e = entry.unwrap();
         let path = e.path();
         if e.metadata().unwrap().file_type().is_dir() {
-            recurse(&path, log);
+            recurse(&path);
         } else if path.extension() == Some(OsStr::new("testdata")) {
             let mut conf = path.clone();
 
@@ -49,13 +47,13 @@ fn recurse(path: &Path, log: &Log) {
             testdata.set_extension("testdata");
 
             if testdata.exists() {
-                lircd_encode(&conf, &testdata, log);
+                lircd_encode(&conf, &testdata);
             }
         }
     }
 }
 
-fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
+fn lircd_encode(conf: &Path, testdata: &Path) {
     println!("Testing {} {}", conf.display(), testdata.display());
 
     let mut file = File::open(testdata).unwrap();
@@ -64,7 +62,7 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
 
     let testdata: Vec<RemoteTestData> = serde_json::from_str(&data).expect("failed to deserialize");
 
-    let lircd_conf = parse(conf, log).expect("parse should work");
+    let lircd_conf = parse(conf).expect("parse should work");
 
     for remote in &lircd_conf {
         let testdata = if let Some(testdata) = testdata
@@ -93,7 +91,7 @@ fn lircd_encode(conf: &Path, testdata: &Path, log: &Log) {
                 continue;
             };
 
-            let mut message = remote.encode_raw(code, 0, log);
+            let mut message = remote.encode_raw(code, 0);
 
             message.raw.pop();
 

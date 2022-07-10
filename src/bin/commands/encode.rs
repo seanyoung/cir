@@ -1,8 +1,7 @@
 use super::encode_args;
-use irp::log::Log;
 
-pub fn encode(matches: &clap::ArgMatches, log: &Log) {
-    let (message, _) = encode_args(matches, log);
+pub fn encode(matches: &clap::ArgMatches) {
+    let (message, _) = encode_args(matches);
 
     if let Some(carrier) = &message.carrier {
         if *carrier == 0 {

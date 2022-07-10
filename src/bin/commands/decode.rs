@@ -3,8 +3,9 @@ use cir::{
     lirc,
     lircd_conf::{parse, Remote},
 };
-use irp::{log::Log, mode2, rawir, InfraredData, Irp, Matcher, NFA};
+use irp::{mode2, rawir, InfraredData, Irp, Matcher, NFA};
 use itertools::Itertools;
+use log::{error, info};
 use num_integer::Integer;
 use std::{
     fs,
@@ -12,7 +13,7 @@ use std::{
     str,
 };
 
-pub fn decode(matches: &clap::ArgMatches, log: &Log) {
+pub fn decode(matches: &clap::ArgMatches) {
     let remotes;
     let nfa_graphviz = matches.value_of("GRAPHVIZ") == Some("nfa");
 
@@ -32,14 +33,14 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 
         if nfa_graphviz {
             let filename = "irp_nfa.dot";
-            log.info(&format!("saving nfa as {}", filename));
+            info!("saving nfa as {}", filename);
 
             nfa.dotgraphviz(filename);
         }
 
         vec![(None, nfa)]
     } else if let Some(filename) = matches.value_of_os("LIRCDCONF") {
-        remotes = match parse(filename, log) {
+        remotes = match parse(filename) {
             Ok(r) => r,
             Err(_) => std::process::exit(2),
         };
@@ -49,8 +50,8 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
             .map(|remote| {
                 let irp = remote.irp();
 
-                log.info(&format!("found remote {}", remote.name));
-                log.info(&format!("IRP {}", irp));
+                info!("found remote {}", remote.name);
+                info!("IRP {}", irp);
 
                 let irp = Irp::parse(&irp).unwrap();
 
@@ -58,7 +59,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 
                 if nfa_graphviz {
                     let filename = format!("{}_nfa.dot", remote.name);
-                    log.info(&format!("saving nfa as {}", filename));
+                    info!("saving nfa as {}", filename);
 
                     nfa.dotgraphviz(&filename);
                 }
@@ -79,44 +80,34 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
             let input = match fs::read_to_string(filename) {
                 Ok(s) => s,
                 Err(s) => {
-                    log.error(&format!("{}: {}", Path::new(filename).display(), s));
+                    error!("{}: {}", Path::new(filename).display(), s);
                     std::process::exit(2);
                 }
             };
 
-            log.info(&format!(
-                "parsing ‘{}’ as rawir",
-                filename.to_string_lossy()
-            ));
+            info!("parsing ‘{}’ as rawir", filename.to_string_lossy());
 
             match rawir::parse(&input) {
                 Ok(raw) => {
-                    log.info(&format!("decoding: {}", rawir::print_to_string(&raw)));
-                    process(&raw, &irps, matches, abs_tolerance, rel_tolerance, log);
+                    info!("decoding: {}", rawir::print_to_string(&raw));
+                    process(&raw, &irps, matches, abs_tolerance, rel_tolerance);
                 }
                 Err(msg) => {
-                    log.info(&format!(
-                        "parsing ‘{}’ as mode2",
-                        filename.to_string_lossy()
-                    ));
+                    info!("parsing ‘{}’ as mode2", filename.to_string_lossy());
 
                     match mode2::parse(&input) {
                         Ok(m) => {
-                            log.info(&format!("decoding: {}", rawir::print_to_string(&m.raw)));
-                            process(&m.raw, &irps, matches, abs_tolerance, rel_tolerance, log);
+                            info!("decoding: {}", rawir::print_to_string(&m.raw));
+                            process(&m.raw, &irps, matches, abs_tolerance, rel_tolerance);
                         }
                         Err((line_no, error)) => {
-                            log.error(&format!(
-                                "{}: parse as rawir: {}",
-                                Path::new(filename).display(),
-                                msg
-                            ));
-                            log.error(&format!(
+                            error!("{}: parse as rawir: {}", Path::new(filename).display(), msg);
+                            error!(
                                 "{}:{}: parse as mode2: {}",
                                 Path::new(filename).display(),
                                 line_no,
                                 error
-                            ));
+                            );
                             std::process::exit(2);
                         }
                     }
@@ -131,11 +122,11 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
         for rawir in rawirs {
             match rawir::parse(rawir) {
                 Ok(raw) => {
-                    log.info(&format!("decoding: {}", rawir::print_to_string(&raw)));
-                    process(&raw, &irps, matches, abs_tolerance, rel_tolerance, log);
+                    info!("decoding: {}", rawir::print_to_string(&raw));
+                    process(&raw, &irps, matches, abs_tolerance, rel_tolerance);
                 }
                 Err(msg) => {
-                    log.error(&format!("parsing ‘{}’: {}", rawir, msg));
+                    error!("parsing ‘{}’: {}", rawir, msg);
                     std::process::exit(2);
                 }
             }
@@ -196,10 +187,10 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
 
                 let abs_tolerance = if let Ok(resolution) = lircdev.receiver_resolution() {
                     if resolution > abs_tolerance {
-                        log.info(&format!(
+                        info!(
                             "{} resolution is {}, using absolute tolerance {} rather than {}",
                             lircdev, resolution, resolution, abs_tolerance
-                        ));
+                        );
 
                         resolution
                     } else {
@@ -212,7 +203,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                 // TODO: for each remote, use eps/aeps from lircd.conf if it was NOT specified on the command line
                 let mut matchers = irps
                     .iter()
-                    .map(|(remote, nfa)| (remote, nfa.matcher(abs_tolerance, rel_tolerance, log)))
+                    .map(|(remote, nfa)| (remote, nfa.matcher(abs_tolerance, rel_tolerance)))
                     .collect::<Vec<(&Option<&Remote>, Matcher)>>();
 
                 loop {
@@ -267,7 +258,7 @@ pub fn decode(matches: &clap::ArgMatches, log: &Log) {
                     }
                 }
             } else {
-                log.error(&format!("{}: device cannot receive raw", lircdev));
+                error!("{}: device cannot receive raw", lircdev);
                 std::process::exit(1);
             }
         }
@@ -280,12 +271,11 @@ fn process(
     matches: &clap::ArgMatches,
     abs_tolerance: u32,
     rel_tolerance: u32,
-    log: &Log,
 ) {
     let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa-step");
 
     for (remote, nfa) in irps {
-        let mut matcher = nfa.matcher(abs_tolerance, rel_tolerance, log);
+        let mut matcher = nfa.matcher(abs_tolerance, rel_tolerance);
 
         for (index, raw) in raw.iter().enumerate() {
             let ir = if index.is_odd() {
@@ -331,7 +321,7 @@ fn process(
                     index
                 );
 
-                log.info(&format!("saving nfa at step {} as {}", index, filename));
+                info!("saving nfa at step {} as {}", index, filename);
 
                 matcher.dotgraphviz(&filename);
             }

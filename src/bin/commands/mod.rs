@@ -3,7 +3,8 @@ use cir::{
     lircd_conf::{encode, parse, Remote},
     rcdev::{enumerate_rc_dev, Rcdev},
 };
-use irp::{log::Log, Irp, Message, Pronto};
+use irp::{Irp, Message, Pronto};
+use log::error;
 use std::{
     ffi::OsStr,
     fs,
@@ -101,10 +102,7 @@ pub fn open_lirc(matches: &clap::ArgMatches, purpose: Purpose) -> lirc::Lirc {
     }
 }
 
-pub fn encode_args<'a>(
-    matches: &'a clap::ArgMatches,
-    log: &Log,
-) -> (Message, &'a clap::ArgMatches) {
+pub fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
     match matches.subcommand() {
         Some(("irp", matches)) => {
             let mut vars = irp::Vartable::new();
@@ -204,11 +202,11 @@ pub fn encode_args<'a>(
 
             (pronto.encode(repeats), matches)
         }
-        Some(("rawir", matches)) => encode_rawir(matches, log),
+        Some(("rawir", matches)) => encode_rawir(matches),
         Some(("lircd", matches)) => {
             let filename = matches.value_of_os("CONF").unwrap();
 
-            let remotes = match parse(filename, log) {
+            let remotes = match parse(filename) {
                 Ok(r) => r,
                 Err(_) => std::process::exit(2),
             };
@@ -227,20 +225,20 @@ pub fn encode_args<'a>(
 
             if let Some(codes) = matches.values_of("CODES") {
                 let codes: Vec<&str> = codes.collect();
-                let m = encode(&remotes, remote, &codes, repeats, log);
+                let m = encode(&remotes, remote, &codes, repeats);
 
                 match m {
                     Ok(m) => (m, matches),
                     Err(e) => {
-                        log.error(&e);
+                        error!("{}", e);
 
-                        list_remotes(filename, &remotes, None, log);
+                        list_remotes(filename, &remotes, None);
 
                         std::process::exit(2);
                     }
                 }
             } else {
-                list_remotes(filename, &remotes, remote, log);
+                list_remotes(filename, &remotes, remote);
 
                 std::process::exit(2);
             }
@@ -252,7 +250,7 @@ pub fn encode_args<'a>(
     }
 }
 
-fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a clap::ArgMatches) {
+fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
     enum Part {
         Raw(Message),
         Gap(u32),
@@ -267,7 +265,7 @@ fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a c
             let input = match fs::read_to_string(filename) {
                 Ok(s) => s,
                 Err(s) => {
-                    log.error(&format!("{}: {}", Path::new(filename).display(), s));
+                    error!("{}: {}", Path::new(filename).display(), s);
                     std::process::exit(2);
                 }
             };
@@ -288,17 +286,13 @@ fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a c
                         part.push((Part::Raw(m), indices.next().unwrap()));
                     }
                     Err((line_no, error)) => {
-                        log.error(&format!(
-                            "{}: parse as rawir: {}",
-                            Path::new(filename).display(),
-                            msg
-                        ));
-                        log.error(&format!(
+                        error!("{}: parse as rawir: {}", Path::new(filename).display(), msg);
+                        error!(
                             "{}:{}: parse as mode2: {}",
                             Path::new(filename).display(),
                             line_no,
                             error
-                        ));
+                        );
                         std::process::exit(2);
                     }
                 },
@@ -322,7 +316,7 @@ fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a c
                     ));
                 }
                 Err(msg) => {
-                    log.error(&msg);
+                    error!("{}", msg);
                     std::process::exit(2);
                 }
             }
@@ -335,7 +329,7 @@ fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a c
         for gap in gaps {
             match gap.parse() {
                 Ok(0) | Err(_) => {
-                    log.error(&format!("{} is not a valid gap", gap));
+                    error!("{} is not a valid gap", gap);
                     std::process::exit(2);
                 }
                 Ok(num) => {
@@ -366,7 +360,7 @@ fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a c
     }
 
     if message.raw.is_empty() {
-        log.error("nothing to send");
+        error!("nothing to send");
         std::process::exit(2);
     }
 
@@ -377,7 +371,7 @@ fn encode_rawir<'a>(matches: &'a clap::ArgMatches, log: &Log) -> (Message, &'a c
     (message, matches)
 }
 
-fn list_remotes(filename: &OsStr, remotes: &[Remote], needle: Option<&str>, log: &Log) {
+fn list_remotes(filename: &OsStr, remotes: &[Remote], needle: Option<&str>) {
     let size = terminal_size();
 
     if size.is_some() {
@@ -434,6 +428,6 @@ fn list_remotes(filename: &OsStr, remotes: &[Remote], needle: Option<&str>, log:
     }
 
     if !remote_found {
-        log.error("not remote found");
+        error!("not remote found");
     }
 }

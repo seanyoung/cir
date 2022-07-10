@@ -1,5 +1,5 @@
 use super::{Code, Flags, RawCode, Remote};
-use irp::log::Log;
+use log::{error, info, warn};
 use std::num::ParseIntError;
 use std::str::Lines;
 use std::{
@@ -13,7 +13,6 @@ pub struct LircParser<'a> {
     path: PathBuf,
     line_no: u32,
     lines: Lines<'a>,
-    log: &'a Log,
 }
 
 /// We need a custom parser for lircd.conf files, because the parser in lircd itself
@@ -21,15 +20,15 @@ pub struct LircParser<'a> {
 /// garbage is permitted when 'begin remote' is expected, and most lines can have
 /// trailing characters after the first two tokens.
 impl<'a> LircParser<'a> {
-    pub fn parse(path: &Path, log: &'a Log) -> Result<Vec<Remote>, ()> {
+    pub fn parse(path: &Path) -> Result<Vec<Remote>, ()> {
         let mut file = OpenOptions::new()
             .read(true)
             .open(path)
-            .map_err(|e| log.error(&format!("failed to open '{}': {}", path.display(), e)))?;
+            .map_err(|e| error!("failed to open '{}': {}", path.display(), e))?;
 
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)
-            .map_err(|e| log.error(&format!("failed to read '{}': {}", path.display(), e)))?;
+            .map_err(|e| error!("failed to read '{}': {}", path.display(), e))?;
 
         let contents = String::from_utf8_lossy(&buf);
 
@@ -42,13 +41,12 @@ impl<'a> LircParser<'a> {
 
         let lines = contents.lines();
 
-        log.info(&format!("parsing '{}' as lircd.conf file", path.display()));
+        info!("parsing '{}' as lircd.conf file", path.display());
 
         let mut parser = LircParser {
             path: PathBuf::from(path),
             line_no: 0,
             lines,
-            log,
         };
 
         parser.read()
@@ -62,10 +60,7 @@ impl<'a> LircParser<'a> {
 
             if line.is_none() {
                 return if remotes.is_empty() {
-                    self.log.error(&format!(
-                        "{}: no remote definitions found",
-                        self.path.display()
-                    ));
+                    error!("{}: no remote definitions found", self.path.display());
                     Err(())
                 } else {
                     Ok(remotes)
@@ -87,12 +82,12 @@ impl<'a> LircParser<'a> {
                 }
             } else if let Some(first) = first {
                 if !first.starts_with('#') {
-                    self.log.warning(&format!(
+                    warn!(
                         "{}:{}: expected 'begin remote', got '{}'",
                         self.path.display(),
                         self.line_no,
                         line
-                    ));
+                    );
                 }
             }
         }
@@ -108,11 +103,11 @@ impl<'a> LircParser<'a> {
             let line = self.next_line();
 
             if line.is_none() {
-                self.log.error(&format!(
+                error!(
                     "{}:{}: unexpected end of file",
                     self.path.display(),
                     self.line_no
-                ));
+                );
                 return Err(());
             }
 
@@ -126,11 +121,11 @@ impl<'a> LircParser<'a> {
             match first {
                 Some("name") => {
                     if second.is_none() {
-                        self.log.error(&format!(
+                        error!(
                             "{}:{}: missing name argument",
                             self.path.display(),
                             self.line_no
-                        ));
+                        );
                         return Err(());
                     }
 
@@ -138,11 +133,11 @@ impl<'a> LircParser<'a> {
                 }
                 Some("driver") => {
                     if second.is_none() {
-                        self.log.error(&format!(
+                        error!(
                             "{}:{}: missing driver argument",
                             self.path.display(),
                             self.line_no
-                        ));
+                        );
                         return Err(());
                     }
 
@@ -150,11 +145,11 @@ impl<'a> LircParser<'a> {
                 }
                 Some("serial_mode") => {
                     if second.is_none() {
-                        self.log.error(&format!(
+                        error!(
                             "{}:{}: missing serial_mode argument",
                             self.path.display(),
                             self.line_no
-                        ));
+                        );
                         return Err(());
                     }
 
@@ -299,12 +294,12 @@ impl<'a> LircParser<'a> {
                                     flags |= Flags::REPEAT_HEADER;
                                 }
                                 _ => {
-                                    self.log.error(&format!(
+                                    error!(
                                         "{}:{}: unknown flag {}",
                                         self.path.display(),
                                         self.line_no,
                                         flag
-                                    ));
+                                    );
                                     return Err(());
                                 }
                             }
@@ -313,11 +308,11 @@ impl<'a> LircParser<'a> {
                         remote.flags = flags;
                     }
                     None => {
-                        self.log.error(&format!(
+                        error!(
                             "{}:{}: missing flags argument",
                             self.path.display(),
                             self.line_no
-                        ));
+                        );
                         return Err(());
                     }
                 },
@@ -326,12 +321,12 @@ impl<'a> LircParser<'a> {
                         return Ok(remote);
                     }
 
-                    self.log.error(&format!(
+                    error!(
                         "{}:{}: expected 'end remote', got '{}'",
                         self.path.display(),
                         self.line_no,
                         line
-                    ));
+                    );
 
                     return Err(());
                 }
@@ -343,23 +338,23 @@ impl<'a> LircParser<'a> {
                         remote.raw_codes = self.read_raw_codes()?;
                     }
                     _ => {
-                        self.log.error(&format!(
+                        error!(
                             "{}:{}: expected 'begin codes' or 'begin raw_codes', got '{}'",
                             self.path.display(),
                             self.line_no,
                             line
-                        ));
+                        );
 
                         return Err(());
                     }
                 },
                 Some(key) => {
-                    self.log.error(&format!(
+                    error!(
                         "{}:{}: '{}' unexpected",
                         self.path.display(),
                         self.line_no,
                         key
-                    ));
+                    );
                 }
                 None => (),
             }
@@ -371,22 +366,22 @@ impl<'a> LircParser<'a> {
             if let Ok(val) = parse_number(val) {
                 Ok(val)
             } else {
-                self.log.error(&format!(
+                error!(
                     "{}:{}: {} argument {} is not a number",
                     self.path.display(),
                     self.line_no,
                     arg_name,
                     val
-                ));
+                );
                 Err(())
             }
         } else {
-            self.log.error(&format!(
+            error!(
                 "{}:{}: missing {} argument",
                 self.path.display(),
                 self.line_no,
                 arg_name
-            ));
+            );
             Err(())
         }
     }
@@ -398,11 +393,11 @@ impl<'a> LircParser<'a> {
             let line = self.next_line();
 
             if line.is_none() {
-                self.log.error(&format!(
+                error!(
                     "{}:{}: unexpected end of file",
                     self.path.display(),
                     self.line_no
-                ));
+                );
                 return Err(());
             }
 
@@ -416,12 +411,12 @@ impl<'a> LircParser<'a> {
                         return Ok(codes);
                     }
 
-                    self.log.error(&format!(
+                    error!(
                         "{}:{}: expected 'end codes', got '{}'",
                         self.path.display(),
                         self.line_no,
                         line
-                    ));
+                    );
 
                     return Err(());
                 }
@@ -438,23 +433,19 @@ impl<'a> LircParser<'a> {
                                 values.push(code);
                             }
                             Err(_) => {
-                                self.log.error(&format!(
+                                error!(
                                     "{}:{}: code '{}' is not valid",
                                     self.path.display(),
                                     self.line_no,
                                     code,
-                                ));
+                                );
                                 return Err(());
                             }
                         }
                     }
 
                     if values.is_empty() {
-                        self.log.error(&format!(
-                            "{}:{}: missing code",
-                            self.path.display(),
-                            self.line_no
-                        ));
+                        error!("{}:{}: missing code", self.path.display(), self.line_no);
                         return Err(());
                     }
 
@@ -479,11 +470,11 @@ impl<'a> LircParser<'a> {
             let line = self.next_line();
 
             if line.is_none() {
-                self.log.error(&format!(
+                error!(
                     "{}:{}: unexpected end of file",
                     self.path.display(),
                     self.line_no
-                ));
+                );
                 return Err(());
             }
 
@@ -500,12 +491,12 @@ impl<'a> LircParser<'a> {
                         return Ok(raw_codes);
                     }
 
-                    self.log.error(&format!(
+                    error!(
                         "{}:{}: expected 'end raw_codes', got '{}'",
                         self.path.display(),
                         self.line_no,
                         line,
-                    ));
+                    );
 
                     return Err(());
                 }
@@ -523,11 +514,7 @@ impl<'a> LircParser<'a> {
                             rawir: self.read_lengths(words)?,
                         });
                     } else {
-                        self.log.error(&format!(
-                            "{}:{}: missing name",
-                            self.path.display(),
-                            self.line_no
-                        ));
+                        error!("{}:{}: missing name", self.path.display(), self.line_no);
                         return Err(());
                     }
                 }
@@ -537,12 +524,12 @@ impl<'a> LircParser<'a> {
 
                         raw_code.rawir.extend(codes);
                     } else {
-                        self.log.error(&format!(
+                        error!(
                             "{}:{}: '{}' not expected",
                             self.path.display(),
                             self.line_no,
                             v
-                        ));
+                        );
                         return Err(());
                     }
                 }
@@ -562,12 +549,12 @@ impl<'a> LircParser<'a> {
             match parse_number(no) {
                 Ok(v) if v <= u32::MAX as u64 => rawir.push(v as u32),
                 _ => {
-                    self.log.error(&format!(
+                    error!(
                         "{}:{}: invalid duration '{}'",
                         self.path.display(),
                         self.line_no,
                         no
-                    ));
+                    );
                     return Err(());
                 }
             }
@@ -593,29 +580,25 @@ impl<'a> LircParser<'a> {
     /// Do some sanity checks and cleanups. Returns false for invalid
     fn sanity_checks(&self, remote: &mut Remote) -> bool {
         if remote.name.is_empty() {
-            self.log.error(&format!(
+            error!(
                 "{}:{}: missing remote name",
                 self.path.display(),
                 self.line_no,
-            ));
+            );
             return false;
         }
 
         if remote.gap == 0 {
-            self.log.warning(&format!(
-                "{}:{}: missing gap",
-                self.path.display(),
-                self.line_no,
-            ));
+            warn!("{}:{}: missing gap", self.path.display(), self.line_no,);
         }
 
         if remote.duty_cycle > 99 {
-            self.log.warning(&format!(
+            warn!(
                 "{}:{}: duty_cycle {} is not valid",
                 self.path.display(),
                 self.line_no,
                 remote.duty_cycle
-            ));
+            );
             remote.duty_cycle = 0;
         }
 
@@ -623,11 +606,11 @@ impl<'a> LircParser<'a> {
             remote.flags.set(Flags::RAW_CODES, true);
 
             if !remote.codes.is_empty() {
-                self.log.error(&format!(
+                error!(
                     "{}:{}: non-raw codes specified for raw remote",
                     self.path.display(),
                     self.line_no,
-                ));
+                );
                 return false;
             }
 
@@ -635,20 +618,16 @@ impl<'a> LircParser<'a> {
         }
 
         if remote.flags.contains(Flags::RAW_CODES) {
-            self.log.error(&format!(
+            error!(
                 "{}:{}: missing raw codes",
                 self.path.display(),
                 self.line_no,
-            ));
+            );
             return false;
         }
 
         if remote.codes.is_empty() {
-            self.log.error(&format!(
-                "{}:{}: missing codes",
-                self.path.display(),
-                self.line_no,
-            ));
+            error!("{}:{}: missing codes", self.path.display(), self.line_no,);
             return false;
         }
 
@@ -656,41 +635,37 @@ impl<'a> LircParser<'a> {
         if (remote.bit[0].0 == 0 && remote.bit[0].1 == 0)
             || (remote.bit[1].0 == 0 && remote.bit[1].1 == 0)
         {
-            self.log.error(&format!(
+            error!(
                 "{}:{}: no bit encoding provided",
                 self.path.display(),
                 self.line_no,
-            ));
+            );
             return false;
         }
 
         if (remote.pre_data & !gen_mask(remote.pre_data_bits)) != 0 {
-            self.log.warning(&format!(
-                "{}:{}: invalid pre_data",
-                self.path.display(),
-                self.line_no,
-            ));
+            warn!("{}:{}: invalid pre_data", self.path.display(), self.line_no,);
             remote.pre_data &= gen_mask(remote.pre_data_bits);
         }
 
         if (remote.post_data & !gen_mask(remote.post_data_bits)) != 0 {
-            self.log.warning(&format!(
+            warn!(
                 "{}:{}: invalid post_data",
                 self.path.display(),
                 self.line_no,
-            ));
+            );
             remote.post_data &= gen_mask(remote.post_data_bits);
         }
 
         for code in &mut remote.codes {
             for code in &mut code.code {
                 if (*code & !gen_mask(remote.bits)) != 0 {
-                    self.log.warning(&format!(
+                    warn!(
                         "{}:{}: invalid code 0x{:x} truncated",
                         self.path.display(),
                         self.line_no,
                         code
-                    ));
+                    );
                     *code &= gen_mask(remote.bits);
                 }
             }
@@ -718,12 +693,12 @@ impl<'a> LircParser<'a> {
 
         if remote.toggle_bit > 0 {
             if remote.toggle_bit_mask > 0 {
-                self.log.warning(&format!(
+                warn!(
                     "{}:{}: remote {} uses both toggle_bit and toggle_bit_mask",
                     self.path.display(),
                     self.line_no,
                     remote.name
-                ));
+                );
             } else {
                 remote.toggle_bit_mask = 1u64 << (remote.all_bits() - remote.toggle_bit);
             }

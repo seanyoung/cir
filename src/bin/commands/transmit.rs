@@ -1,8 +1,8 @@
 use super::{encode_args, open_lirc, Purpose};
-use irp::log::Log;
+use log::info;
 
-pub fn transmit(global_matches: &clap::ArgMatches, log: &Log) {
-    let (message, matches) = encode_args(global_matches, log);
+pub fn transmit(global_matches: &clap::ArgMatches) {
+    let (message, matches) = encode_args(global_matches);
 
     let mut lircdev = open_lirc(matches, Purpose::Transmit);
 
@@ -51,7 +51,7 @@ pub fn transmit(global_matches: &clap::ArgMatches, log: &Log) {
 
             let mask: u32 = transmitters.iter().fold(0, |acc, t| acc | (1 << (t - 1)));
 
-            log.info(&format!("debug: setting transmitter mask {:08x}", mask));
+            info!("debug: setting transmitter mask {:08x}", mask);
 
             match lircdev.set_transmitter_mask(mask) {
                 Ok(v) => v,
@@ -92,15 +92,15 @@ pub fn transmit(global_matches: &clap::ArgMatches, log: &Log) {
 
     if let Some(carrier) = &carrier {
         if *carrier == 0 {
-            log.info("carrier: unmodulated (no carrier)");
+            info!("carrier: unmodulated (no carrier)");
         } else {
-            log.info(&format!("carrier: {}Hz", carrier));
+            info!("carrier: {}Hz", carrier);
         }
     }
     if let Some(duty_cycle) = &duty_cycle {
-        log.info(&format!("duty cycle: {}%", duty_cycle));
+        info!("duty cycle: {}%", duty_cycle);
     }
-    log.info(&format!("rawir: {}", message.print_rawir()));
+    info!("rawir: {}", message.print_rawir());
 
     if let Some(duty_cycle) = duty_cycle {
         if lircdev.can_set_send_duty_cycle() {

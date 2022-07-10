@@ -1,8 +1,8 @@
 use super::{
     build_nfa::{Action, Edge, NFA},
-    log::Log,
     Vartable,
 };
+use log::trace;
 use std::{collections::HashMap, fmt, fmt::Write};
 
 #[derive(Debug)]
@@ -11,22 +11,15 @@ pub struct Matcher<'a> {
     abs_tolerance: u32,
     rel_tolerance: u32,
     nfa: &'a NFA,
-    log: &'a Log,
 }
 
 impl NFA {
-    pub fn matcher<'a>(
-        &'a self,
-        abs_tolerance: u32,
-        rel_tolerance: u32,
-        log: &'a Log,
-    ) -> Matcher<'a> {
+    pub fn matcher(&self, abs_tolerance: u32, rel_tolerance: u32) -> Matcher {
         Matcher {
             pos: Vec::new(),
             abs_tolerance,
             rel_tolerance,
             nfa: self,
-            log,
         }
     }
 }
@@ -95,7 +88,7 @@ impl<'a> Matcher<'a> {
 
     pub fn input(&mut self, ir: InfraredData) -> Option<HashMap<String, i64>> {
         if ir == InfraredData::Reset {
-            self.log.trace("decoder reset");
+            trace!("decoder reset");
             self.reset();
             return None;
         }
@@ -115,11 +108,10 @@ impl<'a> Matcher<'a> {
         while let Some((ir, pos, vartab)) = work.pop() {
             let edges = &self.nfa.verts[pos].edges;
 
-            self.log
-                .trace(&format!("pos:{} ir:{:?} vars:{}", pos, ir, vartab));
+            trace!("pos:{} ir:{:?} vars:{}", pos, ir, vartab);
 
             for edge in edges {
-                //self.log.trace(&format!("edge:{:?}", edge));
+                //trace!(&format!("edge:{:?}", edge));
 
                 match edge {
                     Edge::Flash(expected, dest) => {
@@ -127,10 +119,12 @@ impl<'a> Matcher<'a> {
                             if self.tolerance_eq(*expected as u32, received) {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
-                                self.log.trace(&format!(
+                                trace!(
                                     "matched flash {} (expected {}) => {}",
-                                    received, *expected, dest
-                                ));
+                                    received,
+                                    *expected,
+                                    dest
+                                );
 
                                 if success {
                                     work.push((None, *dest, vartab));
@@ -138,10 +132,12 @@ impl<'a> Matcher<'a> {
                             } else if received > *expected as u32 {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
-                                self.log.trace(&format!(
+                                trace!(
                                     "matched flash {} (expected {}) (incomplete consume) => {}",
-                                    received, *expected, dest
-                                ));
+                                    received,
+                                    *expected,
+                                    dest
+                                );
 
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
@@ -156,10 +152,12 @@ impl<'a> Matcher<'a> {
                             if self.tolerance_eq(*expected as u32, received) {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
-                                self.log.trace(&format!(
+                                trace!(
                                     "matched gap {} (expected {}) => {}",
-                                    received, *expected, dest
-                                ));
+                                    received,
+                                    *expected,
+                                    dest
+                                );
 
                                 if success {
                                     work.push((None, *dest, vartab));
@@ -167,10 +165,12 @@ impl<'a> Matcher<'a> {
                             } else if received > *expected as u32 {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
-                                self.log.trace(&format!(
+                                trace!(
                                     "matched gap {} (expected {}) (incomplete consume) => {}",
-                                    received, *expected, dest
-                                ));
+                                    received,
+                                    *expected,
+                                    dest
+                                );
 
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
@@ -195,12 +195,12 @@ impl<'a> Matcher<'a> {
 
                             let dest = if cond != 0 { *yes } else { *no };
 
-                            self.log.trace(&format!(
+                            trace!(
                                 "conditional branch {}: {}: destination {}",
                                 expr,
                                 cond != 0,
                                 dest
-                            ));
+                            );
 
                             work.push((ir, dest, vartab));
                         }
@@ -213,7 +213,7 @@ impl<'a> Matcher<'a> {
 
                             for (name, (val, _, _)) in &vartab.vars {
                                 if include.contains(name) {
-                                    self.log.trace("done");
+                                    trace!("done");
 
                                     res.insert(name.to_owned(), *val);
                                 }
@@ -238,14 +238,14 @@ impl<'a> Matcher<'a> {
             match a {
                 Action::Set { var, expr } => {
                     let (val, len) = expr.eval(&vartable).unwrap();
-                    self.log.trace(&format!("set {} = {} = {}", var, expr, val));
+                    trace!("set {} = {} = {}", var, expr, val);
                     vartable.vars.insert(var.to_string(), (val, len, None));
                 }
                 Action::Assert { var, expr } => {
                     let (val, _) = expr.eval(&vartable).unwrap();
 
                     if vartable.vars[var].0 != val {
-                        self.log.trace(&format!("assert FAIL {} != {}", var, val));
+                        trace!("assert FAIL {} != {}", var, val);
                         return (false, vartable);
                     }
                 }
@@ -264,7 +264,7 @@ impl<'a> Matcher<'a> {
 #[cfg(test)]
 mod test {
     use super::{InfraredData, Matcher};
-    use crate::{log::Log, rawir, Irp};
+    use crate::{rawir, Irp};
     use num::Integer;
     use std::collections::HashMap;
 
@@ -297,13 +297,12 @@ mod test {
 
     #[test]
     fn sony8() {
-        let log = Log::new();
         // sony 8
         let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]").unwrap();
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3, &log);
+        let mut matcher = nfa.matcher(100, 3);
 
         let res = munge(&mut matcher,
             "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200");
@@ -313,13 +312,11 @@ mod test {
 
     #[test]
     fn nec() {
-        let log = Log::new();
-
         let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3, &log);
+        let mut matcher = nfa.matcher(100, 3);
 
         // let res = munge(&mut matcher, "+9024 -2256 +564 -96156");
 
@@ -338,13 +335,12 @@ mod test {
 
     #[test]
     fn rc5() {
-        let log = Log::new();
         // RC5
         let irp = Irp::parse("{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)[D:0..31,F:0..127,T@:0..1=0]").unwrap();
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3, &log);
+        let mut matcher = nfa.matcher(100, 3);
 
         let  res = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");
