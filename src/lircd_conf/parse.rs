@@ -1,5 +1,5 @@
 use super::{Code, Flags, RawCode, Remote};
-use log::{error, info, warn};
+use log::{debug, error, warn};
 use std::num::ParseIntError;
 use std::str::Lines;
 use std::{
@@ -41,7 +41,7 @@ impl<'a> LircParser<'a> {
 
         let lines = contents.lines();
 
-        info!("parsing '{}' as lircd.conf file", path.display());
+        debug!("parsing '{}' as lircd.conf file", path.display());
 
         let mut parser = LircParser {
             path: PathBuf::from(path),

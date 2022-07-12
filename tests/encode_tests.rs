@@ -6,7 +6,8 @@ fn encode_test() {
 
     let assert = cmd
         .args(&[
-            "encode",
+            "transmit",
+            "--dry-run",
             "irp",
             "-fF=12",
             "{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)+[F:0..255]",
@@ -18,12 +19,12 @@ fn encode_test() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
 
     assert_eq!(
-        stdout,
-        r#"carrier: 40000Hz
-rawir: +2400 -600 +600 -600 +600 -600 +1200 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +600 -31800 +2400 -600 +600 -600 +600 -600 +1200 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +600 -31800
+        stderr,
+        r#"info: carrier: 40000Hz
+info: rawir: +2400 -600 +600 -600 +600 -600 +1200 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +600 -31800 +2400 -600 +600 -600 +600 -600 +1200 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +600 -31800
 "#
     );
 }
@@ -34,7 +35,8 @@ fn encode_lircd_raw_test() {
 
     let assert = cmd
         .args(&[
-            "encode",
+            "transmit",
+            "--dry-run",
             "lircd",
             "testdata/lircd_conf/pace/DC420N.lircd.conf",
             "1",
@@ -46,13 +48,13 @@ fn encode_lircd_raw_test() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
 
     assert_eq!(
-        stdout,
-        r#"carrier: 36000Hz
-duty cycle: 50%
-rawir: +2664 -888 +444 -444 +444 -444 +444 -888 +444 -888 +888 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +888 -123496
+        stderr,
+        r#"info: carrier: 36000Hz
+info: duty cycle: 50%
+info: rawir: +2664 -888 +444 -444 +444 -444 +444 -888 +444 -888 +888 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +888 -123496
 "#
     );
 }
@@ -63,7 +65,8 @@ fn encode_lircd_aiwa_test() {
 
     let assert = cmd
         .args(&[
-            "encode",
+            "transmit",
+            "--dry-run",
             "lircd",
             "testdata/lircd_conf/aiwa/RC-5VP05.lircd.conf",
             "AUTO",
@@ -75,12 +78,12 @@ fn encode_lircd_aiwa_test() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
 
     assert_eq!(
-        stdout,
-        r#"carrier: 38000Hz
-rawir: +9137 -4360 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -441 +688 -441 +688 -1558 +688 -1558 +688 -1558 +688 -441 +688 -1558 +688 -441 +688 -1558 +688 -1558 +688 -441 +688 -441 +688 -441 +688 -1558 +688 -441 +688 -1558 +669 -22856
+        stderr,
+        r#"info: carrier: 38000Hz
+info: rawir: +9137 -4360 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -441 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -1558 +688 -441 +688 -441 +688 -1558 +688 -1558 +688 -1558 +688 -441 +688 -1558 +688 -441 +688 -1558 +688 -1558 +688 -441 +688 -441 +688 -441 +688 -1558 +688 -441 +688 -1558 +669 -22856
 "#
     );
 }
@@ -91,7 +94,8 @@ fn encode_rawir_test() {
 
     let assert = cmd
         .args(&[
-            "encode",
+            "transmit",
+            "--dry-run",
             "rawir",
             r#"1000
             200
@@ -104,11 +108,11 @@ fn encode_rawir_test() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
 
     assert_eq!(
-        stdout,
-        r#"rawir: +1000 -200 +1000 -125000
+        stderr,
+        r#"info: rawir: +1000 -200 +1000 -125000
 "#
     );
 
@@ -116,7 +120,8 @@ fn encode_rawir_test() {
 
     let assert = cmd
         .args(&[
-            "encode",
+            "transmit",
+            "--dry-run",
             "rawir",
             "-f",
             "testdata/rawir/mode2",
@@ -136,11 +141,11 @@ fn encode_rawir_test() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
 
     assert_eq!(
-        stdout,
-        r#"rawir: +1000 -700 +1200 -125000 +345 -30000 +123 -40 +124 -40000 +2000 -500 +2000 -40000
+        stderr,
+        r#"info: rawir: +1000 -700 +1200 -125000 +345 -30000 +123 -40 +124 -40000 +2000 -500 +2000 -40000
 "#
     );
 }
@@ -151,7 +156,8 @@ fn encode_lircd_grundig_test() {
 
     let assert = cmd
         .args(&[
-            "encode",
+            "transmit",
+            "--dry-run",
             "lircd",
             "testdata/lircd_conf/grundig/RP75_LCD.lircd.conf",
             "-m",
@@ -165,12 +171,12 @@ fn encode_lircd_grundig_test() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
 
     assert_eq!(
-        stdout,
-        r#"carrier: 38000Hz
-rawir: +871 -2894 +1363 -2188 +1229 -2192 +1230 -1102 +637 -1098 +638 -1094 +637 -1098 +638 -1723 +638 -435 +638 -443 +638 -1735 +638 -444 +637 -1736 +638 -443 +638 -1735 +638 -57449
+        stderr,
+        r#"info: carrier: 38000Hz
+info: rawir: +871 -2894 +1363 -2188 +1229 -2192 +1230 -1102 +637 -1098 +638 -1094 +637 -1098 +638 -1723 +638 -435 +638 -443 +638 -1735 +638 -444 +637 -1736 +638 -443 +638 -1735 +638 -57449
 "#
     );
 }
@@ -180,7 +186,12 @@ fn empty_lircd_conf() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
-        .args(&["encode", "lircd", "testdata/lircd_conf/empty"])
+        .args(&[
+            "transmit",
+            "--dry-run",
+            "lircd",
+            "testdata/lircd_conf/empty",
+        ])
         .assert();
 
     let output = assert.get_output();

@@ -126,110 +126,6 @@ fn main() {
                 ),
         )
         .subcommand(
-            Command::new("encode")
-                .about("Encode IR and print to stdout")
-                .arg_required_else_help(true)
-                .subcommand(
-                    Command::new("irp")
-                        .about("Encode using IRP language")
-                        .arg(
-                            Arg::new("PRONTO")
-                                .help("Encode IRP to pronto hex")
-                                .long("pronto")
-                                .short('p'),
-                        )
-                        .arg(
-                            Arg::new("REPEATS")
-                                .help("Number of IRP repeats to encode")
-                                .long("repeats")
-                                .short('r')
-                                .conflicts_with("PRONTO")
-                                .takes_value(true)
-                                .default_value("1"),
-                        )
-                        .arg(
-                            Arg::new("FIELD")
-                                .help("Set input variable like KEY=VALUE")
-                                .long("field")
-                                .short('f')
-                                .takes_value(true)
-                                .multiple_occurrences(true)
-                                .conflicts_with("PRONTO"),
-                        )
-                        .arg(Arg::new("IRP").help("IRP protocol").required(true)),
-                )
-                .subcommand(
-                    Command::new("pronto")
-                        .about("Parse pronto hex code and print as raw IR")
-                        .arg(
-                            Arg::new("REPEATS")
-                                .long("repeats")
-                                .short('r')
-                                .help("Number of times to repeat signal")
-                                .takes_value(true)
-                                .default_value("1"),
-                        )
-                        .arg(Arg::new("PRONTO").help("Pronto Hex code").required(true)),
-                )
-                .subcommand(
-                    Command::new("rawir")
-                        .about("Parse raw IR and print")
-                        .arg(
-                            Arg::new("FILE")
-                                .long("file")
-                                .short('f')
-                                .help("Read from rawir or mode2 file")
-                                .takes_value(true)
-                                .allow_invalid_utf8(true)
-                                .multiple_occurrences(true),
-                        )
-                        .arg(
-                            Arg::new("GAP")
-                                .long("gap")
-                                .short('g')
-                                .help("Set gap after each file")
-                                .takes_value(true)
-                                .multiple_occurrences(true),
-                        )
-                        .arg(
-                            Arg::new("RAWIR")
-                                .help("Raw IR text")
-                                .multiple_occurrences(true),
-                        ),
-                )
-                .subcommand(
-                    Command::new("lircd")
-                        .about("Parse lircd.conf file and print codes as raw IR")
-                        .arg(
-                            Arg::new("CONF")
-                                .help("lircd.conf file")
-                                .allow_invalid_utf8(true)
-                                .required(true),
-                        )
-                        .arg(
-                            Arg::new("REMOTE")
-                                .long("remote")
-                                .short('m')
-                                .help("Use codes from specific remote")
-                                .takes_value(true),
-                        )
-                        .arg(
-                            Arg::new("REPEATS")
-                                .long("repeats")
-                                .short('r')
-                                .help("Number of times to repeat signal")
-                                .takes_value(true)
-                                .default_value("0"),
-                        )
-                        .arg(
-                            Arg::new("CODES")
-                                .help("Code to send")
-                                .multiple_occurrences(true)
-                                .takes_value(true),
-                        ),
-                ),
-        )
-        .subcommand(
             Command::new("config")
                 .about("Configure IR decoder")
                 .arg(
@@ -312,6 +208,13 @@ fn main() {
                         .multiple_occurrences(true)
                         .require_value_delimiter(true)
                         .use_value_delimiter(true),
+                )
+                .arg(
+                    Arg::new("DRYRUN")
+                        .help("Encode IR but do not actually send")
+                        .long("dry-run")
+                        .short('n')
+                        .global(true),
                 )
                 .subcommand(
                     Command::new("irp")
@@ -451,7 +354,7 @@ fn main() {
                 ),
         )
         .subcommand(
-            Command::new("list")
+            Command::new("list-devices")
                 .about("List IR and CEC devices")
                 .arg(
                     Arg::new("LIRCDEV")
@@ -518,9 +421,8 @@ fn main() {
         LevelFilter::Error
     } else {
         match matches.occurrences_of("verbosity") {
-            0 => LevelFilter::Warn,
-            1 => LevelFilter::Info,
-            2 => LevelFilter::Debug,
+            0 => LevelFilter::Info,
+            1 => LevelFilter::Debug,
             _ => LevelFilter::Trace,
         }
     };
@@ -529,9 +431,8 @@ fn main() {
 
     match matches.subcommand() {
         Some(("decode", matches)) => commands::decode::decode(matches),
-        Some(("encode", matches)) => commands::encode::encode(matches),
         Some(("transmit", matches)) => commands::transmit::transmit(matches),
-        Some(("list", matches)) => match rcdev::enumerate_rc_dev() {
+        Some(("list-devices", matches)) => match rcdev::enumerate_rc_dev() {
             Ok(list) => print_rc_dev(&list, matches),
             Err(err) => {
                 eprintln!("error: {}", err);
