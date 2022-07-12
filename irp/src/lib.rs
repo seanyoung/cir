@@ -211,7 +211,7 @@ pub enum Pronto {
 /// A parsed IRP notation, which can be used for encoding (and decoding in the future)
 pub struct Irp {
     general_spec: GeneralSpec,
-    stream: Vec<Expression>,
+    stream: Expression,
     definitions: Vec<Expression>,
     parameters: Vec<ParameterSpec>,
 }

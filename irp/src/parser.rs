@@ -17,7 +17,7 @@ impl Irp {
 
                 Ok(Irp {
                     general_spec,
-                    stream: vec![stream],
+                    stream,
                     definitions,
                     parameters,
                 })

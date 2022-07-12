@@ -117,7 +117,7 @@ impl Remote {
         for code in &code.code {
             let mut vars = Vartable::new();
 
-            debug!("encoding {} ({})", name, code);
+            debug!("encoding name={} code={}", name, code);
 
             vars.set(String::from("CODE"), *code as i64, self.bits as u8);
 
@@ -131,7 +131,7 @@ impl Remote {
 
     /// Encode raw code for this remote, with the given repeats
     pub fn encode_raw(&self, raw_code: &RawCode, repeats: u64) -> Message {
-        debug!("encoding {}", raw_code.name);
+        debug!("encoding name={}", raw_code.name);
 
         // remove trailing space
         let length = if raw_code.rawir.len().is_even() {

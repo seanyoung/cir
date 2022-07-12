@@ -10,8 +10,10 @@ impl Irp {
 
         let mut encoder = Encoder::new(&self.general_spec);
 
+        let stream = &[self.stream.clone()];
+
         eval_stream(
-            &self.stream,
+            stream,
             &mut encoder,
             None,
             &mut vars,
@@ -35,8 +37,10 @@ impl Irp {
 
         let mut encoder = Encoder::new(&self.general_spec);
 
+        let stream = &[self.stream.clone()];
+
         eval_stream(
-            &self.stream,
+            stream,
             &mut encoder,
             None,
             &mut vars,

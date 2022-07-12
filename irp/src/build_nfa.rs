@@ -58,9 +58,7 @@ impl Irp {
         let mut verts: Vec<Vertex> = vec![Vertex::new()];
         let mut heads: Vec<BuilderPos> = vec![BuilderPos::new()];
 
-        for expr in &self.stream {
-            self.expression(expr, &mut verts, &mut heads, &[])?;
-        }
+        self.expression(&self.stream, &mut verts, &mut heads, &[])?;
 
         for pos in heads {
             let res: Vec<String> = pos
