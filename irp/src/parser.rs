@@ -25,6 +25,30 @@ impl Irp {
             Err(pos) => Err(format!("parse error at {}:{}", pos.0, pos.1)),
         }
     }
+
+    /// The carrier frequency in Hertz. None means unknown, Some(0) means
+    /// unmodulated.
+    pub fn carrier(&self) -> Option<i64> {
+        self.general_spec.carrier
+    }
+    /// Duty cycle of the carrier pulse wave. Between 1% and 99%.
+    pub fn duty_cycle(&self) -> Option<u8> {
+        self.general_spec.duty_cycle
+    }
+
+    /// Bit-ordering rule to use when converting variables from binary form to
+    /// bit sequences. When true, variables are encoded for transmission with
+    /// their least significant bit first, otherwise the order is reversed.
+    pub fn lsb(&self) -> bool {
+        self.general_spec.lsb
+    }
+
+    /// Unit of time that may be used in durations and extents. The default unit
+    /// is 1.0 microseconds. If a carrier frequency is defined, the unit may
+    /// also be defined in terms of a number of carrier frequency pulses.
+    pub fn unit(&self) -> f64 {
+        self.general_spec.unit
+    }
 }
 
 fn collect_rules(node: &irp::Node, rule: irp::Rule) -> Vec<&irp::Node> {
