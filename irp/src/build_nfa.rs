@@ -68,7 +68,7 @@ impl Irp {
                 .filter(|v| !v.starts_with('$'))
                 .collect();
 
-            if !res.is_empty() {
+            if !res.is_empty() && pos.seen_edges {
                 verts[pos.head].edges.push(Edge::Done(res));
             }
         }
@@ -281,7 +281,10 @@ impl Irp {
         heads: &mut Vec<BuilderPos>,
         bit_spec: &[Expression],
     ) -> Result<(), String> {
+        // TODO: special casing when length == 1
         for head in heads {
+            head.seen_edges = true;
+
             let before = head.head;
 
             let entry = verts.len();
@@ -443,6 +446,8 @@ impl Irp {
             }
             Expression::FlashConstant(v, u) => {
                 for head in heads {
+                    head.seen_edges = true;
+
                     let len = u.eval_float(*v, &self.general_spec)?;
 
                     let pos = verts.len();
@@ -456,6 +461,8 @@ impl Irp {
             }
             Expression::GapConstant(v, u) => {
                 for head in heads {
+                    head.seen_edges = true;
+
                     let len = u.eval_float(*v, &self.general_spec)?;
 
                     let pos = verts.len();
@@ -474,6 +481,8 @@ impl Irp {
             }
             Expression::ExtentConstant(_, _) => {
                 for head in heads {
+                    head.seen_edges = true;
+
                     let pos = verts.len();
 
                     verts.push(Vertex::new());
@@ -502,19 +511,17 @@ fn gen_mask(v: i64) -> i64 {
 }
 
 /// track which
-#[derive(Clone)]
+#[derive(Clone, Default, Debug)]
 struct BuilderPos {
     head: usize,
+    seen_edges: bool,
     vars: HashMap<String, i64>,
 }
 
 #[allow(dead_code)]
 impl BuilderPos {
     fn new() -> Self {
-        BuilderPos {
-            head: 0,
-            vars: HashMap::new(),
-        }
+        Default::default()
     }
 
     fn set(&mut self, name: &str, fields: i64) {
