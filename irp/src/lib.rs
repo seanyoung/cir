@@ -209,6 +209,7 @@ pub enum Pronto {
 }
 
 /// A parsed IRP notation, which can be used for encoding (and decoding in the future)
+#[derive(Debug)]
 pub struct Irp {
     general_spec: GeneralSpec,
     stream: Expression,
@@ -216,6 +217,7 @@ pub struct Irp {
     parameters: Vec<ParameterSpec>,
 }
 
+#[derive(Debug)]
 struct GeneralSpec {
     duty_cycle: Option<u8>,
     carrier: Option<i64>,
