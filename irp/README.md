@@ -6,14 +6,5 @@ A Rust library for handling [Consumer IR](https://en.wikipedia.org/wiki/Consumer
 
 See the [docs](https://docs.rs/irp/) for the usage and some examples.
 
-Currently IRP can be encoded to either raw IR or pronto hex.
-
-## IRP decoding
-
-There is no IRP decoder yet. The plan is:
-
- - Convert IRP to a NFA, much like regular expressions. There will also
-   be a NFA executer to decode IR.
- - Convert the NFA to DFA to make it much more efficient
- - Compile the NFA to BPF to build an IR decoder which can be loaded in
-   the linux kernel
+Currently IRP can be encoded to either raw IR or pronto hex. Decoding is done
+via NFA state machine.

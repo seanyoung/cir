@@ -169,9 +169,9 @@ impl<'a> Vartable<'a> {
 struct Encoder<'a> {
     /// Reference to general spec for lsb/msb etc
     general_spec: &'a GeneralSpec,
-    /// Raw output. Even entries are flash, odd are spaces
+    /// Raw output. Even entries are flash, odd are gaps
     raw: Vec<u32>,
-    /// Length of IR generated, including leading space
+    /// Length of IR generated, including leading gap
     total_length: i64,
     /// Extents start from this point
     extent_marker: Vec<i64>,

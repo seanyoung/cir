@@ -406,7 +406,7 @@ fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                 gap = v;
             }
             Part::Raw(raw) => {
-                if !message.raw.is_empty() && !message.has_trailing_space() {
+                if !message.raw.is_empty() && !message.has_trailing_gap() {
                     message.raw.push(gap);
                 }
 
@@ -420,7 +420,7 @@ fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
         std::process::exit(2);
     }
 
-    if !message.has_trailing_space() {
+    if !message.has_trailing_gap() {
         message.raw.push(gap);
     }
 

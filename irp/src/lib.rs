@@ -1,14 +1,63 @@
-//! This library parses IRP, and encodes IR with the provided parameters. This can then be used for IR transmission.
-//! You can also use the library to parse and encode pronto hex codes, lirc mode2 pulse / space files, and parse
+//! This library parses IRP, and encodes IR with the provided parameters, and can decode
+//! using NFA based decoder compiled from IRP.
+//! This can then be used for IR transmission and receiving. You can also use the library to
+//! parse and encode pronto hex codes, lirc mode2 pulse / space files, and parse
 //! simple raw IR strings.
-//!
-//! A decoder is in the works but this is still some time away.
 //!
 //! ## About IRP
 //!
 //! [IRP Notation](http://hifi-remote.com/wiki/index.php?title=IRP_Notation) is a domain-specific language
 //! which describes [Consumer IR](https://en.wikipedia.org/wiki/Consumer_IR) protocols. There is a extensive
 //! [library](http://hifi-remote.com/wiki/index.php/DecodeIR) of protocols described using IRP.
+//!
+//! ## Decode IR
+//!
+//! This example decodes some IR using rc5 protcool
+//!
+//! ```
+//! use irp::Irp;
+//! use irp::decoder_nfa::InfraredData;
+//!
+//!
+//! let irp = Irp::parse(r#"
+//!     {36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)
+//!     [D:0..31,F:0..127,T@:0..1=0]"#)
+//!     .expect("parse should succeed");
+//! let nfa = irp.compile().expect("build nfa should succeed");
+//! // Create a decoder with 100 microsecond tolerance, 30% relative tolerance,
+//! // and 20000 microseconds trailing gap.
+//! let mut decoder = nfa.decoder(100, 30, 20000);
+//! let input = [
+//!     InfraredData::Flash(940),
+//!     InfraredData::Gap(860),
+//!     InfraredData::Flash(1790),
+//!     InfraredData::Gap(1750),
+//!     InfraredData::Flash(880),
+//!     InfraredData::Gap(880),
+//!     InfraredData::Flash(900),
+//!     InfraredData::Gap(890),
+//!     InfraredData::Flash(870),
+//!     InfraredData::Gap(900),
+//!     InfraredData::Flash(1750),
+//!     InfraredData::Gap(900),
+//!     InfraredData::Flash(890),
+//!     InfraredData::Gap(910),
+//!     InfraredData::Flash(840),
+//!     InfraredData::Gap(920),
+//!     InfraredData::Flash(870),
+//!     InfraredData::Gap(920),
+//!     InfraredData::Flash(840),
+//!     InfraredData::Gap(920),
+//!     InfraredData::Flash(870),
+//!     InfraredData::Gap(1810),
+//!     InfraredData::Flash(840),
+//!     InfraredData::Gap(78132)
+//! ];
+//! input.into_iter().for_each(|ir| decoder.input(ir));
+//! let res = decoder.get().unwrap();
+//! assert_eq!(res["F"], 1);
+//! assert_eq!(res["D"], 30);
+//! ```
 //!
 //! ## An example of how to encode NEC1
 //!
@@ -37,8 +86,8 @@
 //!
 //! The output is in raw ir format, which looks like "+9024 -4512 +564 -1692 +564 -1692 +564 -1692 +564 ...". The first
 //! entry in this array is *flash*, which means infrared light should be on for N microseconds, and every even entry
-//! means *gap*, which means absense of light, i.e. off, for N microseconds. This continues to alternate. The leading
-//! + and - also mean *flash* and *gap*.
+//! means *gap*, which means absense of light, i.e. off, for N microseconds. This continues to alternate. The
+//! leading + and - also mean *flash* and *gap*.
 //!
 //! The IRP can also be encoded to pronto hex codes. Pronto hex codes have a repeating part, so no repeat argument is needed.
 //!
@@ -117,9 +166,9 @@
 //! ```
 
 mod build_nfa;
+pub mod decoder_nfa;
 mod encode;
 mod graphviz;
-mod match_nfa;
 pub mod mode2;
 mod parser;
 mod pronto;
@@ -167,16 +216,16 @@ impl Message {
         self.raw.extend_from_slice(&other.raw);
     }
 
-    /// Do we have a trailing space
-    pub fn has_trailing_space(&self) -> bool {
+    /// Do we have a trailing gap
+    pub fn has_trailing_gap(&self) -> bool {
         let len = self.raw.len();
 
         len > 0 && (len % 2) == 0
     }
 
-    /// Remove any trailing space
-    pub fn remove_trailing_space(&mut self) {
-        if self.has_trailing_space() {
+    /// Remove any trailing gap
+    pub fn remove_trailing_gap(&mut self) {
+        if self.has_trailing_gap() {
             self.raw.pop();
         }
     }
@@ -347,5 +396,3 @@ pub struct Vartable<'a> {
 }
 
 pub use build_nfa::NFA;
-pub use match_nfa::InfraredData;
-pub use match_nfa::Matcher;

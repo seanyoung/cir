@@ -3,7 +3,10 @@ use cir::{
     lirc,
     lircd_conf::{parse, Remote},
 };
-use irp::{mode2, rawir, InfraredData, Irp, Matcher, NFA};
+use irp::{
+    decoder_nfa::{Decoder, InfraredData},
+    mode2, rawir, Irp, NFA,
+};
 use itertools::Itertools;
 use log::{error, info};
 use num_integer::Integer;
@@ -29,7 +32,7 @@ pub fn decode(matches: &clap::ArgMatches) {
             }
         };
 
-        let nfa = irp.build_nfa().unwrap();
+        let nfa = irp.compile().unwrap();
 
         if nfa_graphviz {
             let filename = "irp_nfa.dot";
@@ -55,7 +58,7 @@ pub fn decode(matches: &clap::ArgMatches) {
 
                 let irp = Irp::parse(&irp).unwrap();
 
-                let nfa = irp.build_nfa().unwrap();
+                let nfa = irp.compile().unwrap();
 
                 if nfa_graphviz {
                     let filename = format!("{}_nfa.dot", remote.name);
@@ -203,8 +206,8 @@ pub fn decode(matches: &clap::ArgMatches) {
                 // TODO: for each remote, use eps/aeps from lircd.conf if it was NOT specified on the command line
                 let mut matchers = irps
                     .iter()
-                    .map(|(remote, nfa)| (remote, nfa.matcher(abs_tolerance, rel_tolerance, 20000)))
-                    .collect::<Vec<(&Option<&Remote>, Matcher)>>();
+                    .map(|(remote, nfa)| (remote, nfa.decoder(abs_tolerance, rel_tolerance, 20000)))
+                    .collect::<Vec<(&Option<&Remote>, Decoder)>>();
 
                 loop {
                     if let Err(err) = lircdev.receive_raw(&mut rawbuf) {
@@ -277,7 +280,7 @@ fn process(
     let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa-step");
 
     for (remote, nfa) in irps {
-        let mut matcher = nfa.matcher(abs_tolerance, rel_tolerance, 20000);
+        let mut matcher = nfa.decoder(abs_tolerance, rel_tolerance, 20000);
 
         for (index, raw) in raw.iter().enumerate() {
             let ir = if index.is_odd() {

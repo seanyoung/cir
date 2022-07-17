@@ -54,8 +54,9 @@ pub struct NFA {
 }
 
 impl Irp {
-    /// Generate an NFA decoder for this IRP
-    pub fn build_nfa(&self) -> Result<NFA, String> {
+    /// Generate an NFA decoder for this IRP. This may fail if it is impossible
+    /// to generate a decoder for this Irp.
+    pub fn compile(&self) -> Result<NFA, String> {
         let mut builder = Builder::new(self);
 
         builder.add_action(Action::Set {

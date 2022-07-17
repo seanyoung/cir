@@ -9,23 +9,26 @@ use std::{
     fmt::Write,
 };
 
+/// NFA Decoder state
 #[derive(Debug)]
-pub struct Matcher<'a> {
+pub struct Decoder<'a> {
     pos: Vec<(usize, Vartable<'a>)>,
     abs_tolerance: u32,
     rel_tolerance: u32,
-    trailing_space: u32,
+    trailing_gap: u32,
     nfa: &'a NFA,
     decoded: VecDeque<HashMap<String, i64>>,
 }
 
 impl NFA {
-    pub fn matcher(&self, abs_tolerance: u32, rel_tolerance: u32, trailing_space: u32) -> Matcher {
-        Matcher {
+    /// Create a decoder with parameters. abs_tolerance is microseconds, rel_tolerance is in percentage,
+    /// and trailing gap is the minimum gap in microseconds which must follow.
+    pub fn decoder(&self, abs_tolerance: u32, rel_tolerance: u32, trailing_gap: u32) -> Decoder {
+        Decoder {
             pos: Vec::new(),
             abs_tolerance,
             rel_tolerance,
-            trailing_space,
+            trailing_gap,
             nfa: self,
             decoded: VecDeque::new(),
         }
@@ -75,7 +78,8 @@ impl<'a> fmt::Display for Vartable<'a> {
     }
 }
 
-impl<'a> Matcher<'a> {
+impl<'a> Decoder<'a> {
+    /// Reset decoder state
     pub fn reset(&mut self) {
         self.pos.truncate(0);
     }
@@ -94,6 +98,7 @@ impl<'a> Matcher<'a> {
         }
     }
 
+    /// Feed intrared data to the decoder
     pub fn input(&mut self, ir: InfraredData) {
         if ir == InfraredData::Reset {
             trace!("decoder reset");
@@ -190,7 +195,7 @@ impl<'a> Matcher<'a> {
                     }
                     Edge::TrailingGap(dest) => {
                         if let Some(InfraredData::Gap(received)) = ir {
-                            let expected = self.trailing_space;
+                            let expected = self.trailing_gap;
                             if received >= expected {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
@@ -296,12 +301,12 @@ impl<'a> Matcher<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::{InfraredData, Matcher};
+    use super::{Decoder, InfraredData};
     use crate::{rawir, Irp};
     use num::Integer;
     use std::collections::HashMap;
 
-    fn munge<'a>(matcher: &'a mut Matcher, s: &str) -> HashMap<String, i64> {
+    fn munge<'a>(matcher: &'a mut Decoder, s: &str) -> HashMap<String, i64> {
         let mut res = None;
 
         for ir in rawir::parse(s)
@@ -335,9 +340,9 @@ mod test {
         // sony 8
         let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]").unwrap();
 
-        let nfa = irp.build_nfa().unwrap();
+        let nfa = irp.compile().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3, 20000);
+        let mut matcher = nfa.decoder(100, 3, 20000);
 
         let res = munge(&mut matcher,
             "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200");
@@ -349,9 +354,9 @@ mod test {
     fn nec() {
         let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
 
-        let nfa = irp.build_nfa().unwrap();
+        let nfa = irp.compile().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3, 20000);
+        let mut matcher = nfa.decoder(100, 3, 20000);
 
         let res = munge(&mut matcher,
             "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756");
@@ -393,9 +398,9 @@ mod test {
         // RC5
         let irp = Irp::parse("{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)[D:0..31,F:0..127,T@:0..1=0]").unwrap();
 
-        let nfa = irp.build_nfa().unwrap();
+        let nfa = irp.compile().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3, 20000);
+        let mut matcher = nfa.decoder(100, 3, 20000);
 
         let  res = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");
