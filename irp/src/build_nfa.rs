@@ -16,6 +16,7 @@ use std::collections::HashMap;
 pub(crate) enum Edge {
     Flash(i64, usize),
     Gap(i64, usize),
+    TrailingGap(usize),
     BranchCond {
         expr: Expression,
         yes: usize,
@@ -472,7 +473,15 @@ impl Irp {
                 self.bit_field(length, verts, heads, bit_spec)?;
             }
             Expression::ExtentConstant(_, _) => {
-                // should really check this is the last entry
+                for head in heads {
+                    let pos = verts.len();
+
+                    verts.push(Vertex::new());
+
+                    verts[head.head].edges.push(Edge::TrailingGap(pos));
+
+                    head.head = pos;
+                }
             }
             _ => println!("expr:{:?}", expr),
         }

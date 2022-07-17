@@ -10,15 +10,17 @@ pub struct Matcher<'a> {
     pos: Vec<(usize, Vartable<'a>)>,
     abs_tolerance: u32,
     rel_tolerance: u32,
+    trailing_space: u32,
     nfa: &'a NFA,
 }
 
 impl NFA {
-    pub fn matcher(&self, abs_tolerance: u32, rel_tolerance: u32) -> Matcher {
+    pub fn matcher(&self, abs_tolerance: u32, rel_tolerance: u32, trailing_space: u32) -> Matcher {
         Matcher {
             pos: Vec::new(),
             abs_tolerance,
             rel_tolerance,
+            trailing_space,
             nfa: self,
         }
     }
@@ -180,6 +182,27 @@ impl<'a> Matcher<'a> {
                             new_pos.push((pos, vartab.clone()));
                         }
                     }
+                    Edge::TrailingGap(dest) => {
+                        if let Some(InfraredData::Gap(received)) = ir {
+                            let expected = self.trailing_space;
+                            if received >= expected {
+                                let (success, vartab) = self.run_actions(pos, &vartab);
+
+                                trace!(
+                                    "matched trailing gap {} (expected {}) => {}",
+                                    received,
+                                    20000,
+                                    dest
+                                );
+
+                                if success {
+                                    work.push((None, *dest, vartab));
+                                }
+                            }
+                        } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
+                            new_pos.push((pos, vartab.clone()));
+                        }
+                    }
                     Edge::Branch(dest) => {
                         let (success, vartab) = self.run_actions(pos, &vartab);
 
@@ -303,7 +326,7 @@ mod test {
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3);
+        let mut matcher = nfa.matcher(100, 3, 20000);
 
         let res = munge(&mut matcher,
             "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200");
@@ -317,7 +340,7 @@ mod test {
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3);
+        let mut matcher = nfa.matcher(100, 3, 20000);
 
         // let res = munge(&mut matcher, "+9024 -2256 +564 -96156");
 
@@ -341,7 +364,7 @@ mod test {
 
         let nfa = irp.build_nfa().unwrap();
 
-        let mut matcher = nfa.matcher(100, 3);
+        let mut matcher = nfa.matcher(100, 3, 20000);
 
         let  res = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");

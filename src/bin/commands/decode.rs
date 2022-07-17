@@ -203,7 +203,7 @@ pub fn decode(matches: &clap::ArgMatches) {
                 // TODO: for each remote, use eps/aeps from lircd.conf if it was NOT specified on the command line
                 let mut matchers = irps
                     .iter()
-                    .map(|(remote, nfa)| (remote, nfa.matcher(abs_tolerance, rel_tolerance)))
+                    .map(|(remote, nfa)| (remote, nfa.matcher(abs_tolerance, rel_tolerance, 20000)))
                     .collect::<Vec<(&Option<&Remote>, Matcher)>>();
 
                 loop {
@@ -275,7 +275,7 @@ fn process(
     let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa-step");
 
     for (remote, nfa) in irps {
-        let mut matcher = nfa.matcher(abs_tolerance, rel_tolerance);
+        let mut matcher = nfa.matcher(abs_tolerance, rel_tolerance, 20000);
 
         for (index, raw) in raw.iter().enumerate() {
             let ir = if index.is_odd() {
