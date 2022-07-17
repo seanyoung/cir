@@ -66,13 +66,9 @@ impl Irp {
 
         self.expression(&self.stream, &mut verts, &mut builder, &[])?;
 
-        let res: Vec<String> = builder
-            .vars
-            .into_keys()
-            .filter(|v| !v.starts_with('$'))
-            .collect();
+        if builder.seen_edges && builder.is_done() {
+            let res = builder.done_fields();
 
-        if !res.is_empty() && builder.seen_edges {
             verts[builder.head].edges.push(Edge::Done(res));
         }
 
