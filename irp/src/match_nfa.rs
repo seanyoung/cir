@@ -3,7 +3,11 @@ use super::{
     Vartable,
 };
 use log::trace;
-use std::{collections::HashMap, fmt, fmt::Write};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt,
+    fmt::Write,
+};
 
 #[derive(Debug)]
 pub struct Matcher<'a> {
@@ -12,6 +16,7 @@ pub struct Matcher<'a> {
     rel_tolerance: u32,
     trailing_space: u32,
     nfa: &'a NFA,
+    decoded: VecDeque<HashMap<String, i64>>,
 }
 
 impl NFA {
@@ -22,6 +27,7 @@ impl NFA {
             rel_tolerance,
             trailing_space,
             nfa: self,
+            decoded: VecDeque::new(),
         }
     }
 }
@@ -88,11 +94,11 @@ impl<'a> Matcher<'a> {
         }
     }
 
-    pub fn input(&mut self, ir: InfraredData) -> Option<HashMap<String, i64>> {
+    pub fn input(&mut self, ir: InfraredData) {
         if ir == InfraredData::Reset {
             trace!("decoder reset");
             self.reset();
-            return None;
+            return;
         }
 
         if self.pos.is_empty() {
@@ -235,14 +241,14 @@ impl<'a> Matcher<'a> {
                             let mut res: HashMap<String, i64> = HashMap::new();
 
                             for (name, (val, _, _)) in &vartab.vars {
-                                if include.contains(name) {
+                                if include.contains(name) || name == "$repeat" {
                                     trace!("done");
 
                                     res.insert(name.to_owned(), *val);
                                 }
                             }
 
-                            return Some(res);
+                            self.decoded.push_back(res);
                         }
                     }
                 }
@@ -250,8 +256,6 @@ impl<'a> Matcher<'a> {
         }
 
         self.pos = new_pos;
-
-        None
     }
 
     fn run_actions<'v>(&self, pos: usize, vartab: &Vartable<'v>) -> (bool, Vartable<'v>) {
@@ -283,6 +287,11 @@ impl<'a> Matcher<'a> {
     pub fn dotgraphviz(&self, path: &str) {
         crate::graphviz::graphviz(self.nfa, &self.pos, path);
     }
+
+    /// Get the decoded result
+    pub fn get(&mut self) -> Option<HashMap<String, i64>> {
+        self.decoded.pop_front()
+    }
 }
 
 #[cfg(test)]
@@ -292,7 +301,7 @@ mod test {
     use num::Integer;
     use std::collections::HashMap;
 
-    fn munge(matcher: &mut Matcher, s: &str) -> HashMap<String, i64> {
+    fn munge<'a>(matcher: &'a mut Matcher, s: &str) -> HashMap<String, i64> {
         let mut res = None;
 
         for ir in rawir::parse(s)
@@ -307,12 +316,14 @@ mod test {
                 }
             })
         {
-            if let Some(r) = matcher.input(ir) {
+            matcher.input(ir);
+
+            if let Some(r) = matcher.get() {
                 if res.is_some() {
                     panic!("double result: {:?} and {:?}", res, r);
                 }
 
-                res = Some(r);
+                res = Some(r.clone());
             }
         }
 
@@ -342,11 +353,30 @@ mod test {
 
         let mut matcher = nfa.matcher(100, 3, 20000);
 
-        // let res = munge(&mut matcher, "+9024 -2256 +564 -96156");
+        let res = munge(&mut matcher,
+            "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756");
 
-        // assert_eq!(res, Some(196));
+        // not quite
+        assert_eq!(res["F"], 191);
+        assert_eq!(res["D"], 59);
+        assert_eq!(res["S"], 196);
+        assert_eq!(res["$repeat"], 0);
 
-        // matcher.reset();
+        println!("matcher:{:?}", matcher);
+
+        let res = munge(&mut matcher, "+9024 -2256 +564 -96156");
+
+        assert_eq!(res["F"], 191);
+        assert_eq!(res["D"], 59);
+        assert_eq!(res["S"], 196);
+        assert_eq!(res["$repeat"], 1);
+
+        let res = munge(&mut matcher, "+9024 -2256 +564 -96156");
+
+        assert_eq!(res["F"], 191);
+        assert_eq!(res["D"], 59);
+        assert_eq!(res["S"], 196);
+        assert_eq!(res["$repeat"], 1);
 
         let res = munge(&mut matcher,
             "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756");
@@ -355,6 +385,7 @@ mod test {
         assert_eq!(res["F"], 191);
         assert_eq!(res["D"], 59);
         assert_eq!(res["S"], 196);
+        assert_eq!(res["$repeat"], 0);
     }
 
     #[test]

@@ -226,7 +226,9 @@ pub fn decode(matches: &clap::ArgMatches) {
                         };
 
                         for (remote, matcher) in &mut matchers {
-                            if let Some(var) = matcher.input(ir) {
+                            matcher.input(ir);
+
+                            while let Some(var) = matcher.get() {
                                 if let Some(remote) = remote {
                                     // lirc
                                     let decoded_code = var["CODE"] as u64;
@@ -284,7 +286,9 @@ fn process(
                 InfraredData::Flash(*raw)
             };
 
-            if let Some(var) = matcher.input(ir) {
+            matcher.input(ir);
+
+            while let Some(var) = matcher.get() {
                 if let Some(remote) = remote {
                     // lirc
                     let decoded_code = var["CODE"] as u64;

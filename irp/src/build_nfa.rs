@@ -57,7 +57,12 @@ impl Irp {
     /// Generate an NFA decoder for this IRP
     pub fn build_nfa(&self) -> Result<NFA, String> {
         let mut verts: Vec<Vertex> = vec![Vertex::new()];
-        let mut builder = Builder::new();
+        let mut builder = Builder::new(self);
+
+        verts[0].actions.push(Action::Set {
+            var: "$repeat".to_owned(),
+            expr: Expression::Number(0),
+        });
 
         self.expression(&self.stream, &mut verts, &mut builder, &[])?;
 
@@ -407,19 +412,55 @@ impl Irp {
                     &irstream.bit_spec
                 };
 
-                if irstream.repeat == Some(RepeatMarker::Any) {
-                    let res: Vec<String> = builder
-                        .vars
-                        .keys()
-                        .filter(|v| !v.starts_with('$'))
-                        .cloned()
-                        .collect();
+                if irstream.repeat == Some(RepeatMarker::Any)
+                    || irstream.repeat == Some(RepeatMarker::OneOrMore)
+                {
+                    let mut start = if builder.seen_edges {
+                        Some(builder.head)
+                    } else {
+                        None
+                    };
 
-                    if !res.is_empty() && builder.seen_edges {
+                    let done_before = if builder.is_done() {
+                        let res = builder.done_fields();
+
+                        verts[builder.head].edges.push(Edge::Done(res));
+
+                        let pos = verts.len();
+
+                        verts.push(Vertex::new());
+
+                        verts[builder.head].edges.push(Edge::Branch(pos));
+
+                        builder.head = pos;
+
+                        if start.is_some() {
+                            start = Some(pos);
+                        }
+
+                        verts[builder.head].edges.push(Edge::Branch(0));
+
+                        true
+                    } else {
+                        false
+                    };
+
+                    self.expression_list(&irstream.stream, verts, builder, bit_spec)?;
+
+                    verts[builder.head].actions.push(Action::Set {
+                        var: "$repeat".to_owned(),
+                        expr: Expression::Number(1),
+                    });
+
+                    if !done_before && builder.is_done() {
+                        let res = builder.done_fields();
+
                         verts[builder.head].edges.push(Edge::Done(res));
                     }
 
-                    self.expression_list(&irstream.stream, verts, builder, bit_spec)?;
+                    if let Some(start) = start {
+                        verts[builder.head].edges.push(Edge::Branch(start));
+                    }
                 } else {
                     self.expression_list(&irstream.stream, verts, builder, bit_spec)?;
                 }
@@ -488,17 +529,23 @@ fn gen_mask(v: i64) -> i64 {
 }
 
 /// track which
-#[derive(Clone, Default, Debug)]
-struct Builder {
+#[derive(Clone, Debug)]
+struct Builder<'a> {
     head: usize,
     seen_edges: bool,
     vars: HashMap<String, i64>,
+    irp: &'a Irp,
 }
 
 #[allow(dead_code)]
-impl Builder {
-    fn new() -> Self {
-        Default::default()
+impl<'a> Builder<'a> {
+    fn new(irp: &'a Irp) -> Self {
+        Builder {
+            head: 0,
+            seen_edges: false,
+            vars: HashMap::new(),
+            irp,
+        }
     }
 
     fn set(&mut self, name: &str, fields: i64) {
@@ -523,6 +570,21 @@ impl Builder {
         } else {
             false
         }
+    }
+
+    fn is_done(&self) -> bool {
+        self.irp
+            .parameters
+            .iter()
+            .all(|param| self.vars.contains_key(&param.name))
+    }
+
+    fn done_fields(&self) -> Vec<String> {
+        self.irp
+            .parameters
+            .iter()
+            .map(|param| param.name.to_owned())
+            .collect()
     }
 
     fn clear(&mut self) {
