@@ -56,29 +56,29 @@ pub struct NFA {
 impl Irp {
     /// Generate an NFA decoder for this IRP
     pub fn build_nfa(&self) -> Result<NFA, String> {
-        let mut verts: Vec<Vertex> = vec![Vertex::new()];
         let mut builder = Builder::new(self);
 
-        verts[0].actions.push(Action::Set {
+        builder.add_action(Action::Set {
             var: "$repeat".to_owned(),
             expr: Expression::Number(0),
         });
 
-        self.expression(&self.stream, &mut verts, &mut builder, &[])?;
+        self.expression(&self.stream, &mut builder, &[])?;
 
-        if builder.seen_edges && builder.is_done() {
+        if builder.cur.seen_edges && builder.is_done() {
             let res = builder.done_fields();
 
-            verts[builder.head].edges.push(Edge::Done(res));
+            builder.add_edge(Edge::Done(res));
         }
 
-        Ok(NFA { verts })
+        Ok(NFA {
+            verts: builder.complete(),
+        })
     }
 
     fn expression_list(
         &self,
         list: &[Expression],
-        verts: &mut Vec<Vertex>,
         builder: &mut Builder,
         bit_spec: &[Expression],
     ) -> Result<(), String> {
@@ -96,10 +96,10 @@ impl Irp {
             }
 
             if expr_count == 0 {
-                self.expression(&list[pos], verts, builder, bit_spec)?;
+                self.expression(&list[pos], builder, bit_spec)?;
                 pos += 1;
             } else {
-                self.bit_field(bit_count, verts, builder, bit_spec)?;
+                self.bit_field(bit_count, builder, bit_spec)?;
 
                 // now do stuff with bitfields
                 let mut offset = bit_count;
@@ -127,22 +127,20 @@ impl Irp {
                             Expression::Complement(expr) => match expr.as_ref() {
                                 Expression::Identifier(name) => {
                                     self.store_bits_in_var(
-                                        name, offset, true, length, skip, verts, builder,
+                                        name, offset, true, length, skip, builder,
                                     )?;
                                 }
                                 Expression::Number(_) => self.check_bits_in_var(
-                                    value, offset, true, length, skip, verts, builder,
+                                    value, offset, true, length, skip, builder,
                                 )?,
                                 _ => unimplemented!("{:?}", expr),
                             },
                             Expression::Identifier(name) => {
-                                self.store_bits_in_var(
-                                    name, offset, false, length, skip, verts, builder,
-                                )?;
+                                self.store_bits_in_var(name, offset, false, length, skip, builder)?;
                             }
-                            Expression::Number(_) => self.check_bits_in_var(
-                                value, offset, false, length, skip, verts, builder,
-                            )?,
+                            Expression::Number(_) => {
+                                self.check_bits_in_var(value, offset, false, length, skip, builder)?
+                            }
                             _ => unimplemented!("{:?}", value),
                         }
                     }
@@ -163,7 +161,6 @@ impl Irp {
         complement: bool,
         length: i64,
         skip: i64,
-        verts: &mut Vec<Vertex>,
         builder: &mut Builder,
     ) -> Result<(), String> {
         let expr = Expression::Identifier(String::from("$bits"));
@@ -188,7 +185,7 @@ impl Irp {
         let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
 
         if builder.is_set(name, mask) {
-            verts[builder.head].actions.push(Action::AssertEq {
+            builder.add_action(Action::AssertEq {
                 left: Expression::Identifier(name.to_owned()),
                 right: expr,
             });
@@ -200,7 +197,7 @@ impl Irp {
             }
             None
         }) {
-            verts[builder.head].actions.push(Action::AssertEq {
+            builder.add_action(Action::AssertEq {
                 left: def.as_ref().clone(),
                 right: expr,
             });
@@ -216,7 +213,7 @@ impl Irp {
 
             builder.set(name, mask);
 
-            verts[builder.head].actions.push(Action::Set {
+            builder.add_action(Action::Set {
                 var: name.to_owned(),
                 expr,
             });
@@ -233,7 +230,6 @@ impl Irp {
         complement: bool,
         length: i64,
         skip: i64,
-        verts: &mut Vec<Vertex>,
         builder: &mut Builder,
     ) -> Result<(), String> {
         let expr = Expression::Identifier(String::from("$bits"));
@@ -257,7 +253,7 @@ impl Irp {
 
         let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
 
-        verts[builder.head].actions.push(Action::AssertEq {
+        builder.add_action(Action::AssertEq {
             left: expr,
             right: value.clone(),
         });
@@ -268,127 +264,145 @@ impl Irp {
     fn bit_field(
         &self,
         length: i64,
-        verts: &mut Vec<Vertex>,
         builder: &mut Builder,
         bit_spec: &[Expression],
     ) -> Result<(), String> {
         // TODO: special casing when length == 1
-        builder.seen_edges = true;
+        builder.cur.seen_edges = true;
 
-        let before = builder.head;
+        let before = builder.cur.head;
 
-        let entry = verts.len();
+        let entry = builder.add_vertex();
 
-        verts.push(Vertex::new());
+        let next = builder.add_vertex();
 
-        let next = verts.len();
+        let done = builder.add_vertex();
 
-        verts.push(Vertex::new());
+        builder.add_edge(Edge::Branch(entry));
 
-        let done = verts.len();
-
-        verts.push(Vertex::new());
-
-        verts[builder.head].edges.push(Edge::Branch(entry));
-
-        builder.head = entry;
+        builder.set_head(entry);
 
         for (bit, e) in bit_spec.iter().enumerate() {
-            let mut new_builder = builder.clone();
+            builder.push_location();
 
-            self.expression(e, verts, &mut new_builder, bit_spec)?;
+            self.expression(e, builder, bit_spec)?;
 
-            verts[new_builder.head].actions.push(Action::Set {
+            builder.add_action(Action::Set {
                 var: String::from("$v"),
                 expr: Expression::Number(bit as i64),
             });
 
-            verts[new_builder.head].edges.push(Edge::Branch(next));
+            builder.add_edge(Edge::Branch(next));
+
+            builder.pop_location();
         }
 
         if !self.general_spec.lsb {
-            verts[before].actions.push(Action::Set {
-                var: String::from("$b"),
-                expr: Expression::Number(length),
-            });
+            builder.add_action_at_node(
+                before,
+                Action::Set {
+                    var: String::from("$b"),
+                    expr: Expression::Number(length),
+                },
+            );
 
-            verts[before].actions.push(Action::Set {
-                var: String::from("$bits"),
-                expr: Expression::Number(0),
-            });
+            builder.add_action_at_node(
+                before,
+                Action::Set {
+                    var: String::from("$bits"),
+                    expr: Expression::Number(0),
+                },
+            );
 
-            verts[next] = Vertex {
-                actions: vec![
-                    Action::Set {
-                        var: String::from("$b"),
-                        expr: Expression::Subtract(
+            builder.add_action_at_node(
+                next,
+                Action::Set {
+                    var: String::from("$b"),
+                    expr: Expression::Subtract(
+                        Box::new(Expression::Identifier(String::from("$b"))),
+                        Box::new(Expression::Number(1)),
+                    ),
+                },
+            );
+            builder.add_action_at_node(
+                next,
+                Action::Set {
+                    var: String::from("$bits"),
+                    expr: Expression::BitwiseOr(
+                        Box::new(Expression::Identifier(String::from("$bits"))),
+                        Box::new(Expression::ShiftLeft(
+                            Box::new(Expression::Identifier(String::from("$v"))),
                             Box::new(Expression::Identifier(String::from("$b"))),
-                            Box::new(Expression::Number(1)),
-                        ),
-                    },
-                    Action::Set {
-                        var: String::from("$bits"),
-                        expr: Expression::BitwiseOr(
-                            Box::new(Expression::Identifier(String::from("$bits"))),
-                            Box::new(Expression::ShiftLeft(
-                                Box::new(Expression::Identifier(String::from("$v"))),
-                                Box::new(Expression::Identifier(String::from("$b"))),
-                            )),
-                        ),
-                    },
-                ],
-                edges: vec![Edge::BranchCond {
+                        )),
+                    ),
+                },
+            );
+            builder.add_edge_at_node(
+                next,
+                Edge::BranchCond {
                     expr: Expression::More(
                         Box::new(Expression::Identifier(String::from("$b"))),
                         Box::new(Expression::Number(0)),
                     ),
                     yes: entry,
                     no: done,
-                }],
-            };
+                },
+            );
         } else {
-            verts[before].actions.push(Action::Set {
-                var: String::from("$b"),
-                expr: Expression::Number(0),
-            });
+            builder.add_action_at_node(
+                before,
+                Action::Set {
+                    var: String::from("$b"),
+                    expr: Expression::Number(0),
+                },
+            );
 
-            verts[before].actions.push(Action::Set {
-                var: String::from("$bits"),
-                expr: Expression::Number(0),
-            });
+            builder.add_action_at_node(
+                before,
+                Action::Set {
+                    var: String::from("$bits"),
+                    expr: Expression::Number(0),
+                },
+            );
 
-            verts[next] = Vertex {
-                actions: vec![
-                    Action::Set {
-                        var: String::from("$bits"),
-                        expr: Expression::BitwiseOr(
-                            Box::new(Expression::Identifier(String::from("$bits"))),
-                            Box::new(Expression::ShiftLeft(
-                                Box::new(Expression::Identifier(String::from("$v"))),
-                                Box::new(Expression::Identifier(String::from("$b"))),
-                            )),
-                        ),
-                    },
-                    Action::Set {
-                        var: String::from("$b"),
-                        expr: Expression::Add(
+            builder.add_action_at_node(
+                next,
+                Action::Set {
+                    var: String::from("$bits"),
+                    expr: Expression::BitwiseOr(
+                        Box::new(Expression::Identifier(String::from("$bits"))),
+                        Box::new(Expression::ShiftLeft(
+                            Box::new(Expression::Identifier(String::from("$v"))),
                             Box::new(Expression::Identifier(String::from("$b"))),
-                            Box::new(Expression::Number(1)),
-                        ),
-                    },
-                ],
-                edges: vec![Edge::BranchCond {
+                        )),
+                    ),
+                },
+            );
+            builder.add_action_at_node(
+                next,
+                Action::Set {
+                    var: String::from("$b"),
+                    expr: Expression::Add(
+                        Box::new(Expression::Identifier(String::from("$b"))),
+                        Box::new(Expression::Number(1)),
+                    ),
+                },
+            );
+
+            builder.add_edge_at_node(
+                next,
+                Edge::BranchCond {
                     expr: Expression::Less(
                         Box::new(Expression::Identifier(String::from("$b"))),
                         Box::new(Expression::Number(length)),
                     ),
                     yes: entry,
                     no: done,
-                }],
-            };
+                },
+            );
         }
 
-        builder.head = done;
+        builder.set_head(done);
 
         Ok(())
     }
@@ -396,7 +410,6 @@ impl Irp {
     fn expression(
         &self,
         expr: &Expression,
-        verts: &mut Vec<Vertex>,
         builder: &mut Builder,
         bit_spec: &[Expression],
     ) -> Result<(), String> {
@@ -411,8 +424,8 @@ impl Irp {
                 if irstream.repeat == Some(RepeatMarker::Any)
                     || irstream.repeat == Some(RepeatMarker::OneOrMore)
                 {
-                    let mut start = if builder.seen_edges {
-                        Some(builder.head)
+                    let mut start = if builder.cur.seen_edges {
+                        Some(builder.cur.head)
                     } else {
                         None
                     };
@@ -420,30 +433,28 @@ impl Irp {
                     let done_before = if builder.is_done() {
                         let res = builder.done_fields();
 
-                        verts[builder.head].edges.push(Edge::Done(res));
+                        builder.add_edge(Edge::Done(res));
 
-                        let pos = verts.len();
+                        let node = builder.add_vertex();
 
-                        verts.push(Vertex::new());
+                        builder.add_edge(Edge::Branch(node));
 
-                        verts[builder.head].edges.push(Edge::Branch(pos));
-
-                        builder.head = pos;
+                        builder.set_head(node);
 
                         if start.is_some() {
-                            start = Some(pos);
+                            start = Some(node);
                         }
 
-                        verts[builder.head].edges.push(Edge::Branch(0));
+                        builder.add_edge(Edge::Branch(0));
 
                         true
                     } else {
                         false
                     };
 
-                    self.expression_list(&irstream.stream, verts, builder, bit_spec)?;
+                    self.expression_list(&irstream.stream, builder, bit_spec)?;
 
-                    verts[builder.head].actions.push(Action::Set {
+                    builder.add_action(Action::Set {
                         var: "$repeat".to_owned(),
                         expr: Expression::Number(1),
                     });
@@ -451,60 +462,54 @@ impl Irp {
                     if !done_before && builder.is_done() {
                         let res = builder.done_fields();
 
-                        verts[builder.head].edges.push(Edge::Done(res));
+                        builder.add_edge(Edge::Done(res));
                     }
 
                     if let Some(start) = start {
-                        verts[builder.head].edges.push(Edge::Branch(start));
+                        builder.add_edge(Edge::Branch(start));
                     }
                 } else {
-                    self.expression_list(&irstream.stream, verts, builder, bit_spec)?;
+                    self.expression_list(&irstream.stream, builder, bit_spec)?;
                 }
             }
             Expression::List(list) => {
-                self.expression_list(list, verts, builder, bit_spec)?;
+                self.expression_list(list, builder, bit_spec)?;
             }
             Expression::FlashConstant(v, u) => {
-                builder.seen_edges = true;
+                builder.cur.seen_edges = true;
 
                 let len = u.eval_float(*v, &self.general_spec)?;
 
-                let pos = verts.len();
+                let node = builder.add_vertex();
 
-                verts.push(Vertex::new());
+                builder.add_edge(Edge::Flash(len, node));
 
-                verts[builder.head].edges.push(Edge::Flash(len, pos));
-
-                builder.head = pos;
+                builder.set_head(node);
             }
             Expression::GapConstant(v, u) => {
-                builder.seen_edges = true;
+                builder.cur.seen_edges = true;
 
                 let len = u.eval_float(*v, &self.general_spec)?;
 
-                let pos = verts.len();
+                let node = builder.add_vertex();
 
-                verts.push(Vertex::new());
+                builder.add_edge(Edge::Gap(len, node));
 
-                verts[builder.head].edges.push(Edge::Gap(len, pos));
-
-                builder.head = pos;
+                builder.set_head(node);
             }
             Expression::BitField { length, .. } => {
                 let (length, _) = length.eval(&Vartable::new())?;
 
-                self.bit_field(length, verts, builder, bit_spec)?;
+                self.bit_field(length, builder, bit_spec)?;
             }
             Expression::ExtentConstant(_, _) => {
-                builder.seen_edges = true;
+                builder.cur.seen_edges = true;
 
-                let pos = verts.len();
+                let node = builder.add_vertex();
 
-                verts.push(Vertex::new());
+                builder.add_edge(Edge::TrailingGap(node));
 
-                verts[builder.head].edges.push(Edge::TrailingGap(pos));
-
-                builder.head = pos;
+                builder.set_head(node);
             }
             _ => println!("expr:{:?}", expr),
         }
@@ -527,33 +532,42 @@ fn gen_mask(v: i64) -> i64 {
 /// track which
 #[derive(Clone, Debug)]
 struct Builder<'a> {
+    cur: BuilderLocation,
+    saved: Vec<BuilderLocation>,
+    verts: Vec<Vertex>,
+    irp: &'a Irp,
+}
+
+#[derive(Clone, Debug, Default)]
+struct BuilderLocation {
     head: usize,
     seen_edges: bool,
     vars: HashMap<String, i64>,
-    irp: &'a Irp,
 }
 
 #[allow(dead_code)]
 impl<'a> Builder<'a> {
     fn new(irp: &'a Irp) -> Self {
+        let verts = vec![Vertex::new()];
+
         Builder {
-            head: 0,
-            seen_edges: false,
-            vars: HashMap::new(),
+            cur: Default::default(),
+            saved: Vec::new(),
+            verts,
             irp,
         }
     }
 
     fn set(&mut self, name: &str, fields: i64) {
-        if let Some(e) = self.vars.get_mut(name) {
+        if let Some(e) = self.cur.vars.get_mut(name) {
             *e |= 64;
         } else {
-            self.vars.insert(name.to_owned(), fields);
+            self.cur.vars.insert(name.to_owned(), fields);
         }
     }
 
     fn is_set(&self, name: &str, fields: i64) -> bool {
-        if let Some(e) = self.vars.get(name) {
+        if let Some(e) = self.cur.vars.get(name) {
             (e & fields) != 0
         } else {
             false
@@ -561,7 +575,7 @@ impl<'a> Builder<'a> {
     }
 
     fn is_any_set(&self, name: &str) -> bool {
-        if let Some(e) = self.vars.get(name) {
+        if let Some(e) = self.cur.vars.get(name) {
             *e != 0
         } else {
             false
@@ -572,7 +586,7 @@ impl<'a> Builder<'a> {
         self.irp
             .parameters
             .iter()
-            .all(|param| self.vars.contains_key(&param.name))
+            .all(|param| self.cur.vars.contains_key(&param.name))
     }
 
     fn done_fields(&self) -> Vec<String> {
@@ -584,6 +598,46 @@ impl<'a> Builder<'a> {
     }
 
     fn clear(&mut self) {
-        self.vars.clear();
+        self.cur.vars.clear();
+    }
+
+    fn add_vertex(&mut self) -> usize {
+        let node = self.verts.len();
+
+        self.verts.push(Vertex::new());
+
+        node
+    }
+
+    fn set_head(&mut self, head: usize) {
+        self.cur.head = head;
+    }
+
+    fn add_action(&mut self, action: Action) {
+        self.verts[self.cur.head].actions.push(action);
+    }
+
+    fn add_edge(&mut self, edge: Edge) {
+        self.verts[self.cur.head].edges.push(edge);
+    }
+
+    fn add_action_at_node(&mut self, node: usize, action: Action) {
+        self.verts[node].actions.push(action);
+    }
+
+    fn add_edge_at_node(&mut self, node: usize, edge: Edge) {
+        self.verts[node].edges.push(edge);
+    }
+
+    fn complete(self) -> Vec<Vertex> {
+        self.verts
+    }
+
+    fn push_location(&mut self) {
+        self.saved.push(self.cur.clone());
+    }
+
+    fn pop_location(&mut self) {
+        self.cur = self.saved.pop().unwrap();
     }
 }
