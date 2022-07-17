@@ -57,20 +57,18 @@ impl Irp {
     /// Generate an NFA decoder for this IRP
     pub fn build_nfa(&self) -> Result<NFA, String> {
         let mut verts: Vec<Vertex> = vec![Vertex::new()];
-        let mut heads: Vec<BuilderPos> = vec![BuilderPos::new()];
+        let mut builder = Builder::new();
 
-        self.expression(&self.stream, &mut verts, &mut heads, &[])?;
+        self.expression(&self.stream, &mut verts, &mut builder, &[])?;
 
-        for pos in heads {
-            let res: Vec<String> = pos
-                .vars
-                .into_keys()
-                .filter(|v| !v.starts_with('$'))
-                .collect();
+        let res: Vec<String> = builder
+            .vars
+            .into_keys()
+            .filter(|v| !v.starts_with('$'))
+            .collect();
 
-            if !res.is_empty() && pos.seen_edges {
-                verts[pos.head].edges.push(Edge::Done(res));
-            }
+        if !res.is_empty() && builder.seen_edges {
+            verts[builder.head].edges.push(Edge::Done(res));
         }
 
         Ok(NFA { verts })
@@ -80,7 +78,7 @@ impl Irp {
         &self,
         list: &[Expression],
         verts: &mut Vec<Vertex>,
-        heads: &mut Vec<BuilderPos>,
+        builder: &mut Builder,
         bit_spec: &[Expression],
     ) -> Result<(), String> {
         let mut pos = 0;
@@ -97,10 +95,10 @@ impl Irp {
             }
 
             if expr_count == 0 {
-                self.expression(&list[pos], verts, heads, bit_spec)?;
+                self.expression(&list[pos], verts, builder, bit_spec)?;
                 pos += 1;
             } else {
-                self.bit_field(bit_count, verts, heads, bit_spec)?;
+                self.bit_field(bit_count, verts, builder, bit_spec)?;
 
                 // now do stuff with bitfields
                 let mut offset = bit_count;
@@ -128,21 +126,21 @@ impl Irp {
                             Expression::Complement(expr) => match expr.as_ref() {
                                 Expression::Identifier(name) => {
                                     self.store_bits_in_var(
-                                        name, offset, true, length, skip, verts, heads,
+                                        name, offset, true, length, skip, verts, builder,
                                     )?;
                                 }
                                 Expression::Number(_) => self.check_bits_in_var(
-                                    value, offset, true, length, skip, verts, heads,
+                                    value, offset, true, length, skip, verts, builder,
                                 )?,
                                 _ => unimplemented!("{:?}", expr),
                             },
                             Expression::Identifier(name) => {
                                 self.store_bits_in_var(
-                                    name, offset, false, length, skip, verts, heads,
+                                    name, offset, false, length, skip, verts, builder,
                                 )?;
                             }
                             Expression::Number(_) => self.check_bits_in_var(
-                                value, offset, false, length, skip, verts, heads,
+                                value, offset, false, length, skip, verts, builder,
                             )?,
                             _ => unimplemented!("{:?}", value),
                         }
@@ -165,7 +163,7 @@ impl Irp {
         length: i64,
         skip: i64,
         verts: &mut Vec<Vertex>,
-        heads: &mut Vec<BuilderPos>,
+        builder: &mut Builder,
     ) -> Result<(), String> {
         let expr = Expression::Identifier(String::from("$bits"));
 
@@ -188,43 +186,39 @@ impl Irp {
 
         let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
 
-        for head in heads {
-            let expr = expr.clone();
-
-            if head.is_set(name, mask) {
-                verts[head.head].actions.push(Action::AssertEq {
-                    left: Expression::Identifier(name.to_owned()),
-                    right: expr,
-                });
-            } else if let Some(def) = self.definitions.iter().find_map(|def| {
-                if let Expression::Assignment(var, expr) = def {
-                    if name == var {
-                        return Some(expr);
-                    }
+        if builder.is_set(name, mask) {
+            verts[builder.head].actions.push(Action::AssertEq {
+                left: Expression::Identifier(name.to_owned()),
+                right: expr,
+            });
+        } else if let Some(def) = self.definitions.iter().find_map(|def| {
+            if let Expression::Assignment(var, expr) = def {
+                if name == var {
+                    return Some(expr);
                 }
-                None
-            }) {
-                verts[head.head].actions.push(Action::AssertEq {
-                    left: def.as_ref().clone(),
-                    right: expr,
-                });
-            } else {
-                let expr = if head.is_any_set(name) {
-                    Expression::BitwiseOr(
-                        Box::new(Expression::Identifier(name.to_owned())),
-                        Box::new(expr),
-                    )
-                } else {
-                    expr
-                };
-
-                head.set(name, mask);
-
-                verts[head.head].actions.push(Action::Set {
-                    var: name.to_owned(),
-                    expr,
-                });
             }
+            None
+        }) {
+            verts[builder.head].actions.push(Action::AssertEq {
+                left: def.as_ref().clone(),
+                right: expr,
+            });
+        } else {
+            let expr = if builder.is_any_set(name) {
+                Expression::BitwiseOr(
+                    Box::new(Expression::Identifier(name.to_owned())),
+                    Box::new(expr),
+                )
+            } else {
+                expr
+            };
+
+            builder.set(name, mask);
+
+            verts[builder.head].actions.push(Action::Set {
+                var: name.to_owned(),
+                expr,
+            });
         }
 
         Ok(())
@@ -239,7 +233,7 @@ impl Irp {
         length: i64,
         skip: i64,
         verts: &mut Vec<Vertex>,
-        heads: &mut Vec<BuilderPos>,
+        builder: &mut Builder,
     ) -> Result<(), String> {
         let expr = Expression::Identifier(String::from("$bits"));
 
@@ -262,14 +256,10 @@ impl Irp {
 
         let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
 
-        for head in heads {
-            let expr = expr.clone();
-
-            verts[head.head].actions.push(Action::AssertEq {
-                left: expr,
-                right: value.clone(),
-            });
-        }
+        verts[builder.head].actions.push(Action::AssertEq {
+            left: expr,
+            right: value.clone(),
+        });
 
         Ok(())
     }
@@ -278,130 +268,126 @@ impl Irp {
         &self,
         length: i64,
         verts: &mut Vec<Vertex>,
-        heads: &mut Vec<BuilderPos>,
+        builder: &mut Builder,
         bit_spec: &[Expression],
     ) -> Result<(), String> {
         // TODO: special casing when length == 1
-        for head in heads {
-            head.seen_edges = true;
+        builder.seen_edges = true;
 
-            let before = head.head;
+        let before = builder.head;
 
-            let entry = verts.len();
+        let entry = verts.len();
 
-            verts.push(Vertex::new());
+        verts.push(Vertex::new());
 
-            let next = verts.len();
+        let next = verts.len();
 
-            verts.push(Vertex::new());
+        verts.push(Vertex::new());
 
-            let done = verts.len();
+        let done = verts.len();
 
-            verts.push(Vertex::new());
+        verts.push(Vertex::new());
 
-            verts[head.head].edges.push(Edge::Branch(entry));
+        verts[builder.head].edges.push(Edge::Branch(entry));
 
-            head.head = entry;
+        builder.head = entry;
 
-            for (bit, e) in bit_spec.iter().enumerate() {
-                let mut new_heads = vec![head.clone()];
+        for (bit, e) in bit_spec.iter().enumerate() {
+            let mut new_builder = builder.clone();
 
-                self.expression(e, verts, &mut new_heads, bit_spec)?;
+            self.expression(e, verts, &mut new_builder, bit_spec)?;
 
-                for head in new_heads {
-                    verts[head.head].actions.push(Action::Set {
-                        var: String::from("$v"),
-                        expr: Expression::Number(bit as i64),
-                    });
+            verts[new_builder.head].actions.push(Action::Set {
+                var: String::from("$v"),
+                expr: Expression::Number(bit as i64),
+            });
 
-                    verts[head.head].edges.push(Edge::Branch(next));
-                }
-            }
-
-            if !self.general_spec.lsb {
-                verts[before].actions.push(Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Number(length),
-                });
-
-                verts[before].actions.push(Action::Set {
-                    var: String::from("$bits"),
-                    expr: Expression::Number(0),
-                });
-
-                verts[next] = Vertex {
-                    actions: vec![
-                        Action::Set {
-                            var: String::from("$b"),
-                            expr: Expression::Subtract(
-                                Box::new(Expression::Identifier(String::from("$b"))),
-                                Box::new(Expression::Number(1)),
-                            ),
-                        },
-                        Action::Set {
-                            var: String::from("$bits"),
-                            expr: Expression::BitwiseOr(
-                                Box::new(Expression::Identifier(String::from("$bits"))),
-                                Box::new(Expression::ShiftLeft(
-                                    Box::new(Expression::Identifier(String::from("$v"))),
-                                    Box::new(Expression::Identifier(String::from("$b"))),
-                                )),
-                            ),
-                        },
-                    ],
-                    edges: vec![Edge::BranchCond {
-                        expr: Expression::More(
-                            Box::new(Expression::Identifier(String::from("$b"))),
-                            Box::new(Expression::Number(0)),
-                        ),
-                        yes: entry,
-                        no: done,
-                    }],
-                };
-            } else {
-                verts[before].actions.push(Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Number(0),
-                });
-
-                verts[before].actions.push(Action::Set {
-                    var: String::from("$bits"),
-                    expr: Expression::Number(0),
-                });
-
-                verts[next] = Vertex {
-                    actions: vec![
-                        Action::Set {
-                            var: String::from("$bits"),
-                            expr: Expression::BitwiseOr(
-                                Box::new(Expression::Identifier(String::from("$bits"))),
-                                Box::new(Expression::ShiftLeft(
-                                    Box::new(Expression::Identifier(String::from("$v"))),
-                                    Box::new(Expression::Identifier(String::from("$b"))),
-                                )),
-                            ),
-                        },
-                        Action::Set {
-                            var: String::from("$b"),
-                            expr: Expression::Add(
-                                Box::new(Expression::Identifier(String::from("$b"))),
-                                Box::new(Expression::Number(1)),
-                            ),
-                        },
-                    ],
-                    edges: vec![Edge::BranchCond {
-                        expr: Expression::Less(
-                            Box::new(Expression::Identifier(String::from("$b"))),
-                            Box::new(Expression::Number(length)),
-                        ),
-                        yes: entry,
-                        no: done,
-                    }],
-                };
-            }
-
-            head.head = done;
+            verts[new_builder.head].edges.push(Edge::Branch(next));
         }
+
+        if !self.general_spec.lsb {
+            verts[before].actions.push(Action::Set {
+                var: String::from("$b"),
+                expr: Expression::Number(length),
+            });
+
+            verts[before].actions.push(Action::Set {
+                var: String::from("$bits"),
+                expr: Expression::Number(0),
+            });
+
+            verts[next] = Vertex {
+                actions: vec![
+                    Action::Set {
+                        var: String::from("$b"),
+                        expr: Expression::Subtract(
+                            Box::new(Expression::Identifier(String::from("$b"))),
+                            Box::new(Expression::Number(1)),
+                        ),
+                    },
+                    Action::Set {
+                        var: String::from("$bits"),
+                        expr: Expression::BitwiseOr(
+                            Box::new(Expression::Identifier(String::from("$bits"))),
+                            Box::new(Expression::ShiftLeft(
+                                Box::new(Expression::Identifier(String::from("$v"))),
+                                Box::new(Expression::Identifier(String::from("$b"))),
+                            )),
+                        ),
+                    },
+                ],
+                edges: vec![Edge::BranchCond {
+                    expr: Expression::More(
+                        Box::new(Expression::Identifier(String::from("$b"))),
+                        Box::new(Expression::Number(0)),
+                    ),
+                    yes: entry,
+                    no: done,
+                }],
+            };
+        } else {
+            verts[before].actions.push(Action::Set {
+                var: String::from("$b"),
+                expr: Expression::Number(0),
+            });
+
+            verts[before].actions.push(Action::Set {
+                var: String::from("$bits"),
+                expr: Expression::Number(0),
+            });
+
+            verts[next] = Vertex {
+                actions: vec![
+                    Action::Set {
+                        var: String::from("$bits"),
+                        expr: Expression::BitwiseOr(
+                            Box::new(Expression::Identifier(String::from("$bits"))),
+                            Box::new(Expression::ShiftLeft(
+                                Box::new(Expression::Identifier(String::from("$v"))),
+                                Box::new(Expression::Identifier(String::from("$b"))),
+                            )),
+                        ),
+                    },
+                    Action::Set {
+                        var: String::from("$b"),
+                        expr: Expression::Add(
+                            Box::new(Expression::Identifier(String::from("$b"))),
+                            Box::new(Expression::Number(1)),
+                        ),
+                    },
+                ],
+                edges: vec![Edge::BranchCond {
+                    expr: Expression::Less(
+                        Box::new(Expression::Identifier(String::from("$b"))),
+                        Box::new(Expression::Number(length)),
+                    ),
+                    yes: entry,
+                    no: done,
+                }],
+            };
+        }
+
+        builder.head = done;
 
         Ok(())
     }
@@ -410,7 +396,7 @@ impl Irp {
         &self,
         expr: &Expression,
         verts: &mut Vec<Vertex>,
-        heads: &mut Vec<BuilderPos>,
+        builder: &mut Builder,
         bit_spec: &[Expression],
     ) -> Result<(), String> {
         match expr {
@@ -422,75 +408,66 @@ impl Irp {
                 };
 
                 if irstream.repeat == Some(RepeatMarker::Any) {
-                    let before_heads = heads.clone();
+                    let res: Vec<String> = builder
+                        .vars
+                        .keys()
+                        .filter(|v| !v.starts_with('$'))
+                        .cloned()
+                        .collect();
 
-                    self.expression_list(&irstream.stream, verts, heads, bit_spec)?;
-
-                    for mut head in before_heads.into_iter() {
-                        let pos = verts.len();
-
-                        verts.push(Vertex::new());
-
-                        verts[head.head].edges.push(Edge::Branch(pos));
-
-                        head.head = pos;
-
-                        heads.push(head);
+                    if !res.is_empty() && builder.seen_edges {
+                        verts[builder.head].edges.push(Edge::Done(res));
                     }
+
+                    self.expression_list(&irstream.stream, verts, builder, bit_spec)?;
                 } else {
-                    self.expression_list(&irstream.stream, verts, heads, bit_spec)?;
+                    self.expression_list(&irstream.stream, verts, builder, bit_spec)?;
                 }
             }
             Expression::List(list) => {
-                self.expression_list(list, verts, heads, bit_spec)?;
+                self.expression_list(list, verts, builder, bit_spec)?;
             }
             Expression::FlashConstant(v, u) => {
-                for head in heads {
-                    head.seen_edges = true;
+                builder.seen_edges = true;
 
-                    let len = u.eval_float(*v, &self.general_spec)?;
+                let len = u.eval_float(*v, &self.general_spec)?;
 
-                    let pos = verts.len();
+                let pos = verts.len();
 
-                    verts.push(Vertex::new());
+                verts.push(Vertex::new());
 
-                    verts[head.head].edges.push(Edge::Flash(len, pos));
+                verts[builder.head].edges.push(Edge::Flash(len, pos));
 
-                    head.head = pos;
-                }
+                builder.head = pos;
             }
             Expression::GapConstant(v, u) => {
-                for head in heads {
-                    head.seen_edges = true;
+                builder.seen_edges = true;
 
-                    let len = u.eval_float(*v, &self.general_spec)?;
+                let len = u.eval_float(*v, &self.general_spec)?;
 
-                    let pos = verts.len();
+                let pos = verts.len();
 
-                    verts.push(Vertex::new());
+                verts.push(Vertex::new());
 
-                    verts[head.head].edges.push(Edge::Gap(len, pos));
+                verts[builder.head].edges.push(Edge::Gap(len, pos));
 
-                    head.head = pos;
-                }
+                builder.head = pos;
             }
             Expression::BitField { length, .. } => {
                 let (length, _) = length.eval(&Vartable::new())?;
 
-                self.bit_field(length, verts, heads, bit_spec)?;
+                self.bit_field(length, verts, builder, bit_spec)?;
             }
             Expression::ExtentConstant(_, _) => {
-                for head in heads {
-                    head.seen_edges = true;
+                builder.seen_edges = true;
 
-                    let pos = verts.len();
+                let pos = verts.len();
 
-                    verts.push(Vertex::new());
+                verts.push(Vertex::new());
 
-                    verts[head.head].edges.push(Edge::TrailingGap(pos));
+                verts[builder.head].edges.push(Edge::TrailingGap(pos));
 
-                    head.head = pos;
-                }
+                builder.head = pos;
             }
             _ => println!("expr:{:?}", expr),
         }
@@ -512,14 +489,14 @@ fn gen_mask(v: i64) -> i64 {
 
 /// track which
 #[derive(Clone, Default, Debug)]
-struct BuilderPos {
+struct Builder {
     head: usize,
     seen_edges: bool,
     vars: HashMap<String, i64>,
 }
 
 #[allow(dead_code)]
-impl BuilderPos {
+impl Builder {
     fn new() -> Self {
         Default::default()
     }
