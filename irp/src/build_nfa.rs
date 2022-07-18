@@ -154,7 +154,6 @@ impl Irp {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments, clippy::ptr_arg)]
     fn store_bits_in_var(
         &self,
         name: &str,
@@ -223,7 +222,6 @@ impl Irp {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments, clippy::ptr_arg)]
     fn check_bits_in_var(
         &self,
         value: &Expression,
