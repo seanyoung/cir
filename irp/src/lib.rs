@@ -12,12 +12,14 @@
 //!
 //! ## Decode IR
 //!
-//! This example decodes some IR using rc5 protcool
+//! This example decodes some IR using rc5 protocol. First the IRP notation is parsed, and then
+//! we compile the NFA state machine for decoding. Then we create a decoder, which
+//! needs some matching parameters, and then we can feed it input. The results can be retrieved
+//! with the get() function on the decoder.
 //!
 //! ```
 //! use irp::Irp;
 //! use irp::decoder_nfa::InfraredData;
-//!
 //!
 //! let irp = Irp::parse(r#"
 //!     {36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)
@@ -257,7 +259,8 @@ pub enum Pronto {
     },
 }
 
-/// A parsed IRP notation, which can be used for encoding (and decoding in the future)
+/// A parsed IRP notation, which can be used for encoding and decoding
+///
 #[derive(Debug)]
 pub struct Irp {
     general_spec: GeneralSpec,
