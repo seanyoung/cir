@@ -162,7 +162,7 @@ include!(concat!(env!("OUT_DIR"), "/irp.rs"));
 use std::collections::HashMap;
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 /// An encoded raw infrared message
 pub struct Message {
     /// The carrier for the message. None means unknown, Some(0) means unmodulated

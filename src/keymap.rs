@@ -1,7 +1,7 @@
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct Protocol {
     #[serde(default = "String::new")]
     pub name: String,
@@ -11,7 +11,7 @@ pub struct Protocol {
     pub scancodes: Option<HashMap<String, String>>,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct Raw {
     pub keycode: String,
     pub raw: Option<String>,
@@ -19,7 +19,7 @@ pub struct Raw {
     pub pronto: Option<String>,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct Keymap {
     pub protocols: Vec<Protocol>,
 }
@@ -101,9 +101,7 @@ pub fn parse(contents: &str, filename: &str) -> Result<Keymap, String> {
 
                 Ok(Keymap { protocols })
             }
-            Err(pos) => {
-                return Err(format!("parse error at {}:{}", pos.0, pos.1));
-            }
+            Err(pos) => Err(format!("parse error at {}:{}", pos.0, pos.1)),
         }
     }
 }

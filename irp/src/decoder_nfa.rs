@@ -37,7 +37,7 @@ impl NFA {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum InfraredData {
     Flash(u32),
     Gap(u32),
