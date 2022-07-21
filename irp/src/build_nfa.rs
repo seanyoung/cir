@@ -64,6 +64,35 @@ impl Irp {
             expr: Expression::Number(0),
         });
 
+        // set all definitions which are constant
+        // Note that we support {C=D+1,D=1}; we first D=1 in the first iteration
+        // and C=D+1 in the second.
+        while {
+            let mut changes = false;
+
+            for def in &self.definitions {
+                if let Expression::Assignment(name, expr) = def {
+                    if builder.is_any_set(name) {
+                        continue;
+                    }
+
+                    if builder.unknown_var(expr).is_ok() {
+                        // FIXME: constant folding/eval here?
+                        builder.add_action(Action::Set {
+                            var: name.to_owned(),
+                            expr: expr.as_ref().clone(),
+                        });
+
+                        changes = true;
+
+                        builder.set(name, i64::MAX);
+                    }
+                }
+            }
+
+            changes
+        } {}
+
         self.expression(&self.stream, &mut builder, &[])?;
 
         if builder.cur.seen_edges && builder.is_done() {
@@ -102,8 +131,11 @@ impl Irp {
             } else {
                 self.bit_field(bit_count, builder, bit_spec)?;
 
+                let mut delayed = Vec::new();
+
                 // now do stuff with bitfields
                 let mut offset = if self.general_spec.lsb { 0 } else { bit_count };
+
                 for i in 0..expr_count {
                     if let Expression::BitField {
                         value,
@@ -130,27 +162,58 @@ impl Irp {
                             Expression::Complement(expr) => match expr.as_ref() {
                                 Expression::Identifier(name) => {
                                     self.store_bits_in_var(
-                                        name, offset, true, length, skip, builder,
+                                        name,
+                                        offset,
+                                        true,
+                                        length,
+                                        skip,
+                                        builder,
+                                        &mut delayed,
                                     )?;
                                 }
                                 Expression::Number(_) => self.check_bits_in_var(
                                     value, offset, true, length, skip, builder,
                                 )?,
-                                _ => unimplemented!("{:?}", expr),
+                                _ => {
+                                    return Err(format!("expression {} not supported", expr));
+                                }
                             },
                             Expression::Identifier(name) => {
-                                self.store_bits_in_var(name, offset, false, length, skip, builder)?;
+                                self.store_bits_in_var(
+                                    name,
+                                    offset,
+                                    false,
+                                    length,
+                                    skip,
+                                    builder,
+                                    &mut delayed,
+                                )?;
                             }
                             Expression::Number(_) => {
                                 self.check_bits_in_var(value, offset, false, length, skip, builder)?
                             }
-                            _ => unimplemented!("{:?}", value),
+                            expr => {
+                                return Err(format!("expression {} not supported", expr));
+                            }
                         }
 
                         if self.general_spec.lsb {
                             offset += length;
                         }
                     }
+                }
+
+                for action in delayed {
+                    match &action {
+                        Action::AssertEq { left, right } => {
+                            builder.unknown_var(left)?;
+                            builder.unknown_var(right)?;
+                        }
+                        Action::Set { expr, .. } => {
+                            builder.unknown_var(expr)?;
+                        }
+                    }
+                    builder.add_action(action);
                 }
 
                 pos += expr_count;
@@ -168,6 +231,7 @@ impl Irp {
         length: i64,
         skip: i64,
         builder: &mut Builder,
+        delayed: &mut Vec<Action>,
     ) -> Result<(), String> {
         let expr = Expression::Identifier(String::from("$bits"));
 
@@ -203,10 +267,18 @@ impl Irp {
             }
             None
         }) {
-            builder.add_action(Action::AssertEq {
+            let have_it = builder.unknown_var(def).is_ok();
+
+            let action = Action::AssertEq {
                 left: def.as_ref().clone(),
                 right: expr,
-            });
+            };
+
+            if have_it {
+                builder.add_action(action);
+            } else {
+                delayed.push(action);
+            }
         } else {
             let expr = if builder.is_any_set(name) {
                 Expression::BitwiseOr(
@@ -644,5 +716,101 @@ impl<'a> Builder<'a> {
 
     fn pop_location(&mut self) {
         self.cur = self.saved.pop().unwrap();
+    }
+
+    /// Do we have all the vars to evaluate an expression
+    fn unknown_var(&self, expr: &Expression) -> Result<(), String> {
+        match expr {
+            Expression::FlashConstant(..)
+            | Expression::GapConstant(..)
+            | Expression::ExtentConstant(..)
+            | Expression::Number(..) => Ok(()),
+            Expression::FlashIdentifier(name, ..)
+            | Expression::GapIdentifier(name, ..)
+            | Expression::ExtentIdentifier(name, ..)
+            | Expression::Identifier(name) => {
+                if name.starts_with('$') || self.cur.vars.contains_key(name) {
+                    Ok(())
+                } else {
+                    Err(format!("variable '{}' not known", name))
+                }
+            }
+            Expression::BitField {
+                value,
+                length,
+                skip: Some(skip),
+                ..
+            } => {
+                self.unknown_var(value)?;
+                self.unknown_var(length)?;
+                self.unknown_var(skip)
+            }
+            Expression::BitField {
+                value,
+                length,
+                skip: None,
+                ..
+            } => {
+                self.unknown_var(value)?;
+                self.unknown_var(length)
+            }
+            Expression::InfiniteBitField { value, skip } => {
+                self.unknown_var(value)?;
+                self.unknown_var(skip)
+            }
+            Expression::Assignment(_, expr)
+            | Expression::Complement(expr)
+            | Expression::Not(expr)
+            | Expression::Negative(expr)
+            | Expression::BitCount(expr) => self.unknown_var(expr),
+            Expression::Add(left, right)
+            | Expression::Subtract(left, right)
+            | Expression::Multiply(left, right)
+            | Expression::Power(left, right)
+            | Expression::Divide(left, right)
+            | Expression::Modulo(left, right)
+            | Expression::ShiftLeft(left, right)
+            | Expression::ShiftRight(left, right)
+            | Expression::LessEqual(left, right)
+            | Expression::Less(left, right)
+            | Expression::More(left, right)
+            | Expression::MoreEqual(left, right)
+            | Expression::NotEqual(left, right)
+            | Expression::Equal(left, right)
+            | Expression::BitwiseAnd(left, right)
+            | Expression::BitwiseOr(left, right)
+            | Expression::BitwiseXor(left, right)
+            | Expression::Or(left, right)
+            | Expression::And(left, right) => {
+                self.unknown_var(left)?;
+                self.unknown_var(right)
+            }
+            Expression::Ternary(cond, left, right) => {
+                self.unknown_var(cond)?;
+                self.unknown_var(left)?;
+                self.unknown_var(right)
+            }
+            Expression::List(list) => {
+                for expr in list {
+                    self.unknown_var(expr)?;
+                }
+                Ok(())
+            }
+            Expression::Variation(list) => {
+                for expr in list.iter().flatten() {
+                    self.unknown_var(expr)?;
+                }
+                Ok(())
+            }
+            Expression::Stream(stream) => {
+                for expr in &stream.bit_spec {
+                    self.unknown_var(expr)?;
+                }
+                for expr in &stream.stream {
+                    self.unknown_var(expr)?;
+                }
+                Ok(())
+            }
+        }
     }
 }
