@@ -254,7 +254,7 @@ pub fn decode(matches: &clap::ArgMatches) {
                                     println!(
                                         "decoded: {}",
                                         var.iter()
-                                            .map(|(name, val)| format!("{}={:x}", name, val))
+                                            .map(|(name, val)| format!("{}={}", name, val))
                                             .join(", ")
                                     );
                                 }
@@ -311,7 +311,7 @@ fn process(
                     println!(
                         "decoded: {}",
                         var.iter()
-                            .map(|(name, val)| format!("{}={:x}", name, val))
+                            .map(|(name, val)| format!("{}={}", name, val))
                             .join(", ")
                     );
                 }

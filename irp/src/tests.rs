@@ -401,7 +401,7 @@ fn compare_decode_to_transmogrifier() {
         let irp = Irp::parse(&protocol.irp).unwrap();
 
         let nfa = irp.compile().unwrap();
-        let mut decoder = nfa.decoder(100, 3, 20000);
+        let mut decoder = nfa.decoder(100, 3, 15000);
 
         for data in InfraredData::from_u32_slice(&testcase.render[0]) {
             decoder.input(data);
@@ -416,7 +416,21 @@ fn compare_decode_to_transmogrifier() {
                 );
             }
         } else {
-            println!("{} failed to decode", protocol.name);
+            println!(
+                "{} failed to decode, irp: {} ir: {}",
+                protocol.name,
+                protocol.irp,
+                rawir::print_to_string(&testcase.render[0])
+            );
+            println!(
+                "expected: {}",
+                testcase
+                    .params
+                    .iter()
+                    .map(|param| format!("{}={}", param.name, param.value))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            );
             fails += 1;
         }
     }

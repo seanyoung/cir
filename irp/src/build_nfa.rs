@@ -103,7 +103,7 @@ impl Irp {
                 self.bit_field(bit_count, builder, bit_spec)?;
 
                 // now do stuff with bitfields
-                let mut offset = bit_count;
+                let mut offset = if self.general_spec.lsb { 0 } else { bit_count };
                 for i in 0..expr_count {
                     if let Expression::BitField {
                         value,
@@ -114,7 +114,9 @@ impl Irp {
                     {
                         let (length, _) = length.eval(&Vartable::new())?;
 
-                        offset -= length;
+                        if !self.general_spec.lsb {
+                            offset -= length;
+                        }
 
                         let skip = if let Some(skip) = skip {
                             let (skip, _) = skip.eval(&Vartable::new())?;
@@ -143,6 +145,10 @@ impl Irp {
                                 self.check_bits_in_var(value, offset, false, length, skip, builder)?
                             }
                             _ => unimplemented!("{:?}", value),
+                        }
+
+                        if self.general_spec.lsb {
+                            offset += length;
                         }
                     }
                 }
