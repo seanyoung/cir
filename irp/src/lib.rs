@@ -29,33 +29,11 @@
 //! // Create a decoder with 100 microsecond tolerance, 30% relative tolerance,
 //! // and 20000 microseconds trailing gap.
 //! let mut decoder = nfa.decoder(100, 30, 20000);
-//! let input = [
-//!     InfraredData::Flash(940),
-//!     InfraredData::Gap(860),
-//!     InfraredData::Flash(1790),
-//!     InfraredData::Gap(1750),
-//!     InfraredData::Flash(880),
-//!     InfraredData::Gap(880),
-//!     InfraredData::Flash(900),
-//!     InfraredData::Gap(890),
-//!     InfraredData::Flash(870),
-//!     InfraredData::Gap(900),
-//!     InfraredData::Flash(1750),
-//!     InfraredData::Gap(900),
-//!     InfraredData::Flash(890),
-//!     InfraredData::Gap(910),
-//!     InfraredData::Flash(840),
-//!     InfraredData::Gap(920),
-//!     InfraredData::Flash(870),
-//!     InfraredData::Gap(920),
-//!     InfraredData::Flash(840),
-//!     InfraredData::Gap(920),
-//!     InfraredData::Flash(870),
-//!     InfraredData::Gap(1810),
-//!     InfraredData::Flash(840),
-//!     InfraredData::Gap(78132)
-//! ];
-//! input.into_iter().for_each(|ir| decoder.input(ir));
+//! for ir in InfraredData::from_rawir(
+//!     "+940 -860 +1790 -1750 +880 -880 +900 -890 +870 -900 +1750
+//!      -900 +890 -910 +840 -920 +870 -920 +840 -920 +870 -1810 +840 -125000").unwrap() {
+//!     decoder.input(ir);
+//! }
 //! let res = decoder.get().unwrap();
 //! assert_eq!(res["F"], 1);
 //! assert_eq!(res["D"], 30);

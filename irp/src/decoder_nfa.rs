@@ -1,3 +1,5 @@
+use crate::rawir;
+
 use super::{
     build_nfa::{Action, Edge, NFA},
     Vartable,
@@ -43,6 +45,35 @@ pub enum InfraredData {
 }
 
 impl InfraredData {
+    /// Create from a slice of alternating flash and gap
+    pub fn from_u32_slice(data: &[u32]) -> Vec<InfraredData> {
+        data.iter()
+            .enumerate()
+            .map(|(index, data)| {
+                if index % 2 == 0 {
+                    InfraredData::Flash(*data)
+                } else {
+                    InfraredData::Gap(*data)
+                }
+            })
+            .collect()
+    }
+
+    /// Create from a rawir string
+    pub fn from_rawir(data: &str) -> Result<Vec<InfraredData>, String> {
+        Ok(rawir::parse(data)?
+            .iter()
+            .enumerate()
+            .map(|(index, data)| {
+                if index % 2 == 0 {
+                    InfraredData::Flash(*data)
+                } else {
+                    InfraredData::Gap(*data)
+                }
+            })
+            .collect())
+    }
+
     #[must_use]
     fn consume(&self, v: u32) -> Self {
         match self {
