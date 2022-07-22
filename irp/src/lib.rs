@@ -330,6 +330,7 @@ enum Expression {
     List(Vec<Expression>),
     Stream(IrStream),
     Variation(Vec<Vec<Expression>>),
+    BitReverse(Box<Expression>, i64, i64),
 }
 
 impl fmt::Display for Expression {
@@ -377,6 +378,9 @@ impl fmt::Display for Expression {
                 skip: None,
             } => {
                 write!(f, "{}:{}{}", value, if *reverse { "-" } else { "" }, length,)
+            }
+            Expression::BitReverse(expr, count, skip) => {
+                write!(f, "BITREV({},{},{})", expr, count, skip)
             }
             _ => write!(f, "{:?}", self),
         }

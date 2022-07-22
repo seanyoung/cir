@@ -141,7 +141,7 @@ impl Irp {
                         value,
                         length,
                         skip,
-                        ..
+                        reverse,
                     } = &list[i + pos]
                     {
                         let (length, _) = length.eval(&Vartable::new())?;
@@ -165,6 +165,7 @@ impl Irp {
                                         name,
                                         offset,
                                         true,
+                                        *reverse,
                                         length,
                                         skip,
                                         builder,
@@ -172,7 +173,7 @@ impl Irp {
                                     )?;
                                 }
                                 Expression::Number(_) => self.check_bits_in_var(
-                                    value, offset, true, length, skip, builder,
+                                    value, offset, true, *reverse, length, skip, builder,
                                 )?,
                                 _ => {
                                     return Err(format!("expression {} not supported", expr));
@@ -183,15 +184,16 @@ impl Irp {
                                     name,
                                     offset,
                                     false,
+                                    *reverse,
                                     length,
                                     skip,
                                     builder,
                                     &mut delayed,
                                 )?;
                             }
-                            expr if builder.unknown_var(expr).is_ok() => {
-                                self.check_bits_in_var(value, offset, false, length, skip, builder)?
-                            }
+                            expr if builder.unknown_var(expr).is_ok() => self.check_bits_in_var(
+                                value, offset, false, *reverse, length, skip, builder,
+                            )?,
                             expr => {
                                 return Err(format!("expression {} not supported", expr));
                             }
@@ -228,6 +230,7 @@ impl Irp {
         name: &str,
         offset: i64,
         complement: bool,
+        reverse: bool,
         length: i64,
         skip: i64,
         builder: &mut Builder,
@@ -251,6 +254,12 @@ impl Irp {
         };
 
         let mask = gen_mask(length) << skip;
+
+        let expr = if reverse {
+            Expression::BitReverse(Box::new(expr), length, skip)
+        } else {
+            expr
+        };
 
         let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
 
@@ -311,6 +320,7 @@ impl Irp {
         value: &Expression,
         offset: i64,
         complement: bool,
+        reverse: bool,
         length: i64,
         skip: i64,
         builder: &mut Builder,
@@ -328,6 +338,12 @@ impl Irp {
             Expression::ShiftRight(Box::new(expr), Box::new(Expression::Number(offset - skip)))
         } else if offset < skip {
             Expression::ShiftLeft(Box::new(expr), Box::new(Expression::Number(skip - offset)))
+        } else {
+            expr
+        };
+
+        let expr = if reverse {
+            Expression::BitReverse(Box::new(expr), length, skip)
         } else {
             expr
         };
@@ -776,7 +792,8 @@ impl<'a> Builder<'a> {
             | Expression::Complement(expr)
             | Expression::Not(expr)
             | Expression::Negative(expr)
-            | Expression::BitCount(expr) => self.unknown_var(expr),
+            | Expression::BitCount(expr)
+            | Expression::BitReverse(expr, ..) => self.unknown_var(expr),
             Expression::Add(left, right)
             | Expression::Subtract(left, right)
             | Expression::Multiply(left, right)

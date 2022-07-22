@@ -442,6 +442,19 @@ impl Expression {
 
                 Ok((val.count_ones().into(), len))
             }
+            Expression::BitReverse(e, count, skip) => {
+                let (val, len) = e.eval(vars)?;
+
+                let mut new_val = 0;
+
+                for i in 0..*count {
+                    if (val & (1 << (i + skip))) != 0 {
+                        new_val |= 1 << (skip + count - 1 - i);
+                    }
+                }
+
+                Ok((new_val, len))
+            }
             Expression::ShiftLeft(value, r) => {
                 let (value, len) = value.eval(vars)?;
                 let (r, _) = r.eval(vars)?;
