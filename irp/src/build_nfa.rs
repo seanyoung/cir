@@ -189,7 +189,7 @@ impl Irp {
                                     &mut delayed,
                                 )?;
                             }
-                            Expression::Number(_) => {
+                            expr if builder.unknown_var(expr).is_ok() => {
                                 self.check_bits_in_var(value, offset, false, length, skip, builder)?
                             }
                             expr => {
