@@ -341,6 +341,7 @@ impl fmt::Display for Expression {
             Expression::Add(left, right) => write!(f, "({} + {})", left, right),
             Expression::Subtract(left, right) => write!(f, "({} - {})", left, right),
             Expression::Multiply(left, right) => write!(f, "({} * {})", left, right),
+            Expression::Power(left, right) => write!(f, "({} ** {})", left, right),
             Expression::Modulo(left, right) => write!(f, "({} % {})", left, right),
             Expression::BitwiseOr(left, right) => write!(f, "({} | {})", left, right),
             Expression::BitwiseAnd(left, right) => write!(f, "({} & {})", left, right),
@@ -349,12 +350,20 @@ impl fmt::Display for Expression {
             Expression::ShiftRight(left, right) => write!(f, "({} >> {})", left, right),
 
             Expression::Equal(left, right) => write!(f, "{} == {}", left, right),
+            Expression::NotEqual(left, right) => write!(f, "{} != {}", left, right),
             Expression::More(left, right) => write!(f, "{} > {}", left, right),
             Expression::MoreEqual(left, right) => write!(f, "{} >= {}", left, right),
             Expression::Less(left, right) => write!(f, "{} < {}", left, right),
             Expression::LessEqual(left, right) => write!(f, "{} <= {}", left, right),
 
+            Expression::Or(left, right) => write!(f, "({} || {})", left, right),
+            Expression::And(left, right) => write!(f, "({} && {})", left, right),
+            Expression::Ternary(cond, left, right) => {
+                write!(f, "({} ? {} : {})", cond, left, right)
+            }
             Expression::Complement(expr) => write!(f, "~{}", expr),
+            Expression::Not(expr) => write!(f, "!{}", expr),
+            Expression::Negative(expr) => write!(f, "-{}", expr),
             Expression::BitCount(expr) => write!(f, "#({})", expr),
             Expression::BitField {
                 value,
@@ -379,10 +388,26 @@ impl fmt::Display for Expression {
             } => {
                 write!(f, "{}:{}{}", value, if *reverse { "-" } else { "" }, length,)
             }
+            Expression::InfiniteBitField { value, skip } => {
+                write!(f, "{}::{}", value, skip)
+            }
             Expression::BitReverse(expr, count, skip) => {
                 write!(f, "BITREV({},{},{})", expr, count, skip)
             }
-            _ => write!(f, "{:?}", self),
+            Expression::Assignment(name, expr) => write!(f, "{}={}", name, expr),
+            Expression::List(list) => {
+                write!(f, "(")?;
+                let mut first = true;
+                for expr in list {
+                    if !first {
+                        write!(f, ",")?;
+                    }
+                    write!(f, "{}", expr)?;
+                    first = false;
+                }
+                write!(f, ")")
+            }
+            expr => write!(f, "{:?}", expr),
         }
     }
 }
