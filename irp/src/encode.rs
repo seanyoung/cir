@@ -446,13 +446,13 @@ impl Expression {
                 let (value, len) = value.eval(vars)?;
                 let (r, _) = r.eval(vars)?;
 
-                Ok((value << r, len))
+                Ok((value.wrapping_shl(r as u32), len))
             }
             Expression::ShiftRight(value, r) => {
                 let (value, len) = value.eval(vars)?;
                 let (r, _) = r.eval(vars)?;
 
-                Ok((value >> r, len))
+                Ok((value.wrapping_shr(r as u32), len))
             }
             Expression::Equal(left, right) => {
                 let (left, _) = left.eval(vars)?;

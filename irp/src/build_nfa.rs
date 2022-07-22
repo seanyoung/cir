@@ -110,7 +110,7 @@ impl Irp {
         &self,
         list: &[Expression],
         builder: &mut Builder,
-        bit_spec: &[Expression],
+        bit_spec: &[&[Expression]],
     ) -> Result<(), String> {
         let mut pos = 0;
 
@@ -342,7 +342,7 @@ impl Irp {
         &self,
         length: i64,
         builder: &mut Builder,
-        bit_spec: &[Expression],
+        bit_spec: &[&[Expression]],
     ) -> Result<(), String> {
         // TODO: special casing when length == 1
         builder.cur.seen_edges = true;
@@ -359,10 +359,10 @@ impl Irp {
 
         builder.set_head(entry);
 
-        for (bit, e) in bit_spec.iter().enumerate() {
+        for (bit, e) in bit_spec[0].iter().enumerate() {
             builder.push_location();
 
-            self.expression(e, builder, bit_spec)?;
+            self.expression(e, builder, &bit_spec[1..])?;
 
             builder.add_action(Action::Set {
                 var: String::from("$v"),
@@ -488,14 +488,14 @@ impl Irp {
         &self,
         expr: &Expression,
         builder: &mut Builder,
-        bit_spec: &[Expression],
+        bit_spec: &[&[Expression]],
     ) -> Result<(), String> {
         match expr {
             Expression::Stream(irstream) => {
-                let bit_spec = if irstream.bit_spec.is_empty() {
-                    bit_spec
-                } else {
-                    &irstream.bit_spec
+                let mut bit_spec = bit_spec.to_vec();
+
+                if !irstream.bit_spec.is_empty() {
+                    bit_spec.insert(0, &irstream.bit_spec);
                 };
 
                 if irstream.repeat == Some(RepeatMarker::Any)
@@ -529,7 +529,7 @@ impl Irp {
                         false
                     };
 
-                    self.expression_list(&irstream.stream, builder, bit_spec)?;
+                    self.expression_list(&irstream.stream, builder, &bit_spec)?;
 
                     builder.add_action(Action::Set {
                         var: "$repeat".to_owned(),
@@ -546,7 +546,7 @@ impl Irp {
                         builder.add_edge(Edge::Branch(start));
                     }
                 } else {
-                    self.expression_list(&irstream.stream, builder, bit_spec)?;
+                    self.expression_list(&irstream.stream, builder, &bit_spec)?;
                 }
             }
             Expression::List(list) => {
