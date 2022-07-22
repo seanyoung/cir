@@ -328,12 +328,11 @@ impl Irp {
 
         let mask = gen_mask(length) << skip;
 
-        let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
+        let left = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
+        let right =
+            Expression::BitwiseAnd(Box::new(value.clone()), Box::new(Expression::Number(mask)));
 
-        builder.add_action(Action::AssertEq {
-            left: expr,
-            right: value.clone(),
-        });
+        builder.add_action(Action::AssertEq { left, right });
 
         Ok(())
     }
