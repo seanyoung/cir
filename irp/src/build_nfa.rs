@@ -1,16 +1,9 @@
 use super::{Expression, Irp, RepeatMarker, Vartable};
 use std::collections::HashMap;
 
-// This is the decoder nfa (non-deterministic finite automation)
-//
-// From the IRP, we build the nfa
-// from the nfa we build the dfa
-// from the dfa we build clif
-// from clif we the BPF decoder (cranelift does this)
-
-// clif is a compiler IR. This means basic blocks with a single
-// flow control instruction at the end of the block. So, we try to model
-// the nfa such that it is easy to transform.
+/**
+ * Here we build the decoder nfa (non-deterministic finite automation)
+ */
 
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum Edge {
