@@ -256,7 +256,10 @@ impl Irp {
 
         if builder.is_set(name, mask) {
             builder.add_action(Action::AssertEq {
-                left: Expression::Identifier(name.to_owned()),
+                left: Expression::BitwiseAnd(
+                    Box::new(Expression::Identifier(name.to_owned())),
+                    Box::new(Expression::Number(mask)),
+                ),
                 right: expr,
             });
         } else if let Some(def) = self.definitions.iter().find_map(|def| {
