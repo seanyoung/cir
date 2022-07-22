@@ -359,6 +359,15 @@ impl Irp {
 
         builder.set_head(entry);
 
+        let width = match bit_spec[0].len() {
+            2 => 1,
+            4 => 2,
+            8 => 4,
+            w => {
+                return Err(format!("bit spec with {} fields not supported", w));
+            }
+        };
+
         for (bit, e) in bit_spec[0].iter().enumerate() {
             builder.push_location();
 
@@ -397,7 +406,7 @@ impl Irp {
                     var: String::from("$b"),
                     expr: Expression::Subtract(
                         Box::new(Expression::Identifier(String::from("$b"))),
-                        Box::new(Expression::Number(1)),
+                        Box::new(Expression::Number(width)),
                     ),
                 },
             );
@@ -461,7 +470,7 @@ impl Irp {
                     var: String::from("$b"),
                     expr: Expression::Add(
                         Box::new(Expression::Identifier(String::from("$b"))),
-                        Box::new(Expression::Number(1)),
+                        Box::new(Expression::Number(width)),
                     ),
                 },
             );
