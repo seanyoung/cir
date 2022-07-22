@@ -355,7 +355,29 @@ impl fmt::Display for Expression {
 
             Expression::Complement(expr) => write!(f, "~{}", expr),
             Expression::BitCount(expr) => write!(f, "#({})", expr),
-
+            Expression::BitField {
+                value,
+                reverse,
+                length,
+                skip: Some(skip),
+            } => {
+                write!(
+                    f,
+                    "{}:{}{}:{}",
+                    value,
+                    if *reverse { "-" } else { "" },
+                    length,
+                    skip
+                )
+            }
+            Expression::BitField {
+                value,
+                reverse,
+                length,
+                skip: None,
+            } => {
+                write!(f, "{}:{}{}", value, if *reverse { "-" } else { "" }, length,)
+            }
             _ => write!(f, "{:?}", self),
         }
     }

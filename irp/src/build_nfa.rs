@@ -273,7 +273,10 @@ impl Irp {
             let have_it = builder.unknown_var(def).is_ok();
 
             let action = Action::AssertEq {
-                left: def.as_ref().clone(),
+                left: Expression::BitwiseAnd(
+                    Box::new(def.as_ref().clone()),
+                    Box::new(Expression::Number(mask)),
+                ),
                 right: expr,
             };
 
