@@ -381,6 +381,7 @@ impl Irp {
             2 => 1,
             4 => 2,
             8 => 4,
+            16 => 8,
             w => {
                 return Err(format!("bit spec with {} fields not supported", w));
             }
