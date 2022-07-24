@@ -1,5 +1,5 @@
-use super::{Expression, Vartable};
-use std::fmt;
+use super::{Expression, IrStream, Vartable};
+use std::{fmt, rc::Rc};
 
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -266,4 +266,348 @@ impl Expression {
             _ => panic!("not implemented: {:?}", self),
         }
     }
+}
+
+/// Clone a reference counted expression with a filter
+pub(crate) fn clone_filter<F>(expr: &Rc<Expression>, filter: &F) -> Option<Rc<Expression>>
+where
+    F: Fn(&Rc<Expression>) -> Option<Rc<Expression>>,
+{
+    macro_rules! unary {
+        ($expr:expr, $ty:ident) => {{
+            let expr1 = clone_filter($expr, filter);
+
+            if expr1.is_some() {
+                let expr = expr1.unwrap_or_else(|| $expr.clone());
+                let new_expr = Rc::new(Expression::$ty(expr));
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }};
+    }
+
+    macro_rules! binary {
+        ($left:expr, $right:expr, $ty:ident) => {{
+            let left1 = clone_filter($left, filter);
+            let right1 = clone_filter($right, filter);
+
+            if left1.is_some() || right1.is_some() {
+                let left = left1.unwrap_or_else(|| $left.clone());
+                let right = right1.unwrap_or_else(|| $right.clone());
+                let new_expr = Rc::new(Expression::$ty(left, right));
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }};
+    }
+
+    match expr.as_ref() {
+        // unary
+        Expression::Complement(expr) => unary!(expr, Complement),
+        Expression::Not(expr) => unary!(expr, Not),
+        Expression::BitCount(expr) => unary!(expr, BitCount),
+        Expression::BitReverse(expr, count, skip) => {
+            let expr1 = clone_filter(expr, filter);
+
+            if expr1.is_some() {
+                let expr = expr1.unwrap_or_else(|| expr.clone());
+                let new_expr = Rc::new(Expression::BitReverse(expr, *count, *skip));
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+
+        Expression::Assignment(dest, expr) => {
+            let expr1 = clone_filter(expr, filter);
+
+            if expr1.is_some() {
+                let expr = expr1.unwrap_or_else(|| expr.clone());
+                let new_expr = Rc::new(Expression::Assignment(dest.to_owned(), expr));
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+        // binary
+        Expression::Add(left, right) => binary!(left, right, Add),
+        Expression::Subtract(left, right) => binary!(left, right, Subtract),
+        Expression::Multiply(left, right) => binary!(left, right, Multiply),
+        Expression::Divide(left, right) => binary!(left, right, Divide),
+        Expression::Modulo(left, right) => binary!(left, right, Modulo),
+        Expression::Power(left, right) => binary!(left, right, Power),
+
+        Expression::ShiftLeft(left, right) => binary!(left, right, ShiftLeft),
+        Expression::ShiftRight(left, right) => binary!(left, right, ShiftRight),
+        Expression::BitwiseAnd(left, right) => binary!(left, right, BitwiseAnd),
+        Expression::BitwiseOr(left, right) => binary!(left, right, BitwiseOr),
+        Expression::BitwiseXor(left, right) => binary!(left, right, BitwiseXor),
+
+        Expression::More(left, right) => binary!(left, right, More),
+        Expression::MoreEqual(left, right) => binary!(left, right, MoreEqual),
+        Expression::Less(left, right) => binary!(left, right, Less),
+        Expression::LessEqual(left, right) => binary!(left, right, LessEqual),
+        Expression::Equal(left, right) => binary!(left, right, Equal),
+        Expression::NotEqual(left, right) => binary!(left, right, NotEqual),
+
+        Expression::And(left, right) => binary!(left, right, And),
+        Expression::Or(left, right) => binary!(left, right, Or),
+
+        // Ternary
+        Expression::Ternary(cond, left, right) => {
+            let cond1 = clone_filter(cond, filter);
+            let left1 = clone_filter(left, filter);
+            let right1 = clone_filter(right, filter);
+
+            if cond1.is_some() || left1.is_some() || right1.is_some() {
+                let cond = cond1.unwrap_or_else(|| cond.clone());
+                let left = left1.unwrap_or_else(|| left.clone());
+                let right = right1.unwrap_or_else(|| right.clone());
+
+                let new_expr = Rc::new(Expression::Ternary(cond, left, right));
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+
+        // others with sub expression
+        Expression::BitField {
+            value,
+            reverse,
+            length,
+            skip: Some(skip),
+        } => {
+            let value1 = clone_filter(value, filter);
+            let length1 = clone_filter(length, filter);
+            let skip1 = clone_filter(skip, filter);
+
+            if value1.is_some() || length1.is_some() || skip1.is_some() {
+                let value = value1.unwrap_or_else(|| value.clone());
+                let length = length1.unwrap_or_else(|| length.clone());
+                let skip = Some(skip1.unwrap_or_else(|| skip.clone()));
+                let reverse = *reverse;
+                let new_expr = Rc::new(Expression::BitField {
+                    value,
+                    reverse,
+                    length,
+                    skip,
+                });
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+        Expression::BitField {
+            value,
+            reverse,
+            length,
+            skip: None,
+        } => {
+            let value1 = clone_filter(value, filter);
+            let length1 = clone_filter(length, filter);
+
+            if value1.is_some() || length1.is_some() {
+                let value = value1.unwrap_or_else(|| value.clone());
+                let length = length1.unwrap_or_else(|| length.clone());
+                let skip = None;
+                let reverse = *reverse;
+
+                let new_expr = Rc::new(Expression::BitField {
+                    value,
+                    reverse,
+                    length,
+                    skip,
+                });
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+
+        Expression::InfiniteBitField { value, skip } => {
+            let value1 = clone_filter(value, filter);
+            let skip1 = clone_filter(skip, filter);
+
+            if value1.is_some() || skip1.is_some() {
+                let value = value1.unwrap_or_else(|| value.clone());
+                let skip = skip1.unwrap_or_else(|| skip.clone());
+
+                let new_expr = Rc::new(Expression::InfiniteBitField { value, skip });
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+        Expression::List(list) => {
+            let new_list: Vec<Option<Rc<Expression>>> =
+                list.iter().map(|expr| clone_filter(expr, filter)).collect();
+
+            if new_list.iter().any(Option::is_some) {
+                let list = new_list
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, expr)| expr.unwrap_or_else(|| list[index].clone()))
+                    .collect();
+
+                let new_expr = Rc::new(Expression::List(list));
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+        Expression::Variation(list) => {
+            let new_list = list
+                .iter()
+                .map(|list| {
+                    list.iter()
+                        .map(|expr| clone_filter(expr, filter))
+                        .collect::<Vec<Option<Rc<Expression>>>>()
+                })
+                .collect::<Vec<Vec<Option<Rc<Expression>>>>>();
+
+            if new_list.iter().flatten().any(Option::is_some) {
+                let list = new_list
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index0, variant)| {
+                        variant
+                            .into_iter()
+                            .enumerate()
+                            .map(|(index1, expr)| {
+                                expr.unwrap_or_else(|| list[index0][index1].clone())
+                            })
+                            .collect()
+                    })
+                    .collect();
+
+                let new_expr = Rc::new(Expression::Variation(list));
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+        Expression::Stream(ir_stream) => {
+            let new_bit_spec: Vec<Option<Rc<Expression>>> = ir_stream
+                .bit_spec
+                .iter()
+                .map(|expr| clone_filter(expr, filter))
+                .collect();
+
+            let new_stream: Vec<Option<Rc<Expression>>> = ir_stream
+                .stream
+                .iter()
+                .map(|expr| clone_filter(expr, filter))
+                .collect();
+            if new_bit_spec.iter().any(Option::is_some) || new_stream.iter().any(Option::is_some) {
+                let bit_spec = new_bit_spec
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, expr)| expr.unwrap_or_else(|| ir_stream.bit_spec[index].clone()))
+                    .collect();
+
+                let stream = new_stream
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, expr)| expr.unwrap_or_else(|| ir_stream.stream[index].clone()))
+                    .collect();
+
+                let new_expr = Rc::new(Expression::Stream(IrStream {
+                    bit_spec,
+                    stream,
+                    repeat: ir_stream.repeat.clone(),
+                }));
+
+                let filtered = filter(&new_expr);
+
+                if filtered.is_some() {
+                    filtered
+                } else {
+                    Some(new_expr)
+                }
+            } else {
+                filter(expr)
+            }
+        }
+        _ => filter(expr),
+    }
+}
+
+#[test]
+fn clone1() {
+    let expr = Rc::new(Expression::Add(
+        Rc::new(Expression::Identifier("B".to_owned())),
+        Rc::new(Expression::Identifier("S".to_owned())),
+    ));
+
+    let expr2 = clone_filter(&expr, &|expr: &Rc<Expression>| match expr.as_ref() {
+        Expression::Identifier(var) if var == "S" => Some(Rc::new(Expression::Number(8))),
+        _ => None,
+    })
+    .unwrap();
+
+    assert_eq!(format!("{}", expr), "(B + S)");
+    assert_eq!(format!("{}", expr2), "(B + 8)");
 }
