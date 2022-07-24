@@ -1,4 +1,4 @@
-use super::{Expression, Irp, RepeatMarker, Vartable};
+use super::{expression::clone_filter, Expression, Irp, RepeatMarker, Vartable};
 use std::{collections::HashMap, rc::Rc};
 
 /**
@@ -70,11 +70,9 @@ impl Irp {
                     }
 
                     if builder.unknown_var(expr).is_ok() {
-                        // FIXME: constant folding/eval here?
-                        builder.add_action(Action::Set {
-                            var: name.to_owned(),
-                            expr: expr.as_ref().clone(),
-                        });
+                        let (val, len) = expr.eval(&builder.constants).unwrap();
+
+                        builder.constants.set(name.to_owned(), val, len);
 
                         changes = true;
 
@@ -113,7 +111,7 @@ impl Irp {
 
             while let Some(expr) = list.get(pos + expr_count) {
                 if let Expression::BitField { length, .. } = expr.as_ref() {
-                    let (length, _) = length.eval(&Vartable::new())?;
+                    let (length, _) = builder.const_folding(length).eval(&Vartable::new())?;
 
                     bit_count += length;
                     expr_count += 1;
@@ -141,19 +139,21 @@ impl Irp {
                         reverse,
                     } = list[i + pos].as_ref()
                     {
-                        let (length, _) = length.eval(&Vartable::new())?;
+                        let (length, _) = builder.const_folding(length).eval(&Vartable::new())?;
 
                         if !self.general_spec.lsb {
                             offset -= length;
                         }
 
                         let skip = if let Some(skip) = skip {
-                            let (skip, _) = skip.eval(&Vartable::new())?;
+                            let (skip, _) = builder.const_folding(skip).eval(&Vartable::new())?;
 
                             skip
                         } else {
                             0
                         };
+
+                        let value = builder.const_folding(value);
 
                         match value.as_ref() {
                             Expression::Complement(expr) => match expr.as_ref() {
@@ -170,7 +170,7 @@ impl Irp {
                                     )?;
                                 }
                                 Expression::Number(_) => self.check_bits_in_var(
-                                    value, offset, true, *reverse, length, skip, builder,
+                                    expr, offset, true, *reverse, length, skip, builder,
                                 )?,
                                 _ => {
                                     return Err(format!("expression {} not supported", expr));
@@ -189,7 +189,7 @@ impl Irp {
                                 )?;
                             }
                             expr if builder.unknown_var(expr).is_ok() => self.check_bits_in_var(
-                                value, offset, false, *reverse, length, skip, builder,
+                                &value, offset, false, *reverse, length, skip, builder,
                             )?,
                             expr => {
                                 return Err(format!("expression {} not supported", expr));
@@ -280,7 +280,7 @@ impl Irp {
 
             let action = Action::AssertEq {
                 left: Expression::BitwiseAnd(
-                    Rc::new(def.as_ref().clone()),
+                    builder.const_folding(def),
                     Rc::new(Expression::Number(mask)),
                 ),
                 right: expr,
@@ -639,6 +639,7 @@ struct Builder<'a> {
     cur: BuilderLocation,
     saved: Vec<BuilderLocation>,
     verts: Vec<Vertex>,
+    constants: Vartable<'a>,
     irp: &'a Irp,
 }
 
@@ -657,6 +658,7 @@ impl<'a> Builder<'a> {
         Builder {
             cur: Default::default(),
             saved: Vec::new(),
+            constants: Vartable::new(),
             verts,
             irp,
         }
@@ -756,7 +758,10 @@ impl<'a> Builder<'a> {
             | Expression::GapIdentifier(name, ..)
             | Expression::ExtentIdentifier(name, ..)
             | Expression::Identifier(name) => {
-                if name.starts_with('$') || self.cur.vars.contains_key(name) {
+                if name.starts_with('$')
+                    || self.cur.vars.contains_key(name)
+                    || self.constants.is_defined(name)
+                {
                     Ok(())
                 } else {
                     Err(format!("variable '{}' not known", name))
@@ -840,5 +845,17 @@ impl<'a> Builder<'a> {
                 Ok(())
             }
         }
+    }
+
+    fn const_folding(&mut self, expr: &Rc<Expression>) -> Rc<Expression> {
+        let new = clone_filter(expr, &|expr| match expr.as_ref() {
+            Expression::Identifier(name) => {
+                let (val, _) = self.constants.get(name).ok()?;
+                Some(Rc::new(Expression::Number(val)))
+            }
+            _ => None,
+        });
+
+        new.unwrap_or_else(|| expr.clone())
     }
 }
