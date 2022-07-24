@@ -1,7 +1,7 @@
 use super::{Expression, GeneralSpec, Irp, Message, Pronto, RepeatMarker, Unit, Vartable};
 
 use bitvec::prelude::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 impl Irp {
     /// Render it to raw IR with the given variables
@@ -10,7 +10,7 @@ impl Irp {
 
         let mut encoder = Encoder::new(&self.general_spec);
 
-        let stream = &[self.stream.clone()];
+        let stream = &[Rc::new(self.stream.clone())];
 
         eval_stream(
             stream,
@@ -37,7 +37,7 @@ impl Irp {
 
         let mut encoder = Encoder::new(&self.general_spec);
 
-        let stream = &[self.stream.clone()];
+        let stream = &[Rc::new(self.stream.clone())];
 
         eval_stream(
             stream,
@@ -186,7 +186,7 @@ struct Encoder<'a> {
 /// A single bitscope
 struct BitspecScope<'a> {
     /// The bitspec itself
-    bit_spec: &'a [Expression],
+    bit_spec: &'a [Rc<Expression>],
     /// The bitstream. This will be populated bit by bit, and then flushed.
     bitstream: BitVec<usize, LocalBits>,
 }
@@ -281,7 +281,7 @@ impl<'a> Encoder<'a> {
     }
 
     /// When entering an IR stream with a bitspec, enter a new scope
-    fn enter_bitspec_scope(&mut self, bit_spec: &'a [Expression]) {
+    fn enter_bitspec_scope(&mut self, bit_spec: &'a [Rc<Expression>]) {
         self.bitspec_scope.push(BitspecScope {
             bit_spec,
             bitstream: BitVec::new(),
@@ -329,7 +329,7 @@ impl<'a> Encoder<'a> {
                 for bit in bits.chunks(bits_step as usize) {
                     let bit = bit_to_usize(bit);
 
-                    if let Expression::List(v) = &self.bitspec_scope[level].bit_spec[bit] {
+                    if let Expression::List(v) = self.bitspec_scope[level].bit_spec[bit].as_ref() {
                         eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
                     }
                 }
@@ -337,7 +337,7 @@ impl<'a> Encoder<'a> {
                 for bit in bits.chunks(bits_step as usize).rev() {
                     let bit = bit_to_usize(bit);
 
-                    if let Expression::List(v) = &self.bitspec_scope[level].bit_spec[bit] {
+                    if let Expression::List(v) = self.bitspec_scope[level].bit_spec[bit].as_ref() {
                         eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
                     }
                 }
@@ -347,194 +347,6 @@ impl<'a> Encoder<'a> {
         self.flush_level(lower_level, vars)?;
 
         Ok(())
-    }
-}
-
-impl Expression {
-    /// Evaluate an arithmetic expression
-    pub fn eval(&self, vars: &Vartable) -> Result<(i64, u8), String> {
-        match self {
-            Expression::Number(n) => Ok((*n, 64)),
-            Expression::Identifier(id) => vars.get(id),
-            Expression::Negative(e) => {
-                let (v, l) = e.eval(vars)?;
-
-                Ok((-v, l))
-            }
-            Expression::Complement(e) => {
-                let (v, l) = e.eval(vars)?;
-
-                Ok((!v, l))
-            }
-            Expression::Add(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
-
-                Ok(((l_val + r_val), std::cmp::max(l_len, r_len)))
-            }
-            Expression::Subtract(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
-
-                Ok(((l_val - r_val), std::cmp::max(l_len, r_len)))
-            }
-            Expression::Multiply(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
-
-                Ok(((l_val * r_val), std::cmp::max(l_len, r_len)))
-            }
-            Expression::Divide(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
-
-                if r_val == 0 {
-                    return Err("divide by zero".to_string());
-                }
-
-                Ok(((l_val / r_val), std::cmp::max(l_len, r_len)))
-            }
-            Expression::Modulo(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
-
-                if r_val == 0 {
-                    return Err("divide by zero".to_string());
-                }
-
-                Ok(((l_val % r_val), std::cmp::max(l_len, r_len)))
-            }
-            Expression::BitwiseAnd(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
-
-                Ok(((l_val & r_val), std::cmp::max(l_len, r_len)))
-            }
-            Expression::BitwiseOr(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
-
-                Ok(((l_val | r_val), std::cmp::max(l_len, r_len)))
-            }
-            Expression::BitwiseXor(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
-
-                Ok(((l_val ^ r_val), std::cmp::max(l_len, r_len)))
-            }
-            Expression::Power(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, _) = r.eval(vars)?;
-
-                if r_val < 0 {
-                    return Err("power to negative not supported".to_string());
-                }
-
-                Ok((l_val.pow(r_val as u32), l_len))
-            }
-            Expression::BitCount(e) => {
-                let (mut val, len) = e.eval(vars)?;
-
-                if len < 63 {
-                    // mask off any unused bits
-                    val &= (1 << len) - 1;
-                }
-
-                Ok((val.count_ones().into(), len))
-            }
-            Expression::BitReverse(e, count, skip) => {
-                let (val, len) = e.eval(vars)?;
-
-                let mut new_val = 0;
-
-                for i in 0..*count {
-                    if (val & (1 << (i + skip))) != 0 {
-                        new_val |= 1 << (skip + count - 1 - i);
-                    }
-                }
-
-                Ok((new_val, len))
-            }
-            Expression::ShiftLeft(value, r) => {
-                let (value, len) = value.eval(vars)?;
-                let (r, _) = r.eval(vars)?;
-
-                Ok((value.wrapping_shl(r as u32), len))
-            }
-            Expression::ShiftRight(value, r) => {
-                let (value, len) = value.eval(vars)?;
-                let (r, _) = r.eval(vars)?;
-
-                Ok((value.wrapping_shr(r as u32), len))
-            }
-            Expression::Equal(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
-
-                Ok(((left == right) as i64, 1))
-            }
-            Expression::More(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
-
-                Ok(((left > right) as i64, 1))
-            }
-            Expression::MoreEqual(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
-
-                Ok(((left >= right) as i64, 1))
-            }
-            Expression::Less(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
-
-                Ok(((left < right) as i64, 1))
-            }
-            Expression::LessEqual(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
-
-                Ok(((left <= right) as i64, 1))
-            }
-            Expression::BitField {
-                value,
-                reverse,
-                length,
-                skip,
-            } => {
-                let (mut b, _) = value.eval(vars)?;
-
-                if let Some(skip) = skip {
-                    b >>= skip.eval(vars)?.0;
-                }
-
-                let (l, _) = length.eval(vars)?;
-
-                if *reverse {
-                    b = b.reverse_bits().rotate_left(l as u32);
-                }
-
-                if l < 64 {
-                    b &= (1 << l) - 1;
-                }
-
-                Ok((b, l as u8))
-            }
-            Expression::InfiniteBitField { value, skip } => {
-                let (mut b, _) = value.eval(vars)?;
-
-                b >>= skip.eval(vars)?.0;
-
-                Ok((b, 8))
-            }
-            Expression::List(v) if v.len() == 1 => {
-                let (v, l) = v[0].eval(vars)?;
-
-                Ok((v, l))
-            }
-            _ => panic!("not implemented: {:?}", self),
-        }
     }
 }
 
@@ -565,7 +377,7 @@ impl Unit {
 }
 
 fn eval_stream<'a>(
-    stream: &'a [Expression],
+    stream: &'a [Rc<Expression>],
     encoder: &mut Encoder<'a>,
     level: Option<usize>,
     vars: &mut Vartable,
@@ -574,7 +386,7 @@ fn eval_stream<'a>(
     alternative: usize,
 ) -> Result<(), String> {
     for expr in stream {
-        match expr {
+        match expr.as_ref() {
             Expression::Number(v) => {
                 encoder.flush_level(level, vars)?;
 
@@ -624,7 +436,7 @@ fn eval_stream<'a>(
                     .stream
                     .iter()
                     .filter_map(|e| {
-                        if let Expression::Variation(list) = e {
+                        if let Expression::Variation(list) = e.as_ref() {
                             Some(list.len())
                         } else {
                             None
@@ -642,7 +454,7 @@ fn eval_stream<'a>(
                             // if the first variant is empty, then Any is permitted
                             let mut first_variant_empty = false;
 
-                            if let Expression::Variation(list) = &stream.stream[0] {
+                            if let Expression::Variation(list) = stream.stream[0].as_ref() {
                                 if list[0].is_empty() {
                                     first_variant_empty = true;
                                 }

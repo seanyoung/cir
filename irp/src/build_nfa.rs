@@ -1,5 +1,5 @@
 use super::{Expression, Irp, RepeatMarker, Vartable};
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 /**
  * Here we build the decoder nfa (non-deterministic finite automation)
@@ -101,9 +101,9 @@ impl Irp {
 
     fn expression_list(
         &self,
-        list: &[Expression],
+        list: &[Rc<Expression>],
         builder: &mut Builder,
-        bit_spec: &[&[Expression]],
+        bit_spec: &[&[Rc<Expression>]],
     ) -> Result<(), String> {
         let mut pos = 0;
 
@@ -111,11 +111,15 @@ impl Irp {
             let mut bit_count = 0;
             let mut expr_count = 0;
 
-            while let Some(Expression::BitField { length, .. }) = list.get(pos + expr_count) {
-                let (length, _) = length.eval(&Vartable::new())?;
+            while let Some(expr) = list.get(pos + expr_count) {
+                if let Expression::BitField { length, .. } = expr.as_ref() {
+                    let (length, _) = length.eval(&Vartable::new())?;
 
-                bit_count += length;
-                expr_count += 1;
+                    bit_count += length;
+                    expr_count += 1;
+                } else {
+                    break;
+                }
             }
 
             if expr_count == 0 {
@@ -135,7 +139,7 @@ impl Irp {
                         length,
                         skip,
                         reverse,
-                    } = &list[i + pos]
+                    } = list[i + pos].as_ref()
                     {
                         let (length, _) = length.eval(&Vartable::new())?;
 
@@ -232,16 +236,16 @@ impl Irp {
         let expr = Expression::Identifier(String::from("$bits"));
 
         let expr = if complement {
-            Expression::Complement(Box::new(expr))
+            Expression::Complement(Rc::new(expr))
         } else {
             expr
         };
 
         #[allow(clippy::comparison_chain)]
         let expr = if offset > skip {
-            Expression::ShiftRight(Box::new(expr), Box::new(Expression::Number(offset - skip)))
+            Expression::ShiftRight(Rc::new(expr), Rc::new(Expression::Number(offset - skip)))
         } else if offset < skip {
-            Expression::ShiftLeft(Box::new(expr), Box::new(Expression::Number(skip - offset)))
+            Expression::ShiftLeft(Rc::new(expr), Rc::new(Expression::Number(skip - offset)))
         } else {
             expr
         };
@@ -249,18 +253,18 @@ impl Irp {
         let mask = gen_mask(length) << skip;
 
         let expr = if reverse {
-            Expression::BitReverse(Box::new(expr), length, skip)
+            Expression::BitReverse(Rc::new(expr), length, skip)
         } else {
             expr
         };
 
-        let expr = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
+        let expr = Expression::BitwiseAnd(Rc::new(expr), Rc::new(Expression::Number(mask)));
 
         if builder.is_set(name, mask) {
             builder.add_action(Action::AssertEq {
                 left: Expression::BitwiseAnd(
-                    Box::new(Expression::Identifier(name.to_owned())),
-                    Box::new(Expression::Number(mask)),
+                    Rc::new(Expression::Identifier(name.to_owned())),
+                    Rc::new(Expression::Number(mask)),
                 ),
                 right: expr,
             });
@@ -276,8 +280,8 @@ impl Irp {
 
             let action = Action::AssertEq {
                 left: Expression::BitwiseAnd(
-                    Box::new(def.as_ref().clone()),
-                    Box::new(Expression::Number(mask)),
+                    Rc::new(def.as_ref().clone()),
+                    Rc::new(Expression::Number(mask)),
                 ),
                 right: expr,
             };
@@ -290,8 +294,8 @@ impl Irp {
         } else {
             let expr = if builder.is_any_set(name) {
                 Expression::BitwiseOr(
-                    Box::new(Expression::Identifier(name.to_owned())),
-                    Box::new(expr),
+                    Rc::new(Expression::Identifier(name.to_owned())),
+                    Rc::new(expr),
                 )
             } else {
                 expr
@@ -321,31 +325,31 @@ impl Irp {
         let expr = Expression::Identifier(String::from("$bits"));
 
         let expr = if complement {
-            Expression::Complement(Box::new(expr))
+            Expression::Complement(Rc::new(expr))
         } else {
             expr
         };
 
         #[allow(clippy::comparison_chain)]
         let expr = if offset > skip {
-            Expression::ShiftRight(Box::new(expr), Box::new(Expression::Number(offset - skip)))
+            Expression::ShiftRight(Rc::new(expr), Rc::new(Expression::Number(offset - skip)))
         } else if offset < skip {
-            Expression::ShiftLeft(Box::new(expr), Box::new(Expression::Number(skip - offset)))
+            Expression::ShiftLeft(Rc::new(expr), Rc::new(Expression::Number(skip - offset)))
         } else {
             expr
         };
 
         let expr = if reverse {
-            Expression::BitReverse(Box::new(expr), length, skip)
+            Expression::BitReverse(Rc::new(expr), length, skip)
         } else {
             expr
         };
 
         let mask = gen_mask(length) << skip;
 
-        let left = Expression::BitwiseAnd(Box::new(expr), Box::new(Expression::Number(mask)));
+        let left = Expression::BitwiseAnd(Rc::new(expr), Rc::new(Expression::Number(mask)));
         let right =
-            Expression::BitwiseAnd(Box::new(value.clone()), Box::new(Expression::Number(mask)));
+            Expression::BitwiseAnd(Rc::new(value.clone()), Rc::new(Expression::Number(mask)));
 
         builder.add_action(Action::AssertEq { left, right });
 
@@ -356,7 +360,7 @@ impl Irp {
         &self,
         length: i64,
         builder: &mut Builder,
-        bit_spec: &[&[Expression]],
+        bit_spec: &[&[Rc<Expression>]],
     ) -> Result<(), String> {
         // TODO: special casing when length == 1
         builder.cur.seen_edges = true;
@@ -419,8 +423,8 @@ impl Irp {
                 Action::Set {
                     var: String::from("$b"),
                     expr: Expression::Subtract(
-                        Box::new(Expression::Identifier(String::from("$b"))),
-                        Box::new(Expression::Number(width)),
+                        Rc::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Number(width)),
                     ),
                 },
             );
@@ -429,10 +433,10 @@ impl Irp {
                 Action::Set {
                     var: String::from("$bits"),
                     expr: Expression::BitwiseOr(
-                        Box::new(Expression::Identifier(String::from("$bits"))),
-                        Box::new(Expression::ShiftLeft(
-                            Box::new(Expression::Identifier(String::from("$v"))),
-                            Box::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Identifier(String::from("$bits"))),
+                        Rc::new(Expression::ShiftLeft(
+                            Rc::new(Expression::Identifier(String::from("$v"))),
+                            Rc::new(Expression::Identifier(String::from("$b"))),
                         )),
                     ),
                 },
@@ -441,8 +445,8 @@ impl Irp {
                 next,
                 Edge::BranchCond {
                     expr: Expression::More(
-                        Box::new(Expression::Identifier(String::from("$b"))),
-                        Box::new(Expression::Number(0)),
+                        Rc::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Number(0)),
                     ),
                     yes: entry,
                     no: done,
@@ -470,10 +474,10 @@ impl Irp {
                 Action::Set {
                     var: String::from("$bits"),
                     expr: Expression::BitwiseOr(
-                        Box::new(Expression::Identifier(String::from("$bits"))),
-                        Box::new(Expression::ShiftLeft(
-                            Box::new(Expression::Identifier(String::from("$v"))),
-                            Box::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Identifier(String::from("$bits"))),
+                        Rc::new(Expression::ShiftLeft(
+                            Rc::new(Expression::Identifier(String::from("$v"))),
+                            Rc::new(Expression::Identifier(String::from("$b"))),
                         )),
                     ),
                 },
@@ -483,8 +487,8 @@ impl Irp {
                 Action::Set {
                     var: String::from("$b"),
                     expr: Expression::Add(
-                        Box::new(Expression::Identifier(String::from("$b"))),
-                        Box::new(Expression::Number(width)),
+                        Rc::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Number(width)),
                     ),
                 },
             );
@@ -493,8 +497,8 @@ impl Irp {
                 next,
                 Edge::BranchCond {
                     expr: Expression::Less(
-                        Box::new(Expression::Identifier(String::from("$b"))),
-                        Box::new(Expression::Number(length)),
+                        Rc::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Number(length)),
                     ),
                     yes: entry,
                     no: done,
@@ -511,7 +515,7 @@ impl Irp {
         &self,
         expr: &Expression,
         builder: &mut Builder,
-        bit_spec: &[&[Expression]],
+        bit_spec: &[&[Rc<Expression>]],
     ) -> Result<(), String> {
         match expr {
             Expression::Stream(irstream) => {

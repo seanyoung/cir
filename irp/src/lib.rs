@@ -148,6 +148,7 @@
 mod build_nfa;
 pub mod decoder_nfa;
 mod encode;
+mod expression;
 mod graphviz;
 pub mod mode2;
 mod parser;
@@ -160,7 +161,7 @@ mod tests;
 include!(concat!(env!("OUT_DIR"), "/irp.rs"));
 
 use std::collections::HashMap;
-use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Eq)]
 /// An encoded raw infrared message
@@ -273,8 +274,8 @@ enum RepeatMarker {
 
 #[derive(PartialEq, Debug, Clone)]
 struct IrStream {
-    bit_spec: Vec<Expression>,
-    stream: Vec<Expression>,
+    bit_spec: Vec<Rc<Expression>>,
+    stream: Vec<Rc<Expression>>,
     repeat: Option<RepeatMarker>,
 }
 
@@ -286,130 +287,51 @@ enum Expression {
     FlashIdentifier(String, Unit),
     GapIdentifier(String, Unit),
     ExtentIdentifier(String, Unit),
-    Assignment(String, Box<Expression>),
+    Assignment(String, Rc<Expression>),
     Number(i64),
     Identifier(String),
     BitField {
-        value: Box<Expression>,
+        value: Rc<Expression>,
         reverse: bool,
-        length: Box<Expression>,
-        skip: Option<Box<Expression>>,
+        length: Rc<Expression>,
+        skip: Option<Rc<Expression>>,
     },
     InfiniteBitField {
-        value: Box<Expression>,
-        skip: Box<Expression>,
+        value: Rc<Expression>,
+        skip: Rc<Expression>,
     },
-    Complement(Box<Expression>),
-    Not(Box<Expression>),
-    Negative(Box<Expression>),
-    BitCount(Box<Expression>),
+    Complement(Rc<Expression>),
+    Not(Rc<Expression>),
+    Negative(Rc<Expression>),
+    BitCount(Rc<Expression>),
 
-    Power(Box<Expression>, Box<Expression>),
-    Multiply(Box<Expression>, Box<Expression>),
-    Divide(Box<Expression>, Box<Expression>),
-    Modulo(Box<Expression>, Box<Expression>),
-    Add(Box<Expression>, Box<Expression>),
-    Subtract(Box<Expression>, Box<Expression>),
+    Power(Rc<Expression>, Rc<Expression>),
+    Multiply(Rc<Expression>, Rc<Expression>),
+    Divide(Rc<Expression>, Rc<Expression>),
+    Modulo(Rc<Expression>, Rc<Expression>),
+    Add(Rc<Expression>, Rc<Expression>),
+    Subtract(Rc<Expression>, Rc<Expression>),
 
-    ShiftLeft(Box<Expression>, Box<Expression>),
-    ShiftRight(Box<Expression>, Box<Expression>),
+    ShiftLeft(Rc<Expression>, Rc<Expression>),
+    ShiftRight(Rc<Expression>, Rc<Expression>),
 
-    LessEqual(Box<Expression>, Box<Expression>),
-    Less(Box<Expression>, Box<Expression>),
-    More(Box<Expression>, Box<Expression>),
-    MoreEqual(Box<Expression>, Box<Expression>),
-    Equal(Box<Expression>, Box<Expression>),
-    NotEqual(Box<Expression>, Box<Expression>),
+    LessEqual(Rc<Expression>, Rc<Expression>),
+    Less(Rc<Expression>, Rc<Expression>),
+    More(Rc<Expression>, Rc<Expression>),
+    MoreEqual(Rc<Expression>, Rc<Expression>),
+    Equal(Rc<Expression>, Rc<Expression>),
+    NotEqual(Rc<Expression>, Rc<Expression>),
 
-    BitwiseAnd(Box<Expression>, Box<Expression>),
-    BitwiseOr(Box<Expression>, Box<Expression>),
-    BitwiseXor(Box<Expression>, Box<Expression>),
-    Or(Box<Expression>, Box<Expression>),
-    And(Box<Expression>, Box<Expression>),
-    Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
-    List(Vec<Expression>),
+    BitwiseAnd(Rc<Expression>, Rc<Expression>),
+    BitwiseOr(Rc<Expression>, Rc<Expression>),
+    BitwiseXor(Rc<Expression>, Rc<Expression>),
+    Or(Rc<Expression>, Rc<Expression>),
+    And(Rc<Expression>, Rc<Expression>),
+    Ternary(Rc<Expression>, Rc<Expression>, Rc<Expression>),
+    List(Vec<Rc<Expression>>),
     Stream(IrStream),
-    Variation(Vec<Vec<Expression>>),
-    BitReverse(Box<Expression>, i64, i64),
-}
-
-impl fmt::Display for Expression {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Expression::Number(v) => write!(f, "{}", v),
-            Expression::Identifier(id) => write!(f, "{}", id),
-            Expression::Add(left, right) => write!(f, "({} + {})", left, right),
-            Expression::Subtract(left, right) => write!(f, "({} - {})", left, right),
-            Expression::Multiply(left, right) => write!(f, "({} * {})", left, right),
-            Expression::Power(left, right) => write!(f, "({} ** {})", left, right),
-            Expression::Modulo(left, right) => write!(f, "({} % {})", left, right),
-            Expression::BitwiseOr(left, right) => write!(f, "({} | {})", left, right),
-            Expression::BitwiseAnd(left, right) => write!(f, "({} & {})", left, right),
-            Expression::BitwiseXor(left, right) => write!(f, "({} ^ {})", left, right),
-            Expression::ShiftLeft(left, right) => write!(f, "({} << {})", left, right),
-            Expression::ShiftRight(left, right) => write!(f, "({} >> {})", left, right),
-
-            Expression::Equal(left, right) => write!(f, "{} == {}", left, right),
-            Expression::NotEqual(left, right) => write!(f, "{} != {}", left, right),
-            Expression::More(left, right) => write!(f, "{} > {}", left, right),
-            Expression::MoreEqual(left, right) => write!(f, "{} >= {}", left, right),
-            Expression::Less(left, right) => write!(f, "{} < {}", left, right),
-            Expression::LessEqual(left, right) => write!(f, "{} <= {}", left, right),
-
-            Expression::Or(left, right) => write!(f, "({} || {})", left, right),
-            Expression::And(left, right) => write!(f, "({} && {})", left, right),
-            Expression::Ternary(cond, left, right) => {
-                write!(f, "({} ? {} : {})", cond, left, right)
-            }
-            Expression::Complement(expr) => write!(f, "~{}", expr),
-            Expression::Not(expr) => write!(f, "!{}", expr),
-            Expression::Negative(expr) => write!(f, "-{}", expr),
-            Expression::BitCount(expr) => write!(f, "#({})", expr),
-            Expression::BitField {
-                value,
-                reverse,
-                length,
-                skip: Some(skip),
-            } => {
-                write!(
-                    f,
-                    "{}:{}{}:{}",
-                    value,
-                    if *reverse { "-" } else { "" },
-                    length,
-                    skip
-                )
-            }
-            Expression::BitField {
-                value,
-                reverse,
-                length,
-                skip: None,
-            } => {
-                write!(f, "{}:{}{}", value, if *reverse { "-" } else { "" }, length,)
-            }
-            Expression::InfiniteBitField { value, skip } => {
-                write!(f, "{}::{}", value, skip)
-            }
-            Expression::BitReverse(expr, count, skip) => {
-                write!(f, "BITREV({},{},{})", expr, count, skip)
-            }
-            Expression::Assignment(name, expr) => write!(f, "{}={}", name, expr),
-            Expression::List(list) => {
-                write!(f, "(")?;
-                let mut first = true;
-                for expr in list {
-                    if !first {
-                        write!(f, ",")?;
-                    }
-                    write!(f, "{}", expr)?;
-                    first = false;
-                }
-                write!(f, ")")
-            }
-            expr => write!(f, "{:?}", expr),
-        }
-    }
+    Variation(Vec<Vec<Rc<Expression>>>),
+    BitReverse(Rc<Expression>, i64, i64),
 }
 
 #[derive(Debug)]
