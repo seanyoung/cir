@@ -126,90 +126,96 @@ impl Irp {
             if expr_count == 0 {
                 self.expression(&list[pos], builder, bit_spec)?;
                 pos += 1;
-            } else {
-                self.bit_field(bit_count, builder, bit_spec)?;
+                continue;
+            }
 
-                let mut delayed = Vec::new();
+            // if it is a single constant bitfield, just expand it - no loops needed
+            if expr_count == 1 && bit_count < 4 {
+                if let Expression::BitField {
+                    value,
+                    reverse: false,
+                    skip: None,
+                    ..
+                } = list[pos].as_ref()
+                {
+                    if let Expression::Number(value) = builder.const_folding(value).as_ref() {
+                        for bit in 0..bit_count {
+                            let e = &bit_spec[0][((value >> bit) & 1) as usize];
 
-                // now do stuff with bitfields
-                let mut offset = if self.general_spec.lsb { 0 } else { bit_count };
-
-                for i in 0..expr_count {
-                    if let Expression::BitField {
-                        value,
-                        length,
-                        skip,
-                        reverse,
-                    } = list[i + pos].as_ref()
-                    {
-                        let (length, _) = builder.const_folding(length).eval(&Vartable::new())?;
-
-                        if !self.general_spec.lsb {
-                            offset -= length;
+                            self.expression(e, builder, &bit_spec[1..])?;
                         }
 
-                        let skip = if let Some(skip) = skip {
-                            let (skip, _) = builder.const_folding(skip).eval(&Vartable::new())?;
+                        pos += 1;
+                        continue;
+                    }
+                }
+            }
 
-                            skip
-                        } else {
-                            0
-                        };
+            self.bit_field(bit_count, builder, bit_spec)?;
 
-                        let value = builder.const_folding(value);
+            let mut delayed = Vec::new();
 
-                        let bits = Expression::Identifier(String::from("$bits"));
+            // now do stuff with bitfields
+            let mut offset = if self.general_spec.lsb { 0 } else { bit_count };
 
-                        #[allow(clippy::comparison_chain)]
-                        let bits = if offset > skip {
-                            Expression::ShiftRight(
-                                Rc::new(bits),
-                                Rc::new(Expression::Number(offset - skip)),
-                            )
-                        } else if offset < skip {
-                            Expression::ShiftLeft(
-                                Rc::new(bits),
-                                Rc::new(Expression::Number(skip - offset)),
-                            )
-                        } else {
-                            bits
-                        };
+            for i in 0..expr_count {
+                let expr = list[i + pos].as_ref();
 
-                        let bits = if *reverse {
-                            Expression::BitReverse(Rc::new(bits), length, skip)
-                        } else {
-                            bits
-                        };
+                if let Expression::BitField {
+                    value,
+                    length,
+                    skip,
+                    reverse,
+                } = expr
+                {
+                    let (length, _) = builder.const_folding(length).eval(&Vartable::new())?;
 
-                        match value.as_ref() {
-                            Expression::Complement(inner_expr) => {
-                                let bits = Expression::Complement(Rc::new(bits));
+                    if !self.general_spec.lsb {
+                        offset -= length;
+                    }
 
-                                match inner_expr.as_ref() {
-                                    Expression::Identifier(name) => {
-                                        self.store_bits_in_var(
-                                            name,
-                                            bits,
-                                            length,
-                                            skip,
-                                            builder,
-                                            &mut delayed,
-                                        )?;
-                                    }
-                                    Expression::Number(_) => self.check_bits_in_var(
-                                        inner_expr, bits, length, skip, builder,
-                                    )?,
-                                    _ => {
-                                        return Err(format!(
-                                            "expression {} not supported",
-                                            inner_expr
-                                        ));
-                                    }
-                                }
-                            }
-                            Expression::Identifier(name) => {
+                    let skip = if let Some(skip) = skip {
+                        let (skip, _) = builder.const_folding(skip).eval(&Vartable::new())?;
+
+                        skip
+                    } else {
+                        0
+                    };
+
+                    let value = builder.const_folding(value);
+
+                    let bits = Expression::Identifier(String::from("$bits"));
+
+                    #[allow(clippy::comparison_chain)]
+                    let bits = if offset > skip {
+                        Expression::ShiftRight(
+                            Rc::new(bits),
+                            Rc::new(Expression::Number(offset - skip)),
+                        )
+                    } else if offset < skip {
+                        Expression::ShiftLeft(
+                            Rc::new(bits),
+                            Rc::new(Expression::Number(skip - offset)),
+                        )
+                    } else {
+                        bits
+                    };
+
+                    let bits = if *reverse {
+                        Expression::BitReverse(Rc::new(bits), length, skip)
+                    } else {
+                        bits
+                    };
+
+                    match builder.unknown_var(expr) {
+                        Ok(_) => {
+                            // We know all the variables in here or its constant
+                            self.check_bits_in_var(&value, bits, length, skip, builder)?;
+                        }
+                        Err(name) => match inverse(Rc::new(bits), value.clone(), &name) {
+                            Some(bits) => {
                                 self.store_bits_in_var(
-                                    name,
+                                    &name,
                                     bits,
                                     length,
                                     skip,
@@ -217,35 +223,38 @@ impl Irp {
                                     &mut delayed,
                                 )?;
                             }
-                            expr if builder.unknown_var(expr).is_ok() => {
-                                self.check_bits_in_var(&value, bits, length, skip, builder)?
+                            None => {
+                                return Err(format!("expression {} not supported", value));
                             }
-                            expr => {
-                                return Err(format!("expression {} not supported", expr));
-                            }
-                        }
+                        },
+                    }
 
-                        if self.general_spec.lsb {
-                            offset += length;
-                        }
+                    if self.general_spec.lsb {
+                        offset += length;
                     }
                 }
-
-                for action in delayed {
-                    match &action {
-                        Action::AssertEq { left, right } => {
-                            builder.unknown_var(left)?;
-                            builder.unknown_var(right)?;
-                        }
-                        Action::Set { expr, .. } => {
-                            builder.unknown_var(expr)?;
-                        }
-                    }
-                    builder.add_action(action);
-                }
-
-                pos += expr_count;
             }
+
+            for action in delayed {
+                match &action {
+                    Action::AssertEq { left, right } => {
+                        builder
+                            .unknown_var(left)
+                            .map_err(|name| format!("variable '{}' not known", name))?;
+                        builder
+                            .unknown_var(right)
+                            .map_err(|name| format!("variable '{}' not known", name))?;
+                    }
+                    Action::Set { expr, .. } => {
+                        builder
+                            .unknown_var(expr)
+                            .map_err(|name| format!("variable '{}' not known", name))?;
+                    }
+                }
+                builder.add_action(action);
+            }
+
+            pos += expr_count;
         }
 
         Ok(())
@@ -254,7 +263,7 @@ impl Irp {
     fn store_bits_in_var(
         &self,
         name: &str,
-        bits: Expression,
+        bits: Rc<Expression>,
         length: i64,
         skip: i64,
         builder: &mut Builder,
@@ -262,7 +271,7 @@ impl Irp {
     ) -> Result<(), String> {
         let mask = gen_mask(length) << skip;
 
-        let expr = Expression::BitwiseAnd(Rc::new(bits), Rc::new(Expression::Number(mask)));
+        let expr = Expression::BitwiseAnd(bits, Rc::new(Expression::Number(mask)));
 
         if builder.is_set(name, mask) {
             builder.add_action(Action::AssertEq {
@@ -744,27 +753,24 @@ impl<'a> Builder<'a> {
                 {
                     Ok(())
                 } else {
-                    Err(format!("variable '{}' not known", name))
+                    Err(name.to_owned())
                 }
             }
             Expression::BitField {
                 value,
                 length,
-                skip: Some(skip),
+                skip,
                 ..
             } => {
-                self.unknown_var(value)?;
-                self.unknown_var(length)?;
-                self.unknown_var(skip)
-            }
-            Expression::BitField {
-                value,
-                length,
-                skip: None,
-                ..
-            } => {
-                self.unknown_var(value)?;
-                self.unknown_var(length)
+                if let Some(res) = self.bitfield_known(value, length, skip) {
+                    res
+                } else {
+                    if let Some(skip) = &skip {
+                        self.unknown_var(skip)?;
+                    }
+                    self.unknown_var(value)?;
+                    self.unknown_var(length)
+                }
             }
             Expression::InfiniteBitField { value, skip } => {
                 self.unknown_var(value)?;
@@ -827,7 +833,50 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn const_folding(&mut self, expr: &Rc<Expression>) -> Rc<Expression> {
+    fn bitfield_known(
+        &self,
+        value: &Rc<Expression>,
+        length: &Rc<Expression>,
+        skip: &Option<Rc<Expression>>,
+    ) -> Option<Result<(), String>> {
+        let name = match value.as_ref() {
+            Expression::Identifier(name) => name,
+            Expression::Complement(expr) => {
+                if let Expression::Identifier(name) = expr.as_ref() {
+                    name
+                } else {
+                    return None;
+                }
+            }
+            _ => {
+                return None;
+            }
+        };
+
+        let length = if let Expression::Number(v) = self.const_folding(length).as_ref() {
+            *v
+        } else {
+            return None;
+        };
+
+        let skip = if let Some(skip) = skip {
+            if let Expression::Number(v) = self.const_folding(skip).as_ref() {
+                *v
+            } else {
+                return None;
+            }
+        } else {
+            0
+        };
+
+        if self.is_set(name, gen_mask(length) << skip) {
+            Some(Ok(()))
+        } else {
+            Some(Err(name.to_string()))
+        }
+    }
+
+    fn const_folding(&self, expr: &Rc<Expression>) -> Rc<Expression> {
         let new = clone_filter(expr, &|expr| match expr.as_ref() {
             Expression::Identifier(name) => {
                 let (val, _) = self.constants.get(name).ok()?;
