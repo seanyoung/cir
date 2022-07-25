@@ -9,6 +9,7 @@ impl fmt::Display for Expression {
             Expression::Add(left, right) => write!(f, "({} + {})", left, right),
             Expression::Subtract(left, right) => write!(f, "({} - {})", left, right),
             Expression::Multiply(left, right) => write!(f, "({} * {})", left, right),
+            Expression::Divide(left, right) => write!(f, "({} / {})", left, right),
             Expression::Power(left, right) => write!(f, "({} ** {})", left, right),
             Expression::Modulo(left, right) => write!(f, "({} % {})", left, right),
             Expression::BitwiseOr(left, right) => write!(f, "({} | {})", left, right),
@@ -610,4 +611,229 @@ fn clone1() {
 
     assert_eq!(format!("{}", expr), "(B + S)");
     assert_eq!(format!("{}", expr2), "(B + 8)");
+}
+
+/// Calculate inverse expression. For example:
+/// X=~(B-1) (B) => ~X=B-1 => ~X+1=B
+/// X=(102+B)-C (B) => X+C=102+B => X+C-102=B
+pub(crate) fn inverse(
+    left: Rc<Expression>,
+    right: Rc<Expression>,
+    var: &str,
+) -> Option<Rc<Expression>> {
+    match right.as_ref() {
+        Expression::Identifier(id) if id == var => Some(left),
+        Expression::Complement(expr) => {
+            inverse(Rc::new(Expression::Complement(left)), expr.clone(), var)
+        }
+        Expression::Negative(expr) => {
+            inverse(Rc::new(Expression::Negative(left)), expr.clone(), var)
+        }
+        Expression::Not(expr) => inverse(Rc::new(Expression::Not(left)), expr.clone(), var),
+        Expression::Add(left1, right1) => {
+            let left2 = inverse(
+                Rc::new(Expression::Subtract(left.clone(), right1.clone())),
+                left1.clone(),
+                var,
+            );
+
+            if left2.is_some() {
+                left2
+            } else {
+                inverse(
+                    Rc::new(Expression::Subtract(left, left1.clone())),
+                    right1.clone(),
+                    var,
+                )
+            }
+        }
+        Expression::Subtract(left1, right1) => {
+            let left2 = inverse(
+                Rc::new(Expression::Add(left.clone(), right1.clone())),
+                left1.clone(),
+                var,
+            );
+
+            if left2.is_some() {
+                left2
+            } else {
+                inverse(
+                    Rc::new(Expression::Negative(Rc::new(Expression::Subtract(
+                        left,
+                        left1.clone(),
+                    )))),
+                    right1.clone(),
+                    var,
+                )
+            }
+        }
+        Expression::Multiply(left1, right1) => {
+            let left2 = inverse(
+                Rc::new(Expression::Divide(left.clone(), right1.clone())),
+                left1.clone(),
+                var,
+            );
+
+            if left2.is_some() {
+                left2
+            } else {
+                inverse(
+                    Rc::new(Expression::Divide(left, left1.clone())),
+                    right1.clone(),
+                    var,
+                )
+            }
+        }
+        Expression::Divide(left1, right1) => {
+            let left2 = inverse(
+                Rc::new(Expression::Multiply(left.clone(), right1.clone())),
+                left1.clone(),
+                var,
+            );
+
+            if left2.is_some() {
+                left2
+            } else {
+                inverse(
+                    Rc::new(Expression::Divide(left1.clone(), left)),
+                    right1.clone(),
+                    var,
+                )
+            }
+        }
+        _ => None,
+    }
+}
+
+#[test]
+fn inverse1() {
+    // first
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Complement(Rc::new(Expression::Subtract(
+        Rc::new(Expression::Identifier("B".to_owned())),
+        Rc::new(Expression::Number(1)),
+    ))));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "~(B - 1)");
+    assert_eq!(format!("{}", inv), "(~X + 1)");
+
+    // second
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Complement(Rc::new(Expression::Subtract(
+        Rc::new(Expression::Number(1)),
+        Rc::new(Expression::Identifier("B".to_owned())),
+    ))));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "~(1 - B)");
+    assert_eq!(format!("{}", inv), "-(~X - 1)");
+
+    // third
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Negative(Rc::new(Expression::Add(
+        Rc::new(Expression::Identifier("B".to_owned())),
+        Rc::new(Expression::Number(1)),
+    ))));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "-(B + 1)");
+    assert_eq!(format!("{}", inv), "(-X - 1)");
+
+    // fourth
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Negative(Rc::new(Expression::Add(
+        Rc::new(Expression::Number(1)),
+        Rc::new(Expression::Identifier("B".to_owned())),
+    ))));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "-(1 + B)");
+    assert_eq!(format!("{}", inv), "(-X - 1)");
+
+    // fifth
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Multiply(
+        Rc::new(Expression::Number(3)),
+        Rc::new(Expression::Negative(Rc::new(Expression::Identifier(
+            "B".to_owned(),
+        )))),
+    ));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "(3 * -B)");
+    assert_eq!(format!("{}", inv), "-(X / 3)");
+
+    // sixth
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Multiply(
+        Rc::new(Expression::Negative(Rc::new(Expression::Identifier(
+            "B".to_owned(),
+        )))),
+        Rc::new(Expression::Number(3)),
+    ));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "(-B * 3)");
+    assert_eq!(format!("{}", inv), "-(X / 3)");
+
+    // seventh
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Divide(
+        Rc::new(Expression::Negative(Rc::new(Expression::Identifier(
+            "B".to_owned(),
+        )))),
+        Rc::new(Expression::Number(3)),
+    ));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "(-B / 3)");
+    assert_eq!(format!("{}", inv), "-(X * 3)");
+
+    // 8th
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Divide(
+        Rc::new(Expression::Number(3)),
+        Rc::new(Expression::Negative(Rc::new(Expression::Identifier(
+            "B".to_owned(),
+        )))),
+    ));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "(3 / -B)");
+    assert_eq!(format!("{}", inv), "-(3 / X)");
+
+    // nothing to do
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+    let right = Rc::new(Expression::Identifier("B".to_owned()));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "B");
+    assert_eq!(format!("{}", inv), "X");
 }
