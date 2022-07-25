@@ -1,4 +1,7 @@
-use super::{expression::clone_filter, Expression, Irp, RepeatMarker, Vartable};
+use super::{
+    expression::{clone_filter, inverse},
+    Expression, Irp, RepeatMarker, Vartable,
+};
 use std::{collections::HashMap, rc::Rc};
 
 /**
@@ -155,42 +158,68 @@ impl Irp {
 
                         let value = builder.const_folding(value);
 
+                        let bits = Expression::Identifier(String::from("$bits"));
+
+                        #[allow(clippy::comparison_chain)]
+                        let bits = if offset > skip {
+                            Expression::ShiftRight(
+                                Rc::new(bits),
+                                Rc::new(Expression::Number(offset - skip)),
+                            )
+                        } else if offset < skip {
+                            Expression::ShiftLeft(
+                                Rc::new(bits),
+                                Rc::new(Expression::Number(skip - offset)),
+                            )
+                        } else {
+                            bits
+                        };
+
+                        let bits = if *reverse {
+                            Expression::BitReverse(Rc::new(bits), length, skip)
+                        } else {
+                            bits
+                        };
+
                         match value.as_ref() {
-                            Expression::Complement(expr) => match expr.as_ref() {
-                                Expression::Identifier(name) => {
-                                    self.store_bits_in_var(
-                                        name,
-                                        offset,
-                                        true,
-                                        *reverse,
-                                        length,
-                                        skip,
-                                        builder,
-                                        &mut delayed,
-                                    )?;
+                            Expression::Complement(inner_expr) => {
+                                let bits = Expression::Complement(Rc::new(bits));
+
+                                match inner_expr.as_ref() {
+                                    Expression::Identifier(name) => {
+                                        self.store_bits_in_var(
+                                            name,
+                                            bits,
+                                            length,
+                                            skip,
+                                            builder,
+                                            &mut delayed,
+                                        )?;
+                                    }
+                                    Expression::Number(_) => self.check_bits_in_var(
+                                        inner_expr, bits, length, skip, builder,
+                                    )?,
+                                    _ => {
+                                        return Err(format!(
+                                            "expression {} not supported",
+                                            inner_expr
+                                        ));
+                                    }
                                 }
-                                Expression::Number(_) => self.check_bits_in_var(
-                                    expr, offset, true, *reverse, length, skip, builder,
-                                )?,
-                                _ => {
-                                    return Err(format!("expression {} not supported", expr));
-                                }
-                            },
+                            }
                             Expression::Identifier(name) => {
                                 self.store_bits_in_var(
                                     name,
-                                    offset,
-                                    false,
-                                    *reverse,
+                                    bits,
                                     length,
                                     skip,
                                     builder,
                                     &mut delayed,
                                 )?;
                             }
-                            expr if builder.unknown_var(expr).is_ok() => self.check_bits_in_var(
-                                &value, offset, false, *reverse, length, skip, builder,
-                            )?,
+                            expr if builder.unknown_var(expr).is_ok() => {
+                                self.check_bits_in_var(&value, bits, length, skip, builder)?
+                            }
                             expr => {
                                 return Err(format!("expression {} not supported", expr));
                             }
@@ -225,40 +254,15 @@ impl Irp {
     fn store_bits_in_var(
         &self,
         name: &str,
-        offset: i64,
-        complement: bool,
-        reverse: bool,
+        bits: Expression,
         length: i64,
         skip: i64,
         builder: &mut Builder,
         delayed: &mut Vec<Action>,
     ) -> Result<(), String> {
-        let expr = Expression::Identifier(String::from("$bits"));
-
-        let expr = if complement {
-            Expression::Complement(Rc::new(expr))
-        } else {
-            expr
-        };
-
-        #[allow(clippy::comparison_chain)]
-        let expr = if offset > skip {
-            Expression::ShiftRight(Rc::new(expr), Rc::new(Expression::Number(offset - skip)))
-        } else if offset < skip {
-            Expression::ShiftLeft(Rc::new(expr), Rc::new(Expression::Number(skip - offset)))
-        } else {
-            expr
-        };
-
         let mask = gen_mask(length) << skip;
 
-        let expr = if reverse {
-            Expression::BitReverse(Rc::new(expr), length, skip)
-        } else {
-            expr
-        };
-
-        let expr = Expression::BitwiseAnd(Rc::new(expr), Rc::new(Expression::Number(mask)));
+        let expr = Expression::BitwiseAnd(Rc::new(bits), Rc::new(Expression::Number(mask)));
 
         if builder.is_set(name, mask) {
             builder.add_action(Action::AssertEq {
@@ -315,39 +319,14 @@ impl Irp {
     fn check_bits_in_var(
         &self,
         value: &Expression,
-        offset: i64,
-        complement: bool,
-        reverse: bool,
+        bits: Expression,
         length: i64,
         skip: i64,
         builder: &mut Builder,
     ) -> Result<(), String> {
-        let expr = Expression::Identifier(String::from("$bits"));
-
-        let expr = if complement {
-            Expression::Complement(Rc::new(expr))
-        } else {
-            expr
-        };
-
-        #[allow(clippy::comparison_chain)]
-        let expr = if offset > skip {
-            Expression::ShiftRight(Rc::new(expr), Rc::new(Expression::Number(offset - skip)))
-        } else if offset < skip {
-            Expression::ShiftLeft(Rc::new(expr), Rc::new(Expression::Number(skip - offset)))
-        } else {
-            expr
-        };
-
-        let expr = if reverse {
-            Expression::BitReverse(Rc::new(expr), length, skip)
-        } else {
-            expr
-        };
-
         let mask = gen_mask(length) << skip;
 
-        let left = Expression::BitwiseAnd(Rc::new(expr), Rc::new(Expression::Number(mask)));
+        let left = Expression::BitwiseAnd(Rc::new(bits), Rc::new(Expression::Number(mask)));
         let right =
             Expression::BitwiseAnd(Rc::new(value.clone()), Rc::new(Expression::Number(mask)));
 
