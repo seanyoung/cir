@@ -420,7 +420,14 @@ fn compare_decode_to_transmogrifier() {
             let mut ok = true;
 
             for param in &testcase.params {
-                if res.get(&param.name) != Some(&(param.value as i64)) {
+                let mask = match (protocol.name.as_str(), param.name.as_str()) {
+                    ("Zenith5", "F") => 31,
+                    ("Zenith6", "F") => 63,
+                    ("Zenith7", "F") => 127,
+                    _ => !0,
+                };
+
+                if res.get(&param.name) != Some(&((param.value & mask) as i64)) {
                     println!(
                         "{} does not match, expected {} got {:?}",
                         param.name,
@@ -464,5 +471,5 @@ fn compare_decode_to_transmogrifier() {
     println!("tests: {} fails: {}", total_tests, fails);
 
     // TODO: we still have a whole bunch of fails
-    assert_eq!(fails, 291);
+    assert_eq!(fails, 255);
 }

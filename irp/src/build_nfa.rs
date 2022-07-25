@@ -139,10 +139,18 @@ impl Irp {
                 } = list[pos].as_ref()
                 {
                     if let Expression::Number(value) = builder.const_folding(value).as_ref() {
-                        for bit in 0..bit_count {
-                            let e = &bit_spec[0][((value >> bit) & 1) as usize];
+                        if builder.irp.general_spec.lsb {
+                            for bit in 0..bit_count {
+                                let e = &bit_spec[0][((value >> bit) & 1) as usize];
 
-                            self.expression(e, builder, &bit_spec[1..])?;
+                                self.expression(e, builder, &bit_spec[1..])?;
+                            }
+                        } else {
+                            for bit in (0..bit_count).rev() {
+                                let e = &bit_spec[0][((value >> bit) & 1) as usize];
+
+                                self.expression(e, builder, &bit_spec[1..])?;
+                            }
                         }
 
                         pos += 1;
