@@ -410,7 +410,7 @@ fn compare_decode_to_transmogrifier() {
             }
         };
 
-        let mut decoder = nfa.decoder(100, 3, 3000);
+        let mut decoder = nfa.decoder(10, 3, 3000);
 
         for data in InfraredData::from_u32_slice(&testcase.render[0]) {
             decoder.input(data);
@@ -432,6 +432,13 @@ fn compare_decode_to_transmogrifier() {
             }
 
             if !ok {
+                println!(
+                    "{} failed to decode, irp: {} ir: {}",
+                    protocol.name,
+                    protocol.irp,
+                    rawir::print_to_string(&testcase.render[0])
+                );
+
                 fails += 1;
             }
         } else {
@@ -457,5 +464,5 @@ fn compare_decode_to_transmogrifier() {
     println!("tests: {} fails: {}", total_tests, fails);
 
     // TODO: we still have a whole bunch of fails
-    assert_eq!(fails, 300);
+    assert_eq!(fails, 291);
 }
