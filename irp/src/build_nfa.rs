@@ -6,6 +6,14 @@ use std::{collections::HashMap, rc::Rc};
 
 /**
  * Here we build the decoder nfa (non-deterministic finite automation)
+ *
+ * TODO
+ * - ExtentConstant may be very short. We should calculate minimum length
+ * - (..)2 and other repeat markers are not supported
+ * - variable length bitfields, e.g. Zenith protocol
+ * - (S-1):4 should produce 16, not 0 (mask in the wrong place)
+ * - recursive definitions should be supported, e.g. Kaseikyo protocol
+ * - Fujitsu-128 protocol has 128 bits and overflows i64
  */
 
 #[derive(PartialEq, Debug, Clone)]

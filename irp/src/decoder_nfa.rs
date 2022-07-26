@@ -193,6 +193,22 @@ impl<'a> Decoder<'a> {
                     }
                     Edge::Gap(expected, dest) => {
                         if let Some(ir @ InfraredData::Gap(received)) = ir {
+                            // if *expected >= self.trailing_gap as i64 {
+                            //     if received >= self.trailing_gap {
+                            //         let (success, vartab) = self.run_actions(pos, &vartab);
+
+                            //         trace!(
+                            //             "large gap matched gap {} (expected {}) => {}",
+                            //             received,
+                            //             *expected,
+                            //             dest
+                            //         );
+
+                            //         if success {
+                            //             work.push((None, *dest, vartab));
+                            //         }
+                            //     }
+                            //} else
                             if self.tolerance_eq(*expected as u32, received) {
                                 let (success, vartab) = self.run_actions(pos, &vartab);
 
