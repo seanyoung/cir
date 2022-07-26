@@ -13,7 +13,7 @@ use std::{collections::HashMap, rc::Rc};
  * - variable length bitfields, e.g. Zenith protocol
  * - (S-1):4 should produce 16, not 0 (mask in the wrong place)
  * - recursive definitions should be supported, e.g. Kaseikyo protocol
- * - Fujitsu-128 protocol has 128 bits and overflows i64
+ * - fix variables in bit fields, e.g. B&O protocol
  */
 
 #[derive(PartialEq, Debug, Clone)]
@@ -248,6 +248,10 @@ impl<'a> Builder<'a> {
             while let Some(expr) = list.get(pos + expr_count) {
                 if let Expression::BitField { length, .. } = expr.as_ref() {
                     let (length, _) = self.const_folding(length).eval(&Vartable::new())?;
+
+                    if bit_count + length > 64 {
+                        break;
+                    }
 
                     bit_count += length;
                     expr_count += 1;
