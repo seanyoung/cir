@@ -87,7 +87,7 @@ impl Irp {
             changes
         } {}
 
-        self.expression(&self.stream, &mut builder, &[])?;
+        builder.expression(&self.stream, &[])?;
 
         if builder.cur.seen_edges && builder.is_done() {
             let res = builder.done_fields();
@@ -98,524 +98,6 @@ impl Irp {
         Ok(NFA {
             verts: builder.complete(),
         })
-    }
-
-    fn expression_list(
-        &self,
-        list: &[Rc<Expression>],
-        builder: &mut Builder,
-        bit_spec: &[&[Rc<Expression>]],
-    ) -> Result<(), String> {
-        let mut pos = 0;
-
-        while pos < list.len() {
-            let mut bit_count = 0;
-            let mut expr_count = 0;
-
-            while let Some(expr) = list.get(pos + expr_count) {
-                if let Expression::BitField { length, .. } = expr.as_ref() {
-                    let (length, _) = builder.const_folding(length).eval(&Vartable::new())?;
-
-                    bit_count += length;
-                    expr_count += 1;
-                } else {
-                    break;
-                }
-            }
-
-            if expr_count == 0 {
-                self.expression(&list[pos], builder, bit_spec)?;
-                pos += 1;
-                continue;
-            }
-
-            // if it is a single constant bitfield, just expand it - no loops needed
-            if expr_count == 1 && bit_count < 4 {
-                if let Expression::BitField {
-                    value,
-                    reverse: false,
-                    skip: None,
-                    ..
-                } = list[pos].as_ref()
-                {
-                    if let Expression::Number(value) = builder.const_folding(value).as_ref() {
-                        if builder.irp.general_spec.lsb {
-                            for bit in 0..bit_count {
-                                let e = &bit_spec[0][((value >> bit) & 1) as usize];
-
-                                self.expression(e, builder, &bit_spec[1..])?;
-                            }
-                        } else {
-                            for bit in (0..bit_count).rev() {
-                                let e = &bit_spec[0][((value >> bit) & 1) as usize];
-
-                                self.expression(e, builder, &bit_spec[1..])?;
-                            }
-                        }
-
-                        pos += 1;
-                        continue;
-                    }
-                }
-            }
-
-            self.bit_field(bit_count, builder, bit_spec)?;
-
-            let mut delayed = Vec::new();
-
-            // now do stuff with bitfields
-            let mut offset = if self.general_spec.lsb { 0 } else { bit_count };
-
-            for i in 0..expr_count {
-                let expr = list[i + pos].as_ref();
-
-                if let Expression::BitField {
-                    value,
-                    length,
-                    skip,
-                    reverse,
-                } = expr
-                {
-                    let (length, _) = builder.const_folding(length).eval(&Vartable::new())?;
-
-                    if !self.general_spec.lsb {
-                        offset -= length;
-                    }
-
-                    let skip = if let Some(skip) = skip {
-                        let (skip, _) = builder.const_folding(skip).eval(&Vartable::new())?;
-
-                        skip
-                    } else {
-                        0
-                    };
-
-                    let value = builder.const_folding(value);
-
-                    let bits = Expression::Identifier(String::from("$bits"));
-
-                    #[allow(clippy::comparison_chain)]
-                    let bits = if offset > skip {
-                        Expression::ShiftRight(
-                            Rc::new(bits),
-                            Rc::new(Expression::Number(offset - skip)),
-                        )
-                    } else if offset < skip {
-                        Expression::ShiftLeft(
-                            Rc::new(bits),
-                            Rc::new(Expression::Number(skip - offset)),
-                        )
-                    } else {
-                        bits
-                    };
-
-                    let bits = if *reverse {
-                        Expression::BitReverse(Rc::new(bits), length, skip)
-                    } else {
-                        bits
-                    };
-
-                    match builder.unknown_var(expr) {
-                        Ok(_) => {
-                            // We know all the variables in here or its constant
-                            self.check_bits_in_var(&value, bits, length, skip, builder)?;
-                        }
-                        Err(name) => match inverse(Rc::new(bits), value.clone(), &name) {
-                            Some(bits) => {
-                                self.store_bits_in_var(
-                                    &name,
-                                    bits,
-                                    length,
-                                    skip,
-                                    builder,
-                                    &mut delayed,
-                                )?;
-                            }
-                            None => {
-                                return Err(format!("expression {} not supported", value));
-                            }
-                        },
-                    }
-
-                    if self.general_spec.lsb {
-                        offset += length;
-                    }
-                }
-            }
-
-            for action in delayed {
-                match &action {
-                    Action::AssertEq { left, right } => {
-                        builder
-                            .unknown_var(left)
-                            .map_err(|name| format!("variable '{}' not known", name))?;
-                        builder
-                            .unknown_var(right)
-                            .map_err(|name| format!("variable '{}' not known", name))?;
-                    }
-                    Action::Set { expr, .. } => {
-                        builder
-                            .unknown_var(expr)
-                            .map_err(|name| format!("variable '{}' not known", name))?;
-                    }
-                }
-                builder.add_action(action);
-            }
-
-            pos += expr_count;
-        }
-
-        Ok(())
-    }
-
-    fn store_bits_in_var(
-        &self,
-        name: &str,
-        bits: Rc<Expression>,
-        length: i64,
-        skip: i64,
-        builder: &mut Builder,
-        delayed: &mut Vec<Action>,
-    ) -> Result<(), String> {
-        let mask = gen_mask(length) << skip;
-
-        let expr = Expression::BitwiseAnd(bits, Rc::new(Expression::Number(mask)));
-
-        if builder.is_set(name, mask) {
-            builder.add_action(Action::AssertEq {
-                left: Expression::BitwiseAnd(
-                    Rc::new(Expression::Identifier(name.to_owned())),
-                    Rc::new(Expression::Number(mask)),
-                ),
-                right: expr,
-            });
-        } else if let Some(def) = self.definitions.iter().find_map(|def| {
-            if let Expression::Assignment(var, expr) = def {
-                if name == var {
-                    return Some(expr);
-                }
-            }
-            None
-        }) {
-            let have_it = builder.unknown_var(def).is_ok();
-
-            let action = Action::AssertEq {
-                left: Expression::BitwiseAnd(
-                    builder.const_folding(def),
-                    Rc::new(Expression::Number(mask)),
-                ),
-                right: expr,
-            };
-
-            if have_it {
-                builder.add_action(action);
-            } else {
-                delayed.push(action);
-            }
-        } else {
-            let expr = if builder.is_any_set(name) {
-                Expression::BitwiseOr(
-                    Rc::new(Expression::Identifier(name.to_owned())),
-                    Rc::new(expr),
-                )
-            } else {
-                expr
-            };
-
-            builder.set(name, mask);
-
-            builder.add_action(Action::Set {
-                var: name.to_owned(),
-                expr,
-            });
-        }
-
-        Ok(())
-    }
-
-    fn check_bits_in_var(
-        &self,
-        value: &Expression,
-        bits: Expression,
-        length: i64,
-        skip: i64,
-        builder: &mut Builder,
-    ) -> Result<(), String> {
-        let mask = gen_mask(length) << skip;
-
-        let left = Expression::BitwiseAnd(Rc::new(bits), Rc::new(Expression::Number(mask)));
-        let right =
-            Expression::BitwiseAnd(Rc::new(value.clone()), Rc::new(Expression::Number(mask)));
-
-        builder.add_action(Action::AssertEq { left, right });
-
-        Ok(())
-    }
-
-    fn bit_field(
-        &self,
-        length: i64,
-        builder: &mut Builder,
-        bit_spec: &[&[Rc<Expression>]],
-    ) -> Result<(), String> {
-        // TODO: special casing when length == 1
-        builder.cur.seen_edges = true;
-
-        let before = builder.cur.head;
-
-        let entry = builder.add_vertex();
-
-        let next = builder.add_vertex();
-
-        let done = builder.add_vertex();
-
-        builder.add_edge(Edge::Branch(entry));
-
-        builder.set_head(entry);
-
-        let width = match bit_spec[0].len() {
-            2 => 1,
-            4 => 2,
-            8 => 4,
-            16 => 8,
-            w => {
-                return Err(format!("bit spec with {} fields not supported", w));
-            }
-        };
-
-        for (bit, e) in bit_spec[0].iter().enumerate() {
-            builder.push_location();
-
-            self.expression(e, builder, &bit_spec[1..])?;
-
-            builder.add_action(Action::Set {
-                var: String::from("$v"),
-                expr: Expression::Number(bit as i64),
-            });
-
-            builder.add_edge(Edge::Branch(next));
-
-            builder.pop_location();
-        }
-
-        if !self.general_spec.lsb {
-            builder.add_action_at_node(
-                before,
-                Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Number(length),
-                },
-            );
-
-            builder.add_action_at_node(
-                before,
-                Action::Set {
-                    var: String::from("$bits"),
-                    expr: Expression::Number(0),
-                },
-            );
-
-            builder.add_action_at_node(
-                next,
-                Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Subtract(
-                        Rc::new(Expression::Identifier(String::from("$b"))),
-                        Rc::new(Expression::Number(width)),
-                    ),
-                },
-            );
-            builder.add_action_at_node(
-                next,
-                Action::Set {
-                    var: String::from("$bits"),
-                    expr: Expression::BitwiseOr(
-                        Rc::new(Expression::Identifier(String::from("$bits"))),
-                        Rc::new(Expression::ShiftLeft(
-                            Rc::new(Expression::Identifier(String::from("$v"))),
-                            Rc::new(Expression::Identifier(String::from("$b"))),
-                        )),
-                    ),
-                },
-            );
-            builder.add_edge_at_node(
-                next,
-                Edge::BranchCond {
-                    expr: Expression::More(
-                        Rc::new(Expression::Identifier(String::from("$b"))),
-                        Rc::new(Expression::Number(0)),
-                    ),
-                    yes: entry,
-                    no: done,
-                },
-            );
-        } else {
-            builder.add_action_at_node(
-                before,
-                Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Number(0),
-                },
-            );
-
-            builder.add_action_at_node(
-                before,
-                Action::Set {
-                    var: String::from("$bits"),
-                    expr: Expression::Number(0),
-                },
-            );
-
-            builder.add_action_at_node(
-                next,
-                Action::Set {
-                    var: String::from("$bits"),
-                    expr: Expression::BitwiseOr(
-                        Rc::new(Expression::Identifier(String::from("$bits"))),
-                        Rc::new(Expression::ShiftLeft(
-                            Rc::new(Expression::Identifier(String::from("$v"))),
-                            Rc::new(Expression::Identifier(String::from("$b"))),
-                        )),
-                    ),
-                },
-            );
-            builder.add_action_at_node(
-                next,
-                Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Add(
-                        Rc::new(Expression::Identifier(String::from("$b"))),
-                        Rc::new(Expression::Number(width)),
-                    ),
-                },
-            );
-
-            builder.add_edge_at_node(
-                next,
-                Edge::BranchCond {
-                    expr: Expression::Less(
-                        Rc::new(Expression::Identifier(String::from("$b"))),
-                        Rc::new(Expression::Number(length)),
-                    ),
-                    yes: entry,
-                    no: done,
-                },
-            );
-        }
-
-        builder.set_head(done);
-
-        Ok(())
-    }
-
-    fn expression(
-        &self,
-        expr: &Expression,
-        builder: &mut Builder,
-        bit_spec: &[&[Rc<Expression>]],
-    ) -> Result<(), String> {
-        match expr {
-            Expression::Stream(irstream) => {
-                let mut bit_spec = bit_spec.to_vec();
-
-                if !irstream.bit_spec.is_empty() {
-                    bit_spec.insert(0, &irstream.bit_spec);
-                };
-
-                if irstream.repeat == Some(RepeatMarker::Any)
-                    || irstream.repeat == Some(RepeatMarker::OneOrMore)
-                {
-                    let mut start = if builder.cur.seen_edges {
-                        Some(builder.cur.head)
-                    } else {
-                        None
-                    };
-
-                    let done_before = if builder.is_done() {
-                        let res = builder.done_fields();
-
-                        builder.add_edge(Edge::Done(res));
-
-                        let node = builder.add_vertex();
-
-                        builder.add_edge(Edge::Branch(node));
-
-                        builder.set_head(node);
-
-                        if start.is_some() {
-                            start = Some(node);
-                        }
-
-                        builder.add_edge(Edge::Branch(0));
-
-                        true
-                    } else {
-                        false
-                    };
-
-                    self.expression_list(&irstream.stream, builder, &bit_spec)?;
-
-                    builder.add_action(Action::Set {
-                        var: "$repeat".to_owned(),
-                        expr: Expression::Number(1),
-                    });
-
-                    if !done_before && builder.is_done() {
-                        let res = builder.done_fields();
-
-                        builder.add_edge(Edge::Done(res));
-                    }
-
-                    if let Some(start) = start {
-                        builder.add_edge(Edge::Branch(start));
-                    }
-                } else {
-                    self.expression_list(&irstream.stream, builder, &bit_spec)?;
-                }
-            }
-            Expression::List(list) => {
-                self.expression_list(list, builder, bit_spec)?;
-            }
-            Expression::FlashConstant(v, u) => {
-                builder.cur.seen_edges = true;
-
-                let len = u.eval_float(*v, &self.general_spec)?;
-
-                let node = builder.add_vertex();
-
-                builder.add_edge(Edge::Flash(len, node));
-
-                builder.set_head(node);
-            }
-            Expression::GapConstant(v, u) => {
-                builder.cur.seen_edges = true;
-
-                let len = u.eval_float(*v, &self.general_spec)?;
-
-                let node = builder.add_vertex();
-
-                builder.add_edge(Edge::Gap(len, node));
-
-                builder.set_head(node);
-            }
-            Expression::BitField { length, .. } => {
-                let (length, _) = length.eval(&Vartable::new())?;
-
-                self.bit_field(length, builder, bit_spec)?;
-            }
-            Expression::ExtentConstant(_, _) => {
-                builder.cur.seen_edges = true;
-
-                let node = builder.add_vertex();
-
-                builder.add_edge(Edge::TrailingGap(node));
-
-                builder.set_head(node);
-            }
-            _ => println!("expr:{:?}", expr),
-        }
-
-        Ok(())
     }
 }
 
@@ -742,6 +224,509 @@ impl<'a> Builder<'a> {
 
     fn pop_location(&mut self) {
         self.cur = self.saved.pop().unwrap();
+    }
+
+    fn expression_list(
+        &mut self,
+        list: &[Rc<Expression>],
+        bit_spec: &[&[Rc<Expression>]],
+    ) -> Result<(), String> {
+        let mut pos = 0;
+
+        while pos < list.len() {
+            let mut bit_count = 0;
+            let mut expr_count = 0;
+
+            while let Some(expr) = list.get(pos + expr_count) {
+                if let Expression::BitField { length, .. } = expr.as_ref() {
+                    let (length, _) = self.const_folding(length).eval(&Vartable::new())?;
+
+                    bit_count += length;
+                    expr_count += 1;
+                } else {
+                    break;
+                }
+            }
+
+            if expr_count == 0 {
+                self.expression(&list[pos], bit_spec)?;
+                pos += 1;
+                continue;
+            }
+
+            // if it is a single constant bitfield, just expand it - no loops needed
+            if expr_count == 1 && bit_count < 4 {
+                if let Expression::BitField {
+                    value,
+                    reverse: false,
+                    skip: None,
+                    ..
+                } = list[pos].as_ref()
+                {
+                    if let Expression::Number(value) = self.const_folding(value).as_ref() {
+                        if self.irp.general_spec.lsb {
+                            for bit in 0..bit_count {
+                                let e = &bit_spec[0][((value >> bit) & 1) as usize];
+
+                                self.expression(e, &bit_spec[1..])?;
+                            }
+                        } else {
+                            for bit in (0..bit_count).rev() {
+                                let e = &bit_spec[0][((value >> bit) & 1) as usize];
+
+                                self.expression(e, &bit_spec[1..])?;
+                            }
+                        }
+
+                        pos += 1;
+                        continue;
+                    }
+                }
+            }
+
+            self.bit_field(bit_count, bit_spec)?;
+
+            let mut delayed = Vec::new();
+
+            // now do stuff with bitfields
+            let mut offset = if self.irp.general_spec.lsb {
+                0
+            } else {
+                bit_count
+            };
+
+            for i in 0..expr_count {
+                let expr = list[i + pos].as_ref();
+
+                if let Expression::BitField {
+                    value,
+                    length,
+                    skip,
+                    reverse,
+                } = expr
+                {
+                    let (length, _) = self.const_folding(length).eval(&Vartable::new())?;
+
+                    if !self.irp.general_spec.lsb {
+                        offset -= length;
+                    }
+
+                    let skip = if let Some(skip) = skip {
+                        let (skip, _) = self.const_folding(skip).eval(&Vartable::new())?;
+
+                        skip
+                    } else {
+                        0
+                    };
+
+                    let value = self.const_folding(value);
+
+                    let bits = Expression::Identifier(String::from("$bits"));
+
+                    #[allow(clippy::comparison_chain)]
+                    let bits = if offset > skip {
+                        Expression::ShiftRight(
+                            Rc::new(bits),
+                            Rc::new(Expression::Number(offset - skip)),
+                        )
+                    } else if offset < skip {
+                        Expression::ShiftLeft(
+                            Rc::new(bits),
+                            Rc::new(Expression::Number(skip - offset)),
+                        )
+                    } else {
+                        bits
+                    };
+
+                    let bits = if *reverse {
+                        Expression::BitReverse(Rc::new(bits), length, skip)
+                    } else {
+                        bits
+                    };
+
+                    match self.unknown_var(expr) {
+                        Ok(_) => {
+                            // We know all the variables in here or its constant
+                            self.check_bits_in_var(&value, bits, length, skip)?;
+                        }
+                        Err(name) => match inverse(Rc::new(bits), value.clone(), &name) {
+                            Some(bits) => {
+                                self.store_bits_in_var(&name, bits, length, skip, &mut delayed)?;
+                            }
+                            None => {
+                                return Err(format!("expression {} not supported", value));
+                            }
+                        },
+                    }
+
+                    if self.irp.general_spec.lsb {
+                        offset += length;
+                    }
+                }
+            }
+
+            for action in delayed {
+                match &action {
+                    Action::AssertEq { left, right } => {
+                        self.unknown_var(left)
+                            .map_err(|name| format!("variable '{}' not known", name))?;
+                        self.unknown_var(right)
+                            .map_err(|name| format!("variable '{}' not known", name))?;
+                    }
+                    Action::Set { expr, .. } => {
+                        self.unknown_var(expr)
+                            .map_err(|name| format!("variable '{}' not known", name))?;
+                    }
+                }
+                self.add_action(action);
+            }
+
+            pos += expr_count;
+        }
+
+        Ok(())
+    }
+
+    fn store_bits_in_var(
+        &mut self,
+        name: &str,
+        bits: Rc<Expression>,
+        length: i64,
+        skip: i64,
+        delayed: &mut Vec<Action>,
+    ) -> Result<(), String> {
+        let mask = gen_mask(length) << skip;
+
+        let expr = Expression::BitwiseAnd(bits, Rc::new(Expression::Number(mask)));
+
+        if self.is_set(name, mask) {
+            self.add_action(Action::AssertEq {
+                left: Expression::BitwiseAnd(
+                    Rc::new(Expression::Identifier(name.to_owned())),
+                    Rc::new(Expression::Number(mask)),
+                ),
+                right: expr,
+            });
+        } else if let Some(def) = self.irp.definitions.iter().find_map(|def| {
+            if let Expression::Assignment(var, expr) = def {
+                if name == var {
+                    return Some(expr);
+                }
+            }
+            None
+        }) {
+            let have_it = self.unknown_var(def).is_ok();
+
+            let action = Action::AssertEq {
+                left: Expression::BitwiseAnd(
+                    self.const_folding(def),
+                    Rc::new(Expression::Number(mask)),
+                ),
+                right: expr,
+            };
+
+            if have_it {
+                self.add_action(action);
+            } else {
+                delayed.push(action);
+            }
+        } else {
+            let expr = if self.is_any_set(name) {
+                Expression::BitwiseOr(
+                    Rc::new(Expression::Identifier(name.to_owned())),
+                    Rc::new(expr),
+                )
+            } else {
+                expr
+            };
+
+            self.set(name, mask);
+
+            self.add_action(Action::Set {
+                var: name.to_owned(),
+                expr,
+            });
+        }
+
+        Ok(())
+    }
+
+    fn check_bits_in_var(
+        &mut self,
+        value: &Expression,
+        bits: Expression,
+        length: i64,
+        skip: i64,
+    ) -> Result<(), String> {
+        let mask = gen_mask(length) << skip;
+
+        let left = Expression::BitwiseAnd(Rc::new(bits), Rc::new(Expression::Number(mask)));
+        let right =
+            Expression::BitwiseAnd(Rc::new(value.clone()), Rc::new(Expression::Number(mask)));
+
+        self.add_action(Action::AssertEq { left, right });
+
+        Ok(())
+    }
+
+    fn bit_field(&mut self, length: i64, bit_spec: &[&[Rc<Expression>]]) -> Result<(), String> {
+        // TODO: special casing when length == 1
+        self.cur.seen_edges = true;
+
+        let before = self.cur.head;
+
+        let entry = self.add_vertex();
+
+        let next = self.add_vertex();
+
+        let done = self.add_vertex();
+
+        self.add_edge(Edge::Branch(entry));
+
+        self.set_head(entry);
+
+        let width = match bit_spec[0].len() {
+            2 => 1,
+            4 => 2,
+            8 => 4,
+            16 => 8,
+            w => {
+                return Err(format!("bit spec with {} fields not supported", w));
+            }
+        };
+
+        for (bit, e) in bit_spec[0].iter().enumerate() {
+            self.push_location();
+
+            self.expression(e, &bit_spec[1..])?;
+
+            self.add_action(Action::Set {
+                var: String::from("$v"),
+                expr: Expression::Number(bit as i64),
+            });
+
+            self.add_edge(Edge::Branch(next));
+
+            self.pop_location();
+        }
+
+        if !self.irp.general_spec.lsb {
+            self.add_action_at_node(
+                before,
+                Action::Set {
+                    var: String::from("$b"),
+                    expr: Expression::Number(length),
+                },
+            );
+
+            self.add_action_at_node(
+                before,
+                Action::Set {
+                    var: String::from("$bits"),
+                    expr: Expression::Number(0),
+                },
+            );
+
+            self.add_action_at_node(
+                next,
+                Action::Set {
+                    var: String::from("$b"),
+                    expr: Expression::Subtract(
+                        Rc::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Number(width)),
+                    ),
+                },
+            );
+            self.add_action_at_node(
+                next,
+                Action::Set {
+                    var: String::from("$bits"),
+                    expr: Expression::BitwiseOr(
+                        Rc::new(Expression::Identifier(String::from("$bits"))),
+                        Rc::new(Expression::ShiftLeft(
+                            Rc::new(Expression::Identifier(String::from("$v"))),
+                            Rc::new(Expression::Identifier(String::from("$b"))),
+                        )),
+                    ),
+                },
+            );
+            self.add_edge_at_node(
+                next,
+                Edge::BranchCond {
+                    expr: Expression::More(
+                        Rc::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Number(0)),
+                    ),
+                    yes: entry,
+                    no: done,
+                },
+            );
+        } else {
+            self.add_action_at_node(
+                before,
+                Action::Set {
+                    var: String::from("$b"),
+                    expr: Expression::Number(0),
+                },
+            );
+
+            self.add_action_at_node(
+                before,
+                Action::Set {
+                    var: String::from("$bits"),
+                    expr: Expression::Number(0),
+                },
+            );
+
+            self.add_action_at_node(
+                next,
+                Action::Set {
+                    var: String::from("$bits"),
+                    expr: Expression::BitwiseOr(
+                        Rc::new(Expression::Identifier(String::from("$bits"))),
+                        Rc::new(Expression::ShiftLeft(
+                            Rc::new(Expression::Identifier(String::from("$v"))),
+                            Rc::new(Expression::Identifier(String::from("$b"))),
+                        )),
+                    ),
+                },
+            );
+            self.add_action_at_node(
+                next,
+                Action::Set {
+                    var: String::from("$b"),
+                    expr: Expression::Add(
+                        Rc::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Number(width)),
+                    ),
+                },
+            );
+
+            self.add_edge_at_node(
+                next,
+                Edge::BranchCond {
+                    expr: Expression::Less(
+                        Rc::new(Expression::Identifier(String::from("$b"))),
+                        Rc::new(Expression::Number(length)),
+                    ),
+                    yes: entry,
+                    no: done,
+                },
+            );
+        }
+
+        self.set_head(done);
+
+        Ok(())
+    }
+
+    fn expression(
+        &mut self,
+        expr: &Expression,
+        bit_spec: &[&[Rc<Expression>]],
+    ) -> Result<(), String> {
+        match expr {
+            Expression::Stream(irstream) => {
+                let mut bit_spec = bit_spec.to_vec();
+
+                if !irstream.bit_spec.is_empty() {
+                    bit_spec.insert(0, &irstream.bit_spec);
+                };
+
+                if irstream.repeat == Some(RepeatMarker::Any)
+                    || irstream.repeat == Some(RepeatMarker::OneOrMore)
+                {
+                    let mut start = if self.cur.seen_edges {
+                        Some(self.cur.head)
+                    } else {
+                        None
+                    };
+
+                    let done_before = if self.is_done() {
+                        let res = self.done_fields();
+
+                        self.add_edge(Edge::Done(res));
+
+                        let node = self.add_vertex();
+
+                        self.add_edge(Edge::Branch(node));
+
+                        self.set_head(node);
+
+                        if start.is_some() {
+                            start = Some(node);
+                        }
+
+                        self.add_edge(Edge::Branch(0));
+
+                        true
+                    } else {
+                        false
+                    };
+
+                    self.expression_list(&irstream.stream, &bit_spec)?;
+
+                    self.add_action(Action::Set {
+                        var: "$repeat".to_owned(),
+                        expr: Expression::Number(1),
+                    });
+
+                    if !done_before && self.is_done() {
+                        let res = self.done_fields();
+
+                        self.add_edge(Edge::Done(res));
+                    }
+
+                    if let Some(start) = start {
+                        self.add_edge(Edge::Branch(start));
+                    }
+                } else {
+                    self.expression_list(&irstream.stream, &bit_spec)?;
+                }
+            }
+            Expression::List(list) => {
+                self.expression_list(list, bit_spec)?;
+            }
+            Expression::FlashConstant(v, u) => {
+                self.cur.seen_edges = true;
+
+                let len = u.eval_float(*v, &self.irp.general_spec)?;
+
+                let node = self.add_vertex();
+
+                self.add_edge(Edge::Flash(len, node));
+
+                self.set_head(node);
+            }
+            Expression::GapConstant(v, u) => {
+                self.cur.seen_edges = true;
+
+                let len = u.eval_float(*v, &self.irp.general_spec)?;
+
+                let node = self.add_vertex();
+
+                self.add_edge(Edge::Gap(len, node));
+
+                self.set_head(node);
+            }
+            Expression::BitField { length, .. } => {
+                let (length, _) = length.eval(&Vartable::new())?;
+
+                self.bit_field(length, bit_spec)?;
+            }
+            Expression::ExtentConstant(_, _) => {
+                self.cur.seen_edges = true;
+
+                let node = self.add_vertex();
+
+                self.add_edge(Edge::TrailingGap(node));
+
+                self.set_head(node);
+            }
+            _ => println!("expr:{:?}", expr),
+        }
+
+        Ok(())
     }
 
     /// Do we have all the vars to evaluate an expression
