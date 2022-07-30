@@ -11,6 +11,7 @@ use std::{collections::HashMap, rc::Rc};
  * - ExtentConstant may be very short. We should calculate minimum length
  * - (..)2 and other repeat markers are not supported
  * - (S-1):4 should produce 16, not 0 (mask in the wrong place)
+ * - RTI_Relay_alt requires log2 function for inverse
  */
 
 #[derive(PartialEq, Debug, Clone)]
