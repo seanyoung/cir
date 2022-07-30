@@ -310,7 +310,7 @@ impl<'a> Builder<'a> {
                 }
             }
 
-            if expr_count == 1 {
+            let do_reverse = if expr_count == 1 {
                 if let Expression::BitField {
                     value,
                     skip,
@@ -366,11 +366,17 @@ impl<'a> Builder<'a> {
 
                         pos += 1;
                         continue;
+                    } else {
+                        *reverse
                     }
+                } else {
+                    unreachable!();
                 }
-            }
+            } else {
+                false
+            };
 
-            self.add_bit_specs(None, bit_count, false, None, bit_spec)?;
+            self.add_bit_specs(None, bit_count, do_reverse, None, bit_spec)?;
 
             let mut delayed = Vec::new();
 
@@ -424,7 +430,7 @@ impl<'a> Builder<'a> {
                         bits
                     };
 
-                    let bits = if *reverse {
+                    let bits = if *reverse && !do_reverse {
                         Expression::BitReverse(Rc::new(bits), length, skip)
                     } else {
                         bits
