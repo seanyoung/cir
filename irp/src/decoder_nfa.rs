@@ -279,6 +279,23 @@ impl<'a> Decoder<'a> {
                             work.push((ir, dest, vartab));
                         }
                     }
+                    Edge::MayBranchCond { expr, dest } => {
+                        let (success, vartab) = self.run_actions(pos, &vartab);
+
+                        if success {
+                            let (cond, _) = expr.eval(&vartab).unwrap();
+                            let dest = *dest;
+
+                            trace!(
+                                "conditional branch {}: {}: destination {}",
+                                expr,
+                                cond != 0,
+                                dest
+                            );
+
+                            work.push((ir, dest, vartab));
+                        }
+                    }
                     Edge::Done(include) => {
                         let (success, vartab) = self.run_actions(pos, &vartab);
 

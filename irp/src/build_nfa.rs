@@ -10,7 +10,6 @@ use std::{collections::HashMap, rc::Rc};
  * TODO
  * - ExtentConstant may be very short. We should calculate minimum length
  * - (..)2 and other repeat markers are not supported
- * - variable length bitfields, e.g. Zenith protocol
  * - (S-1):4 should produce 16, not 0 (mask in the wrong place)
  * - fix variables in bit fields, e.g. B&O protocol
  */
@@ -24,6 +23,10 @@ pub(crate) enum Edge {
         expr: Expression,
         yes: usize,
         no: usize,
+    },
+    MayBranchCond {
+        expr: Expression,
+        dest: usize,
     },
     Branch(usize),
     Done(Vec<String>),
@@ -240,14 +243,32 @@ impl<'a> Builder<'a> {
 
             while let Some(expr) = list.get(pos + expr_count) {
                 if let Expression::BitField { length, .. } = expr.as_ref() {
-                    let (length, _) = self.const_folding(length).eval(&Vartable::new())?;
+                    let (min_len, max_len, _) = self.bit_field_length(length)?;
 
-                    if bit_count + length > 64 {
+                    // if this bit field is preceded by a constant length fields, process
+                    // those separately
+                    if expr_count != 0 && max_len != min_len {
                         break;
                     }
 
-                    bit_count += length;
+                    if min_len > 64 || max_len > 64 {
+                        return Err(format!(
+                            "bitfields of {}..{} longer than the 64 maximum",
+                            min_len, max_len
+                        ));
+                    }
+
+                    if bit_count + max_len > 64 {
+                        break;
+                    }
+
+                    bit_count += min_len;
                     expr_count += 1;
+
+                    // variable length bitfields should be processed by one
+                    if max_len != min_len {
+                        break;
+                    }
                 } else {
                     break;
                 }
@@ -289,7 +310,67 @@ impl<'a> Builder<'a> {
                 }
             }
 
-            self.bit_field(bit_count, bit_spec)?;
+            if expr_count == 1 {
+                if let Expression::BitField {
+                    value,
+                    skip,
+                    reverse,
+                    length,
+                } = list[pos].as_ref()
+                {
+                    let (min_len, max_len, store_length) = self.bit_field_length(length)?;
+
+                    if min_len != max_len {
+                        if let Some(length) = &store_length {
+                            self.set(length, !0);
+                        }
+
+                        self.add_bit_specs(
+                            Some(min_len),
+                            max_len,
+                            *reverse,
+                            store_length,
+                            bit_spec,
+                        )?;
+
+                        let skip = if let Some(skip) = skip {
+                            let (skip, _) = self.const_folding(skip).eval(&Vartable::new())?;
+
+                            skip
+                        } else {
+                            0
+                        };
+
+                        let bits = Expression::Identifier(String::from("$bits"));
+
+                        #[allow(clippy::comparison_chain)]
+                        let bits = if skip > 0 {
+                            Expression::ShiftLeft(Rc::new(bits), Rc::new(Expression::Number(skip)))
+                        } else {
+                            bits
+                        };
+
+                        if let Expression::Identifier(name) = value.as_ref() {
+                            self.add_action(Action::Set {
+                                var: name.to_owned(),
+                                expr: bits,
+                            });
+
+                            self.set(name, !0);
+                        } else {
+                            return Err(format!(
+                                "expression {} not supported for variable length bitfield",
+                                value
+                            ));
+                        }
+
+                        pos += 1;
+                        continue;
+                    }
+                }
+            }
+
+            self.add_bit_specs(None, bit_count, false, None, bit_spec)?;
 
             let mut delayed = Vec::new();
 
@@ -387,6 +468,31 @@ impl<'a> Builder<'a> {
         }
 
         Ok(())
+    }
+
+    /// Fetch the length for a bitfield. If the length is not a constant, it has
+    /// to be a parameter with constant min and max.
+    fn bit_field_length(
+        &self,
+        length: &Rc<Expression>,
+    ) -> Result<(i64, i64, Option<String>), String> {
+        let length = self.const_folding(length);
+
+        match length.as_ref() {
+            Expression::Number(v) => Ok((*v, *v, None)),
+            Expression::Identifier(name) => {
+                if let Some(param) = self.irp.parameters.iter().find(|def| def.name == *name) {
+                    Ok((
+                        param.min.eval(&self.constants)?.0,
+                        param.max.eval(&self.constants)?.0,
+                        Some(name.to_owned()),
+                    ))
+                } else {
+                    Err(format!("bit field length {} is not a parameter", name))
+                }
+            }
+            expr => Err(format!("bit field length {} not known", expr)),
+        }
     }
 
     fn store_bits_in_var(
@@ -527,7 +633,17 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn bit_field(&mut self, length: i64, bit_spec: &[&[Rc<Expression>]]) -> Result<(), String> {
+    /// Add the bit specs for bitfields. max specifies the maximum number of
+    /// bits, min specifies a minimum if the number of bits is not fixed at max.
+    /// The length can be stored in the variable name store_length if set.
+    fn add_bit_specs(
+        &mut self,
+        min: Option<i64>,
+        max: i64,
+        reverse: bool,
+        store_length: Option<String>,
+        bit_spec: &[&[Rc<Expression>]],
+    ) -> Result<(), String> {
         // TODO: special casing when length == 1
         self.cur.seen_edges = true;
 
@@ -553,6 +669,8 @@ impl<'a> Builder<'a> {
             }
         };
 
+        let length = store_length.unwrap_or_else(|| String::from("$b"));
+
         for (bit, e) in bit_spec[0].iter().enumerate() {
             self.push_location();
 
@@ -568,75 +686,38 @@ impl<'a> Builder<'a> {
             self.pop_location();
         }
 
-        if !self.irp.general_spec.lsb {
-            self.add_action_at_node(
-                before,
-                Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Number(length),
-                },
-            );
+        self.add_action_at_node(
+            before,
+            Action::Set {
+                var: length.to_owned(),
+                expr: Expression::Number(0),
+            },
+        );
 
-            self.add_action_at_node(
-                before,
-                Action::Set {
-                    var: String::from("$bits"),
-                    expr: Expression::Number(0),
-                },
-            );
+        self.add_action_at_node(
+            before,
+            Action::Set {
+                var: String::from("$bits"),
+                expr: Expression::Number(0),
+            },
+        );
 
-            self.add_action_at_node(
-                next,
-                Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Subtract(
-                        Rc::new(Expression::Identifier(String::from("$b"))),
-                        Rc::new(Expression::Number(width)),
-                    ),
-                },
-            );
+        if !(self.irp.general_spec.lsb ^ reverse) {
             self.add_action_at_node(
                 next,
                 Action::Set {
                     var: String::from("$bits"),
                     expr: Expression::BitwiseOr(
-                        Rc::new(Expression::Identifier(String::from("$bits"))),
                         Rc::new(Expression::ShiftLeft(
-                            Rc::new(Expression::Identifier(String::from("$v"))),
-                            Rc::new(Expression::Identifier(String::from("$b"))),
+                            Rc::new(Expression::Identifier(String::from("$bits"))),
+                            Rc::new(Expression::Number(width)),
                         )),
+                        Rc::new(Expression::Identifier(String::from("$v"))),
                     ),
-                },
-            );
-            self.add_edge_at_node(
-                next,
-                Edge::BranchCond {
-                    expr: Expression::More(
-                        Rc::new(Expression::Identifier(String::from("$b"))),
-                        Rc::new(Expression::Number(0)),
-                    ),
-                    yes: entry,
-                    no: done,
                 },
             );
         } else {
             self.add_action_at_node(
-                before,
-                Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Number(0),
-                },
-            );
-
-            self.add_action_at_node(
-                before,
-                Action::Set {
-                    var: String::from("$bits"),
-                    expr: Expression::Number(0),
-                },
-            );
-
-            self.add_action_at_node(
                 next,
                 Action::Set {
                     var: String::from("$bits"),
@@ -644,31 +725,45 @@ impl<'a> Builder<'a> {
                         Rc::new(Expression::Identifier(String::from("$bits"))),
                         Rc::new(Expression::ShiftLeft(
                             Rc::new(Expression::Identifier(String::from("$v"))),
-                            Rc::new(Expression::Identifier(String::from("$b"))),
+                            Rc::new(Expression::Identifier(length.to_owned())),
                         )),
                     ),
                 },
             );
-            self.add_action_at_node(
-                next,
-                Action::Set {
-                    var: String::from("$b"),
-                    expr: Expression::Add(
-                        Rc::new(Expression::Identifier(String::from("$b"))),
-                        Rc::new(Expression::Number(width)),
-                    ),
-                },
-            );
+        }
 
+        self.add_action_at_node(
+            next,
+            Action::Set {
+                var: length.to_owned(),
+                expr: Expression::Add(
+                    Rc::new(Expression::Identifier(length.to_owned())),
+                    Rc::new(Expression::Number(width)),
+                ),
+            },
+        );
+
+        self.add_edge_at_node(
+            next,
+            Edge::BranchCond {
+                expr: Expression::Less(
+                    Rc::new(Expression::Identifier(length.to_owned())),
+                    Rc::new(Expression::Number(max)),
+                ),
+                yes: entry,
+                no: done,
+            },
+        );
+
+        if let Some(min) = min {
             self.add_edge_at_node(
                 next,
-                Edge::BranchCond {
-                    expr: Expression::Less(
-                        Rc::new(Expression::Identifier(String::from("$b"))),
-                        Rc::new(Expression::Number(length)),
+                Edge::MayBranchCond {
+                    expr: Expression::MoreEqual(
+                        Rc::new(Expression::Identifier(length)),
+                        Rc::new(Expression::Number(min)),
                     ),
-                    yes: entry,
-                    no: done,
+                    dest: done,
                 },
             );
         }
@@ -770,7 +865,7 @@ impl<'a> Builder<'a> {
             Expression::BitField { length, .. } => {
                 let (length, _) = length.eval(&Vartable::new())?;
 
-                self.bit_field(length, bit_spec)?;
+                self.add_bit_specs(None, length, false, None, bit_spec)?;
             }
             Expression::ExtentConstant(_, _) => {
                 self.cur.seen_edges = true;

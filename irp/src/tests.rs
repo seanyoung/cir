@@ -424,6 +424,7 @@ fn compare_decode_to_transmogrifier() {
                     ("Zenith5", "F") => 31,
                     ("Zenith6", "F") => 63,
                     ("Zenith7", "F") => 127,
+                    ("Zenith", "F") => (1 << res["D"]) - 1,
                     _ => !0,
                 };
 
@@ -471,5 +472,5 @@ fn compare_decode_to_transmogrifier() {
     println!("tests: {} fails: {}", total_tests, fails);
 
     // TODO: we still have a whole bunch of fails
-    assert_eq!(fails, 195);
+    assert_eq!(fails, 181);
 }

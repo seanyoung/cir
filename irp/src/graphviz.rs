@@ -37,6 +37,14 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
             labels.push(format!("cond: {}", expr));
         }
 
+        if let Some(Edge::MayBranchCond { expr, .. }) = v
+            .edges
+            .iter()
+            .find(|e| matches!(e, Edge::MayBranchCond { .. }))
+        {
+            labels.push(format!("may cond: {}", expr));
+        }
+
         let color = if let Some((_, vars)) = states.iter().find(|(node, _)| *node == no) {
             let values = vars
                 .vars
@@ -102,6 +110,14 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
                         &mut file,
                         "\t\"{}\" -> \"{}\" [label=\"cond: false\"]",
                         vert_names[i], vert_names[*no]
+                    )
+                    .unwrap();
+                }
+                Edge::MayBranchCond { dest, .. } => {
+                    writeln!(
+                        &mut file,
+                        "\t\"{}\" -> \"{}\" [label=\"may branch\"]",
+                        vert_names[i], vert_names[*dest]
                     )
                     .unwrap();
                 }
