@@ -12,7 +12,6 @@ use std::{collections::HashMap, rc::Rc};
  * - (..)2 and other repeat markers are not supported
  * - variable length bitfields, e.g. Zenith protocol
  * - (S-1):4 should produce 16, not 0 (mask in the wrong place)
- * - recursive definitions should be supported, e.g. Kaseikyo protocol
  * - fix variables in bit fields, e.g. B&O protocol
  */
 
@@ -380,14 +379,11 @@ impl<'a> Builder<'a> {
             for action in delayed {
                 match &action {
                     Action::AssertEq { left, right } => {
-                        self.unknown_var(left)
-                            .map_err(|name| format!("variable '{}' not known", name))?;
-                        self.unknown_var(right)
-                            .map_err(|name| format!("variable '{}' not known", name))?;
+                        self.have_definitions(left)?;
+                        self.have_definitions(right)?;
                     }
                     Action::Set { expr, .. } => {
-                        self.unknown_var(expr)
-                            .map_err(|name| format!("variable '{}' not known", name))?;
+                        self.have_definitions(expr)?;
                     }
                 }
                 self.add_action(action);
@@ -427,7 +423,10 @@ impl<'a> Builder<'a> {
             }
             None
         }) {
-            let have_it = self.unknown_var(def).is_ok();
+            let have_it = match self.unknown_var(def) {
+                Ok(_) => true,
+                Err(name) => self.add_definition(&name),
+            };
 
             let action = Action::AssertEq {
                 left: Expression::BitwiseAnd(
@@ -479,6 +478,59 @@ impl<'a> Builder<'a> {
         self.add_action(Action::AssertEq { left, right });
 
         Ok(())
+    }
+
+    /// Look for a definition of name in the list of definitions. If found,
+    /// add it to the actions. This function works recursively, so if a definition
+    /// requires a further definition, then that definition will be included too
+    fn add_definition(&mut self, name: &str) -> bool {
+        if let Some(def) = self.irp.definitions.iter().find_map(|def| {
+            if let Expression::Assignment(var, expr) = def {
+                if name == var {
+                    return Some(expr);
+                }
+            }
+            None
+        }) {
+            loop {
+                match self.unknown_var(def) {
+                    Ok(_) => {
+                        self.add_action(Action::Set {
+                            var: name.to_owned(),
+                            expr: def.as_ref().clone(),
+                        });
+
+                        self.set(name, !0);
+
+                        return true;
+                    }
+                    Err(name) => {
+                        if !self.add_definition(&name) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    /// For given expression, add any required definitions or return an error if
+    /// no definitions can be found
+    fn have_definitions(&mut self, expr: &Expression) -> Result<(), String> {
+        loop {
+            match self.unknown_var(expr) {
+                Ok(_) => {
+                    return Ok(());
+                }
+                Err(name) => {
+                    if !self.add_definition(&name) {
+                        return Err(format!("variable '{}' not known", name));
+                    }
+                }
+            }
+        }
     }
 
     fn bit_field(&mut self, length: i64, bit_spec: &[&[Rc<Expression>]]) -> Result<(), String> {
