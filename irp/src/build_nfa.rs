@@ -64,32 +64,7 @@ impl Irp {
             expr: Expression::Number(0),
         });
 
-        // set all definitions which are constant
-        // Note that we support {C=D+1,D=1}; we first D=1 in the first iteration
-        // and C=D+1 in the second.
-        while {
-            let mut changes = false;
-
-            for def in &self.definitions {
-                if let Expression::Assignment(name, expr) = def {
-                    if builder.is_any_set(name) {
-                        continue;
-                    }
-
-                    if builder.unknown_var(expr).is_ok() {
-                        let (val, len) = expr.eval(&builder.constants).unwrap();
-
-                        builder.constants.set(name.to_owned(), val, len);
-
-                        changes = true;
-
-                        builder.set(name, i64::MAX);
-                    }
-                }
-            }
-
-            changes
-        } {}
+        builder.add_constants();
 
         builder.expression(&self.stream, &[])?;
 
@@ -228,6 +203,57 @@ impl<'a> Builder<'a> {
 
     fn pop_location(&mut self) {
         self.cur = self.saved.pop().unwrap();
+    }
+
+    /// The list of definitions may contain variables which are constants and
+    /// can be evaluated now. Some of those will be modified at a later point;
+    /// those will have their values set now.
+    fn add_constants(&mut self) {
+        // first add the true constants
+        while {
+            let mut changes = false;
+
+            for def in &self.irp.definitions {
+                if let Expression::Assignment(name, expr) = def {
+                    if self.is_any_set(name) {
+                        continue;
+                    }
+
+                    let mut modified_anywhere = false;
+
+                    // is this variable modified anywhere
+                    self.irp.stream.visit(
+                        &mut modified_anywhere,
+                        &|expr: &Expression, modified: &mut bool| {
+                            if let Expression::Assignment(var_name, _) = expr {
+                                if var_name == name {
+                                    *modified = true;
+                                }
+                            }
+                        },
+                    );
+
+                    if self.unknown_var(expr).is_ok() {
+                        if modified_anywhere {
+                            // just set an initial value
+                            self.add_action(Action::Set {
+                                var: name.to_owned(),
+                                expr: self.const_folding(expr).as_ref().clone(),
+                            });
+                        } else {
+                            let (val, len) = expr.eval(&self.constants).unwrap();
+
+                            self.constants.set(name.to_owned(), val, len);
+                        }
+                        changes = true;
+
+                        self.set(name, i64::MAX);
+                    }
+                }
+            }
+
+            changes
+        } {}
     }
 
     fn expression_list(

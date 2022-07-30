@@ -82,6 +82,87 @@ impl fmt::Display for Expression {
 }
 
 impl Expression {
+    /// Post-order visit all nodes in an expression
+    pub fn visit<T, F>(&self, ctx: &mut T, visit: &F)
+    where
+        F: Fn(&Expression, &mut T),
+    {
+        match self {
+            Expression::Complement(expr)
+            | Expression::Not(expr)
+            | Expression::BitCount(expr)
+            | Expression::BitReverse(expr, _, _)
+            | Expression::Assignment(_, expr) => {
+                expr.visit(ctx, visit);
+            }
+            Expression::Add(left, right)
+            | Expression::Subtract(left, right)
+            | Expression::Multiply(left, right)
+            | Expression::Divide(left, right)
+            | Expression::Modulo(left, right)
+            | Expression::Power(left, right)
+            | Expression::ShiftLeft(left, right)
+            | Expression::ShiftRight(left, right)
+            | Expression::BitwiseAnd(left, right)
+            | Expression::BitwiseOr(left, right)
+            | Expression::BitwiseXor(left, right)
+            | Expression::More(left, right)
+            | Expression::MoreEqual(left, right)
+            | Expression::Less(left, right)
+            | Expression::LessEqual(left, right)
+            | Expression::Equal(left, right)
+            | Expression::NotEqual(left, right)
+            | Expression::And(left, right)
+            | Expression::Or(left, right) => {
+                left.visit(ctx, visit);
+                right.visit(ctx, visit);
+            }
+            Expression::Ternary(cond, left, right) => {
+                cond.visit(ctx, visit);
+                left.visit(ctx, visit);
+                right.visit(ctx, visit);
+            }
+            Expression::BitField {
+                value,
+                length,
+                skip,
+                ..
+            } => {
+                value.visit(ctx, visit);
+                length.visit(ctx, visit);
+                if let Some(skip) = skip {
+                    skip.visit(ctx, visit);
+                }
+            }
+            Expression::InfiniteBitField { value, skip } => {
+                value.visit(ctx, visit);
+                skip.visit(ctx, visit);
+            }
+            Expression::List(list) => {
+                for e in list {
+                    e.visit(ctx, visit);
+                }
+            }
+            Expression::Variation(variants) => {
+                for list in variants {
+                    for e in list {
+                        e.visit(ctx, visit);
+                    }
+                }
+            }
+            Expression::Stream(stream) => {
+                for bit_spec in &stream.bit_spec {
+                    bit_spec.visit(ctx, visit);
+                }
+                for e in &stream.stream {
+                    e.visit(ctx, visit);
+                }
+            }
+            _ => (),
+        }
+        visit(self, ctx);
+    }
+
     /// Evaluate an arithmetic expression
     pub fn eval(&self, vars: &Vartable) -> Result<(i64, u8), String> {
         match self {
