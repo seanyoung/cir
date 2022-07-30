@@ -435,6 +435,14 @@ impl<'a> Decoder<'a> {
                             right_val
                         );
                         return (false, vartable);
+                    } else {
+                        trace!(
+                            "assert  {} == {} ({} == {})",
+                            left,
+                            right,
+                            left_val,
+                            right_val
+                        );
                     }
                 }
             }

@@ -696,8 +696,8 @@ impl<'a> Builder<'a> {
         let width = match bit_spec[0].len() {
             2 => 1,
             4 => 2,
-            8 => 4,
-            16 => 8,
+            8 => 3,
+            16 => 4,
             w => {
                 return Err(format!("bit spec with {} fields not supported", w));
             }
