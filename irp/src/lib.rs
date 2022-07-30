@@ -150,6 +150,7 @@ pub mod decoder_nfa;
 mod encode;
 mod expression;
 mod graphviz;
+mod message;
 pub mod mode2;
 mod parser;
 mod pronto;
@@ -160,10 +161,9 @@ mod tests;
 
 include!(concat!(env!("OUT_DIR"), "/irp.rs"));
 
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Default, Eq)]
 /// An encoded raw infrared message
 pub struct Message {
     /// The carrier for the message. None means unknown, Some(0) means unmodulated
@@ -172,55 +172,6 @@ pub struct Message {
     pub duty_cycle: Option<u8>,
     /// The actual flash and gap information in microseconds. All even entries are flash, odd are gap
     pub raw: Vec<u32>,
-}
-
-impl Message {
-    /// Create an empty packet
-    pub fn new() -> Self {
-        Message {
-            carrier: None,
-            duty_cycle: None,
-            raw: Vec::new(),
-        }
-    }
-
-    /// Concatenate to packets
-    pub fn extend(&mut self, other: &Message) {
-        if self.carrier.is_none() {
-            self.carrier = other.carrier;
-        }
-
-        if self.duty_cycle.is_none() {
-            self.duty_cycle = other.duty_cycle;
-        }
-
-        self.raw.extend_from_slice(&other.raw);
-    }
-
-    /// Do we have a trailing gap
-    pub fn has_trailing_gap(&self) -> bool {
-        let len = self.raw.len();
-
-        len > 0 && (len % 2) == 0
-    }
-
-    /// Remove any trailing gap
-    pub fn remove_trailing_gap(&mut self) {
-        if self.has_trailing_gap() {
-            self.raw.pop();
-        }
-    }
-
-    /// Print the flash and gap information as an raw ir string
-    pub fn print_rawir(&self) -> String {
-        rawir::print_to_string(&self.raw)
-    }
-}
-
-impl Default for Message {
-    fn default() -> Self {
-        Message::new()
-    }
 }
 
 /// A parsed or generated pronto hex code
