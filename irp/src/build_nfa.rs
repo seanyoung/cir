@@ -41,12 +41,6 @@ pub(crate) struct Vertex {
     pub edges: Vec<Edge>,
 }
 
-impl Vertex {
-    fn new() -> Self {
-        Default::default()
-    }
-}
-
 /// Non-deterministic finite automation for decoding IR. Using this we can
 /// match IR and hopefully, one day, create the dfa (deterministic finite
 /// automation).
@@ -139,7 +133,7 @@ struct BuilderLocation {
 #[allow(dead_code)]
 impl<'a> Builder<'a> {
     fn new(irp: &'a Irp) -> Self {
-        let verts = vec![Vertex::new()];
+        let verts = vec![Vertex::default()];
 
         Builder {
             cur: Default::default(),
@@ -196,7 +190,7 @@ impl<'a> Builder<'a> {
     fn add_vertex(&mut self) -> usize {
         let node = self.verts.len();
 
-        self.verts.push(Vertex::new());
+        self.verts.push(Vertex::default());
 
         node
     }
