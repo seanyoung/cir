@@ -138,7 +138,7 @@ impl<'a> Builder<'a> {
 
     fn set(&mut self, name: &str, fields: i64) {
         if let Some(e) = self.cur.vars.get_mut(name) {
-            *e |= 64;
+            *e |= fields;
         } else {
             self.cur.vars.insert(name.to_owned(), fields);
         }
