@@ -1,6 +1,6 @@
-use crate::decoder_nfa::InfraredData;
 use crate::protocols::read_protocols;
 use crate::rawir;
+use crate::InfraredData;
 use crate::{Irp, Vartable};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

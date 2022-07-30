@@ -3,10 +3,7 @@ use cir::{
     lirc,
     lircd_conf::{parse, Remote},
 };
-use irp::{
-    decoder_nfa::{Decoder, InfraredData},
-    mode2, rawir, Irp, NFA,
-};
+use irp::{mode2, rawir, Decoder, InfraredData, Irp, NFA};
 use itertools::Itertools;
 use log::{error, info};
 use num_integer::Integer;

@@ -19,7 +19,7 @@
 //!
 //! ```
 //! use irp::Irp;
-//! use irp::decoder_nfa::InfraredData;
+//! use irp::InfraredData;
 //!
 //! let irp = Irp::parse(r#"
 //!     {36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)
@@ -146,7 +146,7 @@
 //! ```
 
 mod build_nfa;
-pub mod decoder_nfa;
+mod decoder_nfa;
 mod encode;
 mod expression;
 mod graphviz;
@@ -301,4 +301,13 @@ pub struct Vartable<'a> {
     vars: HashMap<String, (i64, u8, Option<&'a Expression>)>,
 }
 
+/// Represents input data to the decoder
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub enum InfraredData {
+    Flash(u32),
+    Gap(u32),
+    Reset,
+}
+
 pub use build_nfa::NFA;
+pub use decoder_nfa::Decoder;

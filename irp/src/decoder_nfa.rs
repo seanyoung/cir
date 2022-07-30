@@ -2,7 +2,7 @@ use crate::rawir;
 
 use super::{
     build_nfa::{Action, Edge, NFA},
-    Vartable,
+    InfraredData, Vartable,
 };
 use log::trace;
 use std::{
@@ -35,13 +35,6 @@ impl NFA {
             decoded: VecDeque::new(),
         }
     }
-}
-
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum InfraredData {
-    Flash(u32),
-    Gap(u32),
-    Reset,
 }
 
 impl InfraredData {
