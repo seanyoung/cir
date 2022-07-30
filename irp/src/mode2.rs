@@ -1,3 +1,7 @@
+/*!
+ * Reading lirc mode2 style input files
+ */
+
 use super::Message;
 
 /// Parse pulse/space text. This format is produces by lirc's mode2 tool.

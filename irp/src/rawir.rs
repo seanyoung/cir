@@ -1,3 +1,7 @@
+/*!
+ * Parsing and printing of raw ir strings
+ */
+
 use num::Integer;
 
 /// Parse a raw IR string of the form "+9000 -45000 +2250"

@@ -1,4 +1,4 @@
-use crate::protocols::read_protocols;
+use crate::protocols::parse;
 use crate::rawir;
 use crate::InfraredData;
 use crate::{Irp, Vartable};
@@ -219,7 +219,7 @@ fn vars() {
 
 #[test]
 fn parse_all_of_them() {
-    let protocols = read_protocols(&PathBuf::from("IrpProtocols.xml"));
+    let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
 
     let mut broken = 0;
     let mut total = 0;
@@ -300,7 +300,7 @@ fn compare_encode_to_transmogrifier() {
     let data = std::fs::read_to_string("transmogrifier_test_data.json").unwrap();
 
     let all_testdata: Vec<TestData> = serde_json::from_str(&data).unwrap();
-    let protocols = read_protocols(&PathBuf::from("IrpProtocols.xml"));
+    let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
 
     let mut fails = 0;
     let total_tests = all_testdata.len();
@@ -381,7 +381,7 @@ fn compare_decode_to_transmogrifier() {
     let data = std::fs::read_to_string("transmogrifier_test_data.json").unwrap();
 
     let all_testdata: Vec<TestData> = serde_json::from_str(&data).unwrap();
-    let protocols = read_protocols(&PathBuf::from("IrpProtocols.xml"));
+    let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
 
     let mut fails = 0;
     let mut total_tests = all_testdata.len();

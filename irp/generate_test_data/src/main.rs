@@ -106,7 +106,7 @@ fn collect_rules(node: &Node, rule: Rule) -> Vec<&Node> {
 }
 
 fn main() {
-    let protocols = irp::protocols::read_protocols(&PathBuf::from("../IrpProtocols.xml"));
+    let protocols = irp::protocols::parse(&PathBuf::from("../IrpProtocols.xml"));
     let mut test_data = Vec::new();
 
     for protocol in protocols {

@@ -1,3 +1,5 @@
+//! Parsing of IrpTransmogrifier's IrpProtocols.xml.
+
 use serde::Deserialize;
 use std::{fs::File, io::BufReader, path::Path, str::FromStr};
 use xml::reader::{EventReader, XmlEvent};
@@ -29,8 +31,9 @@ enum Element {
     RejectRepeatLess,
 }
 
+/// Parsing IrpProtocols.xml file
 #[allow(dead_code)]
-pub fn read_protocols(path: &Path) -> Vec<Protocol> {
+pub fn parse(path: &Path) -> Vec<Protocol> {
     let file = File::open(path).unwrap();
     let file = BufReader::new(file);
 
