@@ -309,16 +309,16 @@ impl<'a> Builder<'a> {
             }
 
             // if it is a single constant bitfield, just expand it - no loops needed
-            if expr_count == 1 && bit_count < 4 {
+            if expr_count == 1 && bit_count < 8 {
                 if let Expression::BitField {
                     value,
-                    reverse: false,
                     skip: None,
+                    reverse,
                     ..
                 } = list[pos].as_ref()
                 {
                     if let Expression::Number(value) = self.const_folding(value).as_ref() {
-                        if self.irp.general_spec.lsb {
+                        if self.irp.general_spec.lsb ^ reverse {
                             for bit in 0..bit_count {
                                 let e = &bit_spec[0][((value >> bit) & 1) as usize];
 
