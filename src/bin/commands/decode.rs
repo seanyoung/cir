@@ -32,7 +32,13 @@ pub fn decode(matches: &clap::ArgMatches) {
             }
         };
 
-        let nfa = irp.compile().unwrap();
+        let nfa = match irp.compile() {
+            Ok(nfa) => nfa,
+            Err(s) => {
+                eprintln!("unable to compile irp ‘{}’: {}", i, s);
+                std::process::exit(2);
+            }
+        };
 
         if nfa_graphviz {
             let filename = "irp_nfa.dot";
