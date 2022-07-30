@@ -2,7 +2,11 @@ use super::{
     expression::{clone_filter, inverse},
     Expression, Irp, RepeatMarker, Vartable,
 };
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::HashMap,
+    ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Shl, Shr, Sub},
+    rc::Rc,
+};
 
 /**
  * Here we build the decoder nfa (non-deterministic finite automation)
@@ -36,8 +40,14 @@ pub(crate) enum Edge {
 
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum Action {
-    Set { var: String, expr: Expression },
-    AssertEq { left: Expression, right: Expression },
+    Set {
+        var: String,
+        expr: Rc<Expression>,
+    },
+    AssertEq {
+        left: Rc<Expression>,
+        right: Rc<Expression>,
+    },
 }
 
 #[derive(PartialEq, Default, Clone, Debug)]
@@ -63,7 +73,7 @@ impl Irp {
 
         builder.add_action(Action::Set {
             var: "$repeat".to_owned(),
-            expr: Expression::Number(0),
+            expr: Rc::new(Expression::Number(0)),
         });
 
         builder.add_constants();
@@ -240,7 +250,7 @@ impl<'a> Builder<'a> {
                             // just set an initial value
                             self.add_action(Action::Set {
                                 var: name.to_owned(),
-                                expr: self.const_folding(expr).as_ref().clone(),
+                                expr: self.const_folding(expr),
                             });
                         } else {
                             let (val, len) = expr.eval(&self.constants).unwrap();
@@ -381,7 +391,7 @@ impl<'a> Builder<'a> {
                         if let Expression::Identifier(name) = value.as_ref() {
                             self.add_action(Action::Set {
                                 var: name.to_owned(),
-                                expr: bits,
+                                expr: self.const_folding(&Rc::new(bits)),
                             });
 
                             self.set(name, !0);
@@ -539,15 +549,18 @@ impl<'a> Builder<'a> {
     ) -> Result<(), String> {
         let mask = gen_mask(length) << skip;
 
-        let expr = Expression::BitwiseAnd(bits, Rc::new(Expression::Number(mask)));
+        let expr = Rc::new(Expression::BitwiseAnd(
+            bits,
+            Rc::new(Expression::Number(mask)),
+        ));
 
         if self.is_set(name, mask) {
             self.add_action(Action::AssertEq {
-                left: Expression::BitwiseAnd(
+                left: self.const_folding(&Rc::new(Expression::BitwiseAnd(
                     Rc::new(Expression::Identifier(name.to_owned())),
                     Rc::new(Expression::Number(mask)),
-                ),
-                right: expr,
+                ))),
+                right: self.const_folding(&expr),
             });
         } else if let Some(def) = self.irp.definitions.iter().find_map(|def| {
             if let Expression::Assignment(var, expr) = def {
@@ -563,11 +576,11 @@ impl<'a> Builder<'a> {
             };
 
             let action = Action::AssertEq {
-                left: Expression::BitwiseAnd(
-                    self.const_folding(def),
+                left: self.const_folding(&Rc::new(Expression::BitwiseAnd(
+                    def.clone(),
                     Rc::new(Expression::Number(mask)),
-                ),
-                right: expr,
+                ))),
+                right: self.const_folding(&expr),
             };
 
             if have_it {
@@ -577,10 +590,10 @@ impl<'a> Builder<'a> {
             }
         } else {
             let expr = if self.is_any_set(name) {
-                Expression::BitwiseOr(
+                Rc::new(Expression::BitwiseOr(
                     Rc::new(Expression::Identifier(name.to_owned())),
-                    Rc::new(expr),
-                )
+                    expr,
+                ))
             } else {
                 expr
             };
@@ -589,7 +602,7 @@ impl<'a> Builder<'a> {
 
             self.add_action(Action::Set {
                 var: name.to_owned(),
-                expr,
+                expr: self.const_folding(&expr),
             });
         }
 
@@ -605,9 +618,14 @@ impl<'a> Builder<'a> {
     ) -> Result<(), String> {
         let mask = gen_mask(length) << skip;
 
-        let left = Expression::BitwiseAnd(Rc::new(bits), Rc::new(Expression::Number(mask)));
-        let right =
-            Expression::BitwiseAnd(Rc::new(value.clone()), Rc::new(Expression::Number(mask)));
+        let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
+            Rc::new(bits),
+            Rc::new(Expression::Number(mask)),
+        )));
+        let right = self.const_folding(&Rc::new(Expression::BitwiseAnd(
+            Rc::new(value.clone()),
+            Rc::new(Expression::Number(mask)),
+        )));
 
         self.add_action(Action::AssertEq { left, right });
 
@@ -631,7 +649,7 @@ impl<'a> Builder<'a> {
                     Ok(_) => {
                         self.add_action(Action::Set {
                             var: name.to_owned(),
-                            expr: def.as_ref().clone(),
+                            expr: self.const_folding(def),
                         });
 
                         self.set(name, !0);
@@ -712,7 +730,7 @@ impl<'a> Builder<'a> {
 
             self.add_action(Action::Set {
                 var: String::from("$v"),
-                expr: Expression::Number(bit as i64),
+                expr: Rc::new(Expression::Number(bit as i64)),
             });
 
             self.add_edge(Edge::Branch(next));
@@ -724,7 +742,7 @@ impl<'a> Builder<'a> {
             before,
             Action::Set {
                 var: length.to_owned(),
-                expr: Expression::Number(0),
+                expr: Rc::new(Expression::Number(0)),
             },
         );
 
@@ -732,7 +750,7 @@ impl<'a> Builder<'a> {
             before,
             Action::Set {
                 var: String::from("$bits"),
-                expr: Expression::Number(0),
+                expr: Rc::new(Expression::Number(0)),
             },
         );
 
@@ -741,13 +759,13 @@ impl<'a> Builder<'a> {
                 next,
                 Action::Set {
                     var: String::from("$bits"),
-                    expr: Expression::BitwiseOr(
+                    expr: Rc::new(Expression::BitwiseOr(
                         Rc::new(Expression::ShiftLeft(
                             Rc::new(Expression::Identifier(String::from("$bits"))),
                             Rc::new(Expression::Number(width)),
                         )),
                         Rc::new(Expression::Identifier(String::from("$v"))),
-                    ),
+                    )),
                 },
             );
         } else {
@@ -755,13 +773,13 @@ impl<'a> Builder<'a> {
                 next,
                 Action::Set {
                     var: String::from("$bits"),
-                    expr: Expression::BitwiseOr(
+                    expr: Rc::new(Expression::BitwiseOr(
                         Rc::new(Expression::Identifier(String::from("$bits"))),
                         Rc::new(Expression::ShiftLeft(
                             Rc::new(Expression::Identifier(String::from("$v"))),
                             Rc::new(Expression::Identifier(length.to_owned())),
                         )),
-                    ),
+                    )),
                 },
             );
         }
@@ -770,10 +788,10 @@ impl<'a> Builder<'a> {
             next,
             Action::Set {
                 var: length.to_owned(),
-                expr: Expression::Add(
+                expr: Rc::new(Expression::Add(
                     Rc::new(Expression::Identifier(length.to_owned())),
                     Rc::new(Expression::Number(width)),
-                ),
+                )),
             },
         );
 
@@ -855,7 +873,7 @@ impl<'a> Builder<'a> {
 
                     self.add_action(Action::Set {
                         var: "$repeat".to_owned(),
-                        expr: Expression::Number(1),
+                        expr: Rc::new(Expression::Number(1)),
                     });
 
                     if !done_before && self.is_done() {
@@ -945,7 +963,7 @@ impl<'a> Builder<'a> {
 
                 self.add_action(Action::Set {
                     var: var.to_owned(),
-                    expr: self.const_folding(expr).as_ref().clone(),
+                    expr: self.const_folding(expr),
                 })
             }
             _ => println!("expr:{:?}", expr),
@@ -1094,12 +1112,51 @@ impl<'a> Builder<'a> {
         }
     }
 
+    /// Constanting folding of expressions. This simply folds constants values and a few
+    /// expression. More to be done.
     fn const_folding(&self, expr: &Rc<Expression>) -> Rc<Expression> {
+        macro_rules! unary {
+            ($expr:expr, $op:ident) => {{
+                if let Expression::Number(expr) = $expr.as_ref() {
+                    Some(Rc::new(Expression::Number(expr.$op().into())))
+                } else {
+                    None
+                }
+            }};
+        }
+
+        macro_rules! binary {
+            ($left:expr, $right:expr, $op:ident) => {{
+                if let (Expression::Number(left), Expression::Number(right)) =
+                    ($left.as_ref(), $right.as_ref())
+                {
+                    Some(Rc::new(Expression::Number(left.$op(right))))
+                } else {
+                    None
+                }
+            }};
+        }
+
         let new = clone_filter(expr, &|expr| match expr.as_ref() {
             Expression::Identifier(name) => {
                 let (val, _) = self.constants.get(name).ok()?;
                 Some(Rc::new(Expression::Number(val)))
             }
+            Expression::Complement(expr) => unary!(expr, not),
+            Expression::BitCount(expr) => unary!(expr, count_ones),
+            Expression::Negative(expr) => unary!(expr, neg),
+
+            Expression::Add(left, right) => binary!(left, right, add),
+            Expression::Subtract(left, right) => binary!(left, right, sub),
+            Expression::Multiply(left, right) => binary!(left, right, mul),
+            Expression::Divide(left, right) => binary!(left, right, div),
+            Expression::Modulo(left, right) => binary!(left, right, rem),
+            Expression::BitwiseAnd(left, right) => binary!(left, right, bitand),
+            Expression::BitwiseOr(left, right) => binary!(left, right, bitor),
+            Expression::BitwiseXor(left, right) => binary!(left, right, bitxor),
+            Expression::ShiftLeft(left, right) => binary!(left, right, shl),
+            Expression::ShiftRight(left, right) => binary!(left, right, shr),
+            // TODO: logical (Not, And, Or, Equal, More, Ternary)
             _ => None,
         });
 
