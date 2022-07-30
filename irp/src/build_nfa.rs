@@ -14,8 +14,8 @@ use std::{
  * TODO
  * - ExtentConstant may be very short. We should calculate minimum length
  * - (..)2 and other repeat markers are not supported
- * - (S-1):4 should produce 16, not 0 (mask in the wrong place)
  * - RTI_Relay_alt requires log2 function for inverse
+ * - Implement variants
  */
 
 #[derive(PartialEq, Debug, Clone)]
@@ -451,12 +451,12 @@ impl<'a> Builder<'a> {
                         0
                     };
 
-                    let value = self.const_folding(value);
+                    let mut value = self.const_folding(value);
 
                     let bits = Expression::Identifier(String::from("$bits"));
 
                     #[allow(clippy::comparison_chain)]
-                    let bits = if offset > skip {
+                    let mut bits = if offset > skip {
                         Expression::ShiftRight(
                             Rc::new(bits),
                             Rc::new(Expression::Number(offset - skip)),
@@ -470,20 +470,42 @@ impl<'a> Builder<'a> {
                         bits
                     };
 
-                    let bits = if *reverse && !do_reverse {
-                        Expression::BitReverse(Rc::new(bits), length, skip)
-                    } else {
-                        bits
+                    if *reverse && !do_reverse {
+                        bits = Expression::BitReverse(Rc::new(bits), length, skip);
+                    }
+
+                    let mask = gen_mask(length) << skip;
+
+                    // F:4 => ($bits & 15) = (F & 15)
+                    // ~F:4 => (~$bits & 15) = (F & 15)
+                    // (F-1):4 => ($bits & 15) + 1 = F
+                    // ~(F-1):4 => ~($bits & 15) + 1 = F
+                    match value.as_ref() {
+                        Expression::Complement(comp) => {
+                            if matches!(comp.as_ref(), Expression::Identifier(..)) {
+                                value = comp.clone();
+                                bits = Expression::BitwiseAnd(
+                                    Rc::new(Expression::Complement(Rc::new(bits))),
+                                    Rc::new(Expression::Number(mask)),
+                                );
+                            }
+                        }
+                        _ => {
+                            bits = Expression::BitwiseAnd(
+                                Rc::new(bits),
+                                Rc::new(Expression::Number(mask)),
+                            );
+                        }
                     };
 
                     match self.unknown_var(expr) {
                         Ok(_) => {
                             // We know all the variables in here or its constant
-                            self.check_bits_in_var(&value, bits, length, skip)?;
+                            self.check_bits_in_var(&value, bits, mask)?;
                         }
                         Err(name) => match inverse(Rc::new(bits), value.clone(), &name) {
                             Some(bits) => {
-                                self.store_bits_in_var(&name, bits, length, skip, &mut delayed)?;
+                                self.store_bits_in_var(&name, bits, mask, &mut delayed)?;
                             }
                             None => {
                                 return Err(format!("expression {} not supported", value));
@@ -545,24 +567,18 @@ impl<'a> Builder<'a> {
         &mut self,
         name: &str,
         bits: Rc<Expression>,
-        length: i64,
-        skip: i64,
+        mask: i64,
         delayed: &mut Vec<Action>,
     ) -> Result<(), String> {
-        let mask = gen_mask(length) << skip;
-
-        let expr = Rc::new(Expression::BitwiseAnd(
-            bits,
-            Rc::new(Expression::Number(mask)),
-        ));
-
         if self.is_set(name, mask) {
+            let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
+                Rc::new(Expression::Identifier(name.to_owned())),
+                Rc::new(Expression::Number(mask)),
+            )));
+
             self.add_action(Action::AssertEq {
-                left: self.const_folding(&Rc::new(Expression::BitwiseAnd(
-                    Rc::new(Expression::Identifier(name.to_owned())),
-                    Rc::new(Expression::Number(mask)),
-                ))),
-                right: self.const_folding(&expr),
+                left,
+                right: self.const_folding(&bits),
             });
         } else if let Some(def) = self.irp.definitions.iter().find_map(|def| {
             if let Expression::Assignment(var, expr) = def {
@@ -577,12 +593,14 @@ impl<'a> Builder<'a> {
                 Err(name) => self.add_definition(&name),
             };
 
+            let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
+                def.clone(),
+                Rc::new(Expression::Number(mask)),
+            )));
+
             let action = Action::AssertEq {
-                left: self.const_folding(&Rc::new(Expression::BitwiseAnd(
-                    def.clone(),
-                    Rc::new(Expression::Number(mask)),
-                ))),
-                right: self.const_folding(&expr),
+                left,
+                right: self.const_folding(&bits),
             };
 
             if have_it {
@@ -594,10 +612,10 @@ impl<'a> Builder<'a> {
             let expr = if self.is_any_set(name) {
                 Rc::new(Expression::BitwiseOr(
                     Rc::new(Expression::Identifier(name.to_owned())),
-                    expr,
+                    bits,
                 ))
             } else {
-                expr
+                bits
             };
 
             self.set(name, mask);
@@ -615,20 +633,13 @@ impl<'a> Builder<'a> {
         &mut self,
         value: &Expression,
         bits: Expression,
-        length: i64,
-        skip: i64,
+        mask: i64,
     ) -> Result<(), String> {
-        let mask = gen_mask(length) << skip;
-
-        let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
-            Rc::new(bits),
-            Rc::new(Expression::Number(mask)),
-        )));
+        let left = Rc::new(bits);
         let right = self.const_folding(&Rc::new(Expression::BitwiseAnd(
             Rc::new(value.clone()),
             Rc::new(Expression::Number(mask)),
         )));
-
         self.add_action(Action::AssertEq { left, right });
 
         Ok(())
