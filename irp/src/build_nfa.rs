@@ -84,6 +84,8 @@ impl Irp {
             let res = builder.done_fields();
 
             builder.add_edge(Edge::Done(res));
+
+            builder.mask_results()?;
         }
 
         Ok(NFA {
@@ -851,6 +853,7 @@ impl<'a> Builder<'a> {
                         let res = self.done_fields();
 
                         self.add_edge(Edge::Done(res));
+                        self.mask_results()?;
 
                         let node = self.add_vertex();
 
@@ -880,6 +883,7 @@ impl<'a> Builder<'a> {
                         let res = self.done_fields();
 
                         self.add_edge(Edge::Done(res));
+                        self.mask_results()?;
                     }
 
                     if let Some(start) = start {
@@ -1110,6 +1114,44 @@ impl<'a> Builder<'a> {
         } else {
             Some(Err(name.to_string()))
         }
+    }
+
+    /// Mask results
+    fn mask_results(&mut self) -> Result<(), String> {
+        for param in &self.irp.parameters {
+            let min = param.min.eval(&self.constants)?.0;
+            let max = param.max.eval(&self.constants)?.0;
+
+            let mut mask;
+
+            if (max as u64 + 1).is_power_of_two() {
+                mask = max;
+
+                if min != 0 {
+                    if (min as u64 + 1).is_power_of_two() {
+                        mask &= !min;
+                    } else {
+                        continue;
+                    }
+                }
+            } else {
+                continue;
+            }
+
+            if let Some(fields) = self.cur.vars.get(&param.name) {
+                if (fields & !mask) != 0 {
+                    self.add_action(Action::Set {
+                        var: param.name.to_owned(),
+                        expr: Rc::new(Expression::BitwiseAnd(
+                            Rc::new(Expression::Identifier(param.name.to_owned())),
+                            Rc::new(Expression::Number(mask)),
+                        )),
+                    });
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Constanting folding of expressions. This simply folds constants values and a few
