@@ -91,6 +91,18 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
                     vert_names[i], vert_names[*dest], len
                 )
                 .unwrap(),
+                Edge::FlashVar(var, unit, dest) => writeln!(
+                    &mut file,
+                    "\t\"{}\" -> \"{}\" [label=\"flash {}*{}\"]",
+                    vert_names[i], vert_names[*dest], var, unit
+                )
+                .unwrap(),
+                Edge::GapVar(var, unit, dest) => writeln!(
+                    &mut file,
+                    "\t\"{}\" -> \"{}\" [label=\"gap {}*{}\"]",
+                    vert_names[i], vert_names[*dest], var, unit
+                )
+                .unwrap(),
                 Edge::TrailingGap(dest) => writeln!(
                     &mut file,
                     "\t\"{}\" -> \"{}\" [label=\"trailing gap\"]",

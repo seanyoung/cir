@@ -11,13 +11,14 @@ use std::{collections::HashMap, rc::Rc};
  * - ExtentConstant may be very short. We should calculate minimum length
  * - (..)2 and other repeat markers are not supported
  * - (S-1):4 should produce 16, not 0 (mask in the wrong place)
- * - fix variables in bit fields, e.g. B&O protocol
  */
 
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum Edge {
     Flash(i64, usize),
     Gap(i64, usize),
+    FlashVar(String, i64, usize),
+    GapVar(String, i64, usize),
     TrailingGap(usize),
     BranchCond {
         expr: Expression,
@@ -894,6 +895,32 @@ impl<'a> Builder<'a> {
 
                 self.set_head(node);
             }
+            Expression::FlashIdentifier(var, unit) => {
+                if !self.is_any_set(var) {
+                    return Err(format!("variable '{}' is not set", var));
+                }
+
+                let unit = unit.eval(1, &self.irp.general_spec)?;
+
+                let node = self.add_vertex();
+
+                self.add_edge(Edge::FlashVar(var.to_owned(), unit, node));
+
+                self.set_head(node);
+            }
+            Expression::GapIdentifier(var, unit) => {
+                if !self.is_any_set(var) {
+                    return Err(format!("variable '{}' is not set", var));
+                }
+
+                let unit = unit.eval(1, &self.irp.general_spec)?;
+
+                let node = self.add_vertex();
+
+                self.add_edge(Edge::GapVar(var.to_owned(), unit, node));
+
+                self.set_head(node);
+            }
             Expression::BitField { length, .. } => {
                 let (length, _) = length.eval(&Vartable::new())?;
 
@@ -907,6 +934,18 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge::TrailingGap(node));
 
                 self.set_head(node);
+            }
+            Expression::Assignment(var, expr) => {
+                if var == "T" {
+                    return Ok(());
+                }
+
+                self.have_definitions(expr)?;
+
+                self.add_action(Action::Set {
+                    var: var.to_owned(),
+                    expr: self.const_folding(expr).as_ref().clone(),
+                })
             }
             _ => println!("expr:{:?}", expr),
         }

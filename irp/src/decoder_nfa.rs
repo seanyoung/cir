@@ -2,7 +2,7 @@ use crate::rawir;
 
 use super::{
     build_nfa::{Action, Edge, NFA},
-    InfraredData, Vartable,
+    Expression, InfraredData, Vartable,
 };
 use log::trace;
 use std::{
@@ -184,6 +184,44 @@ impl<'a> Decoder<'a> {
                             new_pos.push((pos, vartab.clone()));
                         }
                     }
+                    Edge::FlashVar(var, unit, dest) => {
+                        let (res, _) = Expression::Identifier(var.to_owned())
+                            .eval(&vartab)
+                            .unwrap();
+                        let expected = res * unit;
+
+                        if let Some(ir @ InfraredData::Flash(received)) = ir {
+                            if self.tolerance_eq(expected as u32, received) {
+                                let (success, vartab) = self.run_actions(pos, &vartab);
+
+                                trace!(
+                                    "matched flash {} (expected {}) => {}",
+                                    received,
+                                    expected,
+                                    dest
+                                );
+
+                                if success {
+                                    work.push((None, *dest, vartab));
+                                }
+                            } else if received > expected as u32 {
+                                let (success, vartab) = self.run_actions(pos, &vartab);
+
+                                trace!(
+                                    "matched flash {} (expected {}) (incomplete consume) => {}",
+                                    received,
+                                    expected,
+                                    dest
+                                );
+
+                                if success {
+                                    work.push((Some(ir.consume(expected as u32)), *dest, vartab));
+                                }
+                            }
+                        } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
+                            new_pos.push((pos, vartab.clone()));
+                        }
+                    }
                     Edge::Gap(expected, dest) => {
                         if let Some(ir @ InfraredData::Gap(received)) = ir {
                             // if *expected >= self.trailing_gap as i64 {
@@ -227,6 +265,60 @@ impl<'a> Decoder<'a> {
 
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
+                                }
+                            }
+                        } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
+                            new_pos.push((pos, vartab.clone()));
+                        }
+                    }
+                    Edge::GapVar(var, unit, dest) => {
+                        let (res, _) = Expression::Identifier(var.to_owned())
+                            .eval(&vartab)
+                            .unwrap();
+                        let expected = res * unit;
+
+                        if let Some(ir @ InfraredData::Gap(received)) = ir {
+                            // if *expected >= self.trailing_gap as i64 {
+                            //     if received >= self.trailing_gap {
+                            //         let (success, vartab) = self.run_actions(pos, &vartab);
+
+                            //         trace!(
+                            //             "large gap matched gap {} (expected {}) => {}",
+                            //             received,
+                            //             *expected,
+                            //             dest
+                            //         );
+
+                            //         if success {
+                            //             work.push((None, *dest, vartab));
+                            //         }
+                            //     }
+                            //} else
+                            if self.tolerance_eq(expected as u32, received) {
+                                let (success, vartab) = self.run_actions(pos, &vartab);
+
+                                trace!(
+                                    "matched gap {} (expected {}) => {}",
+                                    received,
+                                    expected,
+                                    dest
+                                );
+
+                                if success {
+                                    work.push((None, *dest, vartab));
+                                }
+                            } else if received > expected as u32 {
+                                let (success, vartab) = self.run_actions(pos, &vartab);
+
+                                trace!(
+                                    "matched gap {} (expected {}) (incomplete consume) => {}",
+                                    received,
+                                    expected,
+                                    dest
+                                );
+
+                                if success {
+                                    work.push((Some(ir.consume(expected as u32)), *dest, vartab));
                                 }
                             }
                         } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
