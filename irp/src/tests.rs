@@ -392,7 +392,7 @@ fn compare_decode_to_transmogrifier() {
             .find(|p| p.name == testcase.protocol)
             .unwrap();
 
-        if !testcase.pronto.is_empty() || testcase.render[0].is_empty() {
+        if !testcase.pronto.is_empty() || testcase.render[0].len() < 3 {
             total_tests -= 1;
             continue;
         }
@@ -474,5 +474,5 @@ fn compare_decode_to_transmogrifier() {
     println!("tests: {} fails: {}", total_tests, fails);
 
     // TODO: we still have a whole bunch of fails
-    assert_eq!(fails, 34);
+    assert_eq!(fails, 33);
 }
