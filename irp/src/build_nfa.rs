@@ -1204,7 +1204,7 @@ impl<'a> Builder<'a> {
             if (max as u64 + 1).is_power_of_two() {
                 mask = max;
 
-                if min != 0 {
+                if min >= 2 {
                     if (min as u64 + 1).is_power_of_two() {
                         mask &= !min;
                     } else {
