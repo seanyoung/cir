@@ -101,7 +101,7 @@ impl NFA {
     }
 }
 
-fn gen_mask(v: i64) -> i64 {
+pub(crate) fn gen_mask(v: i64) -> i64 {
     (1i64 << v) - 1
 }
 
@@ -504,7 +504,7 @@ impl<'a> Builder<'a> {
                             self.check_bits_in_var(&value, bits, mask)?;
                         }
                         Err(name) => match inverse(Rc::new(bits), value.clone(), &name) {
-                            Some(bits) => {
+                            Some((bits, _)) => {
                                 self.store_bits_in_var(&name, bits, mask, &mut delayed)?;
                             }
                             None => {
@@ -590,7 +590,36 @@ impl<'a> Builder<'a> {
         }) {
             let have_it = match self.unknown_var(def) {
                 Ok(_) => true,
-                Err(name) => self.add_definition(&name),
+                Err(name) => {
+                    if !self.add_definition(&name) {
+                        if let Some((expr, mask)) = inverse(bits.clone(), def.clone(), &name) {
+                            if self.unknown_var(&expr).is_ok() {
+                                let expr = if self.is_any_set(&name) {
+                                    Rc::new(Expression::BitwiseOr(
+                                        Rc::new(Expression::Identifier(name.to_owned())),
+                                        expr,
+                                    ))
+                                } else {
+                                    expr
+                                };
+
+                                self.set(&name, mask.unwrap_or(!0));
+
+                                self.add_action(Action::Set {
+                                    var: name.to_owned(),
+                                    expr: self.const_folding(&expr),
+                                });
+                                return Ok(());
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        true
+                    }
+                }
             };
 
             let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
@@ -657,7 +686,7 @@ impl<'a> Builder<'a> {
             }
             None
         }) {
-            loop {
+            for _ in 0..self.irp.definitions.len() {
                 match self.unknown_var(def) {
                     Ok(_) => {
                         self.add_action(Action::Set {
@@ -676,9 +705,44 @@ impl<'a> Builder<'a> {
                     }
                 }
             }
-        } else {
-            false
         }
+
+        let mut found = false;
+
+        for def in &self.irp.definitions {
+            if let Expression::Assignment(var, expr) = def {
+                if let Some((expr, mask)) = inverse(
+                    Rc::new(Expression::Identifier(var.to_string())),
+                    expr.clone(),
+                    name,
+                ) {
+                    if self.unknown_var(&expr).is_err() {
+                        continue;
+                    }
+
+                    self.set(name, mask.unwrap_or(!0));
+
+                    if found {
+                        self.add_action(Action::Set {
+                            var: name.to_owned(),
+                            expr: Rc::new(Expression::BitwiseOr(
+                                Rc::new(Expression::Identifier(name.to_owned())),
+                                self.const_folding(&expr),
+                            )),
+                        });
+                    } else {
+                        self.add_action(Action::Set {
+                            var: name.to_owned(),
+                            expr: self.const_folding(&expr),
+                        });
+                    }
+
+                    found = true;
+                }
+            }
+        }
+
+        found
     }
 
     /// For given expression, add any required definitions or return an error if
@@ -1120,7 +1184,9 @@ impl<'a> Builder<'a> {
             0
         };
 
-        if self.is_set(name, gen_mask(length) << skip) {
+        let mask = gen_mask(length) << skip;
+
+        if self.is_set(name, mask) {
             Some(Ok(()))
         } else {
             Some(Err(name.to_string()))
