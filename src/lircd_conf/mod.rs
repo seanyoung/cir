@@ -12,16 +12,23 @@ pub use encode::encode;
 /// A button on a remote presented by a scancode
 #[derive(Debug)]
 pub struct Code {
+    /// Name of the button
     pub name: String,
+    /// Is this a duplicate entry; different codes may be mapped to the same key
     pub dup: bool,
+    /// List of codes. Usually there is only one, sometimes a single button
+    /// transmits multiple codes.
     pub code: Vec<u64>,
 }
 
 /// A button on a remote presented by raw IR
 #[derive(Debug)]
 pub struct RawCode {
+    /// Name of the button
     pub name: String,
+    /// Is this a duplicate entry; different IR may be mapped to the same key
     pub dup: bool,
+    /// Raw IR lengths. The first entry is a pulse, followed by gap, pulse, etc.
     pub rawir: Vec<u32>,
 }
 
