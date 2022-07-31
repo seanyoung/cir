@@ -1,17 +1,28 @@
-// Get a list of rc devices from sysfs
+//! Get a list of remote controller devices from sysfs on linux. A remote
+//! controller is either an infrared receiver/transmitter or a cec interface.
 
 use std::path::Path;
 use std::{fs, io};
 
+/// Single remote controller device on linux (either infrared or cec device)
 #[derive(Debug, Default, Clone)]
 pub struct Rcdev {
+    /// Name of rc. This is usually "rc" followed by a number
     pub name: String,
+    /// Name of the actual device. Human readable
     pub device_name: String,
+    /// Name of the driver
     pub driver: String,
+    /// Default keymap name for this device
     pub default_keymap: String,
+    /// Path to lirc device, if any. Device may be cec or kernel can be
+    /// compiled without lirc chardevs
     pub lircdev: Option<String>,
+    /// Path to input device. Transmitters do not have an input device attached
     pub inputdev: Option<String>,
+    /// Supported protocols. Will be a single "cec" entry for cec devices
     pub supported_protocols: Vec<String>,
+    /// Which protocols are enabled. This indexes into supported_protocols
     pub enabled_protocols: Vec<usize>,
 }
 

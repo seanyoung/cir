@@ -1,3 +1,5 @@
+//! Parse lircd.conf files and generate IRP notation for the parsed file.
+
 use bitflags::bitflags;
 use std::path::Path;
 
@@ -7,6 +9,7 @@ mod parse;
 
 pub use encode::encode;
 
+/// A button on a remote presented by a scancode
 #[derive(Debug)]
 pub struct Code {
     pub name: String,
@@ -14,6 +17,7 @@ pub struct Code {
     pub code: Vec<u64>,
 }
 
+/// A button on a remote presented by raw IR
 #[derive(Debug)]
 pub struct RawCode {
     pub name: String,
@@ -22,28 +26,45 @@ pub struct RawCode {
 }
 
 bitflags! {
+    /// Protocol flags
     #[derive(Default)]
     pub struct Flags: u32 {
+        /// This remote uses raw codes
         const RAW_CODES = 0x0001;
+        /// Uses the rc5 protocol
         const RC5 = 0x0002;
-        // SHIFT_ENC is an alias for RC5
+        /// SHIFT_ENC is an alias for RC5
         const SHIFT_ENC = 0x0002;
+        /// Uses the rc6 protocol
         const RC6 = 0x0004;
+        /// Uses the rc-mm protocol
         const RCMM = 0x0008;
+        /// Uses pulse-distance encoding
         const SPACE_ENC = 0x0010;
+        /// Bit encoding encodes the space before the pulse
         const SPACE_FIRST = 0x0020;
+        /// Grundig protocol
         const GRUNDIG = 0x0040;
+        /// B&O protocol
         const BO = 0x0080;
+        /// Talk to device over serial port
         const SERIAL = 0x0100;
+        /// XMP protocol
         const XMP = 0x0400;
+        /// Reverse the bits in the encoding
         const REVERSE = 0x0800;
+        /// No header in repeats
         const NO_HEAD_REP = 0x1000;
+        /// No footer in repeats
         const NO_FOOT_REP = 0x2000;
+        /// Each encoding will always have the same length
         const CONST_LENGTH = 0x4000;
+        /// Header is preset in repeats
         const REPEAT_HEADER = 0x8000;
     }
 }
 
+/// Lirc remote definition
 #[derive(Debug, Default)]
 pub struct Remote {
     pub name: String,

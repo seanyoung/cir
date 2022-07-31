@@ -4,6 +4,9 @@ use itertools::Itertools;
 use log::{debug, warn};
 use num_integer::Integer;
 
+/// Encode the given codes into raw IR, ready for transmit. This has been validated
+/// against the send output of lircd using all the remotes present in the
+/// lirc-remotes database.
 pub fn encode(
     lirc_remotes: &[Remote],
     remote: Option<&str>,

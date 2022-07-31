@@ -1,3 +1,5 @@
+//! Interface to lirc chardevs on Linux
+
 use iocuddle::*;
 use num_integer::Integer;
 use std::{

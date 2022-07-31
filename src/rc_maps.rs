@@ -1,12 +1,19 @@
+//! Parse /etc/rc_maps.cfg for Linux. This file configures the default keymap
+//! to load on Linux.
+
 use crate::rcdev::Rcdev;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind};
 use std::path::Path;
 
+/// Entry for keymap mapping
 #[derive(Debug)]
 pub struct KeymapTable {
+    /// Name the driver to match ("*" for any)
     pub driver: String,
+    /// Name of the default keymap to match ("*" for any)
     pub table: String,
+    /// Path of keymap to load
     pub file: String,
 }
 
