@@ -1,4 +1,4 @@
-use super::{expression::clone_filter, Expression, Irp, RepeatMarker, Vartable};
+use super::{expression::clone_filter, Expression, Irp, ParameterSpec, RepeatMarker, Vartable};
 use std::{
     collections::HashMap,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Shl, Shr, Sub},
@@ -1200,27 +1200,17 @@ impl<'a> Builder<'a> {
         }
     }
 
+    /// For the given parameter, get the mask
+    fn param_to_mask(&self, param: &ParameterSpec) -> Result<i64, String> {
+        let max = param.max.eval(&self.constants)?.0 as u64;
+
+        Ok((max + 1).next_power_of_two() as i64 - 1)
+    }
+
     /// Mask results
     fn mask_results(&mut self) -> Result<(), String> {
         for param in &self.irp.parameters {
-            let min = param.min.eval(&self.constants)?.0;
-            let max = param.max.eval(&self.constants)?.0;
-
-            let mut mask;
-
-            if (max as u64 + 1).is_power_of_two() {
-                mask = max;
-
-                if min >= 2 {
-                    if (min as u64 + 1).is_power_of_two() {
-                        mask &= !min;
-                    } else {
-                        continue;
-                    }
-                }
-            } else {
-                continue;
-            }
+            let mask = self.param_to_mask(param)?;
 
             if let Some(fields) = self.cur.vars.get(&param.name) {
                 if (fields & !mask) != 0 {
