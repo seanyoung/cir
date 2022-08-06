@@ -1,4 +1,5 @@
 use super::{expression::clone_filter, Expression, Irp, ParameterSpec, RepeatMarker, Vartable};
+use log::trace;
 use std::{
     collections::HashMap,
     ops::{Add, BitAnd, BitOr, BitXor, Neg, Not, Rem, Shl, Shr, Sub},
@@ -109,7 +110,7 @@ pub(crate) struct Builder<'a> {
     saved: Vec<BuilderLocation>,
     verts: Vec<Vertex>,
     constants: Vartable<'a>,
-    irp: &'a Irp,
+    pub irp: &'a Irp,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -141,7 +142,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn is_set(&self, name: &str, fields: i64) -> bool {
+    pub fn is_set(&self, name: &str, fields: i64) -> bool {
         if let Some(e) = self.cur.vars.get(name) {
             (e & fields) == fields
         } else {
@@ -498,7 +499,7 @@ impl<'a> Builder<'a> {
                     match self.unknown_var(expr) {
                         Ok(_) => {
                             // We know all the variables in here or its constant
-                            self.check_bits_in_var(&value, bits, mask)?;
+                            self.check_bits_in_var(value, bits, mask)?;
                         }
                         Err(name) => match self.inverse(Rc::new(bits), value.clone(), &name) {
                             Some((bits, actions, _)) => {
@@ -565,7 +566,7 @@ impl<'a> Builder<'a> {
     fn store_bits_in_var(
         &mut self,
         name: &str,
-        bits: Rc<Expression>,
+        mut bits: Rc<Expression>,
         mask: i64,
         delayed: &mut Vec<Action>,
     ) -> Result<(), String> {
@@ -587,12 +588,33 @@ impl<'a> Builder<'a> {
             }
             None
         }) {
+            let expr = if self.is_any_set(name) {
+                Rc::new(Expression::BitwiseOr(
+                    Rc::new(Expression::Identifier(name.to_owned())),
+                    bits.clone(),
+                ))
+            } else {
+                bits.clone()
+            };
+
+            self.add_action(Action::Set {
+                var: name.to_owned(),
+                expr: self.const_folding(&expr),
+            });
+
+            if !self.is_any_set(name) {
+                bits = Rc::new(Expression::Identifier(name.to_owned()));
+            }
+
+            self.set(name, mask);
+
             let have_it = match self.unknown_var(def) {
                 Ok(_) => true,
                 Err(name) => {
                     if !self.add_definition(&name) {
-                        if let Some((expr, actions, mask)) =
-                            self.inverse(bits.clone(), def.clone(), &name)
+                        let def = self.const_folding(def);
+
+                        if let Some((expr, actions, mask)) = self.inverse(bits.clone(), def, &name)
                         {
                             if self.unknown_var(&expr).is_ok() {
                                 let expr = if self.is_any_set(&name) {
@@ -603,6 +625,8 @@ impl<'a> Builder<'a> {
                                 } else {
                                     expr
                                 };
+
+                                trace!("found definition {} = {}", name, expr);
 
                                 self.set(&name, mask.unwrap_or(!0));
 
@@ -664,13 +688,13 @@ impl<'a> Builder<'a> {
 
     fn check_bits_in_var(
         &mut self,
-        value: &Expression,
+        value: Rc<Expression>,
         bits: Expression,
         mask: i64,
     ) -> Result<(), String> {
         let left = Rc::new(bits);
         let right = self.const_folding(&Rc::new(Expression::BitwiseAnd(
-            Rc::new(value.clone()),
+            value,
             Rc::new(Expression::Number(mask)),
         )));
         self.add_action(Action::AssertEq { left, right });
@@ -693,6 +717,8 @@ impl<'a> Builder<'a> {
             for _ in 0..self.irp.definitions.len() {
                 match self.unknown_var(def) {
                     Ok(_) => {
+                        trace!("found definition {} = {}", name, def);
+
                         self.add_action(Action::Set {
                             var: name.to_owned(),
                             expr: self.const_folding(def),
@@ -715,31 +741,32 @@ impl<'a> Builder<'a> {
 
         for def in &self.irp.definitions {
             if let Expression::Assignment(var, expr) = def {
-                if let Some((expr, actions, mask)) = self.inverse(
-                    Rc::new(Expression::Identifier(var.to_string())),
-                    expr.clone(),
-                    name,
-                ) {
+                let expr = self.const_folding(expr);
+
+                if let Some((expr, actions, mask)) =
+                    self.inverse(Rc::new(Expression::Identifier(var.to_string())), expr, name)
+                {
                     if self.unknown_var(&expr).is_err() {
                         continue;
                     }
 
-                    self.set(name, mask.unwrap_or(!0));
+                    let mut expr = self.const_folding(&expr);
 
-                    if found {
-                        self.add_action(Action::Set {
-                            var: name.to_owned(),
-                            expr: Rc::new(Expression::BitwiseOr(
-                                Rc::new(Expression::Identifier(name.to_owned())),
-                                self.const_folding(&expr),
-                            )),
-                        });
-                    } else {
-                        self.add_action(Action::Set {
-                            var: name.to_owned(),
-                            expr: self.const_folding(&expr),
-                        });
+                    if self.is_any_set(name) {
+                        expr = Rc::new(Expression::BitwiseOr(
+                            Rc::new(Expression::Identifier(name.to_owned())),
+                            expr,
+                        ));
                     }
+
+                    trace!("found definition {} = {}", name, expr);
+
+                    self.add_action(Action::Set {
+                        var: name.to_owned(),
+                        expr,
+                    });
+
+                    self.set(name, mask.unwrap_or(!0));
 
                     actions.into_iter().for_each(|act| self.add_action(act));
 
@@ -1201,7 +1228,7 @@ impl<'a> Builder<'a> {
     }
 
     /// For the given parameter, get the mask
-    fn param_to_mask(&self, param: &ParameterSpec) -> Result<i64, String> {
+    pub fn param_to_mask(&self, param: &ParameterSpec) -> Result<i64, String> {
         let max = param.max.eval(&self.constants)?.0 as u64;
 
         Ok((max + 1).next_power_of_two() as i64 - 1)
