@@ -23,12 +23,12 @@ pub(crate) enum Edge {
     GapVar(String, i64, usize),
     TrailingGap(usize),
     BranchCond {
-        expr: Expression,
+        expr: Rc<Expression>,
         yes: usize,
         no: usize,
     },
     MayBranchCond {
-        expr: Expression,
+        expr: Rc<Expression>,
         dest: usize,
     },
     Branch(usize),
@@ -67,11 +67,6 @@ impl Irp {
     /// to generate a decoder for this Irp.
     pub fn compile(&self) -> Result<NFA, String> {
         let mut builder = Builder::new(self);
-
-        builder.add_action(Action::Set {
-            var: "$repeat".to_owned(),
-            expr: Rc::new(Expression::Number(0)),
-        });
 
         builder.add_constants();
 
@@ -125,7 +120,7 @@ impl<'a> Builder<'a> {
         let verts = vec![Vertex::default()];
 
         Builder {
-            cur: Default::default(),
+            cur: BuilderLocation::default(),
             saved: Vec::new(),
             constants: Vartable::new(),
             verts,
@@ -134,6 +129,8 @@ impl<'a> Builder<'a> {
     }
 
     fn set(&mut self, name: &str, fields: i64) {
+        assert!(fields != 0);
+
         if let Some(e) = self.cur.vars.get_mut(name) {
             *e |= fields;
         } else {
@@ -150,11 +147,7 @@ impl<'a> Builder<'a> {
     }
 
     fn is_any_set(&self, name: &str) -> bool {
-        if let Some(e) = self.cur.vars.get(name) {
-            *e != 0
-        } else {
-            false
-        }
+        self.cur.vars.contains_key(name)
     }
 
     fn is_done(&self) -> bool {
@@ -170,10 +163,6 @@ impl<'a> Builder<'a> {
             .iter()
             .map(|param| param.name.to_owned())
             .collect()
-    }
-
-    fn clear(&mut self) {
-        self.cur.vars.clear();
     }
 
     fn add_vertex(&mut self) -> usize {
@@ -218,7 +207,8 @@ impl<'a> Builder<'a> {
 
     /// The list of definitions may contain variables which are constants and
     /// can be evaluated now. Some of those will be modified at a later point;
-    /// those will have their values set now.
+    /// and will end up as variables with initializers, else if the variables
+    /// are truly constant then they end up in the constants mapping.
     fn add_constants(&mut self) {
         // first add the true constants
         while {
@@ -244,18 +234,15 @@ impl<'a> Builder<'a> {
                         },
                     );
 
-                    if self.unknown_var(expr).is_ok() {
-                        if modified_anywhere {
-                            // just set an initial value
-                            self.add_action(Action::Set {
-                                var: name.to_owned(),
-                                expr: self.const_folding(expr),
-                            });
-                        } else {
-                            let (val, len) = expr.eval(&self.constants).unwrap();
+                    if modified_anywhere {
+                        continue;
+                    }
 
-                            self.constants.set(name.to_owned(), val, len);
-                        }
+                    if self.expression_available(expr).is_ok() {
+                        let (val, len) = expr.eval(&self.constants).unwrap();
+
+                        self.constants.set(name.to_owned(), val, len);
+
                         changes = true;
 
                         self.set(name, i64::MAX);
@@ -265,6 +252,39 @@ impl<'a> Builder<'a> {
 
             changes
         } {}
+
+        // any remaining definitions which are available are either modified or
+        // depend on a variable which will be modified at some point
+        while {
+            let mut changes = false;
+
+            for def in &self.irp.definitions {
+                if let Expression::Assignment(name, expr) = def {
+                    if self.is_any_set(name) {
+                        continue;
+                    }
+
+                    if self.expression_available(expr).is_ok() {
+                        // just set an initial value
+                        self.add_action(Action::Set {
+                            var: name.to_owned(),
+                            expr: self.const_folding(expr),
+                        });
+
+                        changes = true;
+
+                        self.set(name, i64::MAX);
+                    }
+                }
+            }
+
+            changes
+        } {}
+
+        self.add_action(Action::Set {
+            var: "$repeat".to_owned(),
+            expr: Rc::new(Expression::Number(0)),
+        });
     }
 
     fn expression_list(
@@ -282,7 +302,7 @@ impl<'a> Builder<'a> {
                 if let Expression::BitField { length, .. } = expr.as_ref() {
                     let (min_len, max_len, _) = self.bit_field_length(length)?;
 
-                    // if this bit field is preceded by a constant length fields, process
+                    // if variable length bit field is preceded by a constant length fields, process
                     // those separately
                     if expr_count != 0 && max_len != min_len {
                         break;
@@ -312,13 +332,14 @@ impl<'a> Builder<'a> {
             }
 
             if expr_count == 0 {
+                // not a bit field
                 self.expression(&list[pos], bit_spec)?;
                 pos += 1;
                 continue;
             }
 
             // if it is a single constant bitfield, just expand it - no loops needed
-            if expr_count == 1 && bit_count < 8 {
+            if expr_count == 1 && bit_count <= 8 {
                 if let Expression::BitField {
                     value,
                     skip: None,
@@ -362,13 +383,7 @@ impl<'a> Builder<'a> {
                             self.set(length, !0);
                         }
 
-                        self.add_bit_specs(
-                            Some(min_len),
-                            max_len,
-                            *reverse,
-                            store_length,
-                            bit_spec,
-                        )?;
+                        self.decode_bits(Some(min_len), max_len, *reverse, store_length, bit_spec)?;
 
                         let skip = if let Some(skip) = skip {
                             let (skip, _) = self.const_folding(skip).eval(&Vartable::new())?;
@@ -413,7 +428,7 @@ impl<'a> Builder<'a> {
                 false
             };
 
-            self.add_bit_specs(None, bit_count, do_reverse, None, bit_spec)?;
+            self.decode_bits(None, bit_count, do_reverse, None, bit_spec)?;
 
             let mut delayed = Vec::new();
 
@@ -495,7 +510,7 @@ impl<'a> Builder<'a> {
                         }
                     };
 
-                    match self.unknown_var(expr) {
+                    match self.expression_available(expr) {
                         Ok(_) => {
                             // We know all the variables in here or its constant
                             self.check_bits_in_var(value, bits, mask)?;
@@ -609,8 +624,6 @@ impl<'a> Builder<'a> {
 
             let def = self.const_folding(def);
 
-            let have_it = self.have_definitions(&def).is_ok();
-
             let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
                 def.clone(),
                 Rc::new(Expression::Number(mask)),
@@ -621,7 +634,7 @@ impl<'a> Builder<'a> {
                 right: self.const_folding(&bits),
             };
 
-            if have_it {
+            if self.have_definitions(&def).is_ok() {
                 self.add_action(action);
             } else {
                 delayed.push(action);
@@ -676,7 +689,7 @@ impl<'a> Builder<'a> {
             None
         }) {
             for _ in 0..self.irp.definitions.len() {
-                match self.unknown_var(def) {
+                match self.expression_available(def) {
                     Ok(_) => {
                         trace!("found definition {} = {}", name, def);
 
@@ -707,7 +720,7 @@ impl<'a> Builder<'a> {
                 if let Some((expr, actions, mask)) =
                     self.inverse(Rc::new(Expression::Identifier(var.to_string())), expr, name)
                 {
-                    if self.unknown_var(&expr).is_err() {
+                    if self.expression_available(&expr).is_err() {
                         continue;
                     }
 
@@ -749,7 +762,7 @@ impl<'a> Builder<'a> {
     /// no definitions can be found
     fn have_definitions(&mut self, expr: &Expression) -> Result<(), String> {
         loop {
-            match self.unknown_var(expr) {
+            match self.expression_available(expr) {
                 Ok(_) => {
                     return Ok(());
                 }
@@ -765,7 +778,7 @@ impl<'a> Builder<'a> {
     /// Add the bit specs for bitfields. max specifies the maximum number of
     /// bits, min specifies a minimum if the number of bits is not fixed at max.
     /// The length can be stored in the variable name store_length if set.
-    fn add_bit_specs(
+    fn decode_bits(
         &mut self,
         min: Option<i64>,
         max: i64,
@@ -875,10 +888,10 @@ impl<'a> Builder<'a> {
         self.add_edge_at_node(
             next,
             Edge::BranchCond {
-                expr: Expression::Less(
+                expr: Rc::new(Expression::Less(
                     Rc::new(Expression::Identifier(length.to_owned())),
                     Rc::new(Expression::Number(max)),
-                ),
+                )),
                 yes: entry,
                 no: done,
             },
@@ -888,10 +901,10 @@ impl<'a> Builder<'a> {
             self.add_edge_at_node(
                 next,
                 Edge::MayBranchCond {
-                    expr: Expression::MoreEqual(
+                    expr: Rc::new(Expression::MoreEqual(
                         Rc::new(Expression::Identifier(length)),
                         Rc::new(Expression::Number(min)),
-                    ),
+                    )),
                     dest: done,
                 },
             );
@@ -1022,7 +1035,7 @@ impl<'a> Builder<'a> {
             Expression::BitField { length, .. } => {
                 let (length, _) = length.eval(&Vartable::new())?;
 
-                self.add_bit_specs(None, length, false, None, bit_spec)?;
+                self.decode_bits(None, length, false, None, bit_spec)?;
             }
             Expression::ExtentConstant(_, _) => {
                 self.cur.seen_edges = true;
@@ -1051,8 +1064,9 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    /// Do we have all the vars to evaluate an expression
-    fn unknown_var(&self, expr: &Expression) -> Result<(), String> {
+    /// Do we have all the vars to evaluate an expression, i.e. can this
+    /// expression be evaluated now.
+    fn expression_available(&self, expr: &Expression) -> Result<(), String> {
         match expr {
             Expression::FlashConstant(..)
             | Expression::GapConstant(..)
@@ -1081,15 +1095,15 @@ impl<'a> Builder<'a> {
                     res
                 } else {
                     if let Some(skip) = &skip {
-                        self.unknown_var(skip)?;
+                        self.expression_available(skip)?;
                     }
-                    self.unknown_var(value)?;
-                    self.unknown_var(length)
+                    self.expression_available(value)?;
+                    self.expression_available(length)
                 }
             }
             Expression::InfiniteBitField { value, skip } => {
-                self.unknown_var(value)?;
-                self.unknown_var(skip)
+                self.expression_available(value)?;
+                self.expression_available(skip)
             }
             Expression::Assignment(_, expr)
             | Expression::Complement(expr)
@@ -1097,7 +1111,7 @@ impl<'a> Builder<'a> {
             | Expression::Negative(expr)
             | Expression::BitCount(expr)
             | Expression::Log2(expr)
-            | Expression::BitReverse(expr, ..) => self.unknown_var(expr),
+            | Expression::BitReverse(expr, ..) => self.expression_available(expr),
             Expression::Add(left, right)
             | Expression::Subtract(left, right)
             | Expression::Multiply(left, right)
@@ -1117,32 +1131,32 @@ impl<'a> Builder<'a> {
             | Expression::BitwiseXor(left, right)
             | Expression::Or(left, right)
             | Expression::And(left, right) => {
-                self.unknown_var(left)?;
-                self.unknown_var(right)
+                self.expression_available(left)?;
+                self.expression_available(right)
             }
             Expression::Ternary(cond, left, right) => {
-                self.unknown_var(cond)?;
-                self.unknown_var(left)?;
-                self.unknown_var(right)
+                self.expression_available(cond)?;
+                self.expression_available(left)?;
+                self.expression_available(right)
             }
             Expression::List(list) => {
                 for expr in list {
-                    self.unknown_var(expr)?;
+                    self.expression_available(expr)?;
                 }
                 Ok(())
             }
             Expression::Variation(list) => {
                 for expr in list.iter().flatten() {
-                    self.unknown_var(expr)?;
+                    self.expression_available(expr)?;
                 }
                 Ok(())
             }
             Expression::Stream(stream) => {
                 for expr in &stream.bit_spec {
-                    self.unknown_var(expr)?;
+                    self.expression_available(expr)?;
                 }
                 for expr in &stream.stream {
-                    self.unknown_var(expr)?;
+                    self.expression_available(expr)?;
                 }
                 Ok(())
             }
