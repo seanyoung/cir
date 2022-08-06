@@ -697,7 +697,7 @@ impl<'a> Builder<'a> {
             }
             None
         }) {
-            for _ in 0..self.irp.definitions.len() {
+            for _ in 0..2 {
                 match self.expression_available(def) {
                     Ok(_) => {
                         trace!("found definition {} = {}", name, def);
@@ -715,6 +715,7 @@ impl<'a> Builder<'a> {
                         if !self.add_definition(&name) {
                             return false;
                         }
+                        // try once more
                     }
                 }
             }
@@ -760,6 +761,8 @@ impl<'a> Builder<'a> {
                     actions.into_iter().for_each(|act| self.add_action(act));
 
                     found = true;
+
+                    // do not break here, there might be more bits to be found in another inverse definition
                 }
             }
         }
