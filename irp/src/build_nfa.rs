@@ -72,9 +72,7 @@ impl Irp {
 
         builder.expression(&self.stream, &[])?;
 
-        if builder.cur.seen_edges {
-            builder.add_done()?;
-        }
+        builder.add_done()?;
 
         Ok(NFA {
             verts: builder.complete(),
@@ -93,7 +91,7 @@ pub(crate) fn gen_mask(v: i64) -> i64 {
     (1i64 << v) - 1
 }
 
-/// track which
+/// track which bits of which variables may be set, builder head, etc.
 #[derive(Clone, Debug)]
 pub(crate) struct Builder<'a> {
     cur: BuilderLocation,
@@ -147,11 +145,12 @@ impl<'a> Builder<'a> {
     }
 
     fn add_done(&mut self) -> Result<bool, String> {
-        if self
-            .irp
-            .parameters
-            .iter()
-            .all(|param| self.cur.vars.contains_key(&param.name))
+        if self.cur.seen_edges
+            && self
+                .irp
+                .parameters
+                .iter()
+                .all(|param| self.cur.vars.contains_key(&param.name))
         {
             let res = self
                 .irp
@@ -212,7 +211,7 @@ impl<'a> Builder<'a> {
     /// The list of definitions may contain variables which are constants and
     /// can be evaluated now. Some of those will be modified at a later point;
     /// and will end up as variables with initializers, else if the variables
-    /// are truly constant then they end up in the constants mapping.
+    /// are truly constant then they end up in the constants map.
     fn add_constants(&mut self) {
         // first add the true constants
         while {
@@ -249,7 +248,7 @@ impl<'a> Builder<'a> {
 
                         changes = true;
 
-                        self.set(name, i64::MAX);
+                        self.set(name, !0);
                     }
                 }
             }
@@ -277,7 +276,7 @@ impl<'a> Builder<'a> {
 
                         changes = true;
 
-                        self.set(name, i64::MAX);
+                        self.set(name, !0);
                     }
                 }
             }
