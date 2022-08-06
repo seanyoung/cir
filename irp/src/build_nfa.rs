@@ -72,12 +72,8 @@ impl Irp {
 
         builder.expression(&self.stream, &[])?;
 
-        if builder.cur.seen_edges && builder.is_done() {
-            let res = builder.done_fields();
-
-            builder.add_edge(Edge::Done(res));
-
-            builder.mask_results()?;
+        if builder.cur.seen_edges {
+            builder.add_done()?;
         }
 
         Ok(NFA {
@@ -150,19 +146,26 @@ impl<'a> Builder<'a> {
         self.cur.vars.contains_key(name)
     }
 
-    fn is_done(&self) -> bool {
-        self.irp
+    fn add_done(&mut self) -> Result<bool, String> {
+        if self
+            .irp
             .parameters
             .iter()
             .all(|param| self.cur.vars.contains_key(&param.name))
-    }
+        {
+            let res = self
+                .irp
+                .parameters
+                .iter()
+                .map(|param| param.name.to_owned())
+                .collect();
 
-    fn done_fields(&self) -> Vec<String> {
-        self.irp
-            .parameters
-            .iter()
-            .map(|param| param.name.to_owned())
-            .collect()
+            self.add_edge(Edge::Done(res));
+            self.mask_results()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     fn add_vertex(&mut self) -> usize {
@@ -193,6 +196,7 @@ impl<'a> Builder<'a> {
         self.verts[node].edges.push(edge);
     }
 
+    /// Once done building, return the completed vertices
     fn complete(self) -> Vec<Vertex> {
         self.verts
     }
@@ -937,12 +941,7 @@ impl<'a> Builder<'a> {
                         None
                     };
 
-                    let done_before = if self.is_done() {
-                        let res = self.done_fields();
-
-                        self.add_edge(Edge::Done(res));
-                        self.mask_results()?;
-
+                    let done_before = if self.add_done()? {
                         let node = self.add_vertex();
 
                         self.add_edge(Edge::Branch(node));
@@ -967,11 +966,8 @@ impl<'a> Builder<'a> {
                         expr: Rc::new(Expression::Number(1)),
                     });
 
-                    if !done_before && self.is_done() {
-                        let res = self.done_fields();
-
-                        self.add_edge(Edge::Done(res));
-                        self.mask_results()?;
+                    if !done_before {
+                        self.add_done()?;
                     }
 
                     if let Some(start) = start {
