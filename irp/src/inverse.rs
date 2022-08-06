@@ -9,7 +9,6 @@ use std::rc::Rc;
 /// X=(102+B)-C (B) => X+C=102+B => X+C-102=B
 impl<'a> Builder<'a> {
     pub fn expression_bits(&self, expr: &Rc<Expression>) -> Option<i64> {
-        // println!("expr_bits:{}", expr);
         match expr.as_ref() {
             Expression::Identifier(id) => {
                 if let Some(param) = self.irp.parameters.iter().find(|param| &param.name == id) {
@@ -86,7 +85,6 @@ impl<'a> Builder<'a> {
         right: Rc<Expression>,
         var: &str,
     ) -> Option<(Rc<Expression>, Vec<Action>, Option<i64>)> {
-        // println!("inverse left:{} right:{} var:{}", left, right, var);
         match right.as_ref() {
             Expression::Identifier(id) if id == var => Some((left, vec![], None)),
             Expression::Complement(expr) => {
@@ -98,59 +96,93 @@ impl<'a> Builder<'a> {
             Expression::Not(expr) => {
                 self.inverse(Rc::new(Expression::Not(left)), expr.clone(), var)
             }
-            Expression::Add(left1, right1) => {
-                if let (Some(left_bits), Some(right_bits)) =
-                    (self.expression_bits(left1), self.expression_bits(right1))
-                {
-                    // if there is no overlap between the bits.. (must be broken)
-                    if (left_bits & right_bits) == 0 {
-                        let skip = left_bits.trailing_zeros();
-                        let length = i64::BITS - left_bits.leading_zeros() - skip;
+            Expression::Add(..) => {
+                // TODO: Same for bitwise or, maybe others
+                let mut list = Vec::new();
 
-                        //println!("mask:{} {} {}", left_bits, skip, length);
-                        let left2 = Rc::new(Expression::BitField {
-                            value: left.clone(),
-                            reverse: false,
-                            length: Rc::new(Expression::Number(length.into())),
-                            skip: Some(Rc::new(Expression::Number(skip.into()))),
-                        });
-                        let right2 = if skip > 0 {
-                            Rc::new(Expression::ShiftRight(
-                                left1.clone(),
-                                Rc::new(Expression::Number(skip.into())),
-                            ))
-                        } else {
-                            left1.clone()
-                        };
-
-                        //println!("left:{} {}", left, left1);
-                        let v = self.inverse(left2, right2, var);
-
-                        if v.is_some() {
-                            return v;
+                fn collect_terms<'e>(expr: &'e Rc<Expression>, list: &mut Vec<&'e Rc<Expression>>) {
+                    match expr.as_ref() {
+                        Expression::Add(left, right) => {
+                            collect_terms(left, list);
+                            collect_terms(right, list);
                         }
-                        //println!("left:{} {}", left, right1);
+                        _ => list.push(expr),
+                    }
+                }
 
-                        let skip = right_bits.trailing_zeros();
-                        let length = i64::BITS - right_bits.leading_zeros() - skip;
+                collect_terms(&right, &mut list);
 
-                        //println!("mask:{} {} {}", right_bits, skip, length);
-                        let left2 = Rc::new(Expression::BitField {
+                let mut bits = Vec::new();
+
+                for expr in &list {
+                    if let Some(mask) = self.expression_bits(expr) {
+                        bits.push((*expr, mask));
+                    } else {
+                        break;
+                    }
+                }
+
+                fn term_sets(
+                    mut list: Vec<(&Rc<Expression>, i64)>,
+                ) -> Vec<Vec<(&Rc<Expression>, i64)>> {
+                    let mut all = Vec::new();
+
+                    while !list.is_empty() {
+                        let mut set = vec![list.remove(0)];
+
+                        while {
+                            let mut changes = false;
+
+                            for i in 0..list.len() {
+                                if set.iter().any(|(_, mask)| (list[i].1 & mask) != 0) {
+                                    set.push(list.remove(i));
+                                    changes = true;
+                                    break;
+                                }
+                            }
+
+                            changes
+                        } {}
+
+                        all.push(set);
+                    }
+
+                    all
+                }
+
+                if bits.len() == list.len() {
+                    for set in term_sets(bits) {
+                        let cmp_set: Vec<&Rc<Expression>> = set.iter().map(|(e, _)| *e).collect();
+
+                        // this needs more testing. I'm sure we can hit infinite recursion somehow..
+                        if cmp_set == list {
+                            return None;
+                        }
+
+                        let mask = set.iter().fold(0, |acc, entry| acc | entry.1);
+
+                        let skip = mask.trailing_zeros();
+                        let length = i64::BITS - mask.leading_zeros() - skip;
+
+                        let left = Rc::new(Expression::BitField {
                             value: left.clone(),
                             reverse: false,
                             length: Rc::new(Expression::Number(length.into())),
                             skip: Some(Rc::new(Expression::Number(skip.into()))),
                         });
-                        let right2 = if skip > 0 {
-                            Rc::new(Expression::ShiftRight(
-                                left1.clone(),
-                                Rc::new(Expression::Number(skip.into())),
-                            ))
-                        } else {
-                            left1.clone()
-                        };
 
-                        let v = self.inverse(left2, right2, var);
+                        let mut right = set[1..].iter().fold(set[0].0.clone(), |acc, e| {
+                            Rc::new(Expression::Add(acc, e.0.clone()))
+                        });
+
+                        if skip > 0 {
+                            right = Rc::new(Expression::ShiftRight(
+                                right.clone(),
+                                Rc::new(Expression::Number(skip.into())),
+                            ));
+                        }
+
+                        let v = self.inverse(left, right, var);
 
                         if v.is_some() {
                             return v;
@@ -158,21 +190,23 @@ impl<'a> Builder<'a> {
                     }
                 }
 
-                let left2 = self.inverse(
-                    Rc::new(Expression::Subtract(left.clone(), right1.clone())),
-                    left1.clone(),
-                    var,
-                );
+                for i in 0..list.len() {
+                    let left = Rc::new(Expression::Subtract(left.clone(), list[i].clone()));
+                    let mut right_iter = (0..list.len()).filter(|e| *e != i);
 
-                if left2.is_some() {
-                    left2
-                } else {
-                    self.inverse(
-                        Rc::new(Expression::Subtract(left, left1.clone())),
-                        right1.clone(),
-                        var,
-                    )
+                    let first = right_iter.next().unwrap();
+
+                    let right = right_iter.fold(list[first].clone(), |acc, e| {
+                        Rc::new(Expression::Add(acc, list[e].clone()))
+                    });
+
+                    let v = self.inverse(left, right, var);
+                    if v.is_some() {
+                        return v;
+                    }
                 }
+
+                None
             }
             Expression::Subtract(left1, right1) => {
                 let left2 = self.inverse(
@@ -227,7 +261,6 @@ impl<'a> Builder<'a> {
                         | Expression::BitwiseAnd(left2, right2)
                         | Expression::BitwiseXor(left2, right2) => {
                             if let Some(left_bits) = self.expression_bits(left2) {
-                                // println!("left_bits:{:b} {}", left_bits, left2);
                                 if left_bits < minimum {
                                     // left term can be eleminated
                                     return if matches!(left.as_ref(), Expression::Subtract(..)) {
@@ -253,7 +286,6 @@ impl<'a> Builder<'a> {
                             }
 
                             if let Some(right_bits) = self.expression_bits(right2) {
-                                // println!("right_bits:{:b} {}", right_bits, right2);
                                 if right_bits < minimum {
                                     // right term can be eleminated
                                     return self.inverse(
@@ -654,4 +686,54 @@ fn inverse2() {
     assert_eq!(format!("{}", inv.0), "((X:5:3 << 3) >> 3)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
+}
+
+#[test]
+fn inverse3() {
+    use crate::Irp;
+
+    // PARSER BUG! ){A0=F+128*T+D<<8}
+    let irp = Irp::parse(
+        "{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T){A0=F+128*T+(D<<8)}[D:0..31,F:0..127,T@:0..1=0]",
+    )
+    .unwrap();
+
+    let builder = Builder::new(&irp);
+    // first
+
+    if let Expression::Assignment(_, expr) = &irp.definitions[0] {
+        let left = Rc::new(Expression::Identifier("A0".to_owned()));
+        let right = builder.const_folding(expr);
+
+        let inv = builder.inverse(left.clone(), right.clone(), "F").unwrap();
+        assert_eq!(format!("{}", inv.0), "A0:7:0");
+        let inv = builder.inverse(left.clone(), right.clone(), "T").unwrap();
+        assert_eq!(format!("{}", inv.0), "((A0:1:7 << 7) >> 7)");
+        let inv = builder.inverse(left, right, "D").unwrap();
+        assert_eq!(format!("{}", inv.0), "((A0:5:8 << 8) >> 8)");
+    } else {
+        panic!();
+    }
+
+    let irp = Irp::parse(
+        "{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T){B0=F+128*T+(D<<7)}[D:0..31,F:0..127,T@:0..1=0]",
+    )
+    .unwrap();
+
+    let builder = Builder::new(&irp);
+    // first
+
+    if let Expression::Assignment(_, expr) = &irp.definitions[0] {
+        let left = Rc::new(Expression::Identifier("B0".to_owned()));
+        let right = builder.const_folding(expr);
+
+        let inv = builder.inverse(left.clone(), right.clone(), "F").unwrap();
+        assert_eq!(format!("{}", inv.0), "B0:7:0");
+        let inv = builder.inverse(left.clone(), right.clone(), "T").unwrap();
+        assert_eq!(format!("{}", inv.0), "(((B0 - (D << 7)):1:7 << 7) >> 7)");
+        let inv = builder.inverse(left, right, "D").unwrap();
+        assert_eq!(format!("{}", inv.0), "(((B0 - (T << 7)):5:7 << 7) >> 7)");
+    } else {
+        panic!();
+    }
 }

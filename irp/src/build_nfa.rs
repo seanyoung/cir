@@ -12,7 +12,6 @@ use std::{
  * TODO
  * - ExtentConstant may be very short. We should calculate minimum length
  * - (..)2 and other repeat markers are not supported
- * - Fujitsu_Aircon_old needs clever inverse function
  * - Implement variants
  */
 

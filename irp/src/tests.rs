@@ -426,6 +426,7 @@ fn compare_decode_to_transmogrifier() {
                     ("Zenith7", "F") => 127,
                     ("Zenith", "F") => (1 << res["D"]) - 1,
                     ("NEC-Shirriff", "data") => (1 << res["length"]) - 1,
+                    ("Fujitsu_Aircon_old", "tOn") => !0xf0,
 
                     _ => !0,
                 };
@@ -474,5 +475,5 @@ fn compare_decode_to_transmogrifier() {
     println!("tests: {} fails: {}", total_tests, fails);
 
     // TODO: we still have a whole bunch of fails
-    assert_eq!(fails, 24);
+    assert_eq!(fails, 15);
 }
