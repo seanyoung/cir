@@ -608,47 +608,9 @@ impl<'a> Builder<'a> {
 
             self.set(name, mask);
 
-            let have_it = match self.unknown_var(def) {
-                Ok(_) => true,
-                Err(name) => {
-                    if !self.add_definition(&name) {
-                        let def = self.const_folding(def);
+            let def = self.const_folding(def);
 
-                        if let Some((expr, actions, mask)) = self.inverse(bits.clone(), def, &name)
-                        {
-                            if self.unknown_var(&expr).is_ok() {
-                                let expr = if self.is_any_set(&name) {
-                                    Rc::new(Expression::BitwiseOr(
-                                        Rc::new(Expression::Identifier(name.to_owned())),
-                                        expr,
-                                    ))
-                                } else {
-                                    expr
-                                };
-
-                                trace!("found definition {} = {}", name, expr);
-
-                                self.set(&name, mask.unwrap_or(!0));
-
-                                self.add_action(Action::Set {
-                                    var: name.to_owned(),
-                                    expr: self.const_folding(&expr),
-                                });
-
-                                actions.into_iter().for_each(|act| self.add_action(act));
-
-                                return Ok(());
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        }
-                    } else {
-                        true
-                    }
-                }
-            };
+            let have_it = self.have_definitions(&def).is_ok();
 
             let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
                 def.clone(),
@@ -748,6 +710,12 @@ impl<'a> Builder<'a> {
                 {
                     if self.unknown_var(&expr).is_err() {
                         continue;
+                    }
+
+                    if let Some(mask) = mask {
+                        if self.is_set(name, mask) {
+                            continue;
+                        }
                     }
 
                     let mut expr = self.const_folding(&expr);
