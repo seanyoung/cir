@@ -1,4 +1,4 @@
-use super::{expression::clone_filter, inverse::inverse, Expression, Irp, RepeatMarker, Vartable};
+use super::{expression::clone_filter, Expression, Irp, RepeatMarker, Vartable};
 use std::{
     collections::HashMap,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Shl, Shr, Sub},
@@ -104,7 +104,7 @@ pub(crate) fn gen_mask(v: i64) -> i64 {
 
 /// track which
 #[derive(Clone, Debug)]
-struct Builder<'a> {
+pub(crate) struct Builder<'a> {
     cur: BuilderLocation,
     saved: Vec<BuilderLocation>,
     verts: Vec<Vertex>,
@@ -121,7 +121,7 @@ struct BuilderLocation {
 
 #[allow(dead_code)]
 impl<'a> Builder<'a> {
-    fn new(irp: &'a Irp) -> Self {
+    pub fn new(irp: &'a Irp) -> Self {
         let verts = vec![Vertex::default()];
 
         Builder {
@@ -500,7 +500,7 @@ impl<'a> Builder<'a> {
                             // We know all the variables in here or its constant
                             self.check_bits_in_var(&value, bits, mask)?;
                         }
-                        Err(name) => match inverse(Rc::new(bits), value.clone(), &name) {
+                        Err(name) => match self.inverse(Rc::new(bits), value.clone(), &name) {
                             Some((bits, actions, _)) => {
                                 actions.into_iter().for_each(|act| self.add_action(act));
 
@@ -592,7 +592,7 @@ impl<'a> Builder<'a> {
                 Err(name) => {
                     if !self.add_definition(&name) {
                         if let Some((expr, actions, mask)) =
-                            inverse(bits.clone(), def.clone(), &name)
+                            self.inverse(bits.clone(), def.clone(), &name)
                         {
                             if self.unknown_var(&expr).is_ok() {
                                 let expr = if self.is_any_set(&name) {
@@ -715,7 +715,7 @@ impl<'a> Builder<'a> {
 
         for def in &self.irp.definitions {
             if let Expression::Assignment(var, expr) = def {
-                if let Some((expr, actions, mask)) = inverse(
+                if let Some((expr, actions, mask)) = self.inverse(
                     Rc::new(Expression::Identifier(var.to_string())),
                     expr.clone(),
                     name,
