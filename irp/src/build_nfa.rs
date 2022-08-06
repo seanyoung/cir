@@ -14,7 +14,7 @@ use std::{
  * TODO
  * - ExtentConstant may be very short. We should calculate minimum length
  * - (..)2 and other repeat markers are not supported
- * - RTI_Relay_alt requires log2 function for inverse
+ * - Fujitsu_Aircon_old needs clever inverse function
  * - Implement variants
  */
 
@@ -504,7 +504,9 @@ impl<'a> Builder<'a> {
                             self.check_bits_in_var(&value, bits, mask)?;
                         }
                         Err(name) => match inverse(Rc::new(bits), value.clone(), &name) {
-                            Some((bits, _)) => {
+                            Some((bits, actions, _)) => {
+                                actions.into_iter().for_each(|act| self.add_action(act));
+
                                 self.store_bits_in_var(&name, bits, mask, &mut delayed)?;
                             }
                             None => {
@@ -592,7 +594,9 @@ impl<'a> Builder<'a> {
                 Ok(_) => true,
                 Err(name) => {
                     if !self.add_definition(&name) {
-                        if let Some((expr, mask)) = inverse(bits.clone(), def.clone(), &name) {
+                        if let Some((expr, actions, mask)) =
+                            inverse(bits.clone(), def.clone(), &name)
+                        {
                             if self.unknown_var(&expr).is_ok() {
                                 let expr = if self.is_any_set(&name) {
                                     Rc::new(Expression::BitwiseOr(
@@ -609,6 +613,9 @@ impl<'a> Builder<'a> {
                                     var: name.to_owned(),
                                     expr: self.const_folding(&expr),
                                 });
+
+                                actions.into_iter().for_each(|act| self.add_action(act));
+
                                 return Ok(());
                             } else {
                                 false
@@ -711,7 +718,7 @@ impl<'a> Builder<'a> {
 
         for def in &self.irp.definitions {
             if let Expression::Assignment(var, expr) = def {
-                if let Some((expr, mask)) = inverse(
+                if let Some((expr, actions, mask)) = inverse(
                     Rc::new(Expression::Identifier(var.to_string())),
                     expr.clone(),
                     name,
@@ -736,6 +743,8 @@ impl<'a> Builder<'a> {
                             expr: self.const_folding(&expr),
                         });
                     }
+
+                    actions.into_iter().for_each(|act| self.add_action(act));
 
                     found = true;
                 }
@@ -1096,6 +1105,7 @@ impl<'a> Builder<'a> {
             | Expression::Not(expr)
             | Expression::Negative(expr)
             | Expression::BitCount(expr)
+            | Expression::Log2(expr)
             | Expression::BitReverse(expr, ..) => self.unknown_var(expr),
             Expression::Add(left, right)
             | Expression::Subtract(left, right)

@@ -1,4 +1,4 @@
-use super::build_nfa::gen_mask;
+use super::build_nfa::{gen_mask, Action};
 use super::{Expression, IrStream, Vartable};
 use std::{fmt, rc::Rc};
 
@@ -35,6 +35,7 @@ impl fmt::Display for Expression {
             Expression::Not(expr) => write!(f, "!{}", expr),
             Expression::Negative(expr) => write!(f, "-{}", expr),
             Expression::BitCount(expr) => write!(f, "#({})", expr),
+            Expression::Log2(expr) => write!(f, "LOG2({})", expr),
             Expression::BitField {
                 value,
                 reverse,
@@ -178,6 +179,17 @@ impl Expression {
                 let (v, l) = e.eval(vars)?;
 
                 Ok((!v, l))
+            }
+            Expression::Log2(e) => {
+                let (v, l) = e.eval(vars)?;
+
+                for i in 0..(l as i64) {
+                    if (1 << i) == v {
+                        return Ok((i, l));
+                    }
+                }
+
+                Ok((0, l))
             }
             Expression::Add(l, r) => {
                 let (l_val, l_len) = l.eval(vars)?;
@@ -702,9 +714,9 @@ pub(crate) fn inverse(
     left: Rc<Expression>,
     right: Rc<Expression>,
     var: &str,
-) -> Option<(Rc<Expression>, Option<i64>)> {
+) -> Option<(Rc<Expression>, Vec<Action>, Option<i64>)> {
     match right.as_ref() {
-        Expression::Identifier(id) if id == var => Some((left, None)),
+        Expression::Identifier(id) if id == var => Some((left, vec![], None)),
         Expression::Complement(expr) => {
             inverse(Rc::new(Expression::Complement(left)), expr.clone(), var)
         }
@@ -800,6 +812,21 @@ pub(crate) fn inverse(
                 )
             }
         }
+        Expression::Power(left1, right1) => {
+            if matches!(left1.as_ref(), Expression::Number(2)) {
+                if let Some(mut res) =
+                    inverse(Rc::new(Expression::Log2(left.clone())), right1.clone(), var)
+                {
+                    res.1.push(Action::AssertEq { left, right });
+
+                    Some(res)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
         Expression::BitField {
             value,
             reverse: false,
@@ -855,6 +882,7 @@ pub(crate) fn inverse(
                     )),
                     Rc::new(Expression::Number(skip)),
                 )),
+                vec![],
                 Some(gen_mask(length) << skip),
             ))
         }
@@ -877,7 +905,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "~(B - 1)");
     assert_eq!(format!("{}", inv.0), "(~X + 1)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // second
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -892,7 +921,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "~(1 - B)");
     assert_eq!(format!("{}", inv.0), "-(~X - 1)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // third
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -907,7 +937,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "-(B + 1)");
     assert_eq!(format!("{}", inv.0), "(-X - 1)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // fourth
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -922,7 +953,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "-(1 + B)");
     assert_eq!(format!("{}", inv.0), "(-X - 1)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // fifth
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -939,7 +971,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "(3 * -B)");
     assert_eq!(format!("{}", inv.0), "-(X / 3)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // sixth
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -956,7 +989,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "(-B * 3)");
     assert_eq!(format!("{}", inv.0), "-(X / 3)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // seventh
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -973,7 +1007,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "(-B / 3)");
     assert_eq!(format!("{}", inv.0), "-(X * 3)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // 8th
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -990,7 +1025,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "(3 / -B)");
     assert_eq!(format!("{}", inv.0), "-(3 / X)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // xor
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -1007,7 +1043,8 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "(3 ^ -B)");
     assert_eq!(format!("{}", inv.0), "-(X ^ 3)");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 
     // bitfield
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -1024,7 +1061,24 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "B:3:1");
     assert_eq!(format!("{}", inv.0), "((X & 7) << 1)");
-    assert_eq!(inv.1, Some(0b1110));
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, Some(0b1110));
+
+    // 2**n
+    let left = Rc::new(Expression::Identifier("X".to_owned()));
+
+    let right = Rc::new(Expression::Power(
+        Rc::new(Expression::Number(2)),
+        Rc::new(Expression::Identifier("B".to_owned())),
+    ));
+
+    let inv = inverse(left.clone(), right.clone(), "B").unwrap();
+
+    assert_eq!(format!("{}", left), "X");
+    assert_eq!(format!("{}", right), "(2 ** B)");
+    assert_eq!(format!("{}", inv.0), "LOG2(X)");
+    assert_eq!(inv.1, vec![Action::AssertEq { left, right }]);
+    assert_eq!(inv.2, None);
 
     // nothing to do
     let left = Rc::new(Expression::Identifier("X".to_owned()));
@@ -1035,5 +1089,6 @@ fn inverse1() {
     assert_eq!(format!("{}", left), "X");
     assert_eq!(format!("{}", right), "B");
     assert_eq!(format!("{}", inv.0), "X");
-    assert_eq!(inv.1, None);
+    assert_eq!(inv.1.len(), 0);
+    assert_eq!(inv.2, None);
 }

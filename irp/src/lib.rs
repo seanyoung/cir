@@ -283,6 +283,7 @@ enum Expression {
     Stream(IrStream),
     Variation(Vec<Vec<Rc<Expression>>>),
     BitReverse(Rc<Expression>, i64, i64),
+    Log2(Rc<Expression>),
 }
 
 #[derive(Debug)]
