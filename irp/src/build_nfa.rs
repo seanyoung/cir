@@ -790,8 +790,30 @@ impl<'a> Builder<'a> {
         store_length: Option<String>,
         bit_spec: &[&[Rc<Expression>]],
     ) -> Result<(), String> {
-        // TODO: special casing when length == 1
         self.cur.seen_edges = true;
+
+        if max == 1 && min.is_none() {
+            let next = self.add_vertex();
+
+            for (bit, e) in bit_spec[0].iter().enumerate() {
+                self.push_location();
+
+                self.expression(e, &bit_spec[1..])?;
+
+                self.add_action(Action::Set {
+                    var: String::from("$bits"),
+                    expr: Rc::new(Expression::Number(bit as i64)),
+                });
+
+                self.add_edge(Edge::Branch(next));
+
+                self.pop_location();
+            }
+
+            self.set_head(next);
+
+            return Ok(());
+        }
 
         let before = self.cur.head;
 
