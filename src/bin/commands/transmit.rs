@@ -185,7 +185,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                     } {
                         Ok(v) => v,
                         Err(_) => {
-                            eprintln!("'{}' is not a valid number", list[1]);
+                            eprintln!("‘{}’ is not a valid number", list[1]);
                             std::process::exit(2);
                         }
                     };

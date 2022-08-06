@@ -24,11 +24,11 @@ impl<'a> LircParser<'a> {
         let mut file = OpenOptions::new()
             .read(true)
             .open(path)
-            .map_err(|e| error!("failed to open '{}': {}", path.display(), e))?;
+            .map_err(|e| error!("failed to open ‘{}’: {}", path.display(), e))?;
 
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)
-            .map_err(|e| error!("failed to read '{}': {}", path.display(), e))?;
+            .map_err(|e| error!("failed to read ‘{}’: {}", path.display(), e))?;
 
         let contents = String::from_utf8_lossy(&buf);
 
@@ -41,7 +41,7 @@ impl<'a> LircParser<'a> {
 
         let lines = contents.lines();
 
-        debug!("parsing '{}' as lircd.conf file", path.display());
+        debug!("parsing ‘{}’ as lircd.conf file", path.display());
 
         let mut parser = LircParser {
             path: PathBuf::from(path),
@@ -83,7 +83,7 @@ impl<'a> LircParser<'a> {
             } else if let Some(first) = first {
                 if !first.starts_with('#') {
                     warn!(
-                        "{}:{}: expected 'begin remote', got '{}'",
+                        "{}:{}: expected 'begin remote', got ‘{}’",
                         self.path.display(),
                         self.line_no,
                         line
@@ -322,7 +322,7 @@ impl<'a> LircParser<'a> {
                     }
 
                     error!(
-                        "{}:{}: expected 'end remote', got '{}'",
+                        "{}:{}: expected 'end remote', got ‘{}’",
                         self.path.display(),
                         self.line_no,
                         line
@@ -339,7 +339,7 @@ impl<'a> LircParser<'a> {
                     }
                     _ => {
                         error!(
-                            "{}:{}: expected 'begin codes' or 'begin raw_codes', got '{}'",
+                            "{}:{}: expected 'begin codes' or 'begin raw_codes', got ‘{}’",
                             self.path.display(),
                             self.line_no,
                             line
@@ -350,7 +350,7 @@ impl<'a> LircParser<'a> {
                 },
                 Some(key) => {
                     error!(
-                        "{}:{}: '{}' unexpected",
+                        "{}:{}: ‘{}’ unexpected",
                         self.path.display(),
                         self.line_no,
                         key
@@ -412,7 +412,7 @@ impl<'a> LircParser<'a> {
                     }
 
                     error!(
-                        "{}:{}: expected 'end codes', got '{}'",
+                        "{}:{}: expected 'end codes', got ‘{}’",
                         self.path.display(),
                         self.line_no,
                         line
@@ -434,7 +434,7 @@ impl<'a> LircParser<'a> {
                             }
                             Err(_) => {
                                 error!(
-                                    "{}:{}: code '{}' is not valid",
+                                    "{}:{}: code ‘{}’ is not valid",
                                     self.path.display(),
                                     self.line_no,
                                     code,
@@ -492,7 +492,7 @@ impl<'a> LircParser<'a> {
                     }
 
                     error!(
-                        "{}:{}: expected 'end raw_codes', got '{}'",
+                        "{}:{}: expected 'end raw_codes', got ‘{}’",
                         self.path.display(),
                         self.line_no,
                         line,
@@ -525,7 +525,7 @@ impl<'a> LircParser<'a> {
                         raw_code.rawir.extend(codes);
                     } else {
                         error!(
-                            "{}:{}: '{}' not expected",
+                            "{}:{}: ‘{}’ not expected",
                             self.path.display(),
                             self.line_no,
                             v
@@ -550,7 +550,7 @@ impl<'a> LircParser<'a> {
                 Ok(v) if v <= u32::MAX as u64 => rawir.push(v as u32),
                 _ => {
                     error!(
-                        "{}:{}: invalid duration '{}'",
+                        "{}:{}: invalid duration ‘{}’",
                         self.path.display(),
                         self.line_no,
                         no

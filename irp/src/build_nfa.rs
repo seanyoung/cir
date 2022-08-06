@@ -772,7 +772,7 @@ impl<'a> Builder<'a> {
                 }
                 Err(name) => {
                     if !self.add_definition(&name) {
-                        return Err(format!("variable '{}' not known", name));
+                        return Err(format!("variable ‘{}’ not known", name));
                     }
                 }
             }
@@ -952,7 +952,7 @@ impl<'a> Builder<'a> {
 
                 if !irstream.bit_spec.is_empty() {
                     bit_spec.insert(0, &irstream.bit_spec);
-                };
+                }
 
                 if irstream.repeat == Some(RepeatMarker::Any)
                     || irstream.repeat == Some(RepeatMarker::OneOrMore)
@@ -1018,7 +1018,7 @@ impl<'a> Builder<'a> {
             }
             Expression::FlashIdentifier(var, unit) => {
                 if !self.is_any_set(var) {
-                    return Err(format!("variable '{}' is not set", var));
+                    return Err(format!("variable ‘{}’ is not set", var));
                 }
 
                 let unit = unit.eval(1, &self.irp.general_spec)?;
@@ -1031,7 +1031,7 @@ impl<'a> Builder<'a> {
             }
             Expression::GapIdentifier(var, unit) => {
                 if !self.is_any_set(var) {
-                    return Err(format!("variable '{}' is not set", var));
+                    return Err(format!("variable ‘{}’ is not set", var));
                 }
 
                 let unit = unit.eval(1, &self.irp.general_spec)?;
