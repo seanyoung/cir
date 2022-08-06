@@ -79,6 +79,16 @@ impl<'a> Builder<'a> {
                     )
                 }
             }
+            Expression::ShiftRight(left1, right1) => self.inverse(
+                Rc::new(Expression::ShiftLeft(left, right1.clone())),
+                left1.clone(),
+                var,
+            ),
+            Expression::ShiftLeft(left1, right1) => self.inverse(
+                Rc::new(Expression::ShiftRight(left, right1.clone())),
+                left1.clone(),
+                var,
+            ),
             Expression::Divide(left1, right1) => {
                 let left2 = self.inverse(
                     Rc::new(Expression::Multiply(left.clone(), right1.clone())),

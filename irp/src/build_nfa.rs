@@ -1,7 +1,7 @@
 use super::{expression::clone_filter, Expression, Irp, ParameterSpec, RepeatMarker, Vartable};
 use std::{
     collections::HashMap,
-    ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Shl, Shr, Sub},
+    ops::{Add, BitAnd, BitOr, BitXor, Neg, Not, Rem, Shl, Shr, Sub},
     rc::Rc,
 };
 
@@ -1230,7 +1230,7 @@ impl<'a> Builder<'a> {
 
     /// Constanting folding of expressions. This simply folds constants values and a few
     /// expression. More to be done.
-    fn const_folding(&self, expr: &Rc<Expression>) -> Rc<Expression> {
+    pub fn const_folding(&self, expr: &Rc<Expression>) -> Rc<Expression> {
         macro_rules! unary {
             ($expr:expr, $op:ident) => {{
                 if let Expression::Number(expr) = $expr.as_ref() {
@@ -1264,9 +1264,43 @@ impl<'a> Builder<'a> {
 
             Expression::Add(left, right) => binary!(left, right, add),
             Expression::Subtract(left, right) => binary!(left, right, sub),
-            Expression::Multiply(left, right) => binary!(left, right, mul),
-            Expression::Divide(left, right) => binary!(left, right, div),
             Expression::Modulo(left, right) => binary!(left, right, rem),
+            Expression::Multiply(left, right) => {
+                // fold multiply by power-of-two into shift
+                match (left.as_ref(), right.as_ref()) {
+                    (Expression::Number(left), Expression::Number(right)) => {
+                        Some(Rc::new(Expression::Number(left * right)))
+                    }
+                    (Expression::Number(no), _) if (*no as u64).is_power_of_two() => {
+                        Some(Rc::new(Expression::ShiftLeft(
+                            right.clone(),
+                            Rc::new(Expression::Number((*no).trailing_zeros() as i64)),
+                        )))
+                    }
+                    (_, Expression::Number(no)) if (*no as u64).is_power_of_two() => {
+                        Some(Rc::new(Expression::ShiftLeft(
+                            left.clone(),
+                            Rc::new(Expression::Number((*no).trailing_zeros() as i64)),
+                        )))
+                    }
+                    _ => None,
+                }
+            }
+            Expression::Divide(left, right) => {
+                // fold divide by power-of-two into shift
+                match (left.as_ref(), right.as_ref()) {
+                    (Expression::Number(left), Expression::Number(right)) => {
+                        Some(Rc::new(Expression::Number(left / right)))
+                    }
+                    (_, Expression::Number(no)) if (*no as u64).is_power_of_two() => {
+                        Some(Rc::new(Expression::ShiftRight(
+                            left.clone(),
+                            Rc::new(Expression::Number((*no).trailing_zeros() as i64)),
+                        )))
+                    }
+                    _ => None,
+                }
+            }
             Expression::BitwiseAnd(left, right) => binary!(left, right, bitand),
             Expression::BitwiseOr(left, right) => binary!(left, right, bitor),
             Expression::BitwiseXor(left, right) => binary!(left, right, bitxor),
