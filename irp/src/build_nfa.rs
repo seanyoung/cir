@@ -1,7 +1,4 @@
-use super::{
-    expression::{clone_filter, inverse},
-    Expression, Irp, RepeatMarker, Vartable,
-};
+use super::{expression::clone_filter, inverse::inverse, Expression, Irp, RepeatMarker, Vartable};
 use std::{
     collections::HashMap,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Shl, Shr, Sub},

@@ -150,6 +150,7 @@ mod decoder_nfa;
 mod encode;
 mod expression;
 mod graphviz;
+mod inverse;
 mod message;
 pub mod mode2;
 mod parser;
