@@ -131,7 +131,11 @@ impl<'a> Decoder<'a> {
         }
 
         if self.pos.is_empty() {
-            self.pos.push((0, Vartable::new()));
+            let (success, vartab) = self.run_actions(0, &Vartable::new());
+
+            assert!(success);
+
+            self.pos.push((0, vartab));
         }
 
         let mut work = Vec::new();
@@ -154,8 +158,6 @@ impl<'a> Decoder<'a> {
                     Edge::Flash(expected, dest) => {
                         if let Some(ir @ InfraredData::Flash(received)) = ir {
                             if self.tolerance_eq(*expected as u32, received) {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched flash {} (expected {}) => {}",
                                     received,
@@ -163,12 +165,11 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
                             } else if received > *expected as u32 {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched flash {} (expected {}) (incomplete consume) => {}",
                                     received,
@@ -176,6 +177,7 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
                                 }
@@ -192,8 +194,6 @@ impl<'a> Decoder<'a> {
 
                         if let Some(ir @ InfraredData::Flash(received)) = ir {
                             if self.tolerance_eq(expected as u32, received) {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched flash {} (expected {}) => {}",
                                     received,
@@ -201,12 +201,11 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
                             } else if received > expected as u32 {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched flash {} (expected {}) (incomplete consume) => {}",
                                     received,
@@ -214,6 +213,7 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((Some(ir.consume(expected as u32)), *dest, vartab));
                                 }
@@ -241,8 +241,6 @@ impl<'a> Decoder<'a> {
                             //     }
                             //} else
                             if self.tolerance_eq(*expected as u32, received) {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched gap {} (expected {}) => {}",
                                     received,
@@ -250,12 +248,11 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
                             } else if received > *expected as u32 {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched gap {} (expected {}) (incomplete consume) => {}",
                                     received,
@@ -263,6 +260,7 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
                                 }
@@ -295,8 +293,6 @@ impl<'a> Decoder<'a> {
                             //     }
                             //} else
                             if self.tolerance_eq(expected as u32, received) {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched gap {} (expected {}) => {}",
                                     received,
@@ -304,12 +300,11 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
                             } else if received > expected as u32 {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched gap {} (expected {}) (incomplete consume) => {}",
                                     received,
@@ -317,6 +312,7 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((Some(ir.consume(expected as u32)), *dest, vartab));
                                 }
@@ -329,8 +325,6 @@ impl<'a> Decoder<'a> {
                         if let Some(InfraredData::Gap(received)) = ir {
                             let expected = self.trailing_gap;
                             if received >= expected {
-                                let (success, vartab) = self.run_actions(pos, &vartab);
-
                                 trace!(
                                     "matched trailing gap {} (expected {}) => {}",
                                     received,
@@ -338,6 +332,7 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
+                                let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
@@ -347,20 +342,20 @@ impl<'a> Decoder<'a> {
                         }
                     }
                     Edge::Branch(dest) => {
-                        let (success, vartab) = self.run_actions(pos, &vartab);
+                        let (success, vartab) = self.run_actions(*dest, &vartab);
 
                         if success {
                             work.push((ir, *dest, vartab));
                         }
                     }
                     Edge::BranchCond { expr, yes, no } => {
-                        let (success, vartab) = self.run_actions(pos, &vartab);
+                        let (cond, _) = expr.eval(&vartab).unwrap();
+
+                        let dest = if cond != 0 { *yes } else { *no };
+
+                        let (success, vartab) = self.run_actions(dest, &vartab);
 
                         if success {
-                            let (cond, _) = expr.eval(&vartab).unwrap();
-
-                            let dest = if cond != 0 { *yes } else { *no };
-
                             trace!(
                                 "conditional branch {}: {}: destination {}",
                                 expr,
@@ -372,38 +367,37 @@ impl<'a> Decoder<'a> {
                         }
                     }
                     Edge::MayBranchCond { expr, dest } => {
-                        let (success, vartab) = self.run_actions(pos, &vartab);
+                        let (cond, _) = expr.eval(&vartab).unwrap();
 
-                        if success {
-                            let (cond, _) = expr.eval(&vartab).unwrap();
-                            let dest = *dest;
+                        if cond != 0 {
+                            let (success, vartab) = self.run_actions(*dest, &vartab);
 
-                            trace!(
-                                "conditional branch {}: {}: destination {}",
-                                expr,
-                                cond != 0,
-                                dest
-                            );
+                            if success {
+                                let dest = *dest;
 
-                            work.push((ir, dest, vartab));
+                                trace!(
+                                    "conditional branch {}: {}: destination {}",
+                                    expr,
+                                    cond != 0,
+                                    dest
+                                );
+
+                                work.push((ir, dest, vartab));
+                            }
                         }
                     }
                     Edge::Done(include) => {
-                        let (success, vartab) = self.run_actions(pos, &vartab);
+                        let mut res: HashMap<String, i64> = HashMap::new();
 
-                        if success {
-                            let mut res: HashMap<String, i64> = HashMap::new();
+                        for (name, (val, _, _)) in &vartab.vars {
+                            if include.contains(name) || name == "$repeat" {
+                                trace!("done");
 
-                            for (name, (val, _, _)) in &vartab.vars {
-                                if include.contains(name) || name == "$repeat" {
-                                    trace!("done");
-
-                                    res.insert(name.to_owned(), *val);
-                                }
+                                res.insert(name.to_owned(), *val);
                             }
-
-                            self.decoded.push_back(res);
                         }
+
+                        self.decoded.push_back(res);
                     }
                 }
             }
