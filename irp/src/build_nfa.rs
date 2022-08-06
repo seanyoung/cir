@@ -1,5 +1,5 @@
 use super::{expression::clone_filter, Expression, Irp, ParameterSpec, RepeatMarker, Vartable};
-use log::trace;
+use log::{trace, warn};
 use std::{
     collections::HashMap,
     ops::{Add, BitAnd, BitOr, BitXor, Neg, Not, Rem, Shl, Shr, Sub},
@@ -1128,7 +1128,10 @@ impl<'a> Builder<'a> {
                     expr: self.const_folding(expr),
                 })
             }
-            _ => println!("expr:{:?}", expr),
+            Expression::Variation(_) => {
+                warn!("expression {} ignored", expr)
+            }
+            _ => return Err(format!("expression {} not supported", expr)),
         }
 
         Ok(())

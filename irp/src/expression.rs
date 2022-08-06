@@ -1,4 +1,4 @@
-use super::{Expression, IrStream, Vartable};
+use super::{Expression, IrStream, RepeatMarker, Unit, Vartable};
 use std::{fmt, rc::Rc};
 
 impl fmt::Display for Expression {
@@ -77,7 +77,97 @@ impl fmt::Display for Expression {
                 }
                 write!(f, ")")
             }
-            expr => write!(f, "{:?}", expr),
+            Expression::Variation(variants) => {
+                for variant in variants {
+                    write!(f, "[")?;
+                    let mut first = true;
+                    for expr in variant {
+                        if !first {
+                            write!(f, ",")?;
+                        }
+                        write!(f, "{}", expr)?;
+                        first = false;
+                    }
+                    write!(f, "]")?;
+                }
+                write!(f, "")
+            }
+            Expression::FlashConstant(v, u) => {
+                write!(f, "{}{}", v, u)
+            }
+            Expression::GapConstant(v, u) => {
+                write!(f, "-{}{}", v, u)
+            }
+            Expression::FlashIdentifier(v, u) => {
+                write!(f, "{}{}", v, u)
+            }
+            Expression::GapIdentifier(v, u) => {
+                write!(f, "-{}{}", v, u)
+            }
+            Expression::ExtentConstant(v, u) => {
+                write!(f, "^{}{}", v, u)
+            }
+            Expression::ExtentIdentifier(v, u) => {
+                write!(f, "^{}{}", v, u)
+            }
+            Expression::Stream(stream) => {
+                // bitspec
+                if !stream.bit_spec.is_empty() {
+                    let mut iter = stream.bit_spec.iter();
+                    let mut next = iter.next();
+                    write!(f, "<")?;
+                    while let Some(expr) = next {
+                        write!(f, "{}", expr)?;
+                        next = iter.next();
+                        if next.is_some() {
+                            write!(f, "|")?;
+                        } else {
+                            write!(f, ">")?;
+                        }
+                    }
+                }
+
+                // stream
+                write!(f, "(")?;
+                let mut first = true;
+                for expr in &stream.stream {
+                    if !first {
+                        write!(f, ",")?;
+                    }
+                    write!(f, "{}", expr)?;
+                    first = false;
+                }
+                write!(f, ")")?;
+
+                // repeat marker
+                if let Some(repeat) = &stream.repeat {
+                    write!(f, "{}", repeat)
+                } else {
+                    write!(f, "")
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for Unit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Unit::Pulses => write!(f, "p"),
+            Unit::Microseconds => write!(f, "µs"),
+            Unit::Milliseconds => write!(f, "ms"),
+            Unit::Units => write!(f, ""),
+        }
+    }
+}
+
+impl fmt::Display for RepeatMarker {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RepeatMarker::Any => write!(f, "*"),
+            RepeatMarker::OneOrMore => write!(f, "+"),
+            RepeatMarker::Count(n) => write!(f, "{}", n),
+            RepeatMarker::CountOrMore(n) => write!(f, "{}+", n),
         }
     }
 }
