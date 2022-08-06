@@ -4,81 +4,10 @@ use super::{
 };
 use std::rc::Rc;
 
-/// Calculate inverse expression. For example:
-/// X=~(B-1) (B) => ~X=B-1 => ~X+1=B
-/// X=(102+B)-C (B) => X+C=102+B => X+C-102=B
 impl<'a> Builder<'a> {
-    pub fn expression_bits(&self, expr: &Rc<Expression>) -> Option<i64> {
-        match expr.as_ref() {
-            Expression::Identifier(id) => {
-                if let Some(param) = self.irp.parameters.iter().find(|param| &param.name == id) {
-                    self.param_to_mask(param).ok()
-                } else {
-                    None
-                }
-            }
-            Expression::BitwiseOr(left, right) | Expression::BitwiseXor(left, right) => {
-                if let (Some(left), Some(right)) =
-                    (self.expression_bits(left), self.expression_bits(right))
-                {
-                    Some(left | right)
-                } else {
-                    None
-                }
-            }
-            Expression::BitwiseAnd(left, right) => {
-                if let (Some(left), Some(right)) =
-                    (self.expression_bits(left), self.expression_bits(right))
-                {
-                    Some(left & right)
-                } else {
-                    None
-                }
-            }
-            Expression::ShiftLeft(left, right) => {
-                if let (Expression::Number(no), Some(mask)) =
-                    (right.as_ref(), self.expression_bits(left))
-                {
-                    Some(mask << no)
-                } else {
-                    None
-                }
-            }
-            Expression::ShiftRight(left, right) => {
-                if let (Expression::Number(no), Some(mask)) =
-                    (right.as_ref(), self.expression_bits(left))
-                {
-                    Some(mask >> no)
-                } else {
-                    None
-                }
-            }
-            Expression::BitField { length, .. } => {
-                let length = if let Expression::Number(length) = self.const_folding(length).as_ref()
-                {
-                    *length
-                } else {
-                    return None;
-                };
-
-                Some(gen_mask(length))
-            }
-            Expression::Add(left, right) => {
-                if let (Some(left), Some(right)) =
-                    (self.expression_bits(left), self.expression_bits(right))
-                {
-                    let mut mask = left | right;
-                    mask |= (mask as u64).next_power_of_two() as i64;
-
-                    Some(mask)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-
+    /// Calculate inverse expression. For example:
+    /// X=~(B-1) (B) => ~X=B-1 => ~X+1=B
+    /// X=(102+B)-C (B) => X+C=102+B => X+C-102=B
     pub fn inverse(
         &self,
         left: Rc<Expression>,
@@ -416,6 +345,78 @@ impl<'a> Builder<'a> {
                     vec![],
                     Some(gen_mask(length) << skip),
                 ))
+            }
+            _ => None,
+        }
+    }
+
+    /// For the expression, return the bits which may be set, or None for unknown
+    fn expression_bits(&self, expr: &Rc<Expression>) -> Option<i64> {
+        match expr.as_ref() {
+            Expression::Identifier(id) => {
+                if let Some(param) = self.irp.parameters.iter().find(|param| &param.name == id) {
+                    self.param_to_mask(param).ok()
+                } else {
+                    None
+                }
+            }
+            Expression::BitwiseOr(left, right) | Expression::BitwiseXor(left, right) => {
+                if let (Some(left), Some(right)) =
+                    (self.expression_bits(left), self.expression_bits(right))
+                {
+                    Some(left | right)
+                } else {
+                    None
+                }
+            }
+            Expression::BitwiseAnd(left, right) => {
+                if let (Some(left), Some(right)) =
+                    (self.expression_bits(left), self.expression_bits(right))
+                {
+                    Some(left & right)
+                } else {
+                    None
+                }
+            }
+            Expression::ShiftLeft(left, right) => {
+                if let (Expression::Number(no), Some(mask)) =
+                    (right.as_ref(), self.expression_bits(left))
+                {
+                    Some(mask << no)
+                } else {
+                    None
+                }
+            }
+            Expression::ShiftRight(left, right) => {
+                if let (Expression::Number(no), Some(mask)) =
+                    (right.as_ref(), self.expression_bits(left))
+                {
+                    Some(mask >> no)
+                } else {
+                    None
+                }
+            }
+            Expression::BitField { length, .. } => {
+                let length = if let Expression::Number(length) = self.const_folding(length).as_ref()
+                {
+                    *length
+                } else {
+                    return None;
+                };
+
+                Some(gen_mask(length))
+            }
+            Expression::Add(left, right) => {
+                if let (Some(left), Some(right)) =
+                    (self.expression_bits(left), self.expression_bits(right))
+                {
+                    let mut mask = left | right;
+                    mask |= (mask as u64).next_power_of_two() as i64;
+
+                    Some(mask)
+                } else {
+                    None
+                }
             }
             _ => None,
         }
