@@ -143,7 +143,7 @@ impl<'a> Builder<'a> {
 
     fn is_set(&self, name: &str, fields: i64) -> bool {
         if let Some(e) = self.cur.vars.get(name) {
-            (e & fields) != 0
+            (e & fields) == fields
         } else {
             false
         }
