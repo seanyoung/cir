@@ -693,14 +693,13 @@ fn inverse2() {
 fn inverse3() {
     use crate::Irp;
 
-    // PARSER BUG! ){A0=F+128*T+D<<8}
+    // TODO: PARSER BUG! ){A0=F+128*T+D<<8}
     let irp = Irp::parse(
         "{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T){A0=F+128*T+(D<<8)}[D:0..31,F:0..127,T@:0..1=0]",
     )
     .unwrap();
 
     let builder = Builder::new(&irp);
-    // first
 
     if let Expression::Assignment(_, expr) = &irp.definitions[0] {
         let left = Rc::new(Expression::Identifier("A0".to_owned()));
@@ -722,7 +721,6 @@ fn inverse3() {
     .unwrap();
 
     let builder = Builder::new(&irp);
-    // first
 
     if let Expression::Assignment(_, expr) = &irp.definitions[0] {
         let left = Rc::new(Expression::Identifier("B0".to_owned()));
