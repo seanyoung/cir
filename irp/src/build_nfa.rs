@@ -306,15 +306,15 @@ impl<'a> Builder<'a> {
                     let (min_len, max_len, _) = self.bit_field_length(length)?;
 
                     // if variable length bit field is preceded by a constant length fields, process
-                    // those separately
+                    // those before this one
                     if expr_count != 0 && max_len != min_len {
                         break;
                     }
 
-                    if min_len > 64 || max_len > 64 {
+                    if max_len > 64 {
                         return Err(format!(
-                            "bitfields of {}..{} longer than the 64 maximum",
-                            min_len, max_len
+                            "bitfield of length {} longer than the 64 maximum",
+                            max_len
                         ));
                     }
 
@@ -382,10 +382,6 @@ impl<'a> Builder<'a> {
                     let (min_len, max_len, store_length) = self.bit_field_length(length)?;
 
                     if min_len != max_len {
-                        if let Some(length) = &store_length {
-                            self.set(length, !0);
-                        }
-
                         self.decode_bits(Some(min_len), max_len, *reverse, store_length, bit_spec)?;
 
                         let skip = if let Some(skip) = skip {
@@ -468,25 +464,25 @@ impl<'a> Builder<'a> {
 
                     let mut value = self.const_folding(value);
 
-                    let bits = Expression::Identifier(String::from("$bits"));
+                    let bits = Rc::new(Expression::Identifier(String::from("$bits")));
 
                     #[allow(clippy::comparison_chain)]
                     let mut bits = if offset > skip {
-                        Expression::ShiftRight(
-                            Rc::new(bits),
+                        Rc::new(Expression::ShiftRight(
+                            bits,
                             Rc::new(Expression::Number(offset - skip)),
-                        )
+                        ))
                     } else if offset < skip {
-                        Expression::ShiftLeft(
-                            Rc::new(bits),
+                        Rc::new(Expression::ShiftLeft(
+                            bits,
                             Rc::new(Expression::Number(skip - offset)),
-                        )
+                        ))
                     } else {
                         bits
                     };
 
                     if *reverse && !do_reverse {
-                        bits = Expression::BitReverse(Rc::new(bits), length, skip);
+                        bits = Rc::new(Expression::BitReverse(bits, length, skip));
                     }
 
                     let mask = gen_mask(length) << skip;
@@ -499,17 +495,17 @@ impl<'a> Builder<'a> {
                         Expression::Complement(comp) => {
                             if matches!(comp.as_ref(), Expression::Identifier(..)) {
                                 value = comp.clone();
-                                bits = Expression::BitwiseAnd(
-                                    Rc::new(Expression::Complement(Rc::new(bits))),
+                                bits = Rc::new(Expression::BitwiseAnd(
+                                    Rc::new(Expression::Complement(bits)),
                                     Rc::new(Expression::Number(mask)),
-                                );
+                                ));
                             }
                         }
                         _ => {
-                            bits = Expression::BitwiseAnd(
-                                Rc::new(bits),
+                            bits = Rc::new(Expression::BitwiseAnd(
+                                bits,
                                 Rc::new(Expression::Number(mask)),
-                            );
+                            ));
                         }
                     };
 
@@ -518,11 +514,11 @@ impl<'a> Builder<'a> {
                             // We know all the variables in here or its constant
                             self.check_bits_in_var(value, bits, mask)?;
                         }
-                        Err(name) => match self.inverse(Rc::new(bits), value.clone(), &name) {
+                        Err(name) => match self.inverse(bits, value.clone(), &name) {
                             Some((bits, actions, _)) => {
                                 actions.into_iter().for_each(|act| self.add_action(act));
 
-                                self.store_bits_in_var(&name, bits, mask, &mut delayed)?;
+                                self.use_decode_bits(&name, bits, mask, &mut delayed)?;
                             }
                             None => {
                                 return Err(format!("expression {} not supported", value));
@@ -567,11 +563,21 @@ impl<'a> Builder<'a> {
             Expression::Number(v) => Ok((*v, *v, None)),
             Expression::Identifier(name) => {
                 if let Some(param) = self.irp.parameters.iter().find(|def| def.name == *name) {
-                    Ok((
-                        param.min.eval(&self.constants)?.0,
-                        param.max.eval(&self.constants)?.0,
-                        Some(name.to_owned()),
-                    ))
+                    let min = param.min.eval(&self.constants)?.0;
+                    let max = param.max.eval(&self.constants)?.0;
+
+                    if min > max {
+                        Err(format!(
+                            "parameter {} has min > max ({} > {})",
+                            name, min, max
+                        ))
+                    } else {
+                        Ok((
+                            param.min.eval(&self.constants)?.0,
+                            param.max.eval(&self.constants)?.0,
+                            Some(name.to_owned()),
+                        ))
+                    }
                 } else {
                     Err(format!("bit field length {} is not a parameter", name))
                 }
@@ -580,7 +586,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn store_bits_in_var(
+    fn use_decode_bits(
         &mut self,
         name: &str,
         mut bits: Rc<Expression>,
@@ -666,10 +672,10 @@ impl<'a> Builder<'a> {
     fn check_bits_in_var(
         &mut self,
         value: Rc<Expression>,
-        bits: Expression,
+        bits: Rc<Expression>,
         mask: i64,
     ) -> Result<(), String> {
-        let left = Rc::new(bits);
+        let left = bits;
         let right = self.const_folding(&Rc::new(Expression::BitwiseAnd(
             value,
             Rc::new(Expression::Number(mask)),
@@ -791,6 +797,16 @@ impl<'a> Builder<'a> {
     ) -> Result<(), String> {
         self.cur.seen_edges = true;
 
+        let width = match bit_spec[0].len() {
+            2 => 1,
+            4 => 2,
+            8 => 3,
+            16 => 4,
+            w => {
+                return Err(format!("bit spec with {} fields not supported", w));
+            }
+        };
+
         if max == 1 && min.is_none() {
             let next = self.add_vertex();
 
@@ -826,15 +842,9 @@ impl<'a> Builder<'a> {
 
         self.set_head(entry);
 
-        let width = match bit_spec[0].len() {
-            2 => 1,
-            4 => 2,
-            8 => 3,
-            16 => 4,
-            w => {
-                return Err(format!("bit spec with {} fields not supported", w));
-            }
-        };
+        if let Some(length) = &store_length {
+            self.set(length, !0);
+        }
 
         let length = store_length.unwrap_or_else(|| String::from("$b"));
 
