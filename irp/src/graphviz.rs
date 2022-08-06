@@ -103,12 +103,6 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
                     vert_names[i], vert_names[*dest], var, unit
                 )
                 .unwrap(),
-                Edge::TrailingGap(dest) => writeln!(
-                    &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"trailing gap\"]",
-                    vert_names[i], vert_names[*dest],
-                )
-                .unwrap(),
                 Edge::BranchCond { yes, no, .. } => {
                     writeln!(
                         &mut file,

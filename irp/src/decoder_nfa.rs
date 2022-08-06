@@ -17,7 +17,7 @@ pub struct Decoder<'a> {
     pos: Vec<(usize, Vartable<'a>)>,
     abs_tolerance: u32,
     rel_tolerance: u32,
-    trailing_gap: u32,
+    max_gap: u32,
     nfa: &'a NFA,
     decoded: VecDeque<HashMap<String, i64>>,
 }
@@ -25,12 +25,12 @@ pub struct Decoder<'a> {
 impl NFA {
     /// Create a decoder with parameters. abs_tolerance is microseconds, rel_tolerance is in percentage,
     /// and trailing gap is the minimum gap in microseconds which must follow.
-    pub fn decoder(&self, abs_tolerance: u32, rel_tolerance: u32, trailing_gap: u32) -> Decoder {
+    pub fn decoder(&self, abs_tolerance: u32, rel_tolerance: u32, max_gap: u32) -> Decoder {
         Decoder {
             pos: Vec::new(),
             abs_tolerance,
             rel_tolerance,
-            trailing_gap,
+            max_gap,
             nfa: self,
             decoded: VecDeque::new(),
         }
@@ -224,23 +224,21 @@ impl<'a> Decoder<'a> {
                     }
                     Edge::Gap(expected, dest) => {
                         if let Some(ir @ InfraredData::Gap(received)) = ir {
-                            // if *expected >= self.trailing_gap as i64 {
-                            //     if received >= self.trailing_gap {
-                            //         let (success, vartab) = self.run_actions(pos, &vartab);
+                            if *expected >= self.max_gap as i64 {
+                                if received >= self.max_gap {
+                                    trace!(
+                                        "large gap matched gap {} (expected {}) => {}",
+                                        received,
+                                        *expected,
+                                        dest
+                                    );
 
-                            //         trace!(
-                            //             "large gap matched gap {} (expected {}) => {}",
-                            //             received,
-                            //             *expected,
-                            //             dest
-                            //         );
-
-                            //         if success {
-                            //             work.push((None, *dest, vartab));
-                            //         }
-                            //     }
-                            //} else
-                            if self.tolerance_eq(*expected as u32, received) {
+                                    let (success, vartab) = self.run_actions(*dest, &vartab);
+                                    if success {
+                                        work.push((None, *dest, vartab));
+                                    }
+                                }
+                            } else if self.tolerance_eq(*expected as u32, received) {
                                 trace!(
                                     "matched gap {} (expected {}) => {}",
                                     received,
@@ -276,23 +274,21 @@ impl<'a> Decoder<'a> {
                         let expected = res * unit;
 
                         if let Some(ir @ InfraredData::Gap(received)) = ir {
-                            // if *expected >= self.trailing_gap as i64 {
-                            //     if received >= self.trailing_gap {
-                            //         let (success, vartab) = self.run_actions(pos, &vartab);
+                            if expected >= self.max_gap as i64 {
+                                if received >= self.max_gap {
+                                    trace!(
+                                        "large gap matched gap {} (expected {}) => {}",
+                                        received,
+                                        expected,
+                                        dest
+                                    );
 
-                            //         trace!(
-                            //             "large gap matched gap {} (expected {}) => {}",
-                            //             received,
-                            //             *expected,
-                            //             dest
-                            //         );
-
-                            //         if success {
-                            //             work.push((None, *dest, vartab));
-                            //         }
-                            //     }
-                            //} else
-                            if self.tolerance_eq(expected as u32, received) {
+                                    let (success, vartab) = self.run_actions(*dest, &vartab);
+                                    if success {
+                                        work.push((None, *dest, vartab));
+                                    }
+                                }
+                            } else if self.tolerance_eq(expected as u32, received) {
                                 trace!(
                                     "matched gap {} (expected {}) => {}",
                                     received,
@@ -315,26 +311,6 @@ impl<'a> Decoder<'a> {
                                 let (success, vartab) = self.run_actions(*dest, &vartab);
                                 if success {
                                     work.push((Some(ir.consume(expected as u32)), *dest, vartab));
-                                }
-                            }
-                        } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
-                            new_pos.push((pos, vartab.clone()));
-                        }
-                    }
-                    Edge::TrailingGap(dest) => {
-                        if let Some(InfraredData::Gap(received)) = ir {
-                            let expected = self.trailing_gap;
-                            if received >= expected {
-                                trace!(
-                                    "matched trailing gap {} (expected {}) => {}",
-                                    received,
-                                    20000,
-                                    dest
-                                );
-
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
-                                if success {
-                                    work.push((None, *dest, vartab));
                                 }
                             }
                         } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {

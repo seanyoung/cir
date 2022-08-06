@@ -113,7 +113,7 @@ fn main() {
                         .long("relative-tolerance")
                         .help("Relative tolerance in %")
                         .takes_value(true)
-                        .default_value("30")
+                        .default_value("3")
                         .display_order(4),
                 )
                 .arg(

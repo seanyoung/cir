@@ -410,7 +410,7 @@ fn compare_decode_to_transmogrifier() {
             }
         };
 
-        let mut decoder = nfa.decoder(10, 3, 3000);
+        let mut decoder = nfa.decoder(10, 3, 20000);
 
         for data in InfraredData::from_u32_slice(&testcase.render[0]) {
             decoder.input(data);
@@ -425,7 +425,7 @@ fn compare_decode_to_transmogrifier() {
                     ("Zenith6", "F") => 63,
                     ("Zenith7", "F") => 127,
                     ("Zenith", "F") => (1 << res["D"]) - 1,
-                    ("NEC-Shirriff", "data") => (1 << res["length"]) - 1,
+                    ("NEC-Shirriff", "data") if res["length"] < 64 => (1 << res["length"]) - 1,
                     ("Fujitsu_Aircon_old", "tOn") => !0xf0,
 
                     _ => !0,
@@ -475,5 +475,5 @@ fn compare_decode_to_transmogrifier() {
     println!("tests: {} fails: {}", total_tests, fails);
 
     // TODO: we still have a whole bunch of fails
-    assert_eq!(fails, 12);
+    assert_eq!(fails, 10);
 }

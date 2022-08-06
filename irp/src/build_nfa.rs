@@ -10,7 +10,6 @@ use std::{
  * Here we build the decoder nfa (non-deterministic finite automation)
  *
  * TODO
- * - ExtentConstant may be very short. We should calculate minimum length
  * - (..)2 and other repeat markers are not supported
  * - Implement variants
  */
@@ -21,7 +20,6 @@ pub(crate) enum Edge {
     Gap(i64, usize),
     FlashVar(String, i64, usize),
     GapVar(String, i64, usize),
-    TrailingGap(usize),
     BranchCond {
         expr: Rc<Expression>,
         yes: usize,
@@ -130,6 +128,10 @@ impl<'a> Builder<'a> {
         } else {
             self.cur.vars.insert(name.to_owned(), fields);
         }
+    }
+
+    fn unset(&mut self, name: &str) {
+        self.cur.vars.remove(name);
     }
 
     pub fn is_set(&self, name: &str, fields: i64) -> bool {
@@ -296,6 +298,24 @@ impl<'a> Builder<'a> {
         bit_spec: &[&[Rc<Expression>]],
     ) -> Result<(), String> {
         let mut pos = 0;
+
+        // first find any extent
+        for e in list {
+            if let Expression::ExtentConstant(v, u) = e.as_ref() {
+                let len = u.eval_float(*v, &self.irp.general_spec)?;
+
+                self.add_action(Action::Set {
+                    var: "$extent".to_owned(),
+                    expr: Rc::new(Expression::Number(len)),
+                });
+
+                if self.is_any_set("$extent") {
+                    return Err("multiple extents not supported".to_owned());
+                }
+
+                self.set("$extent", !0);
+            }
+        }
 
         while pos < list.len() {
             let mut bit_count = 0;
@@ -1016,6 +1036,8 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge::Flash(len, node));
 
                 self.set_head(node);
+
+                self.subtract_extent(Rc::new(Expression::Number(len)));
             }
             Expression::GapConstant(v, u) => {
                 self.cur.seen_edges = true;
@@ -1027,6 +1049,8 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge::Gap(len, node));
 
                 self.set_head(node);
+
+                self.subtract_extent(Rc::new(Expression::Number(len)));
             }
             Expression::FlashIdentifier(var, unit) => {
                 if !self.is_any_set(var) {
@@ -1040,6 +1064,17 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge::FlashVar(var.to_owned(), unit, node));
 
                 self.set_head(node);
+
+                let mut expr = Rc::new(Expression::Identifier(var.to_owned()));
+
+                if unit != 1 {
+                    expr = Rc::new(Expression::Multiply(
+                        expr,
+                        Rc::new(Expression::Number(unit)),
+                    ));
+                }
+
+                self.subtract_extent(expr);
             }
             Expression::GapIdentifier(var, unit) => {
                 if !self.is_any_set(var) {
@@ -1053,6 +1088,17 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge::GapVar(var.to_owned(), unit, node));
 
                 self.set_head(node);
+
+                let mut expr = Rc::new(Expression::Identifier(var.to_owned()));
+
+                if unit != 1 {
+                    expr = Rc::new(Expression::Multiply(
+                        expr,
+                        Rc::new(Expression::Number(unit)),
+                    ));
+                }
+
+                self.subtract_extent(expr);
             }
             Expression::BitField { length, .. } => {
                 let (length, _) = length.eval(&Vartable::new())?;
@@ -1064,7 +1110,9 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::TrailingGap(node));
+                self.add_edge(Edge::GapVar("$extent".to_owned(), 1, node));
+
+                self.unset("$extent");
 
                 self.set_head(node);
             }
@@ -1256,6 +1304,21 @@ impl<'a> Builder<'a> {
         }
 
         Ok(())
+    }
+
+    /// Remove some value of the extend
+    fn subtract_extent(&mut self, expr: Rc<Expression>) {
+        if self.is_any_set("$extent") {
+            let expr = Rc::new(Expression::Subtract(
+                Rc::new(Expression::Identifier("$extent".to_owned())),
+                expr,
+            ));
+
+            self.add_action(Action::Set {
+                var: "$extent".to_owned(),
+                expr,
+            });
+        }
     }
 
     /// Constanting folding of expressions. This simply folds constants values and a few
