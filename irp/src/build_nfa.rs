@@ -935,11 +935,7 @@ impl<'a> Builder<'a> {
                 if irstream.repeat == Some(RepeatMarker::Any)
                     || irstream.repeat == Some(RepeatMarker::OneOrMore)
                 {
-                    let mut start = if self.cur.seen_edges {
-                        Some(self.cur.head)
-                    } else {
-                        None
-                    };
+                    let mut start = self.cur.head;
 
                     let done_before = if self.add_done()? {
                         let node = self.add_vertex();
@@ -948,9 +944,7 @@ impl<'a> Builder<'a> {
 
                         self.set_head(node);
 
-                        if start.is_some() {
-                            start = Some(node);
-                        }
+                        start = node;
 
                         self.add_edge(Edge::Branch(0));
 
@@ -970,9 +964,7 @@ impl<'a> Builder<'a> {
                         self.add_done()?;
                     }
 
-                    if let Some(start) = start {
-                        self.add_edge(Edge::Branch(start));
-                    }
+                    self.add_edge(Edge::Branch(start));
                 } else {
                     self.expression_list(&irstream.stream, &bit_spec)?;
                 }
