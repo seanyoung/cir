@@ -254,6 +254,8 @@ pub fn decode(matches: &clap::ArgMatches) {
                                     }
                                 } else {
                                     // lirc remote
+                                    let mut var: Vec<(String, i64)> = var.into_iter().collect();
+                                    var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                                     println!(
                                         "decoded: {}",
                                         var.iter()
@@ -311,6 +313,8 @@ fn process(
                     }
                 } else {
                     // lirc remote
+                    let mut var: Vec<(String, i64)> = var.into_iter().collect();
+                    var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                     println!(
                         "decoded: {}",
                         var.iter()
