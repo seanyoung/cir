@@ -356,6 +356,15 @@ pub fn receive(matches: &clap::ArgMatches) {
                             InputEventKind::Sound(sound) => {
                                 println!("{:?} {:?} {:#08x}", ty, sound, value);
                             }
+                            InputEventKind::ForceFeedback(ff) => {
+                                println!("forcefeedback {}", ff);
+                            }
+                            InputEventKind::ForceFeedbackStatus(ff) => {
+                                println!("forcefeedback status {}", ff);
+                            }
+                            InputEventKind::UInput(u) => {
+                                println!("uinput {}", u);
+                            }
                             InputEventKind::Other => {
                                 println!("other");
                             }
