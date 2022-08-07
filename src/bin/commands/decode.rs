@@ -146,6 +146,8 @@ pub fn decode(matches: &clap::ArgMatches) {
         if let Some(lircdev) = rcdev.lircdev {
             let lircpath = PathBuf::from(lircdev);
 
+            info!("opening lirc device: {}", lircpath.display());
+
             let mut lircdev = match lirc::open(&lircpath) {
                 Ok(l) => l,
                 Err(s) => {
@@ -206,10 +208,20 @@ pub fn decode(matches: &clap::ArgMatches) {
                     abs_tolerance
                 };
 
+                let max_gap = if let Ok(timeout) = lircdev.get_timeout() {
+                    info!("device reports timeout of {}, using as max_gap", timeout);
+
+                    timeout
+                } else {
+                    20000
+                };
+
                 // TODO: for each remote, use eps/aeps from lircd.conf if it was NOT specified on the command line
                 let mut matchers = irps
                     .iter()
-                    .map(|(remote, nfa)| (remote, nfa.decoder(abs_tolerance, rel_tolerance, 20000)))
+                    .map(|(remote, nfa)| {
+                        (remote, nfa.decoder(abs_tolerance, rel_tolerance, max_gap))
+                    })
                     .collect::<Vec<(&Option<&Remote>, Decoder)>>();
 
                 loop {
@@ -217,8 +229,6 @@ pub fn decode(matches: &clap::ArgMatches) {
                         eprintln!("error: {}", err);
                         std::process::exit(1);
                     }
-
-                    // TODO: print rawbuf to log.info()
 
                     for raw in &rawbuf {
                         let ir = if raw.is_pulse() {
@@ -230,6 +240,8 @@ pub fn decode(matches: &clap::ArgMatches) {
                         } else {
                             continue;
                         };
+
+                        info!("decoding: {}", ir);
 
                         for (remote, matcher) in &mut matchers {
                             matcher.input(ir);
