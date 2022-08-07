@@ -5,7 +5,7 @@ use cir::{
 };
 use irp::{mode2, rawir, Decoder, InfraredData, Irp, NFA};
 use itertools::Itertools;
-use log::{error, info};
+use log::{error, info, trace};
 use num_integer::Integer;
 use std::{
     fs,
@@ -146,7 +146,7 @@ pub fn decode(matches: &clap::ArgMatches) {
         if let Some(lircdev) = rcdev.lircdev {
             let lircpath = PathBuf::from(lircdev);
 
-            info!("opening lirc device: {}", lircpath.display());
+            trace!("opening lirc device: {}", lircpath.display());
 
             let mut lircdev = match lirc::open(&lircpath) {
                 Ok(l) => l,
@@ -209,9 +209,15 @@ pub fn decode(matches: &clap::ArgMatches) {
                 };
 
                 let max_gap = if let Ok(timeout) = lircdev.get_timeout() {
-                    info!("device reports timeout of {}, using as max_gap", timeout);
+                    let max_gap = (timeout * 9) / 10;
 
-                    timeout
+                    trace!(
+                        "device reports timeout of {}, using 90% of that as {} max_gap",
+                        timeout,
+                        max_gap
+                    );
+
+                    max_gap
                 } else {
                     20000
                 };
@@ -241,7 +247,7 @@ pub fn decode(matches: &clap::ArgMatches) {
                             continue;
                         };
 
-                        info!("decoding: {}", ir);
+                        trace!("decoding: {}", ir);
 
                         for (remote, matcher) in &mut matchers {
                             matcher.input(ir);
