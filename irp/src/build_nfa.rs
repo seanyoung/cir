@@ -12,6 +12,7 @@ use std::{
  * TODO
  * - (..)2 and other repeat markers are not supported
  * - Implement variants
+ * - Implement repeats properly
  */
 
 #[derive(PartialEq, Debug, Clone)]
