@@ -362,19 +362,6 @@ impl<'a> Decoder<'a> {
                             }
                         }
                     }
-                    Edge::Done(include) => {
-                        let mut res: HashMap<String, i64> = HashMap::new();
-
-                        for (name, (val, _, _)) in &vartab.vars {
-                            if include.contains(name) || name == "$repeat" {
-                                trace!("done");
-
-                                res.insert(name.to_owned(), *val);
-                            }
-                        }
-
-                        self.decoded.push_back(res);
-                    }
                 }
             }
         }
@@ -382,7 +369,7 @@ impl<'a> Decoder<'a> {
         self.pos = new_pos;
     }
 
-    fn run_actions<'v>(&self, pos: usize, vartab: &Vartable<'v>) -> (bool, Vartable<'v>) {
+    fn run_actions<'v>(&mut self, pos: usize, vartab: &Vartable<'v>) -> (bool, Vartable<'v>) {
         let mut vartable = vartab.clone();
 
         for a in &self.nfa.verts[pos].actions {
@@ -414,6 +401,19 @@ impl<'a> Decoder<'a> {
                             right_val
                         );
                     }
+                }
+                Action::Done(include) => {
+                    let mut res: HashMap<String, i64> = HashMap::new();
+
+                    for (name, (val, _, _)) in &vartable.vars {
+                        if include.contains(name) || name == "$repeat" {
+                            trace!("done");
+
+                            res.insert(name.to_owned(), *val);
+                        }
+                    }
+
+                    self.decoded.push_back(res);
                 }
             }
         }

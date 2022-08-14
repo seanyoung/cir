@@ -31,7 +31,6 @@ pub(crate) enum Edge {
         dest: usize,
     },
     Branch(usize),
-    Done(Vec<String>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -44,6 +43,7 @@ pub(crate) enum Action {
         left: Rc<Expression>,
         right: Rc<Expression>,
     },
+    Done(Vec<String>),
 }
 
 #[derive(PartialEq, Default, Clone, Debug)]
@@ -162,7 +162,7 @@ impl<'a> Builder<'a> {
                 .map(|param| param.name.to_owned())
                 .collect();
 
-            self.add_edge(Edge::Done(res));
+            self.add_action(Action::Done(res));
             self.mask_results()?;
             self.cur.seen_edges = false;
             Ok(true)
@@ -563,6 +563,7 @@ impl<'a> Builder<'a> {
                     Action::Set { expr, .. } => {
                         self.have_definitions(expr)?;
                     }
+                    Action::Done(_) => (),
                 }
                 self.add_action(action);
             }
