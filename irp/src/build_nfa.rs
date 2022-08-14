@@ -164,6 +164,7 @@ impl<'a> Builder<'a> {
 
             self.add_edge(Edge::Done(res));
             self.mask_results()?;
+            self.cur.seen_edges = false;
             Ok(true)
         } else {
             Ok(false)
