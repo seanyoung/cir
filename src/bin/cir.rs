@@ -375,7 +375,7 @@ fn main() {
                 .arg(Arg::new("READ").long("read-scancodes").short('l')),
         )
         .subcommand(
-            Command::new("receive")
+            Command::new("test-config")
                 .about("Receive IR and print to stdout")
                 .arg(
                     Arg::new("LIRCDEV")
@@ -439,7 +439,7 @@ fn main() {
                 std::process::exit(1);
             }
         },
-        Some(("receive", matches)) => commands::receive::receive(matches),
+        Some(("test-config", matches)) => commands::test_config::test_config(matches),
         Some(("config", matches)) => commands::config::config(matches),
         _ => unreachable!(),
     }
