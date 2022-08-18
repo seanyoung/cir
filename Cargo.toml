@@ -15,10 +15,10 @@ serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
 iocuddle = "0.1.1"
 itertools = "0.10"
-evdev = "0.11.6"
+evdev = "0.12"
 mio = { version = "0.8", features = [ "os-poll", "os-ext" ] }
 libc = "0.2"
-nix = "0.24"
+nix = "0.25"
 regex = "1"
 unicode-xid = "0.2"
 humantime = "2.1"
