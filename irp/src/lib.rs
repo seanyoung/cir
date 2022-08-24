@@ -160,8 +160,6 @@ pub mod rawir;
 #[cfg(test)]
 mod tests;
 
-include!(concat!(env!("OUT_DIR"), "/irp.rs"));
-
 use std::{collections::HashMap, rc::Rc};
 
 #[derive(Debug, PartialEq, Default, Eq)]
