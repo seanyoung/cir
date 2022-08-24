@@ -1,3 +1,5 @@
+#![feature(test)]
+
 //! This library parses IRP, and encodes IR with the provided parameters, and can decode
 //! using NFA based decoder compiled from IRP.
 //! This can then be used for IR transmission and receiving. You can also use the library to

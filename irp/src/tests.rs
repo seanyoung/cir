@@ -1,9 +1,12 @@
+#![feature(test)]
 use crate::protocols::parse;
 use crate::rawir;
 use crate::InfraredData;
 use crate::{Irp, Vartable};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+extern crate test;
+use test::Bencher;
 
 #[test]
 fn test() {
@@ -234,6 +237,19 @@ fn parse_all_of_them() {
     if broken != 0 {
         panic!("{} out of {} broken", broken, total);
     }
+}
+
+#[bench]
+fn parse_all(b: &mut Bencher) {
+    let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
+
+    b.iter(|| {
+        for p in &protocols {
+            if let Err(s) = Irp::parse(&p.irp) {
+                panic!("parse:{}", s);
+            }
+        }
+    });
 }
 
 fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
