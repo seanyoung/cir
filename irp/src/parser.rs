@@ -1,19 +1,336 @@
-use super::irp;
 use super::{Expression, GeneralSpec, IrStream, Irp, ParameterSpec, RepeatMarker, Unit};
-use num::Num;
 use std::{rc::Rc, str::FromStr};
+
+#[derive(PartialEq)]
+enum GeneralItem<'a> {
+    Msb,
+    Lsb,
+    Value(f64, Option<&'a str>),
+}
+
+peg::parser! {
+    grammar irp_parser() for str {
+        pub(super) rule irp() -> (Vec<GeneralItem<'input>>, Expression, Vec<Expression>, Vec<ParameterSpec>)
+         = gs:general_spec() stream:bitspec_irstream() def:definitions()* specs:parameter_specs()?
+        {
+            let defs: Vec<Expression> = def.into_iter().flatten().collect();
+            let specs = specs.unwrap_or_default();
+
+            (gs, stream, defs, specs)
+        }
+
+        rule general_spec() -> Vec<GeneralItem<'input>>
+         = _ "{" _ items:(general_item() ** ",") "}" _ { items }
+
+        rule general_item() -> GeneralItem<'input>
+         = _ "msb" _ { GeneralItem::Msb }
+         / _ "lsb" _ { GeneralItem::Lsb }
+         / _ v:number_decimals() _ u:$("u" / "p" / "k" / "%")? _ { GeneralItem::Value(v, u) }
+
+        rule number_decimals() -> f64
+         = n:$(['0'..='9']+ "." ['0'..='9']+)
+         {? match f64::from_str(n) { Ok(n) => Ok(n), Err(_) => Err("f64") } }
+         / n:$(['0'..='9']+)
+         {? match f64::from_str(n) { Ok(n) => Ok(n), Err(_) => Err("f64") } }
+
+        rule definitions() -> Vec<Expression>
+         = "{" _ def:(definition() ** ("," _)) "}" _ { def }
+
+        rule definition() -> Expression
+         = i:identifier() _ "=" _ e:expression() _ { Expression::Assignment(i.to_owned(), Rc::new(e)) }
+
+        #[cache_left_rec]
+        rule expression() -> Expression
+         = cond:expression() "?" _ left:expression2() ":" _ right:expression2()
+           { Expression::Ternary(Rc::new(cond), Rc::new(left), Rc::new(right)) }
+         / expression2()
+
+        #[cache_left_rec]
+        rule expression2() -> Expression
+         = left:expression2() "||" _ right:expression3()
+           { Expression::Or(Rc::new(left), Rc::new(right)) }
+         / expression3()
+
+        #[cache_left_rec]
+        rule expression3() -> Expression
+         = left:expression3() "&&" _ right:expression4()
+           { Expression::And(Rc::new(left), Rc::new(right)) }
+         / expression4()
+
+        #[cache_left_rec]
+        rule expression4() -> Expression
+         = left:expression4() "|" _ right:expression5()
+           { Expression::BitwiseOr(Rc::new(left), Rc::new(right)) }
+         / expression5()
+
+        #[cache_left_rec]
+        rule expression5() -> Expression
+         = left:expression5() "&" _ right:expression6()
+         { Expression::BitwiseAnd(Rc::new(left), Rc::new(right)) }
+         / expression6()
+
+        #[cache_left_rec]
+        rule expression6() -> Expression
+        = left:expression6() "^" _ right:expression7()
+        { Expression::BitwiseXor(Rc::new(left), Rc::new(right)) }
+        / expression7()
+
+        #[cache_left_rec]
+        rule expression7() -> Expression
+         = left:expression7() "!=" _ right:expression8()
+         { Expression::NotEqual(Rc::new(left), Rc::new(right)) }
+         / left:expression7() "==" _ right:expression8()
+         { Expression::Equal(Rc::new(left), Rc::new(right)) }
+         / expression8()
+
+        #[cache_left_rec]
+        rule expression8() -> Expression
+         = left:expression8() "<=" _ right:expression9()
+         { Expression::LessEqual(Rc::new(left), Rc::new(right)) }
+         / left:expression8() ">=" _ right:expression9()
+         { Expression::MoreEqual(Rc::new(left), Rc::new(right)) }
+         / left:expression8() "<" _ right:expression9()
+         { Expression::Less(Rc::new(left), Rc::new(right)) }
+         / left:expression8() ">" _ right:expression9()
+         { Expression::More(Rc::new(left), Rc::new(right)) }
+         / expression9()
+
+        #[cache_left_rec]
+        rule expression9() -> Expression
+         = left:expression9() "<<" _ right:expression10()
+         { Expression::ShiftLeft(Rc::new(left), Rc::new(right)) }
+         / left:expression9() ">>" _ right:expression10()
+         { Expression::ShiftRight(Rc::new(left), Rc::new(right)) }
+         / expression10()
+
+        #[cache_left_rec]
+        rule expression10() -> Expression
+         = left:expression10() "+" _ right:expression11()
+         { Expression::Add(Rc::new(left), Rc::new(right)) }
+         / left:expression10() "-" _ right:expression11()
+         { Expression::Subtract(Rc::new(left), Rc::new(right)) }
+         / expression11()
+
+        #[cache_left_rec]
+        rule expression11() -> Expression
+        = left:expression11() "*" _ right:expression12()
+         { Expression::Multiply(Rc::new(left), Rc::new(right)) }
+         / left:expression11() "/" _ right:expression12()
+         { Expression::Divide(Rc::new(left), Rc::new(right)) }
+         / left:expression11() "%" _ right:expression12()
+         { Expression::Modulo(Rc::new(left), Rc::new(right)) }
+         / expression12()
+
+        #[cache_left_rec]
+        rule expression12() -> Expression
+         = left:expression12() "**" _ right:expression13()
+         { Expression::Power(Rc::new(left), Rc::new(right)) }
+         / expression13()
+
+        #[cache_left_rec]
+        rule expression13() -> Expression
+         = "#" _ expr:expression14()
+         { Expression::BitCount(Rc::new(expr)) }
+         / expression14()
+
+        #[cache_left_rec]
+        rule expression14() -> Expression
+         = "!" _ expr:expression15()
+         { Expression::Not(Rc::new(expr)) }
+         / expression15()
+
+        #[cache_left_rec]
+        rule expression15() -> Expression
+         = "-" _ expr:expression16()
+         { Expression::Negative(Rc::new(expr)) }
+         / expression16()
+
+        #[cache_left_rec]
+        rule expression16() -> Expression
+         = "~" _ expr:expression17()
+         { Expression::Complement(Rc::new(expr)) }
+         / expression17()
+
+        #[cache_left_rec]
+        rule expression17() -> Expression
+         = bit_field() / primary_item()
+
+        rule bit_field() -> Expression
+         = complement:"~"? _ value:primary_item() ":" _ reverse:"-"? length:primary_item() skip:skip()?
+         {
+            let value = if complement.is_some() {
+                Rc::new(Expression::Complement(Rc::new(value)))
+            } else {
+                Rc::new(value)
+            };
+
+            Expression::BitField {
+                value,
+                reverse: reverse.is_some(),
+                length: Rc::new(length),
+                skip: skip.map(Rc::new),
+            }
+         }
+         / complement:"~"? _ value:primary_item() "::" _ skip:primary_item()
+         {
+            let value = if complement.is_some() {
+                Rc::new(Expression::Complement(Rc::new(value)))
+            } else {
+                Rc::new(value)
+            };
+
+            Expression::InfiniteBitField {
+                value,
+                skip: Rc::new(skip),
+            }
+         }
+
+        rule skip() -> Expression
+         = ":" _ skip:primary_item() { skip }
+
+        rule primary_item() -> Expression
+         = number()
+         / i:identifier() _ { Expression::Identifier(i.to_owned()) }
+         / "(" _ e:expression() ")" _ { e }
+
+        rule identifier() -> &'input str
+         = quiet!{$([ 'a'..='z' | 'A'..='Z']['a'..='z' | 'A'..='Z' | '0'..='9' ]*)}
+         / expected!("identifier")
+
+        rule number() -> Expression
+         = "0x" n:$(['0'..='9' | 'a'..='f' | 'A'..='F']+) _
+         {? match i64::from_str_radix(n, 16) { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
+         / "0b" n:$(['0'..='1']+) _
+         {? match i64::from_str_radix(n, 2) { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
+         / n:$(['0'..='9']+) _
+         {? match n.parse() { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
+         / "UINT8_MAX" _ { Expression::Number(u8::MAX as i64) }
+         / "UINT16_MAX" _ { Expression::Number(u16::MAX as i64) }
+         / "UINT32_MAX" _ { Expression::Number(u32::MAX as i64) }
+         / "UINT64_MAX" _ { Expression::Number(u64::MAX as i64) }
+
+        rule duration() -> Expression
+         = id:identifier() _ unit:unit() { Expression::FlashIdentifier(id.to_owned(), unit) }
+         / "-" id:identifier() _ unit:unit() { Expression::GapIdentifier(id.to_owned(), unit) }
+         / "^" id:identifier() _ unit:unit() { Expression::ExtentIdentifier(id.to_owned(), unit) }
+         / number:number_decimals() _ unit:unit() { Expression::FlashConstant(number, unit) }
+         / "-" number:number_decimals() _ unit:unit() { Expression::GapConstant(number, unit) }
+         / "^" number:number_decimals() _ unit:unit() { Expression::ExtentConstant(number, unit)}
+
+        rule unit() -> Unit
+         = "m" _ { Unit::Milliseconds }
+         / "u" _ { Unit::Microseconds }
+         / "p" _ { Unit::Pulses }
+         / _ { Unit::Units }
+
+        rule bare_irstream() -> Vec<Rc<Expression>>
+         = items:(irstream_item() ** ("," _)) { items }
+
+        rule irstream() -> Expression
+         = "(" _ stream:bare_irstream() ")" _ repeat:repeat_marker()?
+         {
+            Expression::Stream(IrStream {
+                bit_spec: Vec::new(),
+                stream,
+                repeat,
+            })
+         }
+
+        rule repeat_marker() -> RepeatMarker
+         = "*" _ { RepeatMarker::Any }
+         / "+" _ { RepeatMarker::OneOrMore }
+         / n:$(['0'..='9']+) _ more:"+"? _
+         {?
+            match n.parse() {
+                Ok(n) if more.is_some() => Ok(RepeatMarker::CountOrMore(n)),
+                Ok(n) => Ok(RepeatMarker::Count(n)),
+                Err(_) => Err("i64")
+            }
+         }
+
+        rule irstream_item() -> Rc<Expression>
+         = item:(variation()
+         / bit_field()
+         / definition()
+         / duration()
+         / irstream()
+         / bitspec_irstream()) { Rc::new(item) }
+
+        rule bitspec_item() -> Rc<Expression>
+         = item:(variation()
+         / bit_field()
+         / bitspec_definition()
+         / duration()
+         / irstream()
+         / bitspec_irstream()) { Rc::new(item) }
+
+        rule bitspec_definition() -> Expression
+         = i:identifier() _ "=" _ e:primary_item() _ { Expression::Assignment(i.to_owned(), Rc::new(e)) }
+
+        rule bare_bitspec() -> Rc<Expression>
+         = bitspec:(bitspec_item() ++ ("," _))
+         { Rc::new(Expression::List(bitspec)) }
+
+        rule bitspec() -> Vec<Rc<Expression>>
+         = "<" _ bare:(bare_bitspec() ++ ("|" _)) ">" _ { bare }
+
+        rule bitspec_irstream() -> Expression
+         = bit_spec:bitspec() irstream:irstream() {
+            if let Expression::Stream(mut stream) = irstream {
+                stream.bit_spec = bit_spec;
+
+                Expression::Stream(stream)
+            } else {
+                unreachable!()
+            }
+         }
+
+        rule variation() -> Expression
+         = a1:alternative() a2:alternative() a3:alternative()?
+         {
+            let mut list = vec![a1, a2];
+
+            if let Some(e) = a3 {
+                list.push(e);
+            }
+
+            Expression::Variation(list)
+         }
+
+        rule alternative() -> Vec<Rc<Expression>>
+         = "[" _ bare:bare_irstream() "]" _ { bare }
+
+        rule parameter_specs() -> Vec<ParameterSpec>
+         = "[" _ specs:(parameter_spec() ++ ("," _)) "]" _ { specs }
+
+        rule parameter_spec() -> ParameterSpec
+         = id:identifier() _ memory:"@"? _ ":" _ min:number() _ ".." _ max:number() _ default:initializer()?
+         {
+            ParameterSpec {
+                name: id.to_owned(),
+                memory: memory.is_some(),
+                min,
+                max,
+                default,
+            }
+        }
+
+        rule initializer() -> Expression
+         = "=" _ expr:expression() { expr }
+
+        rule _ = quiet!{(commentline() / commentblock() / [' ' | '\n' | '\r' | '\t'])*}
+
+        rule commentline() = "//" [^'\n']*
+        rule commentblock() = "/*" ([_] !"*/")* [_] "*/"
+    }
+}
 
 /// Parse an irp into an AST type representation
 impl Irp {
     pub fn parse(input: &str) -> Result<Irp, String> {
-        let mut parser = irp::PEG::new();
-
-        match parser.parse(input) {
-            Ok(node) => {
-                let general_spec = general_spec(&node.children[0], input)?;
-                let stream = bitspec_irstream(&node.children[1], input)?;
-                let definitions = definitions(&node.children[2], input)?;
-                let parameters = parameters(&node.children[3], input)?;
+        match irp_parser::irp(input) {
+            Ok((general, stream, definitions, parameters)) => {
+                let general_spec = general_spec(&general)?;
 
                 Ok(Irp {
                     general_spec,
@@ -22,7 +339,7 @@ impl Irp {
                     parameters,
                 })
             }
-            Err(pos) => Err(format!("parse error at {}:{}", pos.0, pos.1)),
+            Err(pos) => Err(format!("parse error at {}", pos)),
         }
     }
 
@@ -51,25 +368,7 @@ impl Irp {
     }
 }
 
-fn collect_rules(node: &irp::Node, rule: irp::Rule) -> Vec<&irp::Node> {
-    let mut list = Vec::new();
-
-    fn recurse<'t>(node: &'t irp::Node, rule: irp::Rule, list: &mut Vec<&'t irp::Node>) {
-        if node.rule == rule {
-            list.push(node);
-        } else {
-            for node in &node.children {
-                recurse(node, rule, list);
-            }
-        }
-    }
-
-    recurse(node, rule, &mut list);
-
-    list
-}
-
-fn general_spec(node: &irp::Node, input: &str) -> Result<GeneralSpec, String> {
+fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
     let mut res = GeneralSpec {
         duty_cycle: None,
         carrier: None,
@@ -80,15 +379,20 @@ fn general_spec(node: &irp::Node, input: &str) -> Result<GeneralSpec, String> {
     let mut unit = None;
     let mut lsb = None;
 
-    for node in collect_rules(node, irp::Rule::general_item) {
-        let s = node.as_str(input);
+    for item in items {
+        match item {
+            GeneralItem::Lsb | GeneralItem::Msb => {
+                if lsb.is_some() {
+                    return Err("bit order (lsb,msb) specified twice".to_string());
+                }
 
-        if matches!(node.alternative, Some(2) | Some(3)) {
-            let v = f64::from_str(node.children[0].as_str(input)).unwrap();
+                lsb = Some(*item == GeneralItem::Lsb);
+            }
+            GeneralItem::Value(v, u) => {
+                let v = *v;
 
-            let u = if node.alternative == Some(2) {
-                match node.children[2].as_str(input) {
-                    "%" => {
+                let u = match u {
+                    Some("%") => {
                         if v < 1.0 {
                             return Err("duty cycle less than 1% not valid".to_string());
                         }
@@ -103,7 +407,7 @@ fn general_spec(node: &irp::Node, input: &str) -> Result<GeneralSpec, String> {
 
                         continue;
                     }
-                    "k" => {
+                    Some("k") => {
                         if res.carrier.is_some() {
                             return Err("carrier frequency specified twice".to_string());
                         }
@@ -112,29 +416,13 @@ fn general_spec(node: &irp::Node, input: &str) -> Result<GeneralSpec, String> {
 
                         continue;
                     }
-                    "p" => Unit::Pulses,
-                    "u" => Unit::Units,
+                    Some("p") => Unit::Pulses,
+                    Some("u") => Unit::Units,
+                    None => Unit::Units,
                     _ => unreachable!(),
-                }
-            } else {
-                Unit::Units
-            };
+                };
 
-            if unit.is_some() {
-                return Err("unit specified twice".to_string());
-            }
-
-            unit = Some((v, u));
-        } else {
-            match s {
-                "msb" | "lsb" => {
-                    if lsb.is_some() {
-                        return Err("bit order (lsb,msb) specified twice".to_string());
-                    }
-
-                    lsb = Some(s == "lsb");
-                }
-                _ => unreachable!(),
+                unit = Some((v, u));
             }
         }
     }
@@ -158,320 +446,4 @@ fn general_spec(node: &irp::Node, input: &str) -> Result<GeneralSpec, String> {
     }
 
     Ok(res)
-}
-
-fn definitions(node: &irp::Node, input: &str) -> Result<Vec<Expression>, String> {
-    let mut list = Vec::new();
-
-    for node in collect_rules(node, irp::Rule::definition) {
-        list.push(expression(node, input)?);
-    }
-
-    Ok(list)
-}
-
-fn parameters(node: &irp::Node, input: &str) -> Result<Vec<ParameterSpec>, String> {
-    let mut list = Vec::new();
-
-    for node in collect_rules(node, irp::Rule::parameter_spec) {
-        let name = node.children[0].as_str(input).to_owned();
-        let memory = !node.children[2].is_empty();
-        let min = expression(&node.children[6], input)?;
-        let max = expression(&node.children[10], input)?;
-        let default_node = &node.children[12];
-
-        let default = if default_node.is_empty() {
-            None
-        } else {
-            Some(expression(&default_node.children[1], input)?)
-        };
-
-        list.push(ParameterSpec {
-            name,
-            memory,
-            min,
-            max,
-            default,
-        });
-    }
-
-    Ok(list)
-}
-
-fn expression(node: &irp::Node, input: &str) -> Result<Expression, String> {
-    match node.rule {
-        irp::Rule::expression
-        | irp::Rule::expression2
-        | irp::Rule::expression3
-        | irp::Rule::expression4
-        | irp::Rule::expression5
-        | irp::Rule::expression6
-        | irp::Rule::expression7
-        | irp::Rule::expression8
-        | irp::Rule::expression9
-        | irp::Rule::expression10
-        | irp::Rule::expression11
-        | irp::Rule::expression12
-        | irp::Rule::expression13
-        | irp::Rule::expression14
-        | irp::Rule::expression15
-        | irp::Rule::expression16 => {
-            // expression1
-            if node.children.len() == 3 {
-                let expr = Rc::new(expression(&node.children[2], input)?);
-                match node.children[0].as_str(input) {
-                    "#" => Ok(Expression::BitCount(expr)),
-                    "!" => Ok(Expression::Not(expr)),
-                    "~" => Ok(Expression::Complement(expr)),
-                    "-" => Ok(Expression::Negative(expr)),
-                    op => panic!("{} not expected", op),
-                }
-            } else if node.children.len() == 4 {
-                let left = Rc::new(expression(&node.children[0], input)?);
-                let right = Rc::new(expression(&node.children[3], input)?);
-
-                match node.children[1].as_str(input) {
-                    "*" => Ok(Expression::Multiply(left, right)),
-                    "/" => Ok(Expression::Divide(left, right)),
-                    "%" => Ok(Expression::Modulo(left, right)),
-                    "+" => Ok(Expression::Add(left, right)),
-                    "-" => Ok(Expression::Subtract(left, right)),
-                    "<<" => Ok(Expression::ShiftLeft(left, right)),
-                    ">>" => Ok(Expression::ShiftRight(left, right)),
-                    "<=" => Ok(Expression::LessEqual(left, right)),
-                    ">=" => Ok(Expression::MoreEqual(left, right)),
-                    ">" => Ok(Expression::More(left, right)),
-                    "<" => Ok(Expression::Less(left, right)),
-                    "!=" => Ok(Expression::NotEqual(left, right)),
-                    "==" => Ok(Expression::Equal(left, right)),
-                    "&" => Ok(Expression::BitwiseAnd(left, right)),
-                    "|" => Ok(Expression::BitwiseOr(left, right)),
-                    "^" => Ok(Expression::BitwiseXor(left, right)),
-                    "&&" => Ok(Expression::And(left, right)),
-                    "||" => Ok(Expression::Or(left, right)),
-                    "**" => Ok(Expression::Power(left, right)),
-                    _ => unimplemented!(),
-                }
-            } else if node.children.len() == 6 {
-                let cond = Rc::new(expression(&node.children[0], input)?);
-                let left = Rc::new(expression(&node.children[3], input)?);
-                let right = Rc::new(expression(&node.children[6], input)?);
-
-                Ok(Expression::Ternary(cond, left, right))
-            } else {
-                // expression2
-                expression(&node.children[0], input)
-            }
-        }
-        irp::Rule::expression17 => expression(&node.children[0], input),
-        irp::Rule::primary_item => match node.alternative {
-            Some(0) => expression(&node.children[0], input),
-            Some(1) => {
-                let s = node.children[0].as_str(input);
-
-                Ok(Expression::Identifier(s.to_owned()))
-            }
-            Some(2) => expression(&node.children[2], input),
-            _ => unreachable!(),
-        },
-        irp::Rule::bit_field => {
-            let mut value = Rc::new(expression(&node.children[2], input)?);
-            if !node.children[0].is_empty() {
-                value = Rc::new(Expression::Complement(value));
-            }
-            match node.alternative {
-                Some(0) => {
-                    let reverse = !node.children[5].is_empty();
-                    let length = Rc::new(expression(&node.children[7], input)?);
-
-                    let skip_node = &node.children[8];
-
-                    let skip = if skip_node.children.is_empty() {
-                        None
-                    } else {
-                        Some(Rc::new(expression(&skip_node.children[2], input)?))
-                    };
-
-                    Ok(Expression::BitField {
-                        value,
-                        length,
-                        reverse,
-                        skip,
-                    })
-                }
-                Some(1) => {
-                    let skip = Rc::new(expression(&node.children[5], input)?);
-
-                    Ok(Expression::InfiniteBitField { value, skip })
-                }
-                _ => unreachable!(),
-            }
-        }
-        irp::Rule::number => {
-            // number
-            let s = node.as_str(input);
-
-            if s == "UINT8_MAX" {
-                Ok(Expression::Number(u8::MAX as i64))
-            } else if s == "UINT16_MAX" {
-                Ok(Expression::Number(u16::MAX as i64))
-            } else if s == "UINT32_MAX" {
-                Ok(Expression::Number(u32::MAX as i64))
-            } else if s == "UINT64_MAX" {
-                Ok(Expression::Number(u64::MAX as i64))
-            } else if let Some(hex) = s.strip_prefix("0x") {
-                Ok(Expression::Number(i64::from_str_radix(hex, 16).unwrap()))
-            } else if let Some(bin) = s.strip_prefix("0b") {
-                Ok(Expression::Number(i64::from_str_radix(bin, 2).unwrap()))
-            } else {
-                Ok(Expression::Number(s.parse().unwrap()))
-            }
-        }
-        irp::Rule::bitspec_definition | irp::Rule::definition => {
-            let name = node.children[0].as_str(input);
-
-            let expr = expression(&node.children[4], input)?;
-
-            Ok(Expression::Assignment(name.to_string(), Rc::new(expr)))
-        }
-        irp::Rule::duration => {
-            let unit = match node.children[2].as_str(input) {
-                "" => Unit::Units,
-                "p" => Unit::Pulses,
-                "u" => Unit::Microseconds,
-                "m" => Unit::Milliseconds,
-                err => panic!("unit {} not expected", err),
-            };
-
-            let duration_node = &node.children[1];
-            let op = node.children[0].as_str(input);
-            let duration = duration_node.as_str(input);
-
-            if duration_node.alternative == Some(0) {
-                if op == "^" {
-                    Ok(Expression::ExtentIdentifier(duration.to_owned(), unit))
-                } else if op == "-" {
-                    Ok(Expression::GapIdentifier(duration.to_owned(), unit))
-                } else {
-                    assert_eq!(op, "");
-
-                    Ok(Expression::FlashIdentifier(duration.to_owned(), unit))
-                }
-            } else {
-                let value = f64::from_str_radix(duration, 10).unwrap();
-
-                if op == "^" {
-                    Ok(Expression::ExtentConstant(value, unit))
-                } else if op == "-" {
-                    Ok(Expression::GapConstant(value, unit))
-                } else {
-                    assert_eq!(op, "");
-
-                    Ok(Expression::FlashConstant(value, unit))
-                }
-            }
-        }
-        irp::Rule::irstream_item | irp::Rule::bitspec_item => expression(&node.children[0], input),
-        irp::Rule::irstream => {
-            let (stream, repeat) = irstream(node, input)?;
-
-            Ok(Expression::Stream(IrStream {
-                bit_spec: Vec::new(),
-                stream,
-                repeat,
-            }))
-        }
-        irp::Rule::bitspec_irstream => bitspec_irstream(node, input),
-        irp::Rule::variation => {
-            let mut list = Vec::new();
-
-            for node in collect_rules(node, irp::Rule::alternative) {
-                list.push(bare_irstream(node, input)?);
-            }
-
-            Ok(Expression::Variation(list))
-        }
-        rule => {
-            println!("node:{}", node.print_to_string(input));
-            panic!("rule {:?} not expected", rule);
-        }
-    }
-}
-
-fn bitspec_irstream(node: &irp::Node, input: &str) -> Result<Expression, String> {
-    let bit_spec = bitspec(&node.children[0], input)?;
-    let (stream, repeat) = irstream(&node.children[1], input)?;
-
-    Ok(Expression::Stream(IrStream {
-        bit_spec,
-        stream,
-        repeat,
-    }))
-}
-
-fn bitspec(node: &irp::Node, input: &str) -> Result<Vec<Rc<Expression>>, String> {
-    let mut list = Vec::new();
-
-    for node in collect_rules(node, irp::Rule::bare_bitspec) {
-        list.push(Rc::new(Expression::List(bare_bitspec(node, input)?)));
-    }
-
-    match list.len() {
-        2 | 4 | 8 | 16 => Ok(list),
-        len => Err(format!(
-            "bitspec should have 2, 4, 8, or 16 entries, found {}",
-            len
-        )),
-    }
-}
-
-fn bare_bitspec(node: &irp::Node, input: &str) -> Result<Vec<Rc<Expression>>, String> {
-    let mut list = Vec::new();
-
-    for node in collect_rules(node, irp::Rule::bitspec_item) {
-        list.push(Rc::new(expression(node, input)?));
-    }
-
-    Ok(list)
-}
-
-fn bare_irstream(node: &irp::Node, input: &str) -> Result<Vec<Rc<Expression>>, String> {
-    let mut list = Vec::new();
-
-    for node in collect_rules(node, irp::Rule::irstream_item) {
-        list.push(Rc::new(expression(node, input)?));
-    }
-
-    Ok(list)
-}
-
-fn irstream(
-    node: &irp::Node,
-    input: &str,
-) -> Result<(Vec<Rc<Expression>>, Option<RepeatMarker>), String> {
-    assert_eq!(node.rule, irp::Rule::irstream);
-
-    let bare_irstream = bare_irstream(&node.children[2], input)?;
-
-    let repeat_node = &node.children[5];
-
-    let repeat = if repeat_node.is_empty() {
-        None
-    } else {
-        Some(match repeat_node.alternative {
-            Some(0) => RepeatMarker::Any,
-            Some(1) => RepeatMarker::OneOrMore,
-            Some(2) => {
-                let value = repeat_node.children[0].as_str(input).parse().unwrap();
-                if repeat_node.children[1].is_empty() {
-                    RepeatMarker::Count(value)
-                } else {
-                    RepeatMarker::CountOrMore(value)
-                }
-            }
-            _ => unreachable!(),
-        })
-    };
-
-    Ok((bare_irstream, repeat))
 }
