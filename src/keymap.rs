@@ -3,7 +3,7 @@
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Deserialize, PartialEq, Eq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug, Default)]
 pub struct Protocol {
     #[serde(default = "String::new")]
     pub name: String,
@@ -26,7 +26,61 @@ pub struct Keymap {
     pub protocols: Vec<Protocol>,
 }
 
-include!(concat!(env!("OUT_DIR"), "/text_keymap.rs"));
+peg::parser! {
+    grammar text_keymap() for str {
+        pub rule keymap() -> Vec<Protocol>
+        = (_ newline())* first:first_line() lines:lines() _
+        {
+            let mut scancodes = HashMap::new();
+
+            for (code, name) in lines.into_iter().flatten() {
+                scancodes.insert(code.to_owned(), name.to_owned());
+            }
+
+            let mut protocol = vec![Protocol {
+                    name: first.0.to_owned(),
+                    protocol: first.1[0].to_owned(),
+                    scancodes: Some(scancodes),
+                    ..Default::default()
+            }];
+
+            for other in &first.1[1..] {
+                protocol.push(Protocol { protocol: other.to_string(), ..Default::default() });
+            }
+
+            protocol
+        }
+
+        rule first_line() -> (&'input str, Vec<&'input str>)
+        = _ "#" _ "table" (":" / "=")? _ name:identifier()  _ "," _ "type" (":" / "=")? _ protocols:protocols() _ newline()
+        { (name, protocols) }
+
+        rule identifier() -> &'input str
+        = quiet!{$([ 'a'..='z' | 'A'..='Z']['a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' ]*)}
+        / expected!("identifier")
+
+        rule protocols() -> Vec<&'input str>
+        = protocols:(identifier() ++ ("," _)) { protocols }
+
+        rule lines() -> Vec<Option<(&'input str, &'input str)>>
+        = codes:((scancode() / comment()) ** newline()) { codes }
+
+        rule newline()
+        = "\r\n" / "\n"
+
+        rule comment() -> Option<(&'input str, &'input str)>
+        = _ "#" [^'\n']* { None }
+        / _ { None }
+
+        rule scancode() -> Option<(&'input str, &'input str)>
+        = _ hex:hex() _ id:identifier() _ { Some((hex, id)) }
+
+        rule hex() -> &'input str
+        = hex:$("0x" ['0'..='9' | 'a'..='f' | 'A'..='F']+) _ { hex }
+
+        rule _ = quiet!{[' ' | '\t']*}
+    }
+}
 
 /// Parse a rc keymap file, either toml or old text format. No validation is done of key codes or protocol names
 pub fn parse(contents: &str, filename: &str) -> Result<Keymap, String> {
@@ -67,67 +121,11 @@ pub fn parse(contents: &str, filename: &str) -> Result<Keymap, String> {
 
         Ok(keymap)
     } else {
-        let mut parser = text_keymap::PEG::new();
-
-        match parser.parse(contents) {
-            Ok(node) => {
-                let first_line = &node.children[0];
-
-                let table = first_line.children[6].as_str(contents).to_owned();
-
-                let mut protocols: Vec<Protocol> =
-                    collect_rules(&first_line.children[13], text_keymap::Rule::identifier)
-                        .iter()
-                        .map(|node| Protocol {
-                            name: String::new(),
-                            protocol: node.as_str(contents).to_owned(),
-                            raw: None,
-                            scancodes: None,
-                            variant: None,
-                        })
-                        .collect();
-
-                let scancodes: HashMap<String, String> =
-                    collect_rules(&node, text_keymap::Rule::scancode)
-                        .iter()
-                        .map(|node| {
-                            (
-                                node.children[0].as_str(contents).to_owned(),
-                                node.children[2].as_str(contents).to_owned(),
-                            )
-                        })
-                        .collect();
-
-                protocols[0].name = table;
-                protocols[0].scancodes = Some(scancodes);
-
-                Ok(Keymap { protocols })
-            }
-            Err(pos) => Err(format!("parse error at {}:{}", pos.0, pos.1)),
+        match text_keymap::keymap(contents) {
+            Ok(protocols) => Ok(Keymap { protocols }),
+            Err(pos) => Err(format!("parse error at {}", pos)),
         }
     }
-}
-
-fn collect_rules(node: &text_keymap::Node, rule: text_keymap::Rule) -> Vec<&text_keymap::Node> {
-    let mut list = Vec::new();
-
-    fn recurse<'t>(
-        node: &'t text_keymap::Node,
-        rule: text_keymap::Rule,
-        list: &mut Vec<&'t text_keymap::Node>,
-    ) {
-        if node.rule == rule {
-            list.push(node);
-        } else {
-            for node in &node.children {
-                recurse(node, rule, list);
-            }
-        }
-    }
-
-    recurse(node, rule, &mut list);
-
-    list
 }
 
 #[test]
