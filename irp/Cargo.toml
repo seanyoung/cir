@@ -1,10 +1,10 @@
 [package]
 name = "irp"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Sean Young <sean@mess.org>"]
 repository = "https://github.com/seanyoung/cir"
 edition = "2021"
-description = "Infrared IRP encoder"
+description = "Infrared IRP decoder and encoder"
 documentation = "https://docs.rs/irp/"
 keywords = [ "IRP", "IR", "infrared", "pronto" ]
 readme = "README.md"
