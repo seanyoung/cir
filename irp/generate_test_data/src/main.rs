@@ -1,12 +1,60 @@
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::process::Command;
 
-include!(concat!(env!("OUT_DIR"), "/output.rs"));
+enum Render {
+    Pronto(String),
+    Rawir(Vec<Vec<u32>>),
+}
 
-use output::{Node, Rule};
-use serde::{Deserialize, Serialize};
+peg::parser! {
+    grammar output() for str {
+        pub(super) rule output() -> (Vec<Param>, Render)
+        = p:params() r:render() _ { (p, r) }
+
+        rule params() -> Vec<Param>
+        = "{" params:(param() ++ ",") "}" _ { params }
+
+        rule param() -> Param
+        = id:identifier() _ "=" _ value:number() _ {  Param { name: id.to_owned(), value } }
+
+        rule render() -> Render
+        = p:pronto_out() { Render::Pronto(p.to_owned()) }
+        / r:rawir_out() { Render::Rawir(r) }
+
+        rule pronto_out() -> &'input str
+        = $(hex() ++ _)
+
+        rule rawir_out() -> (Vec<Vec<u32>>)
+        = frequency()? raw:rawir()+ { raw }
+
+        rule frequency() -> u64
+        = "Freq=" n:number() "Hz" { n }
+
+        rule rawir() -> Vec<u32>
+        = "[" values:(value() ** ",") "]" { values }
+
+        rule value() -> u32
+        = ("+" / "-") n:$(['0'..='9']+)
+        {? match n.parse() { Ok(n) => Ok(n), Err(_) => Err("u32")} }
+
+        rule hex()
+        = ['0'..='9' | 'a'..='f' | 'A'..='F']+
+
+        rule number() -> u64
+        =  n:$(['0'..='9']+)
+        {? match n.parse() { Ok(n) => Ok(n), Err(_) => Err("u64")} }
+
+        rule identifier() -> &'input str
+        = quiet!{$([ 'a'..='z' | 'A'..='Z']['a'..='z' | 'A'..='Z' | '0'..='9' ]*)}
+        / expected!("identifier")
+
+        rule _ = quiet!{[' ' | '\t' | '\r' | '\n']*}
+
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct TestData {
@@ -32,8 +80,6 @@ pub struct Param {
 }
 
 pub fn parse_output(protocol: String, repeats: u8, input: &str) -> TestData {
-    let mut parser = output::PEG::new();
-
     let mut data = TestData {
         protocol,
         repeats,
@@ -42,67 +88,21 @@ pub fn parse_output(protocol: String, repeats: u8, input: &str) -> TestData {
         render: Vec::new(),
     };
 
-    match parser.parse(input) {
-        Ok(node) => {
-            fn walk(node: &Node, input: &str, data: &mut TestData) {
-                match node.rule {
-                    Rule::output => {
-                        walk(&node.children[0], input, data);
-                        walk(&node.children[1], input, data);
-                    }
-                    Rule::params => {
-                        for param in collect_rules(node, Rule::param) {
-                            data.params.push(Param {
-                                name: param.children[0].as_str(input).to_owned(),
-                                value: param.children[2].as_str(input).parse().unwrap(),
-                            });
-                        }
-                    }
-                    Rule::render => {
-                        if node.children[0].rule == Rule::pronto_out {
-                            data.pronto = node.children[0].as_str(input).trim().to_owned();
-                        } else {
-                            for rawir in collect_rules(node, Rule::rawir) {
-                                let mut res = Vec::new();
+    match output::output(input) {
+        Ok((params, render)) => {
+            data.params = params;
 
-                                for rawir in collect_rules(rawir, Rule::value) {
-                                    res.push(rawir.children[1].as_str(input).parse().unwrap());
-                                }
-
-                                data.render.push(res);
-                            }
-                        }
-                    }
-                    _ => unimplemented!(),
-                }
+            match render {
+                Render::Pronto(pronto) => data.pronto = pronto,
+                Render::Rawir(raw) => data.render = raw,
             }
-
-            walk(&node, input, &mut data);
         }
         Err(pos) => {
-            panic!("cannot parse `{}` at  position {}:{}", input, pos.0, pos.1);
+            panic!("cannot parse `{}` at  position {}", input, pos);
         }
     }
 
     data
-}
-
-fn collect_rules(node: &Node, rule: Rule) -> Vec<&Node> {
-    let mut list = Vec::new();
-
-    fn recurse<'t>(node: &'t Node, rule: Rule, list: &mut Vec<&'t Node>) {
-        if node.rule == rule {
-            list.push(node);
-        }
-
-        for node in &node.children {
-            recurse(node, rule, list);
-        }
-    }
-
-    recurse(node, rule, &mut list);
-
-    list
 }
 
 fn main() {

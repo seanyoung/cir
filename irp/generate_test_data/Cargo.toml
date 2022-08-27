@@ -3,16 +3,12 @@ name = "generate_test_data"
 version = "0.1.0"
 authors = ["Sean Young <sean@mess.org>"]
 edition = "2021"
-build = "build.rs"
-
-[build-dependencies]
-lrpeg = "0.4.1"
 
 [dependencies]
 irp = { path = ".." }
 regex = "1"
 serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
-unicode-xid = "0.2"
 serde_json = "1.0"
 rand = "0.8"
+peg = "0.8"
