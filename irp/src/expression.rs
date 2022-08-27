@@ -18,12 +18,12 @@ impl fmt::Display for Expression {
             Expression::ShiftLeft(left, right) => write!(f, "({} << {})", left, right),
             Expression::ShiftRight(left, right) => write!(f, "({} >> {})", left, right),
 
-            Expression::Equal(left, right) => write!(f, "{} == {}", left, right),
-            Expression::NotEqual(left, right) => write!(f, "{} != {}", left, right),
-            Expression::More(left, right) => write!(f, "{} > {}", left, right),
-            Expression::MoreEqual(left, right) => write!(f, "{} >= {}", left, right),
-            Expression::Less(left, right) => write!(f, "{} < {}", left, right),
-            Expression::LessEqual(left, right) => write!(f, "{} <= {}", left, right),
+            Expression::Equal(left, right) => write!(f, "({} == {})", left, right),
+            Expression::NotEqual(left, right) => write!(f, "({} != {})", left, right),
+            Expression::More(left, right) => write!(f, "({} > {})", left, right),
+            Expression::MoreEqual(left, right) => write!(f, "({} >= {})", left, right),
+            Expression::Less(left, right) => write!(f, "({} < {})", left, right),
+            Expression::LessEqual(left, right) => write!(f, "({} <= {})", left, right),
 
             Expression::Or(left, right) => write!(f, "({} || {})", left, right),
             Expression::And(left, right) => write!(f, "({} && {})", left, right),

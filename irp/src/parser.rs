@@ -123,7 +123,7 @@ peg::parser! {
 
         #[cache_left_rec]
         rule expression12() -> Expression
-         = left:expression12() "**" _ right:expression13()
+         = left:expression13() "**" _ right:expression12()
          { Expression::Power(Rc::new(left), Rc::new(right)) }
          / expression13()
 
@@ -446,4 +446,40 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
     }
 
     Ok(res)
+}
+
+#[test]
+fn precedence() {
+    let irp = Irp::parse("{}<1|-1>(){A=B<<C+D*E}").unwrap();
+
+    assert_eq!(format!("{}", irp.definitions[0]), "A=(B << (C + (D * E)))");
+
+    let irp = Irp::parse("{}<1|-1>(){A=F**G**H+128*~T>=8}").unwrap();
+
+    assert_eq!(
+        format!("{}", irp.definitions[0]),
+        "A=(((F ** (G ** H)) + (128 * ~T)) >= 8)"
+    );
+
+    let irp = Irp::parse("{}<1|-1>(){A=F||G&&H|I&J^K}").unwrap();
+
+    assert_eq!(
+        format!("{}", irp.definitions[0]),
+        "A=(F || (G && (H | (I & (J ^ K)))))"
+    );
+
+    let irp = Irp::parse("{}<1|-1>(){A=F>G*10&&H*20<J}").unwrap();
+
+    assert_eq!(
+        format!("{}", irp.definitions[0]),
+        "A=((F > (G * 10)) && ((H * 20) < J))"
+    );
+
+    let irp = Irp::parse("{}<1|-1>(){A=E*F+G<<2}").unwrap();
+
+    assert_eq!(format!("{}", irp.definitions[0]), "A=(((E * F) + G) << 2)");
+
+    let irp = Irp::parse("{}<1|-1>(){A=E<<F+G*2}").unwrap();
+
+    assert_eq!(format!("{}", irp.definitions[0]), "A=(E << (F + (G * 2)))");
 }

@@ -693,7 +693,6 @@ fn inverse2() {
 fn inverse3() {
     use crate::Irp;
 
-    // TODO: PARSER BUG! ){A0=F+128*T+D<<8}
     let irp = Irp::parse(
         "{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T){A0=F+128*T+(D<<8)}[D:0..31,F:0..127,T@:0..1=0]",
     )
