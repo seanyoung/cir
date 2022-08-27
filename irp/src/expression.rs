@@ -429,7 +429,7 @@ impl Expression {
                     b = b.reverse_bits().rotate_left(l as u32);
                 }
 
-                if l < 64 {
+                if l < 63 {
                     b &= (1 << l) - 1;
                 }
 
