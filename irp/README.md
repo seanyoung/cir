@@ -1,13 +1,13 @@
 # IRP
 
-Rust libary for encoding and decoding
+This is a rust libary for encoding and decoding
 [Infrared](https://en.wikipedia.org/wiki/Consumer_IR) protocols using
 [IRP Notation](http://hifi-remote.com/wiki/index.php?title=IRP_Notation) or
 [Pronto Hex](http://www.hifi-remote.com/wiki/index.php?title=Working_With_Pronto_Hex).
 Remote controls for TVs, Hifi sets, air conditioning units, etc. send messages encoded
 using many different protocols. Using this library you can decode the IR
-received from a remote control, or encode IR in the same format as a remote
-control, mimicinig a remote control.
+received from a remote control, or encode IR into the same format as a remote
+control.
 
 This library only deals with the encoding and decoding, and does not know anything
 about talking to infrared devices; you can use thee [cir crate](https://crates.io/crates/cir)
@@ -153,27 +153,6 @@ This should print:
 decoded: F=1 D=30 T=0
 ```
 
-## Parsing pronto hex,
-
-The [Pronto Hex](http://www.hifi-remote.com/wiki/index.php?title=Working_With_Pronto_Hex) is made popular by the
-Philips Pronto universal remote. The format is a series of 4 digits hex numbers. This library can parse the long
-codes, there is no support for the short format yet.
-```
-use irp::Pronto;
-let pronto = Pronto::parse(r#"
-    0000 006C 0000 0022 00AD 00AD 0016 0041 0016 0041 0016 0041 0016 0016 0016
-    0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0041 0016 0041 0016 0016
-    0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016
-    0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016 0041
-    0016 0041 0016 0041 0016 0041 0016 0041 0016 0041 0016 06FB
-    "#).expect("parse should succeed");
-let message = pronto.encode(0);
-if let Some(carrier) = &message.carrier {
-    println!("carrier: {}Hz", carrier);
-}
-println!("{}", message.print_rawir());
-```
-
 ## Parsing lirc mode2 pulse space files
 
 This format was made popular by the [`mode2` tool](https://www.lirc.org/html/mode2.html), which prints a single line
@@ -220,11 +199,11 @@ fn main() {
 
 ## Sending IR using cir crate
 
-This example opens the first lirc device `/dev/lirc0` and transmits the
-rc5 button "1" from a Hauppauge remote.
+This example opens the first lirc device `/dev/lirc0` and transmits the `1`
+button from a Hauppauge remote.
 
 ```rust,no_run
-# extern crate cir;
+extern crate cir;
 use cir::lirc;
 use irp::{Irp, Vartable};
 
