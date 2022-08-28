@@ -4,7 +4,7 @@ version = "0.3.0"
 authors = ["Sean Young <sean@mess.org>"]
 repository = "https://github.com/seanyoung/cir"
 edition = "2021"
-description = "Infrared IRP decoder and encoder"
+description = "Infrared IRP encoder and decoder"
 documentation = "https://docs.rs/irp/"
 keywords = [ "IRP", "IR", "infrared", "pronto" ]
 readme = "README.md"
@@ -22,3 +22,4 @@ peg = "0.8"
 
 [dev-dependencies]
 serde_json = "1.0"
+cir = "0.1"
