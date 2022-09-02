@@ -10,7 +10,8 @@ received from a remote control, or encode IR into the same format as a remote
 control.
 
 This library only deals with the encoding and decoding, and does not know anything
-about talking to infrared devices; you can use thee [cir crate](https://crates.io/crates/cir)
+about talking to infrared devices for receiving or transmitting; you can use
+the [cir crate](https://crates.io/crates/cir)
 for that on Linux. You will also need an IRP definition or Pronto hex definition
 of your remote protocol. There is a long list of IRP definitions maintained by
 [IrpTransmogrifier](https://github.com/bengtmartensson/IrpTransmogrifier/blob/master/src/main/resources/IrpProtocols.xml) and on
@@ -20,6 +21,66 @@ There are also some utility functions for parsing raw ir and mode2 output.
 
 See the [docs](https://docs.rs/irp/) to see the complete interface, or use the
 examples below.
+
+## What does raw IR mean?
+
+This library encodes to *raw IR*. *raw IR* is alternating on-off durations of
+infrared light, expressed in microseconds. For example,
+
+```ignore
++500 -100 +500
+```
+
+This means 500 microseconds of infrared light on, 100 microseconds off, and
+then 500 microseconds on again. This is also known as *flash* and *gap*, and lirc
+uses the terms *pulse* and *space*.
+
+It is common for raw IR to end with a gap. This ensures the gap period is correct
+between one message and the next.
+
+## What is IRP?
+
+This is a simple example of IRP:
+
+```ignore
+{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]
+```
+
+IRP is a notation for infrared protocols, which this library uses for both
+encoding and decoding infrared. This usually involve some parameters like:
+
+- `F` for function, like *play* or *volume up*.
+- `D` for device; a hi-fi set can include multiple units,
+  so do you want the tape deck to *play* or the cd player?
+- `S` for Subdevice
+- `T` for toggle. Has a button been pressed down or was it released and
+  pressed again, i.e. *toggled*. The value of `T` does not matter, just whether
+  it changes from one packet to the next.
+- Other protocol specific values like heating or cooling for air conditioning
+  units.
+
+Decoding means recovering the parameters from raw IR, and encoding means
+creating the raw IR from some parameters values.
+
+## What is pronto hex?
+
+This is a notation used by the Philips Pronto universal remote, which is a series
+of hex numbers, for example:
+
+```ignore
+0000 0070 0003 0002 0006 0002 0004 0002 0004 0006 0006 0003 0003 000С
+```
+
+There is one pronto hex code per button; it is not parameterized like IRP.
+
+## Repeats
+
+When a button is held down on a remote, then the IR message is repeated
+until the button is released. Even if a button is pressed briefly, the IR
+message may be repeated a few times.
+
+Some IR receivers require repeats before IR is decoded. For example, the Sony
+LBT-V702 requires at least one repeat, else the IR will be ignored.
 
 ## Encoding IRP
 
@@ -155,7 +216,7 @@ decoded: F=1 D=30 T=0
 
 ## Parsing lirc mode2 pulse space files
 
-This format was made popular by the [`mode2` tool](https://www.lirc.org/html/mode2.html), which prints a single line
+This format was made popular by the [mode2 tool](https://www.lirc.org/html/mode2.html), which prints a single line
 for each flash and gap, but then calls them `pulse` and `space`. It looks like so:
 
 ```skip
