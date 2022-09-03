@@ -30,6 +30,7 @@ pub struct Message {
 
 /// A parsed or generated pronto hex code
 #[derive(Debug, PartialEq)]
+#[allow(non_snake_case)]
 pub enum Pronto {
     LearnedUnmodulated {
         frequency: f64,
@@ -40,6 +41,24 @@ pub enum Pronto {
         frequency: f64,
         intro: Vec<f64>,
         repeat: Vec<f64>,
+    },
+    Rc5 {
+        D: u8,
+        F: u8,
+    },
+    Rc5x {
+        D: u8,
+        S: u8,
+        F: u8,
+    },
+    Rc6 {
+        D: u8,
+        F: u8,
+    },
+    Nec1 {
+        D: u8,
+        S: u8,
+        F: u8,
     },
 }
 

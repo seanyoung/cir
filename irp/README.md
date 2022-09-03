@@ -126,8 +126,7 @@ as *pulse* and *space*.
 ## Encoding Pronto Hex
 
 The [Pronto Hex](http://www.hifi-remote.com/wiki/index.php?title=Working_With_Pronto_Hex) is made popular by the
-Philips Pronto universal remote. The format is a series of 4 digits hex numbers. This library can parse the long
-codes, there is no support for the short format yet.
+Philips Pronto universal remote. The format is a series of 4 digits hex numbers.
 
 ```rust
 use irp::Pronto;

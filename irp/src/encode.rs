@@ -32,6 +32,7 @@ impl Irp {
     /// Render it to pronto hex with the given variables. Any trailing part after the repeating section
     /// cannot be represented in pronto hex, so this is dropped. This part of the IR is commonly use for
     /// a "key up" type message.
+    /// This always produces pronto hex long codes, never the short variant.
     pub fn encode_pronto<'a>(&'a self, mut vars: Vartable<'a>) -> Result<Pronto, String> {
         self.check_parameters(&mut vars)?;
 
