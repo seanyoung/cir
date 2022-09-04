@@ -1,9 +1,8 @@
-use crate::rawir;
-
 use super::{
     build_nfa::{Action, Edge, NFA},
     Expression, InfraredData, Vartable,
 };
+use crate::Message;
 use log::trace;
 use std::{
     collections::{HashMap, VecDeque},
@@ -54,7 +53,8 @@ impl InfraredData {
 
     /// Create from a rawir string
     pub fn from_rawir(data: &str) -> Result<Vec<InfraredData>, String> {
-        Ok(rawir::parse(data)?
+        Ok(Message::parse(data)?
+            .raw
             .iter()
             .enumerate()
             .map(|(index, data)| {
@@ -435,15 +435,16 @@ impl<'a> Decoder<'a> {
 #[cfg(test)]
 mod test {
     use super::{Decoder, InfraredData};
-    use crate::{rawir, Irp};
+    use crate::{Irp, Message};
     use num::Integer;
     use std::collections::HashMap;
 
     fn munge<'a>(matcher: &'a mut Decoder, s: &str) -> HashMap<String, i64> {
         let mut res = None;
 
-        for ir in rawir::parse(s)
+        for ir in Message::parse(s)
             .unwrap()
+            .raw
             .iter()
             .enumerate()
             .map(|(no, len)| {

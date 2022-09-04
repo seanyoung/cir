@@ -249,13 +249,15 @@ fn main() {
 
 ## Parsing raw ir format
 
-The raw ir format looks like "+100 -100 +100". The leading `+` and `-` may be omitted, but if present they are
-checked for consistency. The parse function returns a `Vec<u32>`.
+The raw ir format looks like `+100 -100 +100`. The leading `+` and `-` may be omitted, but if present they are
+checked for consistency. The parse function returns a `Message`.
 
 ```rust
+use irp::Message;
+
 fn main() {
-    let rawir: Vec<u32> = irp::rawir::parse("+100 -100 +100").expect("parse should succeed");
-    println!("{}", irp::rawir::print_to_string(&rawir));
+    let rawir = Message::parse("+100 -100 +100").expect("parse should succeed");
+    println!("{}", rawir.print_rawir());
 }
 ```
 

@@ -38,6 +38,61 @@ impl Message {
         rawir::print_to_string(&self.raw)
     }
 
+    /// Parse a raw IR string of the form `+9000 -45000 +2250`
+    pub fn parse(s: &str) -> Result<Self, String> {
+        let mut raw = Vec::new();
+        let mut flash = true;
+
+        for e in s.split(|c: char| c.is_whitespace() || c == ',') {
+            if e.is_empty() {
+                continue;
+            }
+
+            let mut chars = e.chars().peekable();
+
+            match chars.peek() {
+                Some('+') => {
+                    if !flash {
+                        return Err("unexpected ‘+’ encountered".to_string());
+                    }
+                    chars.next();
+                }
+                Some('-') => {
+                    if flash {
+                        return Err("unexpected ‘-’ encountered".to_string());
+                    }
+                    chars.next();
+                }
+                Some(ch) if !ch.is_numeric() => {
+                    return Err(format!("unexpected ‘{}’ encountered", ch));
+                }
+                _ => (),
+            }
+
+            let v = chars.collect::<String>();
+
+            let v = v.parse().map_err(|_| format!("invalid number ‘{}’", v))?;
+
+            if v == 0 {
+                return Err("nonsensical 0 length".to_string());
+            }
+
+            raw.push(v);
+
+            flash = !flash;
+        }
+
+        if raw.is_empty() {
+            return Err("missing length".to_string());
+        }
+
+        Ok(Message {
+            raw,
+            carrier: None,
+            duty_cycle: None,
+        })
+    }
+
     /// Parse pulse/space text. This format is produces by lirc's mode2 tool.
     /// Some lirc drivers sometimes produce consecutive pulses or spaces, rather
     /// than alternating. These are automatically folded into one.
@@ -234,5 +289,53 @@ fn parse_mode2() {
             duty_cycle: None,
             raw: vec!(100u32, 10u32, 50u32, 100000u32)
         }
+    );
+}
+
+#[test]
+fn parse_test() {
+    assert_eq!(
+        Message::parse("+100 +100"),
+        Err("unexpected ‘+’ encountered".to_string())
+    );
+
+    assert_eq!(
+        Message::parse("+100 -100 -1"),
+        Err("unexpected ‘-’ encountered".to_string())
+    );
+
+    assert_eq!(
+        Message::parse("+100 -100"),
+        Ok(Message {
+            raw: vec!(100, 100),
+            duty_cycle: None,
+            carrier: None
+        })
+    );
+
+    assert_eq!(Message::parse(""), Err("missing length".to_string()));
+
+    assert_eq!(Message::parse("+a"), Err("invalid number ‘a’".to_string()));
+
+    assert_eq!(
+        Message::parse("+0"),
+        Err("nonsensical 0 length".to_string())
+    );
+
+    assert_eq!(
+        Message::parse("100  \n100\r +1"),
+        Ok(Message {
+            raw: vec!(100u32, 100u32, 1u32),
+            duty_cycle: None,
+            carrier: None
+        })
+    );
+    assert_eq!(
+        Message::parse("100,100,+1,-20000"),
+        Ok(Message {
+            raw: vec!(100u32, 100u32, 1u32, 20000u32),
+            duty_cycle: None,
+            carrier: None
+        })
     );
 }

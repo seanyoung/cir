@@ -1,6 +1,6 @@
 use super::{open_lirc, Purpose};
 use cir::lircd_conf;
-use irp::{rawir, Irp, Message, Pronto};
+use irp::{Irp, Message, Pronto};
 use log::{debug, error, info, warn};
 use std::{ffi::OsStr, fs, path::Path};
 use terminal_size::{terminal_size, Width};
@@ -145,11 +145,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
             }
         }
 
-        debug!(
-            "transmitting {} data {}",
-            lircdev,
-            rawir::print_to_string(&message.raw)
-        );
+        debug!("transmitting {} data {}", lircdev, message.print_rawir());
 
         if let Err(s) = lircdev.send(&message.raw) {
             eprintln!("error: {}: {}", lircdev, s);
@@ -326,16 +322,9 @@ fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                 }
             };
 
-            match irp::rawir::parse(&input) {
-                Ok(raw) => {
-                    part.push((
-                        Part::Raw(Message {
-                            carrier: None,
-                            duty_cycle: None,
-                            raw,
-                        }),
-                        indices.next().unwrap(),
-                    ));
+            match Message::parse(&input) {
+                Ok(m) => {
+                    part.push((Part::Raw(m), indices.next().unwrap()));
                 }
                 Err(msg) => match Message::parse_mode2(&input) {
                     Ok(m) => {
@@ -360,16 +349,9 @@ fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
         let mut indices = matches.indices_of("RAWIR").unwrap();
 
         for rawir in rawirs {
-            match irp::rawir::parse(rawir) {
-                Ok(raw) => {
-                    part.push((
-                        Part::Raw(Message {
-                            carrier: None,
-                            duty_cycle: None,
-                            raw,
-                        }),
-                        indices.next().unwrap(),
-                    ));
+            match Message::parse(rawir) {
+                Ok(m) => {
+                    part.push((Part::Raw(m), indices.next().unwrap()));
                 }
                 Err(msg) => {
                     error!("{}", msg);

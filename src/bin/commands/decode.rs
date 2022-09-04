@@ -3,7 +3,7 @@ use cir::{
     lirc,
     lircd_conf::{parse, Remote},
 };
-use irp::{rawir, Decoder, InfraredData, Irp, Message, NFA};
+use irp::{Decoder, InfraredData, Irp, Message, NFA};
 use itertools::Itertools;
 use log::{error, info, trace};
 use num_integer::Integer;
@@ -93,17 +93,17 @@ pub fn decode(matches: &clap::ArgMatches) {
 
             info!("parsing ‘{}’ as rawir", filename.to_string_lossy());
 
-            match rawir::parse(&input) {
+            match Message::parse(&input) {
                 Ok(raw) => {
-                    info!("decoding: {}", rawir::print_to_string(&raw));
-                    process(&raw, &irps, matches, abs_tolerance, rel_tolerance);
+                    info!("decoding: {}", raw.print_rawir());
+                    process(&raw.raw, &irps, matches, abs_tolerance, rel_tolerance);
                 }
                 Err(msg) => {
                     info!("parsing ‘{}’ as mode2", filename.to_string_lossy());
 
                     match Message::parse_mode2(&input) {
                         Ok(m) => {
-                            info!("decoding: {}", rawir::print_to_string(&m.raw));
+                            info!("decoding: {}", m.print_rawir());
                             process(&m.raw, &irps, matches, abs_tolerance, rel_tolerance);
                         }
                         Err((line_no, error)) => {
@@ -126,10 +126,10 @@ pub fn decode(matches: &clap::ArgMatches) {
         input_on_cli = true;
 
         for rawir in rawirs {
-            match rawir::parse(rawir) {
+            match Message::parse(rawir) {
                 Ok(raw) => {
-                    info!("decoding: {}", rawir::print_to_string(&raw));
-                    process(&raw, &irps, matches, abs_tolerance, rel_tolerance);
+                    info!("decoding: {}", raw.print_rawir());
+                    process(&raw.raw, &irps, matches, abs_tolerance, rel_tolerance);
                 }
                 Err(msg) => {
                     error!("parsing ‘{}’: {}", rawir, msg);
