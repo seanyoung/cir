@@ -50,7 +50,7 @@ IRP is a notation for infrared protocols, which this library uses for both
 encoding and decoding infrared. This usually involve some parameters like:
 
 - `F` for function, like *play* or *volume up*.
-- `D` for device; a hi-fi set can include multiple units,
+- `D` for device; a hifi set can include multiple units,
   so do you want the tape deck to *play* or the cd player?
 - `S` for Subdevice
 - `T` for toggle. Has a button been pressed down or was it released and
@@ -213,6 +213,20 @@ This should print:
 decoded: F=1 D=30 T=0
 ```
 
+## Parsing raw ir format
+
+The raw ir format looks like `+100 -100 +100`. The leading `+` and `-` may be omitted, but if present they are
+checked for consistency. The parse function returns a `Message`.
+
+```rust
+use irp::Message;
+
+fn main() {
+    let rawir = Message::parse("+100 -100 +100").expect("parse should succeed");
+    println!("{}", rawir.print_rawir());
+}
+```
+
 ## Parsing lirc mode2 pulse space files
 
 This format was made popular by the [mode2 tool](https://www.lirc.org/html/mode2.html), which prints a single line
@@ -244,20 +258,6 @@ fn main() {
         println!("duty cycle: {}%", duty_cycle);
     }
     println!("{}", message.print_rawir());
-}
-```
-
-## Parsing raw ir format
-
-The raw ir format looks like `+100 -100 +100`. The leading `+` and `-` may be omitted, but if present they are
-checked for consistency. The parse function returns a `Message`.
-
-```rust
-use irp::Message;
-
-fn main() {
-    let rawir = Message::parse("+100 -100 +100").expect("parse should succeed");
-    println!("{}", rawir.print_rawir());
 }
 ```
 

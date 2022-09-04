@@ -1,5 +1,4 @@
 use crate::protocols::parse;
-use crate::rawir;
 use crate::InfraredData;
 use crate::{Irp, Message, Vartable};
 use serde::{Deserialize, Serialize};
@@ -451,21 +450,25 @@ fn compare_decode_to_transmogrifier() {
             }
 
             if !ok {
+                let testcase = Message::from_raw_slice(&testcase.render[0]);
+
                 println!(
                     "{} failed to decode, irp: {} ir: {}",
                     protocol.name,
                     protocol.irp,
-                    rawir::print_to_string(&testcase.render[0])
+                    testcase.print_rawir()
                 );
 
                 fails += 1;
             }
         } else {
+            let m = Message::from_raw_slice(&testcase.render[0]);
+
             println!(
                 "{} failed to decode, irp: {} ir: {}",
                 protocol.name,
                 protocol.irp,
-                rawir::print_to_string(&testcase.render[0])
+                m.print_rawir()
             );
             println!(
                 "expected: {}",

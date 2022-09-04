@@ -1,9 +1,20 @@
-use super::{rawir, Message};
+use super::Message;
+use num::Integer;
+use std::fmt::Write;
 
 impl Message {
     /// Create an empty packet
     pub fn new() -> Self {
         Message::default()
+    }
+
+    /// Create from raw vector of u32
+    pub fn from_raw_slice(raw: &[u32]) -> Self {
+        Message {
+            raw: raw.to_vec(),
+            duty_cycle: None,
+            carrier: None,
+        }
     }
 
     /// Concatenate to packets
@@ -35,7 +46,20 @@ impl Message {
 
     /// Print the flash and gap information as an raw ir string
     pub fn print_rawir(&self) -> String {
-        rawir::print_to_string(&self.raw)
+        let mut s = String::new();
+
+        self.raw.iter().enumerate().for_each(|(i, v)| {
+            write!(
+                s,
+                "{}{}{}",
+                if i == 0 { "" } else { " " },
+                if i.is_even() { "+" } else { "-" },
+                v
+            )
+            .unwrap()
+        });
+
+        s
     }
 
     /// Parse a raw IR string of the form `+9000 -45000 +2250`
@@ -338,4 +362,15 @@ fn parse_test() {
             carrier: None
         })
     );
+}
+
+#[test]
+fn print_test() {
+    let m = Message {
+        raw: vec![100, 50, 75],
+        carrier: None,
+        duty_cycle: None,
+    };
+
+    assert_eq!(m.print_rawir(), "+100 -50 +75");
 }

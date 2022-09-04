@@ -10,7 +10,6 @@ mod message;
 mod parser;
 mod pronto;
 pub mod protocols;
-pub mod rawir;
 #[cfg(test)]
 mod tests;
 

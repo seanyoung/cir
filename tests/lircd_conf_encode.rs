@@ -1,5 +1,5 @@
 use cir::lircd_conf::{parse, Flags, Remote};
-use irp::{rawir, Irp, Message, Vartable};
+use irp::{Irp, Message, Vartable};
 use num_integer::Integer;
 use serde::Deserialize;
 use std::{
@@ -96,8 +96,10 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
             message.raw.pop();
 
             if testdata.rawir != message.raw {
-                println!("lircd {}", rawir::print_to_string(&testdata.rawir));
-                println!("cir {}", rawir::print_to_string(&message.raw));
+                let testdata = Message::from_raw_slice(&testdata.rawir);
+
+                println!("lircd {}", testdata.print_rawir());
+                println!("cir {}", message.print_rawir());
                 panic!("RAW CODE: {}", code.name);
             }
         }
@@ -167,8 +169,10 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
                 };
 
                 if !compare_output(remote, &testdata.rawir, &message.raw) {
-                    println!("lircd {}", rawir::print_to_string(&testdata.rawir));
-                    println!("cir {}", rawir::print_to_string(&message.raw));
+                    let testdata = Message::from_raw_slice(&testdata.rawir);
+
+                    println!("lircd {}", testdata.print_rawir());
+                    println!("cir {}", message.print_rawir());
                     panic!("CODE: {} 0x{:x}", code.name, code.code[0]);
                 }
             }
