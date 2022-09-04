@@ -3,6 +3,7 @@
  */
 
 use num::Integer;
+use std::fmt::Write;
 
 /// Parse a raw IR string of the form "+9000 -45000 +2250"
 pub fn parse(s: &str) -> Result<Vec<u32>, String> {
@@ -57,11 +58,20 @@ pub fn parse(s: &str) -> Result<Vec<u32>, String> {
 
 /// Convert a Vec<u32> to raw IR string
 pub fn print_to_string(ir: &[u32]) -> String {
-    ir.iter()
-        .enumerate()
-        .map(|(i, v)| format!("{}{}", if i.is_even() { "+" } else { "-" }, v))
-        .collect::<Vec<String>>()
-        .join(" ")
+    let mut s = String::new();
+
+    ir.iter().enumerate().for_each(|(i, v)| {
+        write!(
+            s,
+            "{}{}{}",
+            if i == 0 { "" } else { " " },
+            if i.is_even() { "+" } else { "-" },
+            v
+        )
+        .unwrap()
+    });
+
+    s
 }
 
 #[test]
