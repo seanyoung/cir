@@ -228,8 +228,10 @@ pulse 4512
 This is an example of how to parse this. The result is printed in the more concise raw ir format.
 
 ```rust
+use irp::Message;
+
 fn main() {
-    let message = irp::mode2::parse(r#"
+    let message = Message::parse_mode2(r#"
         carrier 38400
         pulse 9024
         space 4512

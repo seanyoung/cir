@@ -337,7 +337,7 @@ fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                         indices.next().unwrap(),
                     ));
                 }
-                Err(msg) => match irp::mode2::parse(&input) {
+                Err(msg) => match Message::parse_mode2(&input) {
                     Ok(m) => {
                         part.push((Part::Raw(m), indices.next().unwrap()));
                     }

@@ -3,7 +3,7 @@ use cir::{
     lirc,
     lircd_conf::{parse, Remote},
 };
-use irp::{mode2, rawir, Decoder, InfraredData, Irp, NFA};
+use irp::{rawir, Decoder, InfraredData, Irp, Message, NFA};
 use itertools::Itertools;
 use log::{error, info, trace};
 use num_integer::Integer;
@@ -101,7 +101,7 @@ pub fn decode(matches: &clap::ArgMatches) {
                 Err(msg) => {
                     info!("parsing ‘{}’ as mode2", filename.to_string_lossy());
 
-                    match mode2::parse(&input) {
+                    match Message::parse_mode2(&input) {
                         Ok(m) => {
                             info!("decoding: {}", rawir::print_to_string(&m.raw));
                             process(&m.raw, &irps, matches, abs_tolerance, rel_tolerance);

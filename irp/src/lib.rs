@@ -7,7 +7,6 @@ mod expression;
 mod graphviz;
 mod inverse;
 mod message;
-pub mod mode2;
 mod parser;
 mod pronto;
 pub mod protocols;
