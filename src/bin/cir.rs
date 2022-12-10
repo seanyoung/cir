@@ -475,7 +475,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
         if let Some(inputdev) = &rcdev.inputdev {
             println!("\tInput Device\t\t: {}", inputdev);
 
-            match Device::open(&inputdev) {
+            match Device::open(inputdev) {
                 Ok(inputdev) => {
                     let id = inputdev.input_id();
 

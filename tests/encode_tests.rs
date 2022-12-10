@@ -5,7 +5,7 @@ fn encode_test() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
-        .args(&[
+        .args([
             "transmit",
             "--dry-run",
             "irp",
@@ -34,7 +34,7 @@ fn encode_lircd_raw_test() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
-        .args(&[
+        .args([
             "transmit",
             "--dry-run",
             "lircd",
@@ -64,7 +64,7 @@ fn encode_lircd_aiwa_test() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
-        .args(&[
+        .args([
             "transmit",
             "--dry-run",
             "lircd",
@@ -93,7 +93,7 @@ fn encode_rawir_test() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
-        .args(&[
+        .args([
             "transmit",
             "--dry-run",
             "rawir",
@@ -119,7 +119,7 @@ fn encode_rawir_test() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
-        .args(&[
+        .args([
             "transmit",
             "--dry-run",
             "rawir",
@@ -155,7 +155,7 @@ fn encode_lircd_grundig_test() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
-        .args(&[
+        .args([
             "transmit",
             "--dry-run",
             "lircd",
@@ -186,7 +186,7 @@ fn empty_lircd_conf() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
-        .args(&[
+        .args([
             "transmit",
             "--dry-run",
             "lircd",

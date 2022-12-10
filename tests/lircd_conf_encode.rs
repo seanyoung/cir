@@ -135,11 +135,7 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
                         {
                             vars.set(
                                 String::from("T"),
-                                if (*code & remote.toggle_bit_mask) != 0 {
-                                    1
-                                } else {
-                                    0
-                                },
+                                ((*code & remote.toggle_bit_mask) != 0).into(),
                                 32,
                             );
                         }

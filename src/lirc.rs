@@ -294,7 +294,7 @@ impl Lirc {
 
     /// Set the receiving timeout in microseconds
     pub fn set_wideband_receiver(&mut self, enable: bool) -> io::Result<()> {
-        let enable = if enable { 1 } else { 0 };
+        let enable = enable.into();
         LIRC_SET_WIDEBAND_RECEIVER.ioctl(&mut self.file, &enable)?;
 
         Ok(())
@@ -307,7 +307,7 @@ impl Lirc {
 
     /// Enabling measuring the carrier
     pub fn set_measure_carrier(&mut self, enable: bool) -> io::Result<()> {
-        let enable = if enable { 1 } else { 0 };
+        let enable = enable.into();
         LIRC_SET_MEASURE_CARRIER_MODE.ioctl(&mut self.file, &enable)?;
 
         Ok(())

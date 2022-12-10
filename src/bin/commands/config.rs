@@ -15,7 +15,7 @@ pub fn config(matches: &clap::ArgMatches) {
 
     let inputdev = rcdev.inputdev.as_ref().unwrap();
 
-    let mut inputdev = match Device::open(&inputdev) {
+    let mut inputdev = match Device::open(inputdev) {
         Ok(l) => l,
         Err(s) => {
             eprintln!("error: {}: {}", inputdev, s);

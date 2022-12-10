@@ -118,7 +118,7 @@ fn main() {
             };
             let number_repeats = format!("{}", repeats);
             let output = Command::new("irptransmogrifier.sh")
-                .args(&[
+                .args([
                     "render",
                     "--random",
                     "-r",
@@ -142,7 +142,7 @@ fn main() {
         }
 
         let output = Command::new("irptransmogrifier.sh")
-            .args(&["render", "--random", "-p", "-P", &protocol.name])
+            .args(["render", "--random", "-p", "-P", &protocol.name])
             .output()
             .expect("Failed to execute irptransmogrifier.sh");
 

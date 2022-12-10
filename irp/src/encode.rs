@@ -145,12 +145,12 @@ impl<'a> Vartable<'a> {
     }
 
     /// IRP definitions are evaluated each time when they are referenced
-    fn set_definition(&mut self, name: String, expr: &'a Expression) {
-        self.vars.insert(name, (0, 0, Some(expr)));
+    fn set_definition(&mut self, id: String, expr: &'a Expression) {
+        self.vars.insert(id, (0, 0, Some(expr)));
     }
 
-    pub fn set(&mut self, id: String, name: i64, length: u8) {
-        self.vars.insert(id, (name, length, None));
+    pub fn set(&mut self, id: String, value: i64, length: u8) {
+        self.vars.insert(id, (value, length, None));
     }
 
     pub fn is_defined(&self, id: &str) -> bool {
