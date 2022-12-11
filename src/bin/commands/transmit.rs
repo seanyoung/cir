@@ -162,31 +162,33 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
             let i = matches.value_of("IRP").unwrap();
 
             if let Some(values) = matches.values_of("FIELD") {
-                for f in values {
-                    let list: Vec<&str> = f.split('=').collect();
+                for fields in values {
+                    for f in fields.split(',') {
+                        let list: Vec<&str> = f.trim().split('=').collect();
 
-                    if list.len() != 2 {
-                        eprintln!("argument to --field must be X=1");
-                        std::process::exit(2);
-                    }
-
-                    let value = match if list[1].starts_with("0x") {
-                        i64::from_str_radix(&list[1][2..], 16)
-                    } else if list[1].starts_with("0o") {
-                        i64::from_str_radix(&list[1][2..], 8)
-                    } else if list[1].starts_with("0b") {
-                        i64::from_str_radix(&list[1][2..], 2)
-                    } else {
-                        list[1].parse()
-                    } {
-                        Ok(v) => v,
-                        Err(_) => {
-                            eprintln!("‘{}’ is not a valid number", list[1]);
+                        if list.len() != 2 {
+                            eprintln!("argument to --field must be X=1");
                             std::process::exit(2);
                         }
-                    };
 
-                    vars.set(list[0].to_string(), value, 8);
+                        let value = match if list[1].starts_with("0x") {
+                            i64::from_str_radix(&list[1][2..], 16)
+                        } else if list[1].starts_with("0o") {
+                            i64::from_str_radix(&list[1][2..], 8)
+                        } else if list[1].starts_with("0b") {
+                            i64::from_str_radix(&list[1][2..], 2)
+                        } else {
+                            list[1].parse()
+                        } {
+                            Ok(v) => v,
+                            Err(_) => {
+                                eprintln!("‘{}’ is not a valid number", list[1]);
+                                std::process::exit(2);
+                            }
+                        };
+
+                        vars.set(list[0].to_string(), value, 8);
+                    }
                 }
             }
 
