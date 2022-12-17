@@ -48,7 +48,7 @@ pub fn enumerate_rc_dev() -> io::Result<Vec<Rcdev>> {
 
                         lircdev = Some(format!("/dev/{}", uevent.dev_name));
                     } else if file_name.starts_with("input") {
-                        for entry in fs::read_dir(&entry.path())? {
+                        for entry in fs::read_dir(entry.path())? {
                             let entry = entry?;
                             if let Some(file_name) = entry.file_name().to_str() {
                                 if file_name.starts_with("event") {
@@ -59,7 +59,7 @@ pub fn enumerate_rc_dev() -> io::Result<Vec<Rcdev>> {
                             }
                         }
                     } else if file_name == "protocols" {
-                        for protocol in fs::read_to_string(&entry.path())?.split_whitespace() {
+                        for protocol in fs::read_to_string(entry.path())?.split_whitespace() {
                             if protocol.starts_with('[') && protocol.ends_with(']') {
                                 let protocol = &protocol[1..protocol.len() - 1];
                                 if protocol == "lirc" {

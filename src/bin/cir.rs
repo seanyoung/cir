@@ -549,7 +549,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
         if let Some(lircdev) = &rcdev.lircdev {
             println!("\tLIRC Device\t\t: {}", lircdev);
 
-            match lirc::open(&PathBuf::from(lircdev)) {
+            match lirc::open(PathBuf::from(lircdev)) {
                 Ok(mut lircdev) => {
                     if lircdev.can_receive_raw() {
                         println!("\tLIRC Receiver\t\t: raw receiver");

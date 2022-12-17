@@ -204,7 +204,7 @@ impl fmt::Display for Pronto {
                     codes.push(0x100);
                 }
 
-                let frequency = 1_000_000f64 / (*frequency as f64 * 0.241_246f64);
+                let frequency = 1_000_000f64 / (frequency * 0.241_246f64);
                 // carrier
                 codes.push((frequency + 0.5) as usize);
 
@@ -213,7 +213,7 @@ impl fmt::Display for Pronto {
                 codes.push(repeat.len() / 2);
 
                 fn to_units(frequency: f64, units: &[f64]) -> Vec<usize> {
-                    let pulse_time = frequency as f64 * 0.241_246f64;
+                    let pulse_time = frequency * 0.241_246f64;
 
                     units.iter().map(|p| (*p / pulse_time) as usize).collect()
                 }
