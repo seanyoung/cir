@@ -2,6 +2,7 @@ use super::{
     build_nfa::{gen_mask, Action, Builder},
     Expression,
 };
+use num::Zero;
 use std::rc::Rc;
 
 impl<'a> Builder<'a> {
@@ -81,23 +82,49 @@ impl<'a> Builder<'a> {
 
                 if bits.len() == list.len() {
                     for set in term_sets(bits) {
-                        let cmp_set: Vec<&Rc<Expression>> = set.iter().map(|(e, _)| *e).collect();
-
-                        // this needs more testing. I'm sure we can hit infinite recursion somehow..
-                        if cmp_set == list {
-                            return None;
-                        }
-
                         let mask = set.iter().fold(0, |acc, entry| acc | entry.1);
 
                         let skip = mask.trailing_zeros();
                         let length = i64::BITS - mask.leading_zeros() - skip;
 
+                        // avoid recursion: have we checked path already
+                        if skip.is_zero() {
+                            if let Expression::BitField {
+                                length: prev_length,
+                                skip: None,
+                                ..
+                            } = &*left
+                            {
+                                if **prev_length == Expression::Number(length.into()) {
+                                    continue;
+                                }
+                            }
+                        } else if let Expression::ShiftLeft(right, prev_skip) = &*left {
+                            if **prev_skip == Expression::Number(skip.into()) {
+                                if let Expression::BitField {
+                                    length: prev_length,
+                                    skip: Some(prev_skip),
+                                    ..
+                                } = &**right
+                                {
+                                    if **prev_skip == Expression::Number(skip.into())
+                                        && **prev_length == Expression::Number(length.into())
+                                    {
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+
                         let left = Rc::new(Expression::BitField {
                             value: left.clone(),
                             reverse: false,
                             length: Rc::new(Expression::Number(length.into())),
-                            skip: Some(Rc::new(Expression::Number(skip.into()))),
+                            skip: if !skip.is_zero() {
+                                Some(Rc::new(Expression::Number(skip.into())))
+                            } else {
+                                None
+                            },
                         });
 
                         let mut right = set[1..].iter().fold(set[0].0.clone(), |acc, e| {
@@ -705,7 +732,7 @@ fn inverse3() {
         let right = builder.const_folding(expr);
 
         let inv = builder.inverse(left.clone(), right.clone(), "F").unwrap();
-        assert_eq!(format!("{}", inv.0), "A0:7:0");
+        assert_eq!(format!("{}", inv.0), "A0:7");
         let inv = builder.inverse(left.clone(), right.clone(), "T").unwrap();
         assert_eq!(format!("{}", inv.0), "((A0:1:7 << 7) >> 7)");
         let inv = builder.inverse(left, right, "D").unwrap();
@@ -726,11 +753,11 @@ fn inverse3() {
         let right = builder.const_folding(expr);
 
         let inv = builder.inverse(left.clone(), right.clone(), "F").unwrap();
-        assert_eq!(format!("{}", inv.0), "B0:7:0");
+        assert_eq!(format!("{}", inv.0), "B0:7");
         let inv = builder.inverse(left.clone(), right.clone(), "T").unwrap();
-        assert_eq!(format!("{}", inv.0), "(((B0 - (D << 7)):1:7 << 7) >> 7)");
+        assert_eq!(format!("{}", inv.0), "(((B0:5:7 << 7) - (D << 7)) >> 7)");
         let inv = builder.inverse(left, right, "D").unwrap();
-        assert_eq!(format!("{}", inv.0), "(((B0 - (T << 7)):5:7 << 7) >> 7)");
+        assert_eq!(format!("{}", inv.0), "(((B0:5:7 << 7) - (T << 7)) >> 7)");
     } else {
         panic!();
     }
