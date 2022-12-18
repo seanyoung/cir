@@ -27,7 +27,7 @@ examples below.
 This library encodes to *raw IR*. *raw IR* is alternating on-off durations of
 infrared light, expressed in microseconds. For example,
 
-```ignore
+```text
 +500 -100 +500
 ```
 
@@ -42,7 +42,7 @@ between one message and the next.
 
 This is a simple example of IRP:
 
-```ignore
+```text
 {40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]
 ```
 
@@ -67,7 +67,7 @@ creating the raw IR from some parameters values.
 This is a notation used by the Philips Pronto universal remote, which is a series
 of hex numbers, for example:
 
-```ignore
+```text
 0000 0070 0003 0002 0006 0002 0004 0002 0004 0006 0006 0003 0003 000С
 ```
 
@@ -114,7 +114,7 @@ fn main() {
 
 The output is in raw ir format, which looks like so:
 
-```ignore
+```text
 carrier: 38400Hz
 +9024 -4512 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -36372
 ```
@@ -149,7 +149,7 @@ fn main() {
 ```
 
 Output:
-```ignore
+```text
 +4507 -4507 +573 -1693 +573 -1693 +573 -1693 +573 -573 +573 -573 +573 -573 +573 -573 +573 -573 +573 -1693 +573 -1693 +573 -1693 +573 -573 +573 -573 +573 -573 +573 -573 +573 -573 +573 -573 +573 -1693 +573 -573 +573 -573 +573 -573 +573 -573 +573 -573 +573 -573 +573 -1693 +573 -573 +573 -1693 +573 -1693 +573 -1693 +573 -1693 +573 -1693 +573 -1693 +573 -46559
 ```
 
@@ -173,7 +173,7 @@ fn main() {
 
 The output:
 
-```ignore
+```text
 0000 0068 0009 0000 0060 0018 0030 0018 0018 0018 0018 0018 0018 0018 0018 0018 0018 0018 0018 0018 0018 0510
 ```
 
@@ -209,7 +209,7 @@ fn main() {
 
 This should print:
 
-```ignore
+```text
 decoded: F=1 D=30 T=0
 ```
 
