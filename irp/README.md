@@ -278,8 +278,8 @@ fn main() {
     let mut dev = lirc::open("/dev/lirc0").unwrap();
 
     let mut vars = Vartable::new();
-    vars.set("F".to_string(), 30, 8);
-    vars.set("D".to_string(), 0, 8);
+    vars.set("F".into(), 30, 8);
+    vars.set("D".into(), 0, 8);
     let irp = Irp::parse(RC5_IRP).unwrap();
 
     let message = irp.encode(vars, 1).unwrap();
