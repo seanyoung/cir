@@ -423,7 +423,7 @@ fn compare_decode_to_transmogrifier() {
             decoder.input(data);
         }
 
-        if let Some(res) = decoder.get() {
+        if let Some((_, res)) = decoder.get() {
             let mut ok = true;
 
             for param in &testcase.params {

@@ -2,7 +2,7 @@ use super::{
     build_nfa::{Action, Edge, NFA},
     Expression, InfraredData, Vartable,
 };
-use crate::Message;
+use crate::{Event, Message};
 use log::trace;
 use std::{
     collections::{HashMap, VecDeque},
@@ -18,7 +18,7 @@ pub struct Decoder<'a> {
     rel_tolerance: u32,
     max_gap: u32,
     nfa: &'a NFA,
-    decoded: VecDeque<HashMap<String, i64>>,
+    decoded: VecDeque<(Event, HashMap<String, i64>)>,
 }
 
 impl NFA {
@@ -402,18 +402,18 @@ impl<'a> Decoder<'a> {
                         );
                     }
                 }
-                Action::Done(include) => {
+                Action::Done(event, include) => {
                     let mut res: HashMap<String, i64> = HashMap::new();
 
                     for (name, (val, _, _)) in &vartable.vars {
                         if include.contains(name) || name == "$repeat" {
-                            trace!("done");
+                            trace!("done {}", event);
 
                             res.insert(name.to_owned(), *val);
                         }
                     }
 
-                    self.decoded.push_back(res);
+                    self.decoded.push_back((*event, res));
                 }
             }
         }
@@ -427,7 +427,7 @@ impl<'a> Decoder<'a> {
     }
 
     /// Get the decoded result
-    pub fn get(&mut self) -> Option<HashMap<String, i64>> {
+    pub fn get(&mut self) -> Option<(Event, HashMap<String, i64>)> {
         self.decoded.pop_front()
     }
 }
@@ -435,11 +435,11 @@ impl<'a> Decoder<'a> {
 #[cfg(test)]
 mod test {
     use super::{Decoder, InfraredData};
-    use crate::{Irp, Message};
+    use crate::{Event, Irp, Message};
     use num::Integer;
     use std::collections::HashMap;
 
-    fn munge<'a>(matcher: &'a mut Decoder, s: &str) -> HashMap<String, i64> {
+    fn munge<'a>(matcher: &'a mut Decoder, s: &str) -> (Event, HashMap<String, i64>) {
         let mut res = None;
 
         for ir in Message::parse(s)
@@ -478,9 +478,10 @@ mod test {
 
         let mut matcher = nfa.decoder(100, 3, 20000);
 
-        let res = munge(&mut matcher,
+        let (event, res) = munge(&mut matcher,
             "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200");
 
+        assert_eq!(event, Event::Down);
         assert_eq!(res["F"], 196);
     }
 
@@ -492,38 +493,34 @@ mod test {
 
         let mut matcher = nfa.decoder(100, 3, 20000);
 
-        let res = munge(&mut matcher,
+        let (event, res) = munge(&mut matcher,
             "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756");
 
+        assert_eq!(event, Event::Down);
         assert_eq!(res["F"], 196);
         assert_eq!(res["D"], 64);
         assert_eq!(res["S"], 191);
-        assert_eq!(res["$repeat"], 0);
 
         println!("matcher:{:?}", matcher);
 
-        let res = munge(&mut matcher, "+9024 -2256 +564 -96156");
+        let (event, res) = munge(&mut matcher, "+9024 -2256 +564 -96156");
 
-        assert_eq!(res["F"], 196);
-        assert_eq!(res["D"], 64);
-        assert_eq!(res["S"], 191);
-        assert_eq!(res["$repeat"], 1);
+        assert_eq!(event, Event::Repeat);
+        assert!(res.is_empty());
 
-        let res = munge(&mut matcher, "+9024 -2256 +564 -96156");
+        let (event, res) = munge(&mut matcher, "+9024 -2256 +564 -96156");
 
-        assert_eq!(res["F"], 196);
-        assert_eq!(res["D"], 64);
-        assert_eq!(res["S"], 191);
-        assert_eq!(res["$repeat"], 1);
+        assert_eq!(event, Event::Repeat);
+        assert!(res.is_empty());
 
-        let res = munge(&mut matcher,
+        let (event, res) = munge(&mut matcher,
             "9024 -4512 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -39756");
 
+        assert_eq!(event, Event::Down);
         // not quite
         assert_eq!(res["F"], 191);
         assert_eq!(res["D"], 59);
         assert_eq!(res["S"], 196);
-        assert_eq!(res["$repeat"], 0);
     }
 
     #[test]
@@ -535,9 +532,10 @@ mod test {
 
         let mut matcher = nfa.decoder(100, 3, 20000);
 
-        let  res = munge(&mut matcher,
+        let  (event, res) = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");
 
+        assert_eq!(event, Event::Repeat);
         assert_eq!(res["F"], 1);
         assert_eq!(res["D"], 30);
         assert_eq!(res["T"], 0);

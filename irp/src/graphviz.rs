@@ -15,7 +15,7 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
     let mut vert_names = Vec::new();
 
     for (no, v) in nfa.verts.iter().enumerate() {
-        let name = if v.actions.iter().any(|a| matches!(a, Action::Done(_))) {
+        let name = if v.actions.iter().any(|a| matches!(a, Action::Done(..))) {
             format!("done ({})", no)
         } else {
             format!("{} ({})", no_to_name(vert_names.len()), no)
@@ -27,7 +27,7 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
             .map(|a| match a {
                 Action::Set { var, expr } => format!("{} = {}", var, expr),
                 Action::AssertEq { left, right } => format!("assert {} = {}", left, right),
-                Action::Done(res) => format!("done ({})", res.iter().join(", ")),
+                Action::Done(event, res) => format!("{} ({})", event, res.iter().join(", ")),
             })
             .collect::<Vec<String>>();
 
