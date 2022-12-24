@@ -1,4 +1,4 @@
-use crate::expression::clone_filter;
+use crate::{expression::clone_filter, RepeatMarker};
 
 use super::{Expression, IrStream, Irp};
 use std::rc::Rc;
@@ -46,10 +46,14 @@ impl Irp {
                         .map(|variant| {
                             clone_filter(&expr, &|e| {
                                 if let Expression::Variation(list) = e.as_ref() {
-                                    if list[variant].len() == 1 {
-                                        Some(list[variant][0].clone())
+                                    if let Some(variant) = list.get(variant) {
+                                        if variant.len() == 1 {
+                                            Some(variant[0].clone())
+                                        } else {
+                                            Some(Rc::new(Expression::List(variant.clone())))
+                                        }
                                     } else {
-                                        Some(Rc::new(Expression::List(list[variant].clone())))
+                                        None
                                     }
                                 } else {
                                     None
@@ -118,10 +122,19 @@ impl Irp {
                     }
                 }
 
-                // We should handle the case where we do (T=0,(foo)*) ???
-                let down = if down.is_empty() {
+                let down = if down.is_empty() || only_assignments(&down) {
                     None
                 } else {
+                    if match seen_repeat {
+                        Some(RepeatMarker::OneOrMore) => true,
+                        Some(RepeatMarker::CountOrMore(n)) => n > 0,
+                        _ => false,
+                    } {
+                        for expr in &repeats {
+                            add_flatten(&mut down, expr);
+                        }
+                    }
+
                     Some(Expression::Stream(IrStream {
                         repeat: None,
                         stream: down,
@@ -129,7 +142,7 @@ impl Irp {
                     }))
                 };
 
-                let up = if up.is_empty() {
+                let up = if up.is_empty() || only_assignments(&up) {
                     None
                 } else {
                     Some(Expression::Stream(IrStream {
@@ -173,16 +186,45 @@ fn add_flatten(expr: &mut Vec<Rc<Expression>>, elem: &Rc<Expression>) {
                 expr.push(elem.clone());
             }
         }
+        Expression::Stream(stream) if stream.bit_spec.is_empty() && !stream.has_extent() => {
+            for elem in &stream.stream {
+                expr.push(elem.clone());
+            }
+        }
         _ => {
             expr.push(elem.clone());
         }
     }
 }
 
+/// Do we only have assignments - nothing to do here
+fn only_assignments(list: &Vec<Rc<Expression>>) -> bool {
+    for expr in list {
+        match expr.as_ref() {
+            Expression::Assignment(..) => (),
+            Expression::List(list) if !only_assignments(list) => return false,
+            Expression::Stream(stream) if !only_assignments(&stream.stream) => return false,
+            _ => return false,
+        }
+    }
+
+    true
+}
+
 impl IrStream {
     /// Every IRP expresion should have at most a single repeat marker. Is this it?
     fn is_repeating(&self) -> bool {
         !matches!(self.repeat, None | Some(crate::RepeatMarker::Count(_)))
+    }
+
+    /// Contains extents
+    fn has_extent(&self) -> bool {
+        self.stream.iter().any(|e| {
+            matches!(
+                e.as_ref(),
+                Expression::ExtentConstant(..) | Expression::ExtentIdentifier(..)
+            )
+        })
     }
 }
 
@@ -259,7 +301,7 @@ fn variants() -> Result<(), String> {
 
     assert_eq!(
         format!("{}", variants.up.unwrap()),
-        "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>((4,-1,D:8,~F1:2,OBC:6,~F2:2,S:8,1,-250ms))"
+        "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>(4,-1,D:8,~F1:2,OBC:6,~F2:2,S:8,1,-250ms)"
     );
 
     let irp = Irp::parse("{30.3k,512}<-1,1|1,-1>(1,-5,1023:10, -44, (1,-5,1:1,F:6,D:3,-236)+ ,1,-5,1023:10,-44)[F:0..63,D:0..7]").unwrap();
