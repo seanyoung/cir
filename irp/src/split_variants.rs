@@ -122,9 +122,21 @@ impl Irp {
                     }
                 }
 
-                let down = if down.is_empty() || only_assignments(&down) {
-                    None
+                let down = if down.is_empty() || all_assignments(&down) {
+                    if any_assignments(&repeats) {
+                        Some(Expression::Stream(IrStream {
+                            repeat: None,
+                            stream: repeats.clone(),
+                            bit_spec: stream.bit_spec.clone(),
+                        }))
+                    } else {
+                        None
+                    }
                 } else {
+                    if repeats.is_empty() {
+                        repeats = down.clone();
+                    }
+
                     if match seen_repeat {
                         Some(RepeatMarker::OneOrMore) => true,
                         Some(RepeatMarker::CountOrMore(n)) => n > 0,
@@ -159,7 +171,7 @@ impl Irp {
                     }))
                 };
 
-                let up = if up.is_empty() || only_assignments(&up) {
+                let up = if up.is_empty() || all_assignments(&up) {
                     None
                 } else {
                     Some(Expression::Stream(IrStream {
@@ -215,17 +227,33 @@ fn add_flatten(expr: &mut Vec<Rc<Expression>>, elem: &Rc<Expression>) {
 }
 
 /// Do we only have assignments - nothing to do here
-fn only_assignments(list: &Vec<Rc<Expression>>) -> bool {
+fn all_assignments(list: &Vec<Rc<Expression>>) -> bool {
     for expr in list {
         match expr.as_ref() {
             Expression::Assignment(..) => (),
-            Expression::List(list) if !only_assignments(list) => return false,
-            Expression::Stream(stream) if !only_assignments(&stream.stream) => return false,
+            Expression::List(list) if !all_assignments(list) => return false,
+            Expression::Stream(stream) if !all_assignments(&stream.stream) => return false,
             _ => return false,
         }
     }
 
     true
+}
+
+/// Do we have any assignments
+fn any_assignments(list: &Vec<Rc<Expression>>) -> bool {
+    for expr in list {
+        let mut changes = false;
+        expr.visit(&mut changes, &|e, changes| {
+            *changes |= matches!(e, Expression::Assignment(..) | Expression::Identifier(..));
+        });
+
+        if changes {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// Do we only have assignments - nothing to do here
@@ -313,7 +341,10 @@ fn variants() -> Result<(), String> {
 
     let variants = irp.split_variants()?;
 
-    assert_eq!(variants.down, None);
+    assert_eq!(
+        format!("{}", variants.down.unwrap()),
+        "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>(4,-1,D:8,T1:2,OBC:6,T2:2,S:8,1,-75ms)"
+    );
 
     assert_eq!(
         format!("{}", variants.repeat),
@@ -353,6 +384,22 @@ fn variants() -> Result<(), String> {
         format!("{}", variants.down.unwrap()),
         "<(-1,1)|(1,-1)>((1,-5,^100ms),(1,-5,1:1,F:6,D:3,^100ms))"
     );
+
+    let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]").unwrap();
+
+    let variants = irp.split_variants()?;
+
+    assert_eq!(
+        format!("{}", variants.down.unwrap()),
+        "<(1,-1)|(2,-1)>(4,-1,F:8,^45ms)"
+    );
+
+    assert_eq!(
+        format!("{}", variants.repeat),
+        "<(1,-1)|(2,-1)>(4,-1,F:8,^45ms)"
+    );
+
+    assert_eq!(variants.up, None);
 
     Ok(())
 }

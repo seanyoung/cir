@@ -131,7 +131,9 @@ impl<'a> Decoder<'a> {
         }
 
         if self.pos.is_empty() {
-            let (success, vartab) = self.run_actions(0, &Vartable::new());
+            let (success, mut vartab) = self.run_actions(0, &Vartable::new());
+
+            vartab.set("down".into(), 0, 8);
 
             assert!(success);
 
@@ -380,26 +382,29 @@ impl<'a> Decoder<'a> {
                     vartable.vars.insert(var.to_string(), (val, len, None));
                 }
                 Action::AssertEq { left, right } => {
-                    let (left_val, _) = left.eval(&vartable).unwrap();
-                    let (right_val, _) = right.eval(&vartable).unwrap();
-
-                    if left_val != right_val {
-                        trace!(
-                            "assert FAIL {} != {} ({} != {})",
-                            left,
-                            right,
-                            left_val,
-                            right_val
-                        );
-                        return (false, vartable);
+                    if let (Ok((left_val, _)), Ok((right_val, _))) =
+                        (left.eval(&vartable), right.eval(&vartable))
+                    {
+                        if left_val != right_val {
+                            trace!(
+                                "assert FAIL {} != {} ({} != {})",
+                                left,
+                                right,
+                                left_val,
+                                right_val
+                            );
+                            return (false, vartable);
+                        } else {
+                            trace!(
+                                "assert  {} == {} ({} == {})",
+                                left,
+                                right,
+                                left_val,
+                                right_val
+                            );
+                        }
                     } else {
-                        trace!(
-                            "assert  {} == {} ({} == {})",
-                            left,
-                            right,
-                            left_val,
-                            right_val
-                        );
+                        return (false, vartable);
                     }
                 }
                 Action::Done(event, include) => {
@@ -535,7 +540,7 @@ mod test {
         let  (event, res) = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");
 
-        assert_eq!(event, Event::Repeat);
+        assert_eq!(event, Event::Down);
         assert_eq!(res["F"], 1);
         assert_eq!(res["D"], 30);
         assert_eq!(res["T"], 0);

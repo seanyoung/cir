@@ -70,22 +70,51 @@ impl Irp {
 
         let variants = self.split_variants()?;
 
+        let mut down_needed = false;
+
         if let Some(down) = &variants.down {
             builder.expression(down, &[])?;
 
+            builder.add_action(Action::AssertEq {
+                left: Rc::new(Expression::Identifier("down".into())),
+                right: Rc::new(Expression::Number(0)),
+            });
+
+            builder.add_action(Action::Set {
+                var: "down".into(),
+                expr: Rc::new(Expression::Number(1)),
+            });
+
             builder.add_done(Event::Down)?;
 
-            builder.cur = BuilderLocation::default();
+            builder.set_head(0);
+            builder.cur.seen_edges = false;
+            down_needed = true;
         }
 
         builder.expression(&variants.repeat, &[])?;
 
+        if down_needed {
+            builder.add_action(Action::AssertEq {
+                left: Rc::new(Expression::Identifier("down".into())),
+                right: Rc::new(Expression::Number(1)),
+            });
+        }
+
         builder.add_done(Event::Repeat)?;
 
         if let Some(up) = &variants.up {
-            builder.cur = BuilderLocation::default();
+            builder.set_head(0);
+            builder.cur.seen_edges = false;
 
             builder.expression(up, &[])?;
+
+            if down_needed {
+                builder.add_action(Action::AssertEq {
+                    left: Rc::new(Expression::Identifier("down".into())),
+                    right: Rc::new(Expression::Number(1)),
+                });
+            }
 
             builder.add_done(Event::Up)?;
         }
