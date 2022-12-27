@@ -130,8 +130,25 @@ impl Irp {
                         Some(RepeatMarker::CountOrMore(n)) => n > 0,
                         _ => false,
                     } {
-                        for expr in &repeats {
-                            add_flatten(&mut down, expr);
+                        // if both the original stream and the added stream contain an extend,
+                        // puth the original in stream
+                        if has_extent(&repeats) && has_extent(&down) {
+                            down = vec![
+                                Rc::new(Expression::Stream(IrStream {
+                                    bit_spec: Vec::new(),
+                                    stream: down,
+                                    repeat: None,
+                                })),
+                                Rc::new(Expression::Stream(IrStream {
+                                    bit_spec: Vec::new(),
+                                    stream: repeats.clone(),
+                                    repeat: None,
+                                })),
+                            ];
+                        } else {
+                            for expr in &repeats {
+                                add_flatten(&mut down, expr);
+                            }
                         }
                     }
 
@@ -186,7 +203,7 @@ fn add_flatten(expr: &mut Vec<Rc<Expression>>, elem: &Rc<Expression>) {
                 expr.push(elem.clone());
             }
         }
-        Expression::Stream(stream) if stream.bit_spec.is_empty() && !stream.has_extent() => {
+        Expression::Stream(stream) if stream.bit_spec.is_empty() && !has_extent(&stream.stream) => {
             for elem in &stream.stream {
                 expr.push(elem.clone());
             }
@@ -211,20 +228,24 @@ fn only_assignments(list: &Vec<Rc<Expression>>) -> bool {
     true
 }
 
+/// Do we only have assignments - nothing to do here
+fn has_extent(list: &Vec<Rc<Expression>>) -> bool {
+    for expr in list {
+        if matches!(
+            expr.as_ref(),
+            Expression::ExtentConstant(..) | Expression::ExtentIdentifier(..)
+        ) {
+            return true;
+        }
+    }
+
+    false
+}
+
 impl IrStream {
     /// Every IRP expresion should have at most a single repeat marker. Is this it?
     fn is_repeating(&self) -> bool {
         !matches!(self.repeat, None | Some(crate::RepeatMarker::Count(_)))
-    }
-
-    /// Contains extents
-    fn has_extent(&self) -> bool {
-        self.stream.iter().any(|e| {
-            matches!(
-                e.as_ref(),
-                Expression::ExtentConstant(..) | Expression::ExtentIdentifier(..)
-            )
-        })
     }
 }
 
@@ -310,7 +331,7 @@ fn variants() -> Result<(), String> {
 
     assert_eq!(
         format!("{}", variants.down.unwrap()),
-        "<(-1,1)|(1,-1)>(1,-5,1023:10,-44)"
+        "<(-1,1)|(1,-1)>(1,-5,1023:10,-44,1,-5,1:1,F:6,D:3,-236)"
     );
 
     assert_eq!(
@@ -321,6 +342,16 @@ fn variants() -> Result<(), String> {
     assert_eq!(
         format!("{}", variants.up.unwrap()),
         "<(-1,1)|(1,-1)>(1,-5,1023:10,-44)"
+    );
+
+    let irp =
+        Irp::parse("{}<-1,1|1,-1>(1,-5,^100m,(1,-5,1:1,F:6,D:3,^100m)+)[F:0..63,D:0..7]").unwrap();
+
+    let variants = irp.split_variants()?;
+
+    assert_eq!(
+        format!("{}", variants.down.unwrap()),
+        "<(-1,1)|(1,-1)>((1,-5,^100ms),(1,-5,1:1,F:6,D:3,^100ms))"
     );
 
     Ok(())
