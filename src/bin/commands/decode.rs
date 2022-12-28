@@ -252,7 +252,7 @@ pub fn decode(matches: &clap::ArgMatches) {
                         for (remote, matcher) in &mut matchers {
                             matcher.input(ir);
 
-                            while let Some(var) = matcher.get() {
+                            while let Some((event, var)) = matcher.get() {
                                 if let Some(remote) = remote {
                                     // lirc
                                     let decoded_code = var["CODE"] as u64;
@@ -275,7 +275,8 @@ pub fn decode(matches: &clap::ArgMatches) {
                                     let mut var: Vec<(String, i64)> = var.into_iter().collect();
                                     var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                                     println!(
-                                        "decoded: {}",
+                                        "decoded: {} {}",
+                                        event,
                                         var.iter()
                                             .map(|(name, val)| format!("{}={}", name, val))
                                             .join(", ")
@@ -314,7 +315,7 @@ fn process(
 
             matcher.input(ir);
 
-            while let Some(var) = matcher.get() {
+            while let Some((event, var)) = matcher.get() {
                 if let Some(remote) = remote {
                     // lirc
                     let decoded_code = var["CODE"] as u64;
@@ -334,7 +335,8 @@ fn process(
                     let mut var: Vec<(String, i64)> = var.into_iter().collect();
                     var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                     println!(
-                        "decoded: {}",
+                        "decoded: {} {}",
+                        event,
                         var.iter()
                             .map(|(name, val)| format!("{}={}", name, val))
                             .join(", ")

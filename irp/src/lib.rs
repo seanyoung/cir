@@ -10,10 +10,11 @@ mod message;
 mod parser;
 mod pronto;
 pub mod protocols;
+mod split_variants;
 #[cfg(test)]
 mod tests;
 
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, fmt, rc::Rc};
 
 #[derive(Debug, PartialEq, Default, Eq)]
 /// An encoded raw infrared message
@@ -179,6 +180,23 @@ pub enum InfraredData {
     Flash(u32),
     Gap(u32),
     Reset,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum Event {
+    Down,
+    Repeat,
+    Up,
+}
+
+impl fmt::Display for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Event::Down => write!(f, "down"),
+            Event::Repeat => write!(f, "repeat"),
+            Event::Up => write!(f, "up"),
+        }
+    }
 }
 
 pub use build_nfa::NFA;

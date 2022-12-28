@@ -1,4 +1,4 @@
-use super::{expression::clone_filter, Expression, Irp, ParameterSpec, RepeatMarker, Vartable};
+use super::{expression::clone_filter, Event, Expression, Irp, ParameterSpec, Vartable};
 use log::{trace, warn};
 use std::{
     collections::HashMap,
@@ -43,9 +43,8 @@ pub(crate) enum Action {
         left: Rc<Expression>,
         right: Rc<Expression>,
     },
-    Done(Vec<String>),
+    Done(Event, Vec<String>),
 }
-
 #[derive(PartialEq, Default, Clone, Debug)]
 pub(crate) struct Vertex {
     pub actions: Vec<Action>,
@@ -69,9 +68,57 @@ impl Irp {
 
         builder.add_constants();
 
-        builder.expression(&self.stream, &[])?;
+        let variants = self.split_variants()?;
 
-        builder.add_done()?;
+        let mut down_needed = false;
+
+        if let Some(down) = &variants.down {
+            builder.expression(down, &[])?;
+
+            builder.add_action(Action::Set {
+                var: "$down".into(),
+                expr: Rc::new(Expression::Number(1)),
+            });
+
+            builder.add_done(Event::Down)?;
+
+            builder.add_edge(Edge::Branch(0));
+
+            builder.set_head(0);
+            builder.cur.seen_edges = false;
+            down_needed = true;
+        }
+
+        builder.expression(&variants.repeat, &[])?;
+
+        if down_needed {
+            builder.add_action(Action::AssertEq {
+                left: Rc::new(Expression::Identifier("$down".into())),
+                right: Rc::new(Expression::Number(1)),
+            });
+        }
+
+        builder.add_done(Event::Repeat)?;
+
+        builder.add_edge(Edge::Branch(0));
+
+        if let Some(up) = &variants.up {
+            builder.set_head(0);
+            builder.cur.seen_edges = false;
+
+            builder.expression(up, &[])?;
+
+            if down_needed {
+                builder.add_action(Action::AssertEq {
+                    left: Rc::new(Expression::Identifier("$down".into())),
+                    right: Rc::new(Expression::Number(1)),
+                });
+            }
+
+            builder.add_done(Event::Up)?;
+
+            builder.add_edge(Edge::Branch(0));
+        }
 
         Ok(NFA {
             verts: builder.complete(),
@@ -147,22 +194,22 @@ impl<'a> Builder<'a> {
         self.cur.vars.contains_key(name)
     }
 
-    fn add_done(&mut self) -> Result<bool, String> {
-        if self.cur.seen_edges
-            && self
-                .irp
-                .parameters
-                .iter()
-                .all(|param| self.cur.vars.contains_key(&param.name))
-        {
+    fn add_done(&mut self, event: Event) -> Result<bool, String> {
+        if self.cur.seen_edges {
             let res = self
                 .irp
                 .parameters
                 .iter()
-                .map(|param| param.name.to_owned())
+                .filter_map(|param| {
+                    if self.cur.vars.contains_key(&param.name) {
+                        Some(param.name.to_owned())
+                    } else {
+                        None
+                    }
+                })
                 .collect();
 
-            self.add_action(Action::Done(res));
+            self.add_action(Action::Done(event, res));
             self.mask_results()?;
             self.cur.seen_edges = false;
             Ok(true)
@@ -287,11 +334,6 @@ impl<'a> Builder<'a> {
 
             changes
         } {}
-
-        self.add_action(Action::Set {
-            var: "$repeat".to_owned(),
-            expr: Rc::new(Expression::Number(0)),
-        });
     }
 
     fn expression_list(
@@ -563,7 +605,7 @@ impl<'a> Builder<'a> {
                     Action::Set { expr, .. } => {
                         self.have_definitions(expr)?;
                     }
-                    Action::Done(_) => (),
+                    Action::Done(..) => (),
                 }
                 self.add_action(action);
             }
@@ -989,42 +1031,7 @@ impl<'a> Builder<'a> {
                     bit_spec.insert(0, &irstream.bit_spec);
                 }
 
-                if irstream.repeat == Some(RepeatMarker::Any)
-                    || irstream.repeat == Some(RepeatMarker::OneOrMore)
-                {
-                    let mut start = self.cur.head;
-
-                    let done_before = if self.add_done()? {
-                        let node = self.add_vertex();
-
-                        self.add_edge(Edge::Branch(node));
-
-                        self.set_head(node);
-
-                        start = node;
-
-                        self.add_edge(Edge::Branch(0));
-
-                        true
-                    } else {
-                        false
-                    };
-
-                    self.expression_list(&irstream.stream, &bit_spec)?;
-
-                    self.add_action(Action::Set {
-                        var: "$repeat".to_owned(),
-                        expr: Rc::new(Expression::Number(1)),
-                    });
-
-                    if !done_before {
-                        self.add_done()?;
-                    }
-
-                    self.add_edge(Edge::Branch(start));
-                } else {
-                    self.expression_list(&irstream.stream, &bit_spec)?;
-                }
+                self.expression_list(&irstream.stream, &bit_spec)?;
             }
             Expression::List(list) => {
                 self.expression_list(list, bit_spec)?;
