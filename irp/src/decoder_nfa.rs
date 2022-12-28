@@ -133,7 +133,7 @@ impl<'a> Decoder<'a> {
         if self.pos.is_empty() {
             let (success, mut vartab) = self.run_actions(0, &Vartable::new());
 
-            vartab.set("down".into(), 0, 8);
+            vartab.set("$down".into(), 0, 8);
 
             assert!(success);
 
@@ -411,7 +411,7 @@ impl<'a> Decoder<'a> {
                     let mut res: HashMap<String, i64> = HashMap::new();
 
                     for (name, (val, _, _)) in &vartable.vars {
-                        if include.contains(name) || name == "$repeat" {
+                        if include.contains(name) {
                             trace!("done {}", event);
 
                             res.insert(name.to_owned(), *val);
@@ -511,15 +511,19 @@ mod test {
         let (event, res) = munge(&mut matcher, "+9024 -2256 +564 -96156");
 
         assert_eq!(event, Event::Repeat);
-        assert!(res.is_empty());
+        assert_eq!(res["F"], 196);
+        assert_eq!(res["D"], 64);
+        assert_eq!(res["S"], 191);
 
         let (event, res) = munge(&mut matcher, "+9024 -2256 +564 -96156");
 
         assert_eq!(event, Event::Repeat);
-        assert!(res.is_empty());
+        assert_eq!(res["F"], 196);
+        assert_eq!(res["D"], 64);
+        assert_eq!(res["S"], 191);
 
         let (event, res) = munge(&mut matcher,
-            "9024 -4512 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -39756");
+            "+9024 -4512 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -39756");
 
         assert_eq!(event, Event::Down);
         // not quite

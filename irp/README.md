@@ -201,16 +201,16 @@ fn main() {
         -900 +890 -910 +840 -920 +870 -920 +840 -920 +870 -1810 +840 -125000").unwrap() {
         decoder.input(ir);
     }
-    let res = decoder.get().unwrap();
+    let (event, res) = decoder.get().unwrap();
 
-    println!("decoded: F={} D={} T={}", res["F"], res["D"], res["T"]);
+    println!("decoded: {} F={} D={} T={}", event, res["F"], res["D"], res["T"]);
 }
 ```
 
 This should print:
 
 ```text
-decoded: F=1 D=30 T=0
+decoded: down F=1 D=30 T=0
 ```
 
 ## Parsing raw ir format

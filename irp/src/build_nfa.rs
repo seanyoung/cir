@@ -75,17 +75,14 @@ impl Irp {
         if let Some(down) = &variants.down {
             builder.expression(down, &[])?;
 
-            builder.add_action(Action::AssertEq {
-                left: Rc::new(Expression::Identifier("down".into())),
-                right: Rc::new(Expression::Number(0)),
-            });
-
             builder.add_action(Action::Set {
-                var: "down".into(),
+                var: "$down".into(),
                 expr: Rc::new(Expression::Number(1)),
             });
 
             builder.add_done(Event::Down)?;
+
+            builder.add_edge(Edge::Branch(0));
 
             builder.set_head(0);
             builder.cur.seen_edges = false;
@@ -96,12 +93,14 @@ impl Irp {
 
         if down_needed {
             builder.add_action(Action::AssertEq {
-                left: Rc::new(Expression::Identifier("down".into())),
+                left: Rc::new(Expression::Identifier("$down".into())),
                 right: Rc::new(Expression::Number(1)),
             });
         }
 
         builder.add_done(Event::Repeat)?;
+
+        builder.add_edge(Edge::Branch(0));
 
         if let Some(up) = &variants.up {
             builder.set_head(0);
@@ -111,12 +110,14 @@ impl Irp {
 
             if down_needed {
                 builder.add_action(Action::AssertEq {
-                    left: Rc::new(Expression::Identifier("down".into())),
+                    left: Rc::new(Expression::Identifier("$down".into())),
                     right: Rc::new(Expression::Number(1)),
                 });
             }
 
             builder.add_done(Event::Up)?;
+
+            builder.add_edge(Edge::Branch(0));
         }
 
         Ok(NFA {
