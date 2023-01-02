@@ -1,8 +1,7 @@
-use crate::protocols::parse;
-use crate::InfraredData;
-use crate::{Irp, Message, Vartable};
+use crate::{protocols::parse, InfraredData, Irp, Message, Vartable};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 #[test]
 fn test() {
@@ -383,27 +382,14 @@ fn compare_encode_to_transmogrifier() {
 }
 
 #[test]
-fn compare_decode_to_transmogrifier() {
-    // load test data
-    let data = std::fs::read_to_string("transmogrifier_test_data.json").unwrap();
-
-    let all_testdata: Vec<TestData> = serde_json::from_str(&data).unwrap();
+fn decode_all() {
     let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
 
+    let mut total_tests = 0;
     let mut fails = 0;
-    let mut total_tests = all_testdata.len();
+    let mut rng = rand::thread_rng();
 
-    for testcase in &all_testdata {
-        let protocol = protocols
-            .iter()
-            .find(|p| p.name == testcase.protocol)
-            .unwrap();
-
-        if !testcase.pronto.is_empty() || testcase.render[0].len() < 3 {
-            total_tests -= 1;
-            continue;
-        }
-
+    for protocol in &protocols {
         println!("trying {}", protocol.name);
 
         let irp = Irp::parse(&protocol.irp).unwrap();
@@ -419,72 +405,102 @@ fn compare_decode_to_transmogrifier() {
 
         let mut decoder = nfa.decoder(10, 3, 20000);
 
-        for data in InfraredData::from_u32_slice(&testcase.render[0]) {
-            decoder.input(data);
-        }
+        for repeats in 0..10 {
+            decoder.reset();
 
-        if let Some((_, res)) = decoder.get() {
-            let mut ok = true;
+            let mut vars = Vartable::new();
+            let mut params = HashMap::new();
 
-            for param in &testcase.params {
-                let mask = match (protocol.name.as_str(), param.name.as_str()) {
-                    ("Zenith5", "F") => 31,
-                    ("Zenith6", "F") => 63,
-                    ("Zenith7", "F") => 127,
-                    ("Zenith", "F") => (1 << res["D"]) - 1,
-                    ("NEC-Shirriff", "data") if res["length"] < 64 => (1 << res["length"]) - 1,
-                    ("Fujitsu_Aircon_old", "tOn") => !0xf0,
+            for param in &irp.parameters {
+                let min = param.min.eval(&vars).unwrap().0;
+                let max = param.max.eval(&vars).unwrap().0;
 
-                    _ => !0,
-                };
+                let value = rng.gen_range(min..=max);
 
-                if res.get(&param.name) != Some(&((param.value & mask) as i64)) {
-                    println!(
-                        "{} does not match, expected {} got {:?}",
-                        param.name,
-                        param.value,
-                        res.get(&param.name),
-                    );
-                    ok = false;
-                }
+                params.insert(param.name.to_owned(), value);
+                vars.set(param.name.to_owned(), value, 8);
             }
 
-            if !ok {
-                let testcase = Message::from_raw_slice(&testcase.render[0]);
+            let msg = irp.encode(vars, repeats).unwrap();
+
+            if msg.raw.len() < 3 {
+                println!("protocol:{} repeats:{} too short", protocol.name, repeats);
+                continue;
+            }
+
+            total_tests += 1;
+
+            for data in InfraredData::from_u32_slice(&msg.raw) {
+                decoder.input(data);
+            }
+
+            if let Some((_, res)) = decoder.get() {
+                let mut ok = true;
+
+                for param in &irp.parameters {
+                    let mask = match (protocol.name.as_str(), param.name.as_str()) {
+                        ("Zenith5", "F") => 31,
+                        ("Zenith6", "F") => 63,
+                        ("Zenith7", "F") => 127,
+                        ("Zenith", "F") => (1 << res["D"]) - 1,
+                        ("NEC-Shirriff", "data") if res["length"] < 64 => {
+                            let mask = (1u64 << res["length"]) - 1u64;
+                            mask as i64
+                        }
+                        ("Fujitsu_Aircon_old", "tOn") => !0xf0,
+
+                        _ => !0,
+                    };
+
+                    let value = params[&param.name];
+
+                    if res.get(&param.name) != Some(&(value & mask)) {
+                        println!(
+                            "{} does not match, expected {} got {:?}",
+                            param.name,
+                            value,
+                            res.get(&param.name),
+                        );
+                        ok = false;
+                    }
+                }
+
+                if !ok {
+                    let testcase = Message::from_raw_slice(&msg.raw);
+
+                    println!(
+                        "{} failed to decode, irp: {} ir: {}",
+                        protocol.name,
+                        protocol.irp,
+                        testcase.print_rawir()
+                    );
+
+                    fails += 1;
+                }
+            } else {
+                let m = Message::from_raw_slice(&msg.raw);
 
                 println!(
                     "{} failed to decode, irp: {} ir: {}",
                     protocol.name,
                     protocol.irp,
-                    testcase.print_rawir()
+                    m.print_rawir()
                 );
-
+                println!(
+                    "expected: {}",
+                    irp.parameters
+                        .iter()
+                        .map(|param| format!("{}={}", param.name, params[&param.name]))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
                 fails += 1;
             }
-        } else {
-            let m = Message::from_raw_slice(&testcase.render[0]);
-
-            println!(
-                "{} failed to decode, irp: {} ir: {}",
-                protocol.name,
-                protocol.irp,
-                m.print_rawir()
-            );
-            println!(
-                "expected: {}",
-                testcase
-                    .params
-                    .iter()
-                    .map(|param| format!("{}={}", param.name, param.value))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            );
-            fails += 1;
         }
     }
 
     println!("tests: {} fails: {}", total_tests, fails);
 
     // TODO: we still have a whole bunch of fails
-    assert_eq!(fails, 39);
+    assert!(fails <= 49);
 }

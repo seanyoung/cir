@@ -106,6 +106,7 @@ impl<'a> Decoder<'a> {
     /// Reset decoder state
     pub fn reset(&mut self) {
         self.pos.truncate(0);
+        self.decoded.truncate(0);
     }
 
     fn tolerance_eq(&self, expected: u32, received: u32) -> bool {
