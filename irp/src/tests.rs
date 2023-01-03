@@ -1,7 +1,14 @@
-use crate::{protocols::parse, InfraredData, Irp, Message, Vartable};
+#![cfg(test)]
+
+mod irptransmogrifier;
+
+use crate::{
+    protocols::parse,
+    tests::irptransmogrifier::{create_jvm, IrpTransmogrifierRender},
+    InfraredData, {Irp, Message, Vartable},
+};
 use itertools::Itertools;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
 #[test]
@@ -283,98 +290,88 @@ fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
     true
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct TestData {
-    pub protocol: String,
-    #[serde(default)]
-    pub repeats: u64,
-    pub params: Vec<Param>,
-    #[serde(default)]
-    pub pronto: String,
-    #[serde(default)]
-    pub render: Vec<Vec<u32>>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Param {
-    pub name: String,
-    pub value: u64,
-}
-
 #[test]
 fn compare_encode_to_transmogrifier() {
-    // load test data
-    let data = std::fs::read_to_string("transmogrifier_test_data.json").unwrap();
-
-    let all_testdata: Vec<TestData> = serde_json::from_str(&data).unwrap();
     let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
 
+    let mut total_tests = 0;
     let mut fails = 0;
-    let total_tests = all_testdata.len();
+    let jvm = create_jvm();
+    let mut rng = rand::thread_rng();
 
-    for testcase in &all_testdata {
-        let protocol = protocols
-            .iter()
-            .find(|p| p.name == testcase.protocol)
-            .unwrap();
+    for protocol in &protocols {
+        let irp = Irp::parse(&protocol.irp).unwrap();
+
+        let trans_irp = IrpTransmogrifierRender::new(&jvm, &protocol.irp);
 
         let mut vars = Vartable::new();
 
-        for param in &testcase.params {
-            vars.set(param.name.to_owned(), param.value as i64, 8);
+        let mut params = HashMap::new();
+
+        for param in &irp.parameters {
+            let min = param.min.eval(&vars).unwrap().0;
+            let max = param.max.eval(&vars).unwrap().0;
+
+            let value = rng.gen_range(min..=max);
+
+            params.insert(param.name.to_owned(), value);
+            vars.set(param.name.to_owned(), value, 32);
         }
 
-        let irp = Irp::parse(&protocol.irp).unwrap();
+        for repeats in 0..10 {
+            let msg = irp.encode(vars.clone(), repeats).unwrap();
+            let trans_msg = trans_irp.render_raw(params.clone(), repeats as usize);
 
-        if testcase.pronto.is_empty() {
-            let f = irp.encode(vars, testcase.repeats).unwrap();
-
-            if !compare_with_rounding(&testcase.render[0], &f.raw) {
+            if !compare_with_rounding(&msg.raw, &trans_msg.raw) {
                 println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
 
-                for param in &testcase.params {
-                    println!("{} = {}", param.name, param.value);
+                for (name, value) in &params {
+                    println!("{} = {}", name, value);
                 }
-                println!("repeats {}", testcase.repeats);
+                println!("repeats {}", repeats);
 
                 fails += 1;
             }
-        } else {
-            let pronto = irp.encode_pronto(vars).unwrap();
 
-            let f = pronto.to_string();
+            total_tests += 1;
+        }
 
-            if f != testcase.pronto {
-                let left: Vec<u32> = f
-                    .split_whitespace()
-                    .map(|v| u32::from_str_radix(v, 16).unwrap())
-                    .collect();
+        // Test pronto
+        let trans_pronto = trans_irp.render_pronto(params.clone());
 
-                let right: Vec<u32> = testcase
-                    .pronto
-                    .split_whitespace()
-                    .map(|v| u32::from_str_radix(v, 16).unwrap())
-                    .collect();
+        let pronto = irp.encode_pronto(vars).unwrap().to_string();
 
-                if left[0] != right[0]
-                    || left[1] != right[1]
-                    || left[2] != right[2]
-                    || left[3] != right[3]
-                    || !compare_with_rounding(&left, &right)
-                {
-                    println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
+        if pronto != trans_pronto {
+            let left: Vec<u32> = pronto
+                .split_whitespace()
+                .map(|v| u32::from_str_radix(v, 16).unwrap())
+                .collect();
 
-                    println!("left: {}", f);
-                    println!("right: {}", testcase.pronto);
+            let right: Vec<u32> = trans_pronto
+                .split_whitespace()
+                .map(|v| u32::from_str_radix(v, 16).unwrap())
+                .collect();
 
-                    for param in &testcase.params {
-                        println!("{} = {}", param.name, param.value);
-                    }
+            if left[0] != right[0]
+                || left[1] != right[1]
+                || left[2] != right[2]
+                || left[3] != right[3]
+                || !compare_with_rounding(&left, &right)
+            {
+                println!("FAIL testing pronto {} irp {}", protocol.name, protocol.irp);
 
-                    fails += 1;
+                println!("left: {}", pronto);
+                println!("right: {}", trans_pronto);
+
+                for (name, value) in &params {
+                    println!("{} = {}", name, value);
                 }
+
+                fails += 1;
             }
         }
+
+        total_tests += 1;
     }
 
     println!("tests: {} fails: {}", total_tests, fails);

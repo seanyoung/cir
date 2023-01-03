@@ -1,0 +1,3 @@
+[submodule "irp/IrpTransmogrifier"]
+	path = irp/IrpTransmogrifier
+	url = https://github.com/bengtmartensson/IrpTransmogrifier
