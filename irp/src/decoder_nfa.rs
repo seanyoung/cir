@@ -110,16 +110,13 @@ impl<'a> Decoder<'a> {
     }
 
     fn tolerance_eq(&self, expected: u32, received: u32) -> bool {
-        let diff = if expected > received {
-            expected - received
-        } else {
-            received - expected
-        };
+        let diff = expected.abs_diff(received);
 
         if diff <= self.abs_tolerance {
             true
         } else {
-            ((diff * 100) / expected) <= self.rel_tolerance
+            // upcast to u64 since diff * 100 may overflow
+            ((diff as u64 * 100) / expected as u64) <= self.rel_tolerance as u64
         }
     }
 

@@ -35,7 +35,6 @@ serde_json = "1.0"
 [workspace]
 members = [
 	"irp",
-	"irp/generate_test_data",
 	"generate_lircd_test_data"
 ]
 
