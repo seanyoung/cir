@@ -1,4 +1,5 @@
 use crate::{protocols::parse, InfraredData, Irp, Message, Vartable};
+use itertools::Itertools;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
@@ -405,8 +406,10 @@ fn decode_all() {
 
         let mut decoder = nfa.decoder(10, 3, 20000);
 
-        for repeats in 0..10 {
-            decoder.reset();
+        for n in 0..10 {
+            let repeats = if n < 3 { n } else { rng.gen_range(n..n + 20) };
+
+            decoder.input(InfraredData::Reset);
 
             let mut vars = Vartable::new();
             let mut params = HashMap::new();
@@ -434,9 +437,9 @@ fn decode_all() {
                 decoder.input(data);
             }
 
-            if let Some((_, res)) = decoder.get() {
-                let mut ok = true;
+            let mut ok = true;
 
+            if let Some((_, res)) = decoder.get() {
                 for param in &irp.parameters {
                     let mask = match (protocol.name.as_str(), param.name.as_str()) {
                         ("Zenith5", "F") => 31,
@@ -464,36 +467,26 @@ fn decode_all() {
                         ok = false;
                     }
                 }
-
-                if !ok {
-                    let testcase = Message::from_raw_slice(&msg.raw);
-
-                    println!(
-                        "{} failed to decode, irp: {} ir: {}",
-                        protocol.name,
-                        protocol.irp,
-                        testcase.print_rawir()
-                    );
-
-                    fails += 1;
-                }
             } else {
-                let m = Message::from_raw_slice(&msg.raw);
+                ok = false;
+            }
 
+            if !ok {
                 println!(
                     "{} failed to decode, irp: {} ir: {}",
                     protocol.name,
                     protocol.irp,
-                    m.print_rawir()
+                    msg.print_rawir()
                 );
+
                 println!(
                     "expected: {}",
                     irp.parameters
                         .iter()
                         .map(|param| format!("{}={}", param.name, params[&param.name]))
-                        .collect::<Vec<String>>()
-                        .join(", ")
+                        .join(",")
                 );
+
                 fails += 1;
             }
         }
