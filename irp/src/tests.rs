@@ -233,7 +233,9 @@ fn vars() {
 
 #[test]
 fn parse_all_of_them() {
-    let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
+    let protocols = parse(&PathBuf::from(
+        "IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+    ));
 
     let mut broken = 0;
     let mut total = 0;
@@ -292,7 +294,9 @@ fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
 
 #[test]
 fn compare_encode_to_transmogrifier() {
-    let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
+    let protocols = parse(&PathBuf::from(
+        "IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+    ));
 
     let mut total_tests = 0;
     let mut fails = 0;
@@ -381,7 +385,9 @@ fn compare_encode_to_transmogrifier() {
 
 #[test]
 fn decode_all() {
-    let protocols = parse(&PathBuf::from("IrpProtocols.xml"));
+    let protocols = parse(&PathBuf::from(
+        "IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+    ));
 
     let mut total_tests = 0;
     let mut fails = 0;
