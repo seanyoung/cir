@@ -5,171 +5,9 @@ impl Remote {
     /// Build an IRP representation for the remote. This can be used both for encoding
     /// and decoding.
     pub fn irp(&self) -> String {
-        let mut irp = String::from("{");
+        let builder = Builder::new(self);
 
-        if self.frequency != 0 {
-            write!(irp, "{}k,", self.frequency as f64 / 1000f64).unwrap();
-        }
-
-        if self.duty_cycle != 0 {
-            write!(irp, "{}%,", self.duty_cycle).unwrap();
-        }
-
-        irp.push_str("msb}<");
-
-        if self.flags.contains(Flags::BO) {
-            write!(
-                irp,
-                "{},-zeroGap,zeroGap={},oneGap={}|{},-oneGap,zeroGap={},oneGap={}|",
-                self.bit[1].0,
-                self.bit[2].1,
-                self.bit[3].1,
-                self.bit[2].0,
-                self.bit[1].1,
-                self.bit[2].1,
-            )
-            .unwrap();
-        } else if self.flags.contains(Flags::GRUNDIG) {
-            write!(
-                irp,
-                "-{},{}|\
-                -{},{},-{},{}|\
-                -{},{},-{},{}|\
-                -{},{},-{},{}|",
-                // bit 0
-                self.bit[3].1,
-                self.bit[3].0,
-                // bit 1
-                self.bit[2].1,
-                self.bit[2].0,
-                self.bit[0].1,
-                self.bit[0].0,
-                // bit 2
-                self.bit[1].1,
-                self.bit[1].0,
-                self.bit[1].1,
-                self.bit[1].0,
-                // bit 3
-                self.bit[0].1,
-                self.bit[0].0,
-                self.bit[2].1,
-                self.bit[2].0,
-            )
-            .unwrap();
-        } else if self.flags.contains(Flags::XMP) {
-            for i in 0..16 {
-                write!(
-                    irp,
-                    "{},-{}|",
-                    self.bit[0].0,
-                    self.bit[0].1 + i * self.bit[1].1
-                )
-                .unwrap();
-            }
-        } else {
-            for (bit_no, (pulse, space)) in self.bit.iter().enumerate() {
-                if *pulse == 0 && *space == 0 {
-                    break;
-                }
-
-                if (self.flags.intersects(Flags::RC5 | Flags::RC6) && bit_no == 1)
-                    || self.flags.contains(Flags::SPACE_FIRST)
-                {
-                    if *space > 0 {
-                        write!(irp, "-{},", space).unwrap();
-                    }
-
-                    if *pulse > 0 {
-                        write!(irp, "{},", pulse).unwrap();
-                    }
-                } else {
-                    if *pulse > 0 {
-                        write!(irp, "{},", pulse).unwrap();
-                    }
-
-                    if *space > 0 {
-                        write!(irp, "-{},", space).unwrap();
-                    }
-                }
-
-                irp.pop();
-                irp.push('|');
-            }
-        }
-
-        irp.pop();
-        irp.push_str(">(");
-
-        add_irp_body(self, &mut irp, false);
-
-        if self.repeat.0 != 0 && self.repeat.1 != 0 {
-            irp.push('(');
-            if self.flags.contains(Flags::REPEAT_HEADER) && self.header.0 != 0 && self.header.1 != 0
-            {
-                write!(irp, "{},-{},", self.header.0, self.header.1).unwrap();
-            }
-            if self.plead != 0 {
-                write!(irp, "{},", self.plead).unwrap();
-            }
-            write!(irp, "{},-{},", self.repeat.0, self.repeat.1).unwrap();
-            if self.ptrail != 0 {
-                write!(irp, "{},", self.ptrail).unwrap();
-            }
-            add_gap(self, &mut irp, true);
-
-            irp.pop();
-            match self.min_repeat {
-                0 => irp.push_str(")*)"),
-                1 => irp.push_str(")+)"),
-                _ => write!(irp, "){}+)", self.min_repeat).unwrap(),
-            }
-        } else if self
-            .flags
-            .intersects(Flags::NO_HEAD_REP | Flags::NO_FOOT_REP)
-        {
-            irp.push('(');
-
-            add_irp_body(self, &mut irp, true);
-
-            irp.pop();
-            match self.min_repeat {
-                0 => irp.push_str(")*)"),
-                1 => irp.push_str(")+)"),
-                _ => write!(irp, "){}+)", self.min_repeat).unwrap(),
-            }
-        } else {
-            irp.pop();
-            if self.min_repeat > 0 {
-                write!(irp, "){}+", self.min_repeat + 1).unwrap();
-            } else {
-                irp.push_str(")+");
-            }
-        }
-
-        if toggle_post_data(self) || self.flags.contains(Flags::BO) {
-            irp.push('{');
-
-            if toggle_post_data(self) {
-                write!(irp, "POST=0x{:x},", self.post_data).unwrap();
-            }
-
-            if self.flags.contains(Flags::BO) {
-                write!(irp, "zeroGap={},oneGap={},", self.bit[1].1, self.bit[3].1).unwrap();
-            }
-
-            irp.pop();
-            irp.push('}');
-        }
-
-        write!(irp, " [CODE:0..{}", gen_mask(self.bits)).unwrap();
-
-        if self.toggle_bit_mask.count_ones() == 1 {
-            irp.push_str(",T@:0..1=0");
-        }
-
-        irp.push(']');
-
-        irp
+        builder.build()
     }
 
     /// How many bits are there in the definition
@@ -178,146 +16,9 @@ impl Remote {
     }
 }
 
-fn add_irp_body(remote: &Remote, irp: &mut String, repeat: bool) {
-    let supress_header = repeat && remote.flags.contains(Flags::NO_HEAD_REP);
-    let supress_footer = repeat && remote.flags.contains(Flags::NO_FOOT_REP);
-
-    if remote.flags.contains(Flags::BO) {
-        write!(
-            irp,
-            "{},-{},{},-{},",
-            remote.bit[1].0, remote.bit[1].1, remote.bit[1].0, remote.bit[1].1
-        )
-        .unwrap();
-    }
-
-    if !supress_header && remote.header.0 != 0 && remote.header.1 != 0 {
-        write!(irp, "{},-{},", remote.header.0, remote.header.1).unwrap();
-    }
-
-    if remote.plead != 0 {
-        write!(irp, "{},", remote.plead).unwrap();
-    }
-
-    let toggle_bit_mask = if remote.toggle_bit_mask.count_ones() == 1 {
-        remote.toggle_bit_mask
-    } else {
-        0
-    };
-
-    if remote.pre_data_bits != 0 {
-        add_bit_stream(
-            remote,
-            Stream::Constant(remote.pre_data),
-            remote.pre_data_bits,
-            toggle_bit_mask >> (remote.bits + remote.post_data_bits),
-            remote.rc6_mask >> (remote.bits + remote.post_data_bits),
-            irp,
-        );
-
-        if remote.pre.0 != 0 && remote.pre.1 != 0 {
-            write!(irp, "{},-{},", remote.pre.0, remote.pre.1).unwrap();
-        }
-    }
-
-    add_bit_stream(
-        remote,
-        Stream::Variable("CODE"),
-        remote.bits,
-        toggle_bit_mask >> remote.post_data_bits,
-        remote.rc6_mask >> remote.post_data_bits,
-        irp,
-    );
-
-    if remote.post_data_bits != 0 {
-        let stream = if toggle_post_data(remote) {
-            Stream::Variable("POST")
-        } else {
-            Stream::Constant(remote.post_data)
-        };
-
-        add_bit_stream(
-            remote,
-            stream,
-            remote.post_data_bits,
-            toggle_bit_mask,
-            remote.rc6_mask,
-            irp,
-        );
-
-        if remote.post.0 != 0 && remote.post.1 != 0 {
-            write!(irp, "{},-{},", remote.post.0, remote.post.1).unwrap();
-        }
-    }
-
-    if !supress_footer && remote.foot.0 != 0 && remote.foot.1 != 0 {
-        write!(irp, "{},-{},", remote.foot.0, remote.foot.1).unwrap();
-    }
-
-    if remote.ptrail != 0 {
-        write!(irp, "{},", remote.ptrail).unwrap();
-    }
-
-    add_gap(remote, irp, repeat);
-
-    if remote.toggle_mask != 0 {
-        write!(
-            irp,
-            "CODE=CODE^0x{:x},",
-            remote.toggle_mask >> remote.post_data_bits
-        )
-        .unwrap();
-    }
-
-    if remote.toggle_bit_mask.count_ones() > 1 {
-        write!(
-            irp,
-            "CODE=CODE^0x{:x},",
-            remote.toggle_bit_mask >> remote.post_data_bits
-        )
-        .unwrap();
-    }
-
-    if toggle_post_data(remote) {
-        write!(
-            irp,
-            "POST=POST^0x{:x},",
-            remote.toggle_mask & gen_mask(remote.post_data_bits)
-        )
-        .unwrap();
-    }
-}
-
-fn add_gap(remote: &Remote, irp: &mut String, repeat: bool) {
-    if remote.gap != 0 || (remote.repeat_gap != 0 && repeat) {
-        let gap = if repeat && remote.repeat_gap != 0 {
-            remote.repeat_gap
-        } else if !repeat
-            && remote
-                .flags
-                .contains(Flags::NO_HEAD_REP | Flags::CONST_LENGTH)
-        {
-            remote.gap + remote.header.0 + remote.header.1
-        } else {
-            remote.gap
-        };
-
-        irp.push(if remote.flags.contains(Flags::CONST_LENGTH) {
-            '^'
-        } else {
-            '-'
-        });
-
-        if remote.gap % 1000 == 0 {
-            write!(irp, "{}m,", gap / 1000).unwrap();
-        } else {
-            write!(irp, "{},", gap).unwrap();
-        }
-    }
-}
-
-fn toggle_post_data(remote: &Remote) -> bool {
-    remote.toggle_mask != 0 && (remote.toggle_mask & gen_mask(remote.post_data_bits)) != 0
+struct Builder<'a> {
+    remote: &'a Remote,
+    irp: String,
 }
 
 #[derive(Clone, Copy)]
@@ -327,72 +28,427 @@ enum Stream<'a> {
     Toggle,
 }
 
-fn add_bit_stream(
-    remote: &Remote,
-    stream: Stream,
-    bits: u64,
-    toggle_mask: u64,
-    rc6_mask: u64,
-    irp: &mut String,
-) {
-    let mut edges = mask_edges(rc6_mask, bits);
-    edges.extend_from_slice(&mask_edges(toggle_mask, bits));
-    edges.sort_by(|a, b| b.partial_cmp(a).unwrap());
-    edges.dedup();
-    edges.push(0);
+impl<'a> Builder<'a> {
+    fn new(remote: &'a Remote) -> Self {
+        Builder {
+            remote,
+            irp: String::new(),
+        }
+    }
 
-    let mut highest_bit = bits;
+    fn build(mut self) -> String {
+        self.irp = "{".into();
 
-    for bit in edges {
-        let is_toggle = (toggle_mask & (1 << bit)) != 0;
-        let is_rc6 = (rc6_mask & (1 << bit)) != 0;
-
-        if is_rc6 {
+        if self.remote.frequency != 0 {
             write!(
-                irp,
-                "<{},-{}|-{},{}>(",
-                remote.bit[0].0 * 2,
-                remote.bit[0].1 * 2,
-                remote.bit[1].1 * 2,
-                remote.bit[1].0 * 2
+                &mut self.irp,
+                "{}k,",
+                self.remote.frequency as f64 / 1000f64
             )
             .unwrap();
         }
 
-        let stream = if is_toggle { Stream::Toggle } else { stream };
+        if self.remote.duty_cycle != 0 {
+            write!(&mut self.irp, "{}%,", self.remote.duty_cycle).unwrap();
+        }
 
-        let bit_count = highest_bit - bit;
-        let offset = bit;
+        self.irp.push_str("msb}<");
 
-        match stream {
-            Stream::Constant(v) => {
-                let v = (v >> offset) & gen_mask(bit_count);
+        if self.remote.flags.contains(Flags::BO) {
+            write!(
+                &mut self.irp,
+                "{},-zeroGap,zeroGap={},oneGap={}|{},-oneGap,zeroGap={},oneGap={}|",
+                self.remote.bit[1].0,
+                self.remote.bit[2].1,
+                self.remote.bit[3].1,
+                self.remote.bit[2].0,
+                self.remote.bit[1].1,
+                self.remote.bit[2].1,
+            )
+            .unwrap();
+        } else if self.remote.flags.contains(Flags::GRUNDIG) {
+            write!(
+                &mut self.irp,
+                "-{},{}|\
+                -{},{},-{},{}|\
+                -{},{},-{},{}|\
+                -{},{},-{},{}|",
+                // bit 0
+                self.remote.bit[3].1,
+                self.remote.bit[3].0,
+                // bit 1
+                self.remote.bit[2].1,
+                self.remote.bit[2].0,
+                self.remote.bit[0].1,
+                self.remote.bit[0].0,
+                // bit 2
+                self.remote.bit[1].1,
+                self.remote.bit[1].0,
+                self.remote.bit[1].1,
+                self.remote.bit[1].0,
+                // bit 3
+                self.remote.bit[0].1,
+                self.remote.bit[0].0,
+                self.remote.bit[2].1,
+                self.remote.bit[2].0,
+            )
+            .unwrap();
+        } else if self.remote.flags.contains(Flags::XMP) {
+            for i in 0..16 {
+                write!(
+                    &mut self.irp,
+                    "{},-{}|",
+                    self.remote.bit[0].0,
+                    self.remote.bit[0].1 + i * self.remote.bit[1].1
+                )
+                .unwrap();
+            }
+        } else {
+            for (bit_no, (pulse, space)) in self.remote.bit.iter().enumerate() {
+                if *pulse == 0 && *space == 0 {
+                    break;
+                }
 
-                if v <= 9 {
-                    write!(irp, "{}:{},", v, bit_count).unwrap();
+                if (self.remote.flags.intersects(Flags::RC5 | Flags::RC6) && bit_no == 1)
+                    || self.remote.flags.contains(Flags::SPACE_FIRST)
+                {
+                    if *space > 0 {
+                        write!(&mut self.irp, "-{},", space).unwrap();
+                    }
+
+                    if *pulse > 0 {
+                        write!(&mut self.irp, "{},", pulse).unwrap();
+                    }
                 } else {
-                    write!(irp, "0x{:x}:{},", v, bit_count).unwrap();
+                    if *pulse > 0 {
+                        write!(&mut self.irp, "{},", pulse).unwrap();
+                    }
+
+                    if *space > 0 {
+                        write!(&mut self.irp, "-{},", space).unwrap();
+                    }
+                }
+
+                self.irp.pop();
+                self.irp.push('|');
+            }
+        }
+
+        self.irp.pop();
+        self.irp.push_str(">(");
+
+        self.add_irp_body(false);
+
+        if self.remote.repeat.0 != 0 && self.remote.repeat.1 != 0 {
+            self.irp.push('(');
+            if self.remote.flags.contains(Flags::REPEAT_HEADER)
+                && self.remote.header.0 != 0
+                && self.remote.header.1 != 0
+            {
+                write!(
+                    &mut self.irp,
+                    "{},-{},",
+                    self.remote.header.0, self.remote.header.1
+                )
+                .unwrap();
+            }
+            if self.remote.plead != 0 {
+                write!(&mut self.irp, "{},", self.remote.plead).unwrap();
+            }
+            write!(
+                &mut self.irp,
+                "{},-{},",
+                self.remote.repeat.0, self.remote.repeat.1
+            )
+            .unwrap();
+            if self.remote.ptrail != 0 {
+                write!(&mut self.irp, "{},", self.remote.ptrail).unwrap();
+            }
+            self.add_gap(true);
+
+            self.irp.pop();
+            match self.remote.min_repeat {
+                0 => self.irp.push_str(")*)"),
+                1 => self.irp.push_str(")+)"),
+                _ => write!(&mut self.irp, "){}+)", self.remote.min_repeat).unwrap(),
+            }
+        } else if self
+            .remote
+            .flags
+            .intersects(Flags::NO_HEAD_REP | Flags::NO_FOOT_REP)
+        {
+            self.irp.push('(');
+
+            self.add_irp_body(true);
+
+            self.irp.pop();
+            match self.remote.min_repeat {
+                0 => self.irp.push_str(")*)"),
+                1 => self.irp.push_str(")+)"),
+                _ => write!(&mut self.irp, "){}+)", self.remote.min_repeat).unwrap(),
+            }
+        } else {
+            self.irp.pop();
+            if self.remote.min_repeat > 0 {
+                write!(&mut self.irp, "){}+", self.remote.min_repeat + 1).unwrap();
+            } else {
+                self.irp.push_str(")+");
+            }
+        }
+
+        if self.toggle_post_data() || self.remote.flags.contains(Flags::BO) {
+            self.irp.push('{');
+
+            if self.toggle_post_data() {
+                write!(&mut self.irp, "POST=0x{:x},", self.remote.post_data).unwrap();
+            }
+
+            if self.remote.flags.contains(Flags::BO) {
+                write!(
+                    &mut self.irp,
+                    "zeroGap={},oneGap={},",
+                    self.remote.bit[1].1, self.remote.bit[3].1
+                )
+                .unwrap();
+            }
+
+            self.irp.pop();
+            self.irp.push('}');
+        }
+
+        write!(&mut self.irp, " [CODE:0..{}", gen_mask(self.remote.bits)).unwrap();
+
+        if self.remote.toggle_bit_mask.count_ones() == 1 {
+            self.irp.push_str(",T@:0..1=0");
+        }
+
+        self.irp.push(']');
+
+        self.irp
+    }
+
+    fn add_irp_body(&mut self, repeat: bool) {
+        let supress_header = repeat && self.remote.flags.contains(Flags::NO_HEAD_REP);
+        let supress_footer = repeat && self.remote.flags.contains(Flags::NO_FOOT_REP);
+
+        if self.remote.flags.contains(Flags::BO) {
+            write!(
+                &mut self.irp,
+                "{},-{},{},-{},",
+                self.remote.bit[1].0,
+                self.remote.bit[1].1,
+                self.remote.bit[1].0,
+                self.remote.bit[1].1
+            )
+            .unwrap();
+        }
+
+        if !supress_header && self.remote.header.0 != 0 && self.remote.header.1 != 0 {
+            write!(
+                &mut self.irp,
+                "{},-{},",
+                self.remote.header.0, self.remote.header.1
+            )
+            .unwrap();
+        }
+
+        if self.remote.plead != 0 {
+            write!(&mut self.irp, "{},", self.remote.plead).unwrap();
+        }
+
+        let toggle_bit_mask = if self.remote.toggle_bit_mask.count_ones() == 1 {
+            self.remote.toggle_bit_mask
+        } else {
+            0
+        };
+
+        if self.remote.pre_data_bits != 0 {
+            self.add_bit_stream(
+                Stream::Constant(self.remote.pre_data),
+                self.remote.pre_data_bits,
+                toggle_bit_mask >> (self.remote.bits + self.remote.post_data_bits),
+                self.remote.rc6_mask >> (self.remote.bits + self.remote.post_data_bits),
+            );
+
+            if self.remote.pre.0 != 0 && self.remote.pre.1 != 0 {
+                write!(
+                    &mut self.irp,
+                    "{},-{},",
+                    self.remote.pre.0, self.remote.pre.1
+                )
+                .unwrap();
+            }
+        }
+
+        self.add_bit_stream(
+            Stream::Variable("CODE"),
+            self.remote.bits,
+            toggle_bit_mask >> self.remote.post_data_bits,
+            self.remote.rc6_mask >> self.remote.post_data_bits,
+        );
+
+        if self.remote.post_data_bits != 0 {
+            let stream = if self.toggle_post_data() {
+                Stream::Variable("POST")
+            } else {
+                Stream::Constant(self.remote.post_data)
+            };
+
+            self.add_bit_stream(
+                stream,
+                self.remote.post_data_bits,
+                toggle_bit_mask,
+                self.remote.rc6_mask,
+            );
+
+            if self.remote.post.0 != 0 && self.remote.post.1 != 0 {
+                write!(
+                    &mut self.irp,
+                    "{},-{},",
+                    self.remote.post.0, self.remote.post.1
+                )
+                .unwrap();
+            }
+        }
+
+        if !supress_footer && self.remote.foot.0 != 0 && self.remote.foot.1 != 0 {
+            write!(
+                &mut self.irp,
+                "{},-{},",
+                self.remote.foot.0, self.remote.foot.1
+            )
+            .unwrap();
+        }
+
+        if self.remote.ptrail != 0 {
+            write!(&mut self.irp, "{},", self.remote.ptrail).unwrap();
+        }
+
+        self.add_gap(repeat);
+
+        if self.remote.toggle_mask != 0 {
+            write!(
+                &mut self.irp,
+                "CODE=CODE^0x{:x},",
+                self.remote.toggle_mask >> self.remote.post_data_bits
+            )
+            .unwrap();
+        }
+
+        if self.remote.toggle_bit_mask.count_ones() > 1 {
+            write!(
+                &mut self.irp,
+                "CODE=CODE^0x{:x},",
+                self.remote.toggle_bit_mask >> self.remote.post_data_bits
+            )
+            .unwrap();
+        }
+
+        if self.toggle_post_data() {
+            write!(
+                &mut self.irp,
+                "POST=POST^0x{:x},",
+                self.remote.toggle_mask & gen_mask(self.remote.post_data_bits)
+            )
+            .unwrap();
+        }
+    }
+
+    fn add_gap(&mut self, repeat: bool) {
+        if self.remote.gap != 0 || (self.remote.repeat_gap != 0 && repeat) {
+            let gap = if repeat && self.remote.repeat_gap != 0 {
+                self.remote.repeat_gap
+            } else if !repeat
+                && self
+                    .remote
+                    .flags
+                    .contains(Flags::NO_HEAD_REP | Flags::CONST_LENGTH)
+            {
+                self.remote.gap + self.remote.header.0 + self.remote.header.1
+            } else {
+                self.remote.gap
+            };
+
+            self.irp
+                .push(if self.remote.flags.contains(Flags::CONST_LENGTH) {
+                    '^'
+                } else {
+                    '-'
+                });
+
+            if self.remote.gap % 1000 == 0 {
+                write!(&mut self.irp, "{}m,", gap / 1000).unwrap();
+            } else {
+                write!(&mut self.irp, "{},", gap).unwrap();
+            }
+        }
+    }
+
+    fn toggle_post_data(&self) -> bool {
+        self.remote.toggle_mask != 0
+            && (self.remote.toggle_mask & gen_mask(self.remote.post_data_bits)) != 0
+    }
+
+    fn add_bit_stream(&mut self, stream: Stream, bits: u64, toggle_mask: u64, rc6_mask: u64) {
+        let mut edges = mask_edges(rc6_mask, bits);
+        edges.extend_from_slice(&mask_edges(toggle_mask, bits));
+        edges.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        edges.dedup();
+        edges.push(0);
+
+        let mut highest_bit = bits;
+
+        for bit in edges {
+            let is_toggle = (toggle_mask & (1 << bit)) != 0;
+            let is_rc6 = (rc6_mask & (1 << bit)) != 0;
+
+            if is_rc6 {
+                write!(
+                    &mut self.irp,
+                    "<{},-{}|-{},{}>(",
+                    self.remote.bit[0].0 * 2,
+                    self.remote.bit[0].1 * 2,
+                    self.remote.bit[1].1 * 2,
+                    self.remote.bit[1].0 * 2
+                )
+                .unwrap();
+            }
+
+            let stream = if is_toggle { Stream::Toggle } else { stream };
+
+            let bit_count = highest_bit - bit;
+            let offset = bit;
+
+            match stream {
+                Stream::Constant(v) => {
+                    let v = (v >> offset) & gen_mask(bit_count);
+
+                    if v <= 9 {
+                        write!(&mut self.irp, "{}:{},", v, bit_count).unwrap();
+                    } else {
+                        write!(&mut self.irp, "0x{:x}:{},", v, bit_count).unwrap();
+                    }
+                }
+                Stream::Variable(v) if offset == 0 => {
+                    write!(&mut self.irp, "{}:{},", v, bit_count).unwrap();
+                }
+                Stream::Variable(v) => {
+                    write!(&mut self.irp, "{}:{}:{},", v, bit_count, offset).unwrap();
+                }
+                Stream::Toggle => {
+                    assert_eq!(bit_count, 1);
+
+                    self.irp.push_str("T:1,");
                 }
             }
-            Stream::Variable(v) if offset == 0 => {
-                write!(irp, "{}:{},", v, bit_count).unwrap();
-            }
-            Stream::Variable(v) => {
-                write!(irp, "{}:{}:{},", v, bit_count, offset).unwrap();
-            }
-            Stream::Toggle => {
-                assert_eq!(bit_count, 1);
 
-                irp.push_str("T:1,");
+            if is_rc6 {
+                self.irp.pop();
+                self.irp.push_str("),");
             }
+
+            highest_bit = bit;
         }
-
-        if is_rc6 {
-            irp.pop();
-            irp.push_str("),");
-        }
-
-        highest_bit = bit;
     }
 }
 
