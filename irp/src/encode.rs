@@ -217,8 +217,10 @@ impl<'a> Encoder<'a> {
     }
 
     /// Add a flash of length microseconds
-    fn add_flash(&mut self, length: i64) {
-        assert!(length > 0);
+    fn add_flash(&mut self, length: i64) -> Result<(), String> {
+        if length <= 0 {
+            return Err("length should be non-zero".into());
+        }
 
         self.total_length += length;
 
@@ -227,11 +229,14 @@ impl<'a> Encoder<'a> {
         } else {
             self.raw.push(length as u32);
         }
+        Ok(())
     }
 
     /// Add a gap of length microseconds
-    fn add_gap(&mut self, length: i64) {
-        assert!(length > 0);
+    fn add_gap(&mut self, length: i64) -> Result<(), String> {
+        if length <= 0 {
+            return Err("length should be non-zero".into());
+        }
 
         // Leading gaps must be added to the totals
         self.total_length += length;
@@ -245,20 +250,22 @@ impl<'a> Encoder<'a> {
         } else {
             self.raw.push(length as u32);
         }
+        Ok(())
     }
 
     /// Add an extent.
-    fn add_extent(&mut self, extent: i64) {
+    fn add_extent(&mut self, extent: i64) -> Result<(), String> {
         // remove length of stream generated so far
         let trimmed_extent = extent - (self.total_length - *self.extent_marker.last().unwrap());
 
         if trimmed_extent > 0 {
-            self.add_gap(trimmed_extent);
+            self.add_gap(trimmed_extent)?;
         } else {
             // IrpTransmogrifier will error here with: Argument of extent smaller than actual duration
             // We do this to remain compatible with lircd transmit
-            self.add_gap(extent);
+            self.add_gap(extent)?;
         }
+        Ok(())
     }
 
     /// Add some bits after evaluating a bitfield.
@@ -321,7 +328,7 @@ impl<'a> Encoder<'a> {
             // 2 => 1, 4 => 2, 8 => 3, 16 => 4
             let bits_step = len.trailing_zeros();
 
-            if (bits.len() % bits_step as usize) != 0 {
+            if bits_step == 0 || (bits.len() % bits_step as usize) != 0 {
                 return Err(format!(
                     "{} bits found, not multiple of {}",
                     self.bitspec_scope[level].bitstream.len(),
@@ -396,39 +403,39 @@ fn eval_stream<'a>(
             Expression::Number(v) => {
                 encoder.flush_level(level, vars)?;
 
-                encoder.add_flash(Unit::Units.eval(*v, gs)?);
+                encoder.add_flash(Unit::Units.eval(*v, gs)?)?;
             }
             Expression::Negative(e) => {
                 encoder.flush_level(level, vars)?;
                 match e.as_ref() {
-                    Expression::Number(v) => encoder.add_gap(Unit::Units.eval(*v, gs)?),
-                    Expression::FlashConstant(v, u) => encoder.add_gap(u.eval_float(*v, gs)?),
+                    Expression::Number(v) => encoder.add_gap(Unit::Units.eval(*v, gs)?)?,
+                    Expression::FlashConstant(v, u) => encoder.add_gap(u.eval_float(*v, gs)?)?,
                     _ => unreachable!(),
                 }
             }
             Expression::FlashConstant(p, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_flash(u.eval_float(*p, gs)?);
+                encoder.add_flash(u.eval_float(*p, gs)?)?;
             }
             Expression::FlashIdentifier(id, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_flash(u.eval(vars.get(id)?.0, gs)?);
+                encoder.add_flash(u.eval(vars.get(id)?.0, gs)?)?;
             }
             Expression::ExtentConstant(p, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval_float(*p, gs)?);
+                encoder.add_extent(u.eval_float(*p, gs)?)?;
             }
             Expression::ExtentIdentifier(id, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval(vars.get(id)?.0, gs)?);
+                encoder.add_extent(u.eval(vars.get(id)?.0, gs)?)?;
             }
             Expression::GapConstant(p, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_gap(u.eval_float(*p, gs)?);
+                encoder.add_gap(u.eval_float(*p, gs)?)?;
             }
             Expression::GapIdentifier(id, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_gap(u.eval(vars.get(id)?.0, gs)?);
+                encoder.add_gap(u.eval(vars.get(id)?.0, gs)?)?;
             }
             Expression::Assignment(id, expr) => {
                 encoder.flush_level(level, vars)?;
