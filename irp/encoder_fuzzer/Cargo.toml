@@ -1,0 +1,9 @@
+[package]
+name = "encoder_fuzzer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+afl = "*"
+irp = { path = ".." }
+rand = "0.8"

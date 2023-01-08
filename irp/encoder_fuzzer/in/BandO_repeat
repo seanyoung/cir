@@ -1,0 +1,4 @@
+{455k,3125,msb}<200u,-zeroGap,zeroGap=2,oneGap=3 | 200u,-oneGap,zeroGap=1,oneGap=2>
+(200u,-1,200u,-1,200u,-5,D:9,F:8,200u,-4)
+{zeroGap=1, oneGap=3}
+[D:0..511,F:0..255]

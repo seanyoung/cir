@@ -68,11 +68,11 @@ pub struct Irp {
     general_spec: GeneralSpec,
     stream: Expression,
     definitions: Vec<Expression>,
-    parameters: Vec<ParameterSpec>,
+    pub parameters: Vec<ParameterSpec>,
 }
 
 #[derive(Debug)]
-struct GeneralSpec {
+pub struct GeneralSpec {
     duty_cycle: Option<u8>,
     carrier: Option<i64>,
     lsb: bool,
@@ -80,7 +80,7 @@ struct GeneralSpec {
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
-enum Unit {
+pub enum Unit {
     Units,
     Microseconds,
     Milliseconds,
@@ -88,7 +88,7 @@ enum Unit {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-enum RepeatMarker {
+pub enum RepeatMarker {
     Any,
     OneOrMore,
     Count(i64),
@@ -96,14 +96,14 @@ enum RepeatMarker {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-struct IrStream {
+pub struct IrStream {
     bit_spec: Vec<Rc<Expression>>,
     stream: Vec<Rc<Expression>>,
     repeat: Option<RepeatMarker>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
-enum Expression {
+pub enum Expression {
     FlashConstant(f64, Unit),
     GapConstant(f64, Unit),
     ExtentConstant(f64, Unit),
@@ -159,7 +159,7 @@ enum Expression {
 }
 
 #[derive(Debug)]
-struct ParameterSpec {
+pub struct ParameterSpec {
     pub name: String,
     #[allow(unused)]
     pub memory: bool,
