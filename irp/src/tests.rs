@@ -312,6 +312,11 @@ fn compare_encode_to_transmogrifier() {
 
         let mut params = HashMap::new();
 
+        if irp.parameters.is_empty() {
+            println!("irp {} has not parameters, skipping", protocol.irp);
+            continue;
+        }
+
         for param in &irp.parameters {
             let min = param.min.eval(&vars).unwrap().0;
             let max = param.max.eval(&vars).unwrap().0;
