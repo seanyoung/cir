@@ -142,7 +142,7 @@ pub fn parse(path: &Path) -> Vec<Protocol> {
                 }
             }
             Err(e) => {
-                panic!("Error: {}", e);
+                panic!("Error: {e}");
             }
             _ => {}
         }

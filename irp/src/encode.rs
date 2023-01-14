@@ -120,7 +120,7 @@ impl Irp {
         if !self.parameters.is_empty() {
             for name in vars.vars.keys() {
                 if !self.parameters.iter().any(|p| &p.name == name) {
-                    return Err(format!("no parameter called {}", name));
+                    return Err(format!("no parameter called {name}"));
                 }
             }
         }
@@ -129,7 +129,7 @@ impl Irp {
             if let Expression::Assignment(name, expr) = e {
                 vars.set_definition(name.clone(), expr.as_ref());
             } else {
-                panic!("definition not correct expression: {:?}", e);
+                panic!("definition not correct expression: {e:?}");
             }
         }
 
@@ -161,7 +161,7 @@ impl<'a> Vartable<'a> {
         match self.vars.get(id) {
             Some((val, length, None)) => Ok((*val, *length)),
             Some((_, _, Some(expr))) => expr.eval(self),
-            None => Err(format!("variable `{}´ not defined", id)),
+            None => Err(format!("variable `{id}´ not defined")),
         }
     }
 }

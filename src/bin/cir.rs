@@ -435,7 +435,7 @@ fn main() {
         Some(("list-devices", matches)) => match rcdev::enumerate_rc_dev() {
             Ok(list) => print_rc_dev(&list, matches),
             Err(err) => {
-                eprintln!("error: {}", err);
+                eprintln!("error: {err}");
                 std::process::exit(1);
             }
         },
@@ -473,7 +473,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
             println!("\tDefault Keymap\t\t: {}", rcdev.default_keymap);
         }
         if let Some(inputdev) = &rcdev.inputdev {
-            println!("\tInput Device\t\t: {}", inputdev);
+            println!("\tInput Device\t\t: {inputdev}");
 
             match Device::open(inputdev) {
                 Ok(inputdev) => {
@@ -509,8 +509,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                                             let keycode = evdev::Key::new(keycode as u16);
 
                                             println!(
-                                                "\tScancode\t\t: 0x{:08x} => {:?}",
-                                                scancode, keycode
+                                                "\tScancode\t\t: 0x{scancode:08x} => {keycode:?}"
                                             );
                                         }
                                         4 => {
@@ -520,13 +519,11 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                                             let keycode = evdev::Key::new(keycode as u16);
 
                                             println!(
-                                                "\tScancode\t\t: 0x{:08x} => {:?}",
-                                                scancode, keycode
+                                                "\tScancode\t\t: 0x{scancode:08x} => {keycode:?}"
                                             )
                                         }
                                         len => panic!(
-                                            "scancode should be 4 or 8 bytes long, not {}",
-                                            len
+                                            "scancode should be 4 or 8 bytes long, not {len}"
                                         ),
                                     }
 
@@ -534,7 +531,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                                 }
                                 Err(err) if err.kind() == std::io::ErrorKind::InvalidInput => break,
                                 Err(err) => {
-                                    eprintln!("error: {}", err);
+                                    eprintln!("error: {err}");
                                     std::process::exit(1);
                                 }
                             }
@@ -542,12 +539,12 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                     }
                 }
                 Err(err) => {
-                    println!("\tInput properties\t: {}", err);
+                    println!("\tInput properties\t: {err}");
                 }
             };
         }
         if let Some(lircdev) = &rcdev.lircdev {
-            println!("\tLIRC Device\t\t: {}", lircdev);
+            println!("\tLIRC Device\t\t: {lircdev}");
 
             match lirc::open(PathBuf::from(lircdev)) {
                 Ok(mut lircdev) => {
@@ -558,7 +555,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                             println!(
                                 "\tLIRC Resolution\t\t: {}",
                                 match lircdev.receiver_resolution() {
-                                    Ok(res) => format!("{} microseconds", res),
+                                    Ok(res) => format!("{res} microseconds"),
                                     Err(err) => err.to_string(),
                                 }
                             );
@@ -569,7 +566,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                         println!(
                             "\tLIRC Timeout\t\t: {}",
                             match lircdev.get_timeout() {
-                                Ok(timeout) => format!("{} microseconds", timeout),
+                                Ok(timeout) => format!("{timeout} microseconds"),
                                 Err(err) => err.to_string(),
                             }
                         );
@@ -620,11 +617,11 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
 
                                     match e.info() {
                                         Ok(info) => match info.name_as_str() {
-                                            Some(name) => print!("{}", name),
+                                            Some(name) => print!("{name}"),
                                             None => print!("{}", info.id()),
                                         },
                                         Err(err) => {
-                                            print!("{}", err)
+                                            print!("{err}")
                                         }
                                     }
                                 }
@@ -632,7 +629,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                                 println!();
                             }
                             Err(err) => {
-                                println!("\tBPF protocols\t\t: {}", err)
+                                println!("\tBPF protocols\t\t: {err}")
                             }
                         }
                     } else if lircdev.can_receive_scancodes() {
@@ -666,7 +663,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                             println!(
                                 "\tLIRC Transmitters\t: {}",
                                 match lircdev.num_transmitters() {
-                                    Ok(count) => format!("{}", count),
+                                    Ok(count) => format!("{count}"),
                                     Err(err) => err.to_string(),
                                 }
                             );
@@ -678,7 +675,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                     }
                 }
                 Err(err) => {
-                    println!("\tLIRC Features\t\t: {}", err);
+                    println!("\tLIRC Features\t\t: {err}");
                 }
             }
         }
@@ -704,9 +701,9 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
 
     if printed == 0 {
         if let Some(lircdev) = matches.value_of("LIRCDEV") {
-            eprintln!("error: no lirc device named {}", lircdev);
+            eprintln!("error: no lirc device named {lircdev}");
         } else if let Some(rcdev) = matches.value_of("RCDEV") {
-            eprintln!("error: no rc device named {}", rcdev);
+            eprintln!("error: no rc device named {rcdev}");
         } else {
             eprintln!("error: no devices found");
         }

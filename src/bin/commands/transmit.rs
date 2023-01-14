@@ -13,7 +13,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
         match value.parse() {
             Ok(d @ 1..=99) => Some(d),
             _ => {
-                eprintln!("error: ‘{}’ duty cycle is not valid", value);
+                eprintln!("error: ‘{value}’ duty cycle is not valid");
 
                 std::process::exit(1);
             }
@@ -26,7 +26,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
         match value.parse() {
             Ok(c @ 0..=1_000_000) => Some(c),
             _ => {
-                eprintln!("error: ‘{}’ carrier is not valid", value);
+                eprintln!("error: ‘{value}’ carrier is not valid");
 
                 std::process::exit(1);
             }
@@ -58,7 +58,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
             for t in values {
                 match t.parse() {
                     Ok(0) | Err(_) => {
-                        eprintln!("error: ‘{}’ is not a valid transmitter number", t);
+                        eprintln!("error: ‘{t}’ is not a valid transmitter number");
                         std::process::exit(1);
                     }
                     Ok(v) => transmitters.push(v),
@@ -67,10 +67,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
 
             if !transmitters.is_empty() {
                 if !lircdev.can_set_send_transmitter_mask() {
-                    eprintln!(
-                        "error: {}: device does not support setting transmitters",
-                        lircdev
-                    );
+                    eprintln!("error: {lircdev}: device does not support setting transmitters");
 
                     std::process::exit(1);
                 }
@@ -78,7 +75,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
                 let transmitter_count = match lircdev.num_transmitters() {
                     Ok(v) => v,
                     Err(e) => {
-                        eprintln!("error: {}: failed to get transmitter count: {}", lircdev, e);
+                        eprintln!("error: {lircdev}: failed to get transmitter count: {e}");
 
                         std::process::exit(1);
                     }
@@ -86,8 +83,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
 
                 if let Some(t) = transmitters.iter().find(|t| **t > transmitter_count) {
                     eprintln!(
-                        "error: transmitter {} not valid, device has {} transmitters",
-                        t, transmitter_count
+                        "error: transmitter {t} not valid, device has {transmitter_count} transmitters"
                     );
 
                     std::process::exit(1);
@@ -100,7 +96,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
                 match lircdev.set_transmitter_mask(mask) {
                     Ok(v) => v,
                     Err(e) => {
-                        eprintln!("error: {}: failed to set transmitter mask: {}", lircdev, e);
+                        eprintln!("error: {lircdev}: failed to set transmitter mask: {e}");
 
                         std::process::exit(1);
                     }
@@ -113,7 +109,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
                 debug!("setting {} duty cycle {}", lircdev, duty_cycle);
 
                 if let Err(s) = lircdev.set_send_duty_cycle(duty_cycle as u32) {
-                    eprintln!("error: {}: {}", lircdev, s);
+                    eprintln!("error: {lircdev}: {s}");
 
                     std::process::exit(1);
                 }
@@ -130,7 +126,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
                 debug!("setting {} send carrier {}", lircdev, carrier);
 
                 if let Err(s) = lircdev.set_send_carrier(carrier as u32) {
-                    eprintln!("error: {}: {}", lircdev, s);
+                    eprintln!("error: {lircdev}: {s}");
 
                     if carrier == 0 {
                         eprintln!("info: not all lirc devices can send unmodulated");
@@ -138,17 +134,14 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
                     std::process::exit(1);
                 }
             } else {
-                eprintln!(
-                    "warning: {}: device does not support setting carrier",
-                    lircdev
-                );
+                eprintln!("warning: {lircdev}: device does not support setting carrier");
             }
         }
 
         debug!("transmitting {} data {}", lircdev, message.print_rawir());
 
         if let Err(s) = lircdev.send(&message.raw) {
-            eprintln!("error: {}: {}", lircdev, s);
+            eprintln!("error: {lircdev}: {s}");
             std::process::exit(1);
         }
     }
@@ -197,7 +190,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                 Some(s) => match s.parse() {
                     Ok(num) => num,
                     Err(_) => {
-                        eprintln!("error: {} is not numeric", s);
+                        eprintln!("error: {s} is not numeric");
                         std::process::exit(2);
                     }
                 },
@@ -206,7 +199,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
             let irp = match Irp::parse(i) {
                 Ok(m) => m,
                 Err(s) => {
-                    eprintln!("unable to parse irp ‘{}’: {}", i, s);
+                    eprintln!("unable to parse irp ‘{i}’: {s}");
                     std::process::exit(2);
                 }
             };
@@ -214,11 +207,11 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
             if matches.is_present("PRONTO") {
                 match irp.encode_pronto(vars) {
                     Ok(p) => {
-                        println!("{}", p);
+                        println!("{p}");
                         std::process::exit(0);
                     }
                     Err(s) => {
-                        eprintln!("error: {}", s);
+                        eprintln!("error: {s}");
                         std::process::exit(2);
                     }
                 }
@@ -226,7 +219,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                 match irp.encode(vars, repeats) {
                     Ok(m) => (m, matches),
                     Err(s) => {
-                        eprintln!("error: {}", s);
+                        eprintln!("error: {s}");
                         std::process::exit(2);
                     }
                 }
@@ -240,7 +233,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                 Some(s) => match str::parse(s) {
                     Ok(num) => num,
                     Err(_) => {
-                        eprintln!("error: {} is not numeric", s);
+                        eprintln!("error: {s} is not numeric");
                         std::process::exit(2);
                     }
                 },
@@ -249,7 +242,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
             let pronto = match Pronto::parse(pronto) {
                 Ok(pronto) => pronto,
                 Err(err) => {
-                    eprintln!("error: {}", err);
+                    eprintln!("error: {err}");
                     std::process::exit(2);
                 }
             };
@@ -271,7 +264,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                 Some(s) => match s.parse() {
                     Ok(num) => num,
                     Err(_) => {
-                        eprintln!("error: {} is not numeric", s);
+                        eprintln!("error: {s} is not numeric");
                         std::process::exit(2);
                     }
                 },
@@ -462,7 +455,7 @@ fn list_remotes(filename: &OsStr, remotes: &[lircd_conf::Remote], needle: Option
             println!("Remote:\n  {}\nCodes:\n  {}", remote.name, res);
         } else {
             for code in codes {
-                println!("{}", code);
+                println!("{code}");
             }
         }
     }

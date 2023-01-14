@@ -4,37 +4,37 @@ use std::{fmt, rc::Rc};
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expression::Number(v) => write!(f, "{}", v),
-            Expression::Identifier(id) => write!(f, "{}", id),
-            Expression::Add(left, right) => write!(f, "({} + {})", left, right),
-            Expression::Subtract(left, right) => write!(f, "({} - {})", left, right),
-            Expression::Multiply(left, right) => write!(f, "({} * {})", left, right),
-            Expression::Divide(left, right) => write!(f, "({} / {})", left, right),
-            Expression::Power(left, right) => write!(f, "({} ** {})", left, right),
-            Expression::Modulo(left, right) => write!(f, "({} % {})", left, right),
-            Expression::BitwiseOr(left, right) => write!(f, "({} | {})", left, right),
-            Expression::BitwiseAnd(left, right) => write!(f, "({} & {})", left, right),
-            Expression::BitwiseXor(left, right) => write!(f, "({} ^ {})", left, right),
-            Expression::ShiftLeft(left, right) => write!(f, "({} << {})", left, right),
-            Expression::ShiftRight(left, right) => write!(f, "({} >> {})", left, right),
+            Expression::Number(v) => write!(f, "{v}"),
+            Expression::Identifier(id) => write!(f, "{id}"),
+            Expression::Add(left, right) => write!(f, "({left} + {right})"),
+            Expression::Subtract(left, right) => write!(f, "({left} - {right})"),
+            Expression::Multiply(left, right) => write!(f, "({left} * {right})"),
+            Expression::Divide(left, right) => write!(f, "({left} / {right})"),
+            Expression::Power(left, right) => write!(f, "({left} ** {right})"),
+            Expression::Modulo(left, right) => write!(f, "({left} % {right})"),
+            Expression::BitwiseOr(left, right) => write!(f, "({left} | {right})"),
+            Expression::BitwiseAnd(left, right) => write!(f, "({left} & {right})"),
+            Expression::BitwiseXor(left, right) => write!(f, "({left} ^ {right})"),
+            Expression::ShiftLeft(left, right) => write!(f, "({left} << {right})"),
+            Expression::ShiftRight(left, right) => write!(f, "({left} >> {right})"),
 
-            Expression::Equal(left, right) => write!(f, "({} == {})", left, right),
-            Expression::NotEqual(left, right) => write!(f, "({} != {})", left, right),
-            Expression::More(left, right) => write!(f, "({} > {})", left, right),
-            Expression::MoreEqual(left, right) => write!(f, "({} >= {})", left, right),
-            Expression::Less(left, right) => write!(f, "({} < {})", left, right),
-            Expression::LessEqual(left, right) => write!(f, "({} <= {})", left, right),
+            Expression::Equal(left, right) => write!(f, "({left} == {right})"),
+            Expression::NotEqual(left, right) => write!(f, "({left} != {right})"),
+            Expression::More(left, right) => write!(f, "({left} > {right})"),
+            Expression::MoreEqual(left, right) => write!(f, "({left} >= {right})"),
+            Expression::Less(left, right) => write!(f, "({left} < {right})"),
+            Expression::LessEqual(left, right) => write!(f, "({left} <= {right})"),
 
-            Expression::Or(left, right) => write!(f, "({} || {})", left, right),
-            Expression::And(left, right) => write!(f, "({} && {})", left, right),
+            Expression::Or(left, right) => write!(f, "({left} || {right})"),
+            Expression::And(left, right) => write!(f, "({left} && {right})"),
             Expression::Ternary(cond, left, right) => {
-                write!(f, "({} ? {} : {})", cond, left, right)
+                write!(f, "({cond} ? {left} : {right})")
             }
-            Expression::Complement(expr) => write!(f, "~{}", expr),
-            Expression::Not(expr) => write!(f, "!{}", expr),
-            Expression::Negative(expr) => write!(f, "-{}", expr),
-            Expression::BitCount(expr) => write!(f, "#({})", expr),
-            Expression::Log2(expr) => write!(f, "LOG2({})", expr),
+            Expression::Complement(expr) => write!(f, "~{expr}"),
+            Expression::Not(expr) => write!(f, "!{expr}"),
+            Expression::Negative(expr) => write!(f, "-{expr}"),
+            Expression::BitCount(expr) => write!(f, "#({expr})"),
+            Expression::Log2(expr) => write!(f, "LOG2({expr})"),
             Expression::BitField {
                 value,
                 reverse,
@@ -59,12 +59,12 @@ impl fmt::Display for Expression {
                 write!(f, "{}:{}{}", value, if *reverse { "-" } else { "" }, length,)
             }
             Expression::InfiniteBitField { value, skip } => {
-                write!(f, "{}::{}", value, skip)
+                write!(f, "{value}::{skip}")
             }
             Expression::BitReverse(expr, count, skip) => {
-                write!(f, "BITREV({},{},{})", expr, count, skip)
+                write!(f, "BITREV({expr},{count},{skip})")
             }
-            Expression::Assignment(name, expr) => write!(f, "{}={}", name, expr),
+            Expression::Assignment(name, expr) => write!(f, "{name}={expr}"),
             Expression::List(list) => {
                 write!(f, "(")?;
                 let mut first = true;
@@ -72,7 +72,7 @@ impl fmt::Display for Expression {
                     if !first {
                         write!(f, ",")?;
                     }
-                    write!(f, "{}", expr)?;
+                    write!(f, "{expr}")?;
                     first = false;
                 }
                 write!(f, ")")
@@ -85,7 +85,7 @@ impl fmt::Display for Expression {
                         if !first {
                             write!(f, ",")?;
                         }
-                        write!(f, "{}", expr)?;
+                        write!(f, "{expr}")?;
                         first = false;
                     }
                     write!(f, "]")?;
@@ -93,22 +93,22 @@ impl fmt::Display for Expression {
                 write!(f, "")
             }
             Expression::FlashConstant(v, u) => {
-                write!(f, "{}{}", v, u)
+                write!(f, "{v}{u}")
             }
             Expression::GapConstant(v, u) => {
-                write!(f, "-{}{}", v, u)
+                write!(f, "-{v}{u}")
             }
             Expression::FlashIdentifier(v, u) => {
-                write!(f, "{}{}", v, u)
+                write!(f, "{v}{u}")
             }
             Expression::GapIdentifier(v, u) => {
-                write!(f, "-{}{}", v, u)
+                write!(f, "-{v}{u}")
             }
             Expression::ExtentConstant(v, u) => {
-                write!(f, "^{}{}", v, u)
+                write!(f, "^{v}{u}")
             }
             Expression::ExtentIdentifier(v, u) => {
-                write!(f, "^{}{}", v, u)
+                write!(f, "^{v}{u}")
             }
             Expression::Stream(stream) => {
                 // bitspec
@@ -117,7 +117,7 @@ impl fmt::Display for Expression {
                     let mut next = iter.next();
                     write!(f, "<")?;
                     while let Some(expr) = next {
-                        write!(f, "{}", expr)?;
+                        write!(f, "{expr}")?;
                         next = iter.next();
                         if next.is_some() {
                             write!(f, "|")?;
@@ -134,14 +134,14 @@ impl fmt::Display for Expression {
                     if !first {
                         write!(f, ",")?;
                     }
-                    write!(f, "{}", expr)?;
+                    write!(f, "{expr}")?;
                     first = false;
                 }
                 write!(f, ")")?;
 
                 // repeat marker
                 if let Some(repeat) = &stream.repeat {
-                    write!(f, "{}", repeat)
+                    write!(f, "{repeat}")
                 } else {
                     write!(f, "")
                 }
@@ -166,8 +166,8 @@ impl fmt::Display for RepeatMarker {
         match self {
             RepeatMarker::Any => write!(f, "*"),
             RepeatMarker::OneOrMore => write!(f, "+"),
-            RepeatMarker::Count(n) => write!(f, "{}", n),
-            RepeatMarker::CountOrMore(n) => write!(f, "{}+", n),
+            RepeatMarker::Count(n) => write!(f, "{n}"),
+            RepeatMarker::CountOrMore(n) => write!(f, "{n}+"),
         }
     }
 }
@@ -447,7 +447,7 @@ impl Expression {
 
                 Ok((v, l))
             }
-            _ => panic!("not implemented: {:?}", self),
+            _ => panic!("not implemented: {self:?}"),
         }
     }
 }
@@ -792,6 +792,6 @@ fn clone1() {
     })
     .unwrap();
 
-    assert_eq!(format!("{}", expr), "(B + S)");
-    assert_eq!(format!("{}", expr2), "(B + 8)");
+    assert_eq!(format!("{expr}"), "(B + S)");
+    assert_eq!(format!("{expr2}"), "(B + 8)");
 }

@@ -24,7 +24,7 @@ pub fn decode(matches: &clap::ArgMatches) {
         let irp = match Irp::parse(i) {
             Ok(m) => m,
             Err(s) => {
-                eprintln!("unable to parse irp ‘{}’: {}", i, s);
+                eprintln!("unable to parse irp ‘{i}’: {s}");
                 std::process::exit(2);
             }
         };
@@ -32,7 +32,7 @@ pub fn decode(matches: &clap::ArgMatches) {
         let nfa = match irp.compile() {
             Ok(nfa) => nfa,
             Err(s) => {
-                eprintln!("unable to compile irp ‘{}’: {}", i, s);
+                eprintln!("unable to compile irp ‘{i}’: {s}");
                 std::process::exit(2);
             }
         };
@@ -161,10 +161,7 @@ pub fn decode(matches: &clap::ArgMatches) {
 
                 if lircdev.can_measure_carrier() {
                     if let Err(err) = lircdev.set_measure_carrier(true) {
-                        eprintln!(
-                            "error: {}: failed to enable measure carrier: {}",
-                            lircdev, err
-                        );
+                        eprintln!("error: {lircdev}: failed to enable measure carrier: {err}");
                         std::process::exit(1);
                     }
                     learning_mode = true;
@@ -172,20 +169,14 @@ pub fn decode(matches: &clap::ArgMatches) {
 
                 if lircdev.can_use_wideband_receiver() {
                     if let Err(err) = lircdev.set_wideband_receiver(true) {
-                        eprintln!(
-                            "error: {}: failed to enable wideband receiver: {}",
-                            lircdev, err
-                        );
+                        eprintln!("error: {lircdev}: failed to enable wideband receiver: {err}");
                         std::process::exit(1);
                     }
                     learning_mode = true;
                 }
 
                 if !learning_mode {
-                    eprintln!(
-                        "error: {}: lirc device does not support learning mode",
-                        lircdev
-                    );
+                    eprintln!("error: {lircdev}: lirc device does not support learning mode");
                     std::process::exit(1);
                 }
             }
@@ -232,7 +223,7 @@ pub fn decode(matches: &clap::ArgMatches) {
 
                 loop {
                     if let Err(err) = lircdev.receive_raw(&mut rawbuf) {
-                        eprintln!("error: {}", err);
+                        eprintln!("error: {err}");
                         std::process::exit(1);
                     }
 
@@ -278,7 +269,7 @@ pub fn decode(matches: &clap::ArgMatches) {
                                         "decoded: {} {}",
                                         event,
                                         var.iter()
-                                            .map(|(name, val)| format!("{}={}", name, val))
+                                            .map(|(name, val)| format!("{name}={val}"))
                                             .join(", ")
                                     );
                                 }
@@ -338,7 +329,7 @@ fn process(
                         "decoded: {} {}",
                         event,
                         var.iter()
-                            .map(|(name, val)| format!("{}={}", name, val))
+                            .map(|(name, val)| format!("{name}={val}"))
                             .join(", ")
                     );
                 }

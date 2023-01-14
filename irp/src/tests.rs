@@ -248,7 +248,7 @@ fn parse_all_of_them() {
     }
 
     if broken != 0 {
-        panic!("{} out of {} broken", broken, total);
+        panic!("{broken} out of {total} broken");
     }
 }
 
@@ -335,9 +335,9 @@ fn compare_encode_to_transmogrifier() {
                 println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
 
                 for (name, value) in &params {
-                    println!("{} = {}", name, value);
+                    println!("{name} = {value}");
                 }
-                println!("repeats {}", repeats);
+                println!("repeats {repeats}");
 
                 fails += 1;
             }
@@ -369,11 +369,11 @@ fn compare_encode_to_transmogrifier() {
             {
                 println!("FAIL testing pronto {} irp {}", protocol.name, protocol.irp);
 
-                println!("left: {}", pronto);
-                println!("right: {}", trans_pronto);
+                println!("left: {pronto}");
+                println!("right: {trans_pronto}");
 
                 for (name, value) in &params {
-                    println!("{} = {}", name, value);
+                    println!("{name} = {value}");
                 }
 
                 fails += 1;
@@ -383,7 +383,7 @@ fn compare_encode_to_transmogrifier() {
         total_tests += 1;
     }
 
-    println!("tests: {} fails: {}", total_tests, fails);
+    println!("tests: {total_tests} fails: {fails}");
 
     assert_eq!(fails, 0);
 }
@@ -500,7 +500,7 @@ fn decode_all() {
         }
     }
 
-    println!("tests: {} fails: {}", total_tests, fails);
+    println!("tests: {total_tests} fails: {fails}");
 
     // TODO: we still have a whole bunch of fails
     assert!(fails <= 49);

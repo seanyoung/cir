@@ -470,8 +470,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "~(B - 1)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "~(B - 1)");
     assert_eq!(format!("{}", inv.0), "(~X + 1)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -486,8 +486,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "~(1 - B)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "~(1 - B)");
     assert_eq!(format!("{}", inv.0), "-(~X - 1)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -502,8 +502,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "-(B + 1)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "-(B + 1)");
     assert_eq!(format!("{}", inv.0), "(-X - 1)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -518,8 +518,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "-(1 + B)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "-(1 + B)");
     assert_eq!(format!("{}", inv.0), "(-X - 1)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -536,8 +536,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "(3 * -B)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "(3 * -B)");
     assert_eq!(format!("{}", inv.0), "-(X / 3)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -554,8 +554,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "(-B * 3)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "(-B * 3)");
     assert_eq!(format!("{}", inv.0), "-(X / 3)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -572,8 +572,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "(-B / 3)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "(-B / 3)");
     assert_eq!(format!("{}", inv.0), "-(X * 3)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -590,8 +590,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "(3 / -B)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "(3 / -B)");
     assert_eq!(format!("{}", inv.0), "-(3 / X)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -608,8 +608,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "(3 ^ -B)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "(3 ^ -B)");
     assert_eq!(format!("{}", inv.0), "-(X ^ 3)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -626,8 +626,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "B:3:1");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "B:3:1");
     assert_eq!(format!("{}", inv.0), "((X & 7) << 1)");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, Some(0b1110));
@@ -642,8 +642,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "(2 ** B)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "(2 ** B)");
     assert_eq!(format!("{}", inv.0), "LOG2(X)");
     assert_eq!(inv.1, vec![Action::AssertEq { left, right }]);
     assert_eq!(inv.2, None);
@@ -654,8 +654,8 @@ fn inverse1() {
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "B");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "B");
     assert_eq!(format!("{}", inv.0), "X");
     assert_eq!(inv.1.len(), 0);
     assert_eq!(inv.2, None);
@@ -682,8 +682,8 @@ fn inverse2() {
         Rc::new(Expression::Identifier("T".to_owned())),
     ));
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "((D * 16) + T)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "((D * 16) + T)");
     let inv = builder
         .inverse(left, builder.const_folding(&right), "D")
         .unwrap();
@@ -706,8 +706,8 @@ fn inverse2() {
         }),
     ));
 
-    assert_eq!(format!("{}", left), "X");
-    assert_eq!(format!("{}", right), "((D * 8) + D:3:8)");
+    assert_eq!(format!("{left}"), "X");
+    assert_eq!(format!("{right}"), "((D * 8) + D:3:8)");
     let inv = builder
         .inverse(left, builder.const_folding(&right), "D")
         .unwrap();

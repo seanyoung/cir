@@ -375,8 +375,7 @@ impl<'a> Builder<'a> {
 
                     if max_len > 64 {
                         return Err(format!(
-                            "bitfield of length {} longer than the 64 maximum",
-                            max_len
+                            "bitfield of length {max_len} longer than the 64 maximum"
                         ));
                     }
 
@@ -472,8 +471,7 @@ impl<'a> Builder<'a> {
                             self.set(name, !0);
                         } else {
                             return Err(format!(
-                                "expression {} not supported for variable length bitfield",
-                                value
+                                "expression {value} not supported for variable length bitfield"
                             ));
                         }
 
@@ -583,7 +581,7 @@ impl<'a> Builder<'a> {
                                 self.use_decode_bits(&name, bits, mask, &mut delayed)?;
                             }
                             None => {
-                                return Err(format!("expression {} not supported", value));
+                                return Err(format!("expression {value} not supported",));
                             }
                         },
                     }
@@ -630,10 +628,7 @@ impl<'a> Builder<'a> {
                     let max = param.max.eval(&self.constants)?.0;
 
                     if min > max {
-                        Err(format!(
-                            "parameter {} has min > max ({} > {})",
-                            name, min, max
-                        ))
+                        Err(format!("parameter {name} has min > max ({min} > {max})",))
                     } else {
                         Ok((
                             param.min.eval(&self.constants)?.0,
@@ -642,10 +637,10 @@ impl<'a> Builder<'a> {
                         ))
                     }
                 } else {
-                    Err(format!("bit field length {} is not a parameter", name))
+                    Err(format!("bit field length {name} is not a parameter"))
                 }
             }
-            expr => Err(format!("bit field length {} not known", expr)),
+            expr => Err(format!("bit field length {expr} not known")),
         }
     }
 
@@ -843,7 +838,7 @@ impl<'a> Builder<'a> {
                 }
                 Err(name) => {
                     if !self.add_definition(&name) {
-                        return Err(format!("variable ‘{}’ not known", name));
+                        return Err(format!("variable ‘{name}’ not known"));
                     }
                 }
             }
@@ -869,7 +864,7 @@ impl<'a> Builder<'a> {
             8 => 3,
             16 => 4,
             w => {
-                return Err(format!("bit spec with {} fields not supported", w));
+                return Err(format!("bit spec with {w} fields not supported"));
             }
         };
 
@@ -1062,7 +1057,7 @@ impl<'a> Builder<'a> {
             }
             Expression::FlashIdentifier(var, unit) => {
                 if !self.is_any_set(var) {
-                    return Err(format!("variable ‘{}’ is not set", var));
+                    return Err(format!("variable ‘{var}’ is not set"));
                 }
 
                 let unit = unit.eval(1, &self.irp.general_spec)?;
@@ -1086,7 +1081,7 @@ impl<'a> Builder<'a> {
             }
             Expression::GapIdentifier(var, unit) => {
                 if !self.is_any_set(var) {
-                    return Err(format!("variable ‘{}’ is not set", var));
+                    return Err(format!("variable ‘{var}’ is not set"));
                 }
 
                 let unit = unit.eval(1, &self.irp.general_spec)?;
@@ -1139,7 +1134,7 @@ impl<'a> Builder<'a> {
             Expression::Variation(_) => {
                 warn!("expression {} ignored", expr)
             }
-            _ => return Err(format!("expression {} not supported", expr)),
+            _ => return Err(format!("expression {expr} not supported")),
         }
 
         Ok(())

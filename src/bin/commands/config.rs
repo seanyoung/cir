@@ -18,7 +18,7 @@ pub fn config(matches: &clap::ArgMatches) {
     let mut inputdev = match Device::open(inputdev) {
         Ok(l) => l,
         Err(s) => {
-            eprintln!("error: {}: {}", inputdev, s);
+            eprintln!("error: {inputdev}: {s}");
             std::process::exit(1);
         }
     };
@@ -32,7 +32,7 @@ pub fn config(matches: &clap::ArgMatches) {
             repeat.delay = match delay.parse() {
                 Ok(d) => d,
                 Err(_) => {
-                    eprintln!("error: ‘{}’ is not a valid delay", delay);
+                    eprintln!("error: ‘{delay}’ is not a valid delay");
                     std::process::exit(1);
                 }
             }
@@ -42,14 +42,14 @@ pub fn config(matches: &clap::ArgMatches) {
             repeat.period = match period.parse() {
                 Ok(d) => d,
                 Err(_) => {
-                    eprintln!("error: ‘{}’ is not a valid period", period);
+                    eprintln!("error: ‘{period}’ is not a valid period");
                     std::process::exit(1);
                 }
             }
         }
 
         if let Err(e) = inputdev.update_auto_repeat(&repeat) {
-            eprintln!("error: failed to update autorepeat: {}", e);
+            eprintln!("error: failed to update autorepeat: {e}");
             std::process::exit(1);
         }
     }
@@ -80,7 +80,7 @@ pub fn config(matches: &clap::ArgMatches) {
                 std::process::exit(2);
             }
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("{e}");
                 std::process::exit(1);
             }
         }
@@ -99,7 +99,7 @@ fn clear_scancodes(inputdev: &Device) {
             Ok(_) => (),
             Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => break,
             Err(e) => {
-                eprintln!("error: unable to remove scancode entry: {}", e);
+                eprintln!("error: unable to remove scancode entry: {e}");
                 std::process::exit(1);
             }
         }
@@ -112,7 +112,7 @@ fn load_keymap(inputdev: &Device, keymap_filename: &str) {
     let map = match keymap::parse(&keymap_contents, keymap_filename) {
         Ok(map) => map,
         Err(e) => {
-            eprintln!("error: {}: {}", keymap_filename, e);
+            eprintln!("error: {keymap_filename}: {e}");
             std::process::exit(1);
         }
     };
@@ -123,7 +123,7 @@ fn load_keymap(inputdev: &Device, keymap_filename: &str) {
                 let key = match Key::from_str(&keycode) {
                     Ok(key) => key,
                     Err(_) => {
-                        eprintln!("error: ‘{}’ is not a valid keycode", keycode);
+                        eprintln!("error: ‘{keycode}’ is not a valid keycode");
                         continue;
                     }
                 };
@@ -131,7 +131,7 @@ fn load_keymap(inputdev: &Device, keymap_filename: &str) {
                 let scancode = match u64::from_str_radix(scancode.trim_start_matches("0x"), 16) {
                     Ok(scancode) => scancode,
                     Err(_) => {
-                        eprintln!("error: ‘{}’ is not a valid scancode", scancode);
+                        eprintln!("error: ‘{scancode}’ is not a valid scancode");
                         continue;
                     }
                 };
@@ -147,8 +147,7 @@ fn load_keymap(inputdev: &Device, keymap_filename: &str) {
                     Ok(_) => (),
                     Err(e) => {
                         eprintln!(
-                            "error: failed to update key mapping from scancode {:x?} to {:?}: {}",
-                            scancode, key, e
+                            "error: failed to update key mapping from scancode {scancode:x?} to {key:?}: {e}"
                         );
                         std::process::exit(1);
                     }

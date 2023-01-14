@@ -88,14 +88,14 @@ impl Message {
                     chars.next();
                 }
                 Some(ch) if !ch.is_numeric() => {
-                    return Err(format!("unexpected ‘{}’ encountered", ch));
+                    return Err(format!("unexpected ‘{ch}’ encountered"));
                 }
                 _ => (),
             }
 
             let v = chars.collect::<String>();
 
-            let v = v.parse().map_err(|_| format!("invalid number ‘{}’", v))?;
+            let v = v.parse().map_err(|_| format!("invalid number ‘{v}’"))?;
 
             if v == 0 {
                 return Err("nonsensical 0 length".to_string());
@@ -150,7 +150,7 @@ impl Message {
                                 if c < 0 {
                                     return Err((
                                         line_no,
-                                        format!("negative carrier {} does not make sense", c),
+                                        format!("negative carrier {c} does not make sense"),
                                     ));
                                 }
 
@@ -159,7 +159,7 @@ impl Message {
                             Err(_) => {
                                 return Err((
                                     line_no,
-                                    format!("carrier argument ‘{}’ is not a number", w),
+                                    format!("carrier argument ‘{w}’ is not a number"),
                                 ));
                             }
                         },
@@ -168,7 +168,7 @@ impl Message {
 
                     if let Some(w) = words.next() {
                         if !w.starts_with('#') && !w.starts_with("//") {
-                            return Err((line_no, format!("unexpected ‘{}’", w)));
+                            return Err((line_no, format!("unexpected ‘{w}’")));
                         }
                     }
 
@@ -176,7 +176,7 @@ impl Message {
                 }
                 Some(w) => {
                     if !w.starts_with('#') && !w.starts_with("//") {
-                        return Err((line_no, format!("unexpected ‘{}’", w)));
+                        return Err((line_no, format!("unexpected ‘{w}’")));
                     }
                     continue;
                 }
@@ -192,12 +192,12 @@ impl Message {
                     }
                     Ok(n) => {
                         if n > 0xff_ff_ff {
-                            return Err((line_no, format!("duration ‘{}’ too long", w)));
+                            return Err((line_no, format!("duration ‘{w}’ too long")));
                         }
                         n
                     }
                     Err(_) => {
-                        return Err((line_no, format!("invalid duration ‘{}’", w)));
+                        return Err((line_no, format!("invalid duration ‘{w}’")));
                     }
                 },
                 None => {
@@ -206,7 +206,7 @@ impl Message {
             };
 
             if let Some(trailing) = words.next() {
-                return Err((line_no, format!("unexpected ‘{}’", trailing)));
+                return Err((line_no, format!("unexpected ‘{trailing}’")));
             }
 
             if is_pulse {

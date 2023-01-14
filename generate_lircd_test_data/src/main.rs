@@ -84,7 +84,7 @@ fn recurse(path: &Path) {
             let conf = path.to_str().unwrap();
 
             loop {
-                println!("starting lircd {}", conf);
+                println!("starting lircd {conf}");
                 let mut child = Command::new("lircd")
                     .args(["-n", "-H", "default", conf])
                     .spawn()
@@ -127,9 +127,9 @@ fn list_remotes() -> io::Result<Vec<Remote>> {
     for name in remote_names {
         let mut codes = Vec::new();
 
-        println!("Remote: {}", name);
+        println!("Remote: {name}");
 
-        let (success, res) = send_lirc_command(&format!("list {}\n", name))?;
+        let (success, res) = send_lirc_command(&format!("list {name}\n"))?;
         assert!(success);
 
         for code in res {
@@ -165,7 +165,7 @@ fn list_remotes() -> io::Result<Vec<Remote>> {
 }
 
 fn send_lirc_command(cmd: &str) -> io::Result<(bool, Vec<String>)> {
-    println!("sending lirc command: {}", cmd);
+    println!("sending lirc command: {cmd}");
 
     let mut stream = UnixStream::connect(LIRCD_SOCKET)?;
 

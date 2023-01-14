@@ -80,8 +80,8 @@ impl InfraredData {
 impl fmt::Display for InfraredData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            InfraredData::Flash(dur) => write!(f, "+{}", dur),
-            InfraredData::Gap(dur) => write!(f, "-{}", dur),
+            InfraredData::Flash(dur) => write!(f, "+{dur}"),
+            InfraredData::Gap(dur) => write!(f, "-{dur}"),
             InfraredData::Reset => write!(f, "!"),
         }
     }
@@ -92,13 +92,13 @@ impl<'a> fmt::Display for Vartable<'a> {
         let mut s = String::new();
         for (name, (val, _, expr)) in &self.vars {
             if let Some(expr) = expr {
-                write!(s, " {} = {}", name, expr).unwrap();
+                write!(s, " {name} = {expr}").unwrap();
             } else {
-                write!(s, " {} = {}", name, val).unwrap();
+                write!(s, " {name} = {val}").unwrap();
             }
         }
 
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -442,7 +442,7 @@ mod test {
     use num::Integer;
     use std::collections::HashMap;
 
-    fn munge<'a>(matcher: &'a mut Decoder, s: &str) -> (Event, HashMap<String, i64>) {
+    fn munge(matcher: &mut Decoder, s: &str) -> (Event, HashMap<String, i64>) {
         let mut res = None;
 
         for ir in Message::parse(s)
@@ -462,7 +462,7 @@ mod test {
 
             if let Some(r) = matcher.get() {
                 if res.is_some() {
-                    panic!("double result: {:?} and {:?}", res, r);
+                    panic!("double result: {res:?} and {r:?}");
                 }
 
                 res = Some(r.clone());
@@ -503,8 +503,6 @@ mod test {
         assert_eq!(res["F"], 196);
         assert_eq!(res["D"], 64);
         assert_eq!(res["S"], 191);
-
-        println!("matcher:{:?}", matcher);
 
         let (event, res) = munge(&mut matcher, "+9024 -2256 +564 -96156");
 

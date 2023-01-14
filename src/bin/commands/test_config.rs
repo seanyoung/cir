@@ -38,10 +38,7 @@ pub fn test_config(matches: &clap::ArgMatches) {
 
             if lircdev.can_measure_carrier() {
                 if let Err(err) = lircdev.set_measure_carrier(true) {
-                    eprintln!(
-                        "error: {}: failed to enable measure carrier: {}",
-                        lircdev, err
-                    );
+                    eprintln!("error: {lircdev}: failed to enable measure carrier: {err}");
                     std::process::exit(1);
                 }
                 learning_mode = true;
@@ -49,39 +46,27 @@ pub fn test_config(matches: &clap::ArgMatches) {
 
             if lircdev.can_use_wideband_receiver() {
                 if let Err(err) = lircdev.set_wideband_receiver(true) {
-                    eprintln!(
-                        "error: {}: failed to enable wideband receiver: {}",
-                        lircdev, err
-                    );
+                    eprintln!("error: {lircdev}: failed to enable wideband receiver: {err}");
                     std::process::exit(1);
                 }
                 learning_mode = true;
             }
 
             if !learning_mode {
-                eprintln!(
-                    "error: {}: lirc device does not support learning mode",
-                    lircdev
-                );
+                eprintln!("error: {lircdev}: lirc device does not support learning mode");
                 std::process::exit(1);
             }
         } else {
             if lircdev.can_measure_carrier() {
                 if let Err(err) = lircdev.set_measure_carrier(false) {
-                    eprintln!(
-                        "error: {}: failed to disable measure carrier: {}",
-                        lircdev, err
-                    );
+                    eprintln!("error: {lircdev}: failed to disable measure carrier: {err}");
                     std::process::exit(1);
                 }
             }
 
             if lircdev.can_use_wideband_receiver() {
                 if let Err(err) = lircdev.set_wideband_receiver(false) {
-                    eprintln!(
-                        "error: {}: failed to disable wideband receiver: {}",
-                        lircdev, err
-                    );
+                    eprintln!("error: {lircdev}: failed to disable wideband receiver: {err}");
                     std::process::exit(1);
                 }
             }
@@ -93,7 +78,7 @@ pub fn test_config(matches: &clap::ArgMatches) {
                     match lircdev.get_min_max_timeout() {
                         Ok(range) if range.contains(&timeout) => {
                             if let Err(err) = lircdev.set_timeout(timeout) {
-                                eprintln!("error: {}: {}", lircdev, err);
+                                eprintln!("error: {lircdev}: {err}");
                                 std::process::exit(1);
                             }
                         }
@@ -105,16 +90,16 @@ pub fn test_config(matches: &clap::ArgMatches) {
                             std::process::exit(1);
                         }
                         Err(err) => {
-                            eprintln!("error: {}: {}", lircdev, err);
+                            eprintln!("error: {lircdev}: {err}");
                             std::process::exit(1);
                         }
                     }
                 } else {
-                    eprintln!("error: {}: changing timeout not supported", lircdev);
+                    eprintln!("error: {lircdev}: changing timeout not supported");
                     std::process::exit(1);
                 }
             } else {
-                eprintln!("error: timeout {} not valid", timeout);
+                eprintln!("error: timeout {timeout} not valid");
                 std::process::exit(1);
             }
         }
@@ -166,7 +151,7 @@ pub fn test_config(matches: &clap::ArgMatches) {
         let inputdev = match Device::open(&inputdev) {
             Ok(l) => l,
             Err(s) => {
-                eprintln!("error: {}: {}", inputdev, s);
+                eprintln!("error: {inputdev}: {s}");
                 std::process::exit(1);
             }
         };
@@ -195,7 +180,7 @@ pub fn test_config(matches: &clap::ArgMatches) {
         if let Some(lircdev) = &mut rawdev {
             if let Err(err) = lircdev.receive_raw(&mut rawbuf) {
                 if err.kind() != std::io::ErrorKind::WouldBlock {
-                    eprintln!("error: {}", err);
+                    eprintln!("error: {err}");
                     std::process::exit(1);
                 }
             }
@@ -215,7 +200,7 @@ pub fn test_config(matches: &clap::ArgMatches) {
                     carrier = Some(entry.value());
                 } else if entry.is_overflow() {
                     if let Some(freq) = carrier {
-                        println!(" # receiver overflow, carrier {}Hz", freq);
+                        println!(" # receiver overflow, carrier {freq}Hz");
                         carrier = None;
                     } else {
                         println!(" # receiver overflow");
@@ -242,7 +227,7 @@ pub fn test_config(matches: &clap::ArgMatches) {
         if let Some(lircdev) = &mut scandev {
             if let Err(err) = lircdev.receive_scancodes(&mut scanbuf) {
                 if err.kind() != std::io::ErrorKind::WouldBlock {
-                    eprintln!("error: {}", err);
+                    eprintln!("error: {err}");
                     std::process::exit(1);
                 }
             }
@@ -327,43 +312,43 @@ pub fn test_config(matches: &clap::ArgMatches) {
 
                         match ev.kind() {
                             InputEventKind::Misc(misc) => {
-                                println!("{:?}: {:?} = {:#010x}", ty, misc, value);
+                                println!("{ty:?}: {misc:?} = {value:#010x}");
                             }
                             InputEventKind::Synchronization(sync) => {
-                                println!("{:?}", sync);
+                                println!("{sync:?}");
                             }
                             InputEventKind::Key(key) if value == 1 => {
-                                println!("KEY_DOWN: {:?} ", key);
+                                println!("KEY_DOWN: {key:?} ");
                             }
                             InputEventKind::Key(key) if value == 0 => {
-                                println!("KEY_UP: {:?}", key);
+                                println!("KEY_UP: {key:?}");
                             }
                             InputEventKind::Key(key) => {
-                                println!("{:?} {:?} {}", ty, key, value);
+                                println!("{ty:?} {key:?} {value}");
                             }
                             InputEventKind::RelAxis(rel) => {
-                                println!("{:?} {:?} {:#08x}", ty, rel, value);
+                                println!("{ty:?} {rel:?} {value:#08x}");
                             }
                             InputEventKind::AbsAxis(abs) => {
-                                println!("{:?} {:?} {:#08x}", ty, abs, value);
+                                println!("{ty:?} {abs:?} {value:#08x}");
                             }
                             InputEventKind::Switch(switch) => {
-                                println!("{:?} {:?} {:#08x}", ty, switch, value);
+                                println!("{ty:?} {switch:?} {value:#08x}");
                             }
                             InputEventKind::Led(led) => {
-                                println!("{:?} {:?} {:#08x}", ty, led, value);
+                                println!("{ty:?} {led:?} {value:#08x}");
                             }
                             InputEventKind::Sound(sound) => {
-                                println!("{:?} {:?} {:#08x}", ty, sound, value);
+                                println!("{ty:?} {sound:?} {value:#08x}");
                             }
                             InputEventKind::ForceFeedback(ff) => {
-                                println!("forcefeedback {}", ff);
+                                println!("forcefeedback {ff}");
                             }
                             InputEventKind::ForceFeedbackStatus(ff) => {
-                                println!("forcefeedback status {}", ff);
+                                println!("forcefeedback status {ff}");
                             }
                             InputEventKind::UInput(u) => {
-                                println!("uinput {}", u);
+                                println!("uinput {u}");
                             }
                             InputEventKind::Other => {
                                 println!("other");
@@ -373,7 +358,7 @@ pub fn test_config(matches: &clap::ArgMatches) {
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => (),
                 Err(e) => {
-                    eprintln!("error: {}", e);
+                    eprintln!("error: {e}");
                     std::process::exit(1);
                 }
             }

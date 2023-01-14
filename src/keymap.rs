@@ -123,7 +123,7 @@ pub fn parse(contents: &str, filename: &str) -> Result<Keymap, String> {
     } else {
         match text_keymap::keymap(contents) {
             Ok(protocols) => Ok(Keymap { protocols }),
-            Err(pos) => Err(format!("parse error at {}", pos)),
+            Err(pos) => Err(format!("parse error at {pos}")),
         }
     }
 }
@@ -150,7 +150,7 @@ fn parse_toml_test() {
         for s in scancodes {
             match (s.0.as_str(), s.1.as_str()) {
                 ("0x1e3b", "KEY_SELECT") | ("0x1e3d", "KEY_POWER2") | ("0x1e1c", "KEY_TV") => {}
-                _ => panic!("{:?} not expected", s),
+                _ => panic!("{s:?} not expected"),
             }
         }
     }
@@ -216,7 +216,7 @@ fn parse_text_test() {
         for s in scancodes {
             match (s.0.as_str(), s.1.as_str()) {
                 ("0x1e3b", "KEY_SELECT") | ("0x1e3d", "KEY_POWER2") | ("0x1e1c", "KEY_TV") => {}
-                _ => panic!("{:?} not expected", s),
+                _ => panic!("{s:?} not expected"),
             }
         }
     }
@@ -244,7 +244,7 @@ fn parse_text_test() {
                 | ("0x800f0401", "KEY_NUMERIC_1")
                 | ("0x800f0402", "KEY_NUMERIC_2")
                 | ("0x800f0403", "KEY_NUMERIC_3") => {}
-                _ => panic!("{:?} not expected", s),
+                _ => panic!("{s:?} not expected"),
             }
         }
     }
@@ -267,7 +267,7 @@ fn parse_text_test() {
                 ("0x28c0", "KEY_NUMERIC_0")
                 | ("0x28c1", "KEY_NUMERIC_1")
                 | ("0x28c2", "KEY_NUMERIC_2") => {}
-                _ => panic!("{:?} not expected", s),
+                _ => panic!("{s:?} not expected"),
             }
         }
     }

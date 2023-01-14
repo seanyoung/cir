@@ -24,7 +24,7 @@ pub fn find_devices(matches: &clap::ArgMatches, purpose: Purpose) -> Rcdev {
         }
         Ok(list) => list,
         Err(err) => {
-            eprintln!("error: no devices found: {}", err);
+            eprintln!("error: no devices found: {err}");
             std::process::exit(1);
         }
     };
@@ -33,7 +33,7 @@ pub fn find_devices(matches: &clap::ArgMatches, purpose: Purpose) -> Rcdev {
         if let Some(entry) = list.iter().position(|rc| rc.name == rcdev) {
             entry
         } else {
-            eprintln!("error: {} not found", rcdev);
+            eprintln!("error: {rcdev} not found");
             std::process::exit(1);
         }
     } else if let Some(lircdev) = matches.value_of("LIRCDEV") {
@@ -43,7 +43,7 @@ pub fn find_devices(matches: &clap::ArgMatches, purpose: Purpose) -> Rcdev {
         {
             entry
         } else {
-            eprintln!("error: {} not found", lircdev);
+            eprintln!("error: {lircdev} not found");
             std::process::exit(1);
         }
     } else if let Some(entry) = list.iter().position(|rc| {

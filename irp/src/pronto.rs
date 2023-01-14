@@ -8,7 +8,7 @@ impl Pronto {
 
         for elem in s.split_whitespace() {
             if elem.len() != 4 {
-                return Err(format!("pronto hex expects 4 hex digits, {} found", elem));
+                return Err(format!("pronto hex expects 4 hex digits, {elem} found"));
             }
 
             match u16::from_str_radix(elem, 16) {
@@ -244,13 +244,13 @@ impl fmt::Display for Pronto {
         let mut s = String::new();
 
         for c in codes {
-            write!(s, "{:04X} ", c).unwrap();
+            write!(s, "{c:04X} ").unwrap();
         }
 
         // return last space
         s.pop();
 
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

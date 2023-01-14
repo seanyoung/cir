@@ -16,7 +16,7 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
 
     for (no, v) in nfa.verts.iter().enumerate() {
         let name = if v.actions.iter().any(|a| matches!(a, Action::Done(..))) {
-            format!("done ({})", no)
+            format!("done ({no})")
         } else {
             format!("{} ({})", no_to_name(vert_names.len()), no)
         };
@@ -25,8 +25,8 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
             .actions
             .iter()
             .map(|a| match a {
-                Action::Set { var, expr } => format!("{} = {}", var, expr),
-                Action::AssertEq { left, right } => format!("assert {} = {}", left, right),
+                Action::Set { var, expr } => format!("{var} = {expr}"),
+                Action::AssertEq { left, right } => format!("assert {left} = {right}",),
                 Action::Done(event, res) => format!("{} ({})", event, res.iter().join(", ")),
             })
             .collect::<Vec<String>>();
@@ -36,7 +36,7 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
             .iter()
             .find(|e| matches!(e, Edge::BranchCond { .. }))
         {
-            labels.push(format!("cond: {}", expr));
+            labels.push(format!("cond: {expr}"));
         }
 
         if let Some(Edge::MayBranchCond { expr, .. }) = v
@@ -44,14 +44,14 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
             .iter()
             .find(|e| matches!(e, Edge::MayBranchCond { .. }))
         {
-            labels.push(format!("may cond: {}", expr));
+            labels.push(format!("may cond: {expr}"));
         }
 
         let color = if let Some((_, vars)) = states.iter().find(|(node, _)| *node == no) {
             let values = vars
                 .vars
                 .iter()
-                .map(|(name, (val, _, _))| format!("{}={}", name, val))
+                .map(|(name, (val, _, _))| format!("{name}={val}"))
                 .collect::<Vec<String>>();
 
             labels.push(format!("state: {}", values.join(", ")));
@@ -72,7 +72,7 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
             )
             .unwrap();
         } else if !color.is_empty() {
-            writeln!(&mut file, "\t\"{}\"{}", name, color).unwrap();
+            writeln!(&mut file, "\t\"{name}\"{color}").unwrap();
         }
 
         vert_names.push(name);

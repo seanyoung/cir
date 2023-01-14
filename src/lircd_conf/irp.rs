@@ -113,19 +113,19 @@ impl<'a> Builder<'a> {
                     || self.remote.flags.contains(Flags::SPACE_FIRST)
                 {
                     if *space > 0 {
-                        write!(&mut self.irp, "-{},", space).unwrap();
+                        write!(&mut self.irp, "-{space},").unwrap();
                     }
 
                     if *pulse > 0 {
-                        write!(&mut self.irp, "{},", pulse).unwrap();
+                        write!(&mut self.irp, "{pulse},").unwrap();
                     }
                 } else {
                     if *pulse > 0 {
-                        write!(&mut self.irp, "{},", pulse).unwrap();
+                        write!(&mut self.irp, "{pulse},").unwrap();
                     }
 
                     if *space > 0 {
-                        write!(&mut self.irp, "-{},", space).unwrap();
+                        write!(&mut self.irp, "-{space},").unwrap();
                     }
                 }
 
@@ -379,7 +379,7 @@ impl<'a> Builder<'a> {
             if self.remote.gap % 1000 == 0 {
                 write!(&mut self.irp, "{}m,", gap / 1000).unwrap();
             } else {
-                write!(&mut self.irp, "{},", gap).unwrap();
+                write!(&mut self.irp, "{gap},").unwrap();
             }
         }
     }
@@ -424,16 +424,16 @@ impl<'a> Builder<'a> {
                     let v = (v >> offset) & gen_mask(bit_count);
 
                     if v <= 9 {
-                        write!(&mut self.irp, "{}:{},", v, bit_count).unwrap();
+                        write!(&mut self.irp, "{v}:{bit_count},").unwrap();
                     } else {
-                        write!(&mut self.irp, "0x{:x}:{},", v, bit_count).unwrap();
+                        write!(&mut self.irp, "0x{v:x}:{bit_count},").unwrap();
                     }
                 }
                 Stream::Variable(v) if offset == 0 => {
-                    write!(&mut self.irp, "{}:{},", v, bit_count).unwrap();
+                    write!(&mut self.irp, "{v}:{bit_count},").unwrap();
                 }
                 Stream::Variable(v) => {
-                    write!(&mut self.irp, "{}:{}:{},", v, bit_count, offset).unwrap();
+                    write!(&mut self.irp, "{v}:{bit_count}:{offset},").unwrap();
                 }
                 Stream::Toggle => {
                     assert_eq!(bit_count, 1);

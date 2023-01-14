@@ -28,7 +28,7 @@ pub fn encode(
 
     if remotes.is_empty() {
         if let Some(needle) = remote {
-            return Err(format!("remote {} not found", needle));
+            return Err(format!("remote {needle} not found"));
         } else {
             return Err(String::from("no remote found"));
         }
@@ -69,7 +69,7 @@ pub fn encode(
         }
 
         if remotes.is_empty() {
-            return Err(format!("code {} not found", encode_code));
+            return Err(format!("code {encode_code} not found"));
         }
 
         let (remote, count) = remotes[0];

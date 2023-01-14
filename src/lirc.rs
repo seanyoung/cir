@@ -253,7 +253,7 @@ impl Lirc {
         if res != 0 {
             Err(Error::new(
                 ErrorKind::Unsupported,
-                format!("device only supports {} transmitters", res),
+                format!("device only supports {res} transmitters"),
             ))
         } else {
             Ok(())

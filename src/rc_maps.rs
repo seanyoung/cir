@@ -73,7 +73,7 @@ fn parse_bad() {
     let e = parse_rc_maps_file(&PathBuf::from("testdata/rc_maps_cfg/bad.cfg")).unwrap_err();
 
     assert_eq!(
-        format!("{}", e),
+        format!("{e}"),
         "testdata/rc_maps_cfg/bad.cfg:4: error: invalid parameters"
     );
 }
