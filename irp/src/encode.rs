@@ -222,7 +222,11 @@ impl<'a> Encoder<'a> {
             return Err("length should be non-zero".into());
         }
 
-        self.total_length += length;
+        if let Some(v) = self.total_length.checked_add(length) {
+            self.total_length = v;
+        } else {
+            return Err("length overflow".into());
+        }
 
         if (self.raw.len() % 2) == 1 {
             *self.raw.last_mut().unwrap() += length as u32;
@@ -370,6 +374,7 @@ impl Unit {
             Unit::Microseconds => Ok(v),
             Unit::Milliseconds => Ok(v * 1000),
             Unit::Pulses => match spec.carrier {
+                Some(f) if f == 0 => Err("pulses cannot be used with zero carrier".into()),
                 Some(f) => Ok(v * 1_000_000 / f),
                 None => Err("pulses specified but no carrier given".to_string()),
             },
@@ -382,6 +387,7 @@ impl Unit {
             Unit::Microseconds => Ok(v as i64),
             Unit::Milliseconds => Ok((v * 1000.0) as i64),
             Unit::Pulses => match spec.carrier {
+                Some(f) if f == 0 => Err("pulses cannot be used with zero carrier".into()),
                 Some(f) => Ok((v * 1_000_000.0) as i64 / f),
                 None => Err("pulses specified but no carrier given".to_string()),
             },
