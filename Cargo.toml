@@ -10,7 +10,7 @@ license = "MIT"
 [dependencies]
 irp = { version = "0.3.1", path = "irp" }
 clap = "3.1"
-toml = "0.5"
+toml = "0.7"
 serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
 iocuddle = "0.1.1"
