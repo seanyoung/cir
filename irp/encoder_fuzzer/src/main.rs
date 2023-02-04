@@ -17,6 +17,10 @@ fn main() {
                     let min = param.min.eval(&vars).unwrap().0;
                     let max = param.max.eval(&vars).unwrap().0;
 
+                    if min > max {
+                        continue;
+                    }
+
                     let value = rng.gen_range(min..=max);
 
                     params.insert(param.name.to_owned(), value);

@@ -243,7 +243,11 @@ impl<'a> Encoder<'a> {
         }
 
         // Leading gaps must be added to the totals
-        self.total_length += length;
+        if let Some(v) = self.total_length.checked_add(length) {
+            self.total_length = v;
+        } else {
+            return Err("length overflow".into());
+        }
 
         let len = self.raw.len();
 

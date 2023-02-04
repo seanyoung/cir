@@ -284,19 +284,19 @@ impl Expression {
                 let (l_val, l_len) = l.eval(vars)?;
                 let (r_val, r_len) = r.eval(vars)?;
 
-                Ok(((l_val + r_val), std::cmp::max(l_len, r_len)))
+                Ok((l_val.overflowing_add(r_val).0, std::cmp::max(l_len, r_len)))
             }
             Expression::Subtract(l, r) => {
                 let (l_val, l_len) = l.eval(vars)?;
                 let (r_val, r_len) = r.eval(vars)?;
 
-                Ok(((l_val - r_val), std::cmp::max(l_len, r_len)))
+                Ok((l_val.overflowing_sub(r_val).0, std::cmp::max(l_len, r_len)))
             }
             Expression::Multiply(l, r) => {
                 let (l_val, l_len) = l.eval(vars)?;
                 let (r_val, r_len) = r.eval(vars)?;
 
-                Ok(((l_val * r_val), std::cmp::max(l_len, r_len)))
+                Ok((l_val.overflowing_mul(r_val).0, std::cmp::max(l_len, r_len)))
             }
             Expression::Divide(l, r) => {
                 let (l_val, l_len) = l.eval(vars)?;
@@ -344,7 +344,7 @@ impl Expression {
                     return Err("power to negative not supported".to_string());
                 }
 
-                Ok((l_val.pow(r_val as u32), l_len))
+                Ok((l_val.overflowing_pow(r_val as u32).0, l_len))
             }
             Expression::BitCount(e) => {
                 let (mut val, len) = e.eval(vars)?;
@@ -446,6 +446,11 @@ impl Expression {
                 let (v, l) = v[0].eval(vars)?;
 
                 Ok((v, l))
+            }
+            Expression::Not(expr) => {
+                let (v, l) = expr.eval(vars)?;
+
+                Ok(((v == 0) as i64, l))
             }
             _ => panic!("not implemented: {self:?}"),
         }
