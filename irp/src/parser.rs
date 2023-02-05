@@ -1,5 +1,9 @@
 use super::{Expression, GeneralSpec, IrStream, Irp, ParameterSpec, RepeatMarker, Unit, Vartable};
-use std::{rc::Rc, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+    str::FromStr,
+};
 
 #[derive(PartialEq)]
 enum GeneralItem<'a> {
@@ -482,6 +486,7 @@ fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
 
 fn check_definitions(definitions: &[Expression]) -> Result<(), String> {
     let mut seen_names: Vec<&str> = Vec::new();
+    let mut deps: HashMap<&str, HashSet<String>> = HashMap::new();
 
     for definition in definitions {
         if let Expression::Assignment(name, expr) = definition {
@@ -491,22 +496,51 @@ fn check_definitions(definitions: &[Expression]) -> Result<(), String> {
             seen_names.push(name);
 
             // definition cannot define itself
-            let mut seen_self = false;
-            expr.visit(&mut seen_self, &|expr, seen_self| {
-                if let Expression::Identifier(var) = expr {
-                    if var == name {
-                        *seen_self = true;
-                    }
+            let mut dependents = HashSet::new();
+            expr.visit(&mut dependents, &|expr, dependents| {
+                if let Expression::Identifier(var) = &expr {
+                    dependents.insert(var.to_owned());
                 }
             });
 
-            if seen_self {
+            if dependents.contains(name) {
                 return Err(format!("definition {definition} depends on its own value"));
             }
+            deps.insert(name, dependents);
         } else {
             return Err(format!("invalid definition {definition}"));
         }
     }
+
+    for name in deps.keys() {
+        let mut visited: HashSet<&str> = HashSet::new();
+        visited.insert(name);
+
+        fn check_dep<'a>(
+            def_name: &str,
+            dep_name: &'a str,
+            deps: &'a HashMap<&str, HashSet<String>>,
+            visited: &mut HashSet<&'a str>,
+        ) -> Result<(), String> {
+            if let Some(dep) = deps.get(dep_name) {
+                for name in dep {
+                    if visited.contains(name.as_str()) {
+                        return Err(format!(
+                            "definition for {def_name} is circular via {dep_name}"
+                        ));
+                    } else {
+                        let mut visited = visited.clone();
+                        visited.insert(dep_name);
+                        check_dep(def_name, name, deps, &mut visited)?;
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        check_dep(name, name, &deps, &mut visited)?;
+    }
+
     Ok(())
 }
 
