@@ -480,7 +480,16 @@ impl Expression {
                     right.eval(vars)
                 }
             }
-            _ => panic!("not implemented: {self:?}"),
+            Expression::FlashConstant(..)
+            | Expression::FlashIdentifier(..)
+            | Expression::GapConstant(..)
+            | Expression::GapIdentifier(..)
+            | Expression::ExtentConstant(..)
+            | Expression::ExtentIdentifier(..)
+            | Expression::Assignment(..)
+            | Expression::List(..)
+            | Expression::Variation(..)
+            | Expression::Stream(..) => unreachable!(),
         }
     }
 }
