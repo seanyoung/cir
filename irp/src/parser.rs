@@ -1,4 +1,4 @@
-use super::{Expression, GeneralSpec, IrStream, Irp, ParameterSpec, RepeatMarker, Unit};
+use super::{Expression, GeneralSpec, IrStream, Irp, ParameterSpec, RepeatMarker, Unit, Vartable};
 use std::{rc::Rc, str::FromStr};
 
 #[derive(PartialEq)]
@@ -332,6 +332,8 @@ impl Irp {
             Ok((general, stream, definitions, parameters)) => {
                 let general_spec = general_spec(&general)?;
 
+                check_parameters(&parameters)?;
+
                 Ok(Irp {
                     general_spec,
                     stream,
@@ -446,6 +448,27 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
     }
 
     Ok(res)
+}
+
+fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
+    let mut seen_names: Vec<&str> = Vec::new();
+    let vars = Vartable::new();
+
+    for parameter in parameters {
+        if seen_names.contains(&parameter.name.as_str()) {
+            return Err(format!("duplicate parameter called {}", parameter.name));
+        }
+        seen_names.push(&parameter.name);
+
+        let min = parameter.min.eval(&vars)?.0;
+        let max = parameter.max.eval(&vars)?.0;
+
+        if min < 0 || max < 0 || min > max {
+            return Err(format!("invalid minimum {min} and maximum {max}"));
+        }
+    }
+
+    Ok(())
 }
 
 #[test]
