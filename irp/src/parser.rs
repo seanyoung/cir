@@ -558,12 +558,43 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
             }
 
             for expr in &stream.stream {
-                // TODO not all expressions allowed here, e.g. infinite bit field makes no sense
-                check_stream(expr)?;
+                match expr.as_ref() {
+                    Expression::FlashConstant(..)
+                    | Expression::FlashIdentifier(..)
+                    | Expression::GapConstant(..)
+                    | Expression::GapIdentifier(..)
+                    | Expression::ExtentConstant(..)
+                    | Expression::ExtentIdentifier(..)
+                    | Expression::Assignment(..)
+                    | Expression::BitField { .. }
+                    | Expression::Variation(..) => (),
+                    Expression::Stream(..) => {
+                        check_stream(expr)?;
+                    }
+                    _ => {
+                        return Err(format!("expression {expr} not expected in stream"));
+                    }
+                }
             }
 
             for expr in &stream.bit_spec {
-                check_stream(expr)?;
+                if let Expression::List(list) = expr.as_ref() {
+                    for expr in list {
+                        match expr.as_ref() {
+                            Expression::FlashConstant(..)
+                            | Expression::FlashIdentifier(..)
+                            | Expression::GapConstant(..)
+                            | Expression::GapIdentifier(..)
+                            | Expression::Assignment(..)
+                            | Expression::BitField { .. } => (),
+                            _ => {
+                                return Err(format!("expression {expr} not expected in bit spec"));
+                            }
+                        }
+                    }
+                } else {
+                    return Err("bit should be list of expressions".into());
+                }
             }
         }
         Expression::List(list) => {
