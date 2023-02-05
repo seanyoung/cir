@@ -27,7 +27,7 @@ impl fmt::Display for Expression {
 
             Expression::Or(left, right) => write!(f, "({left} || {right})"),
             Expression::And(left, right) => write!(f, "({left} && {right})"),
-            Expression::Ternary(cond, left, right) => {
+            Expression::Conditional(cond, left, right) => {
                 write!(f, "({cond} ? {left} : {right})")
             }
             Expression::Complement(expr) => write!(f, "~{expr}"),
@@ -209,7 +209,7 @@ impl Expression {
                 left.visit(ctx, visit);
                 right.visit(ctx, visit);
             }
-            Expression::Ternary(cond, left, right) => {
+            Expression::Conditional(cond, left, right) => {
                 cond.visit(ctx, visit);
                 left.visit(ctx, visit);
                 right.visit(ctx, visit);
@@ -471,7 +471,7 @@ impl Expression {
 
                 Ok(((left != 0 || right != 0) as i64, 1))
             }
-            Expression::Ternary(cond, left, right) => {
+            Expression::Conditional(cond, left, right) => {
                 let (cond, _) = cond.eval(vars)?;
 
                 if cond != 0 {
@@ -597,7 +597,7 @@ where
         Expression::Or(left, right) => binary!(left, right, Or),
 
         // Ternary
-        Expression::Ternary(cond, left, right) => {
+        Expression::Conditional(cond, left, right) => {
             let cond1 = clone_filter(cond, filter);
             let left1 = clone_filter(left, filter);
             let right1 = clone_filter(right, filter);
@@ -607,7 +607,7 @@ where
                 let left = left1.unwrap_or_else(|| left.clone());
                 let right = right1.unwrap_or_else(|| right.clone());
 
-                let new_expr = Rc::new(Expression::Ternary(cond, left, right));
+                let new_expr = Rc::new(Expression::Conditional(cond, left, right));
                 let filtered = filter(&new_expr);
 
                 if filtered.is_some() {

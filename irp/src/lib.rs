@@ -150,7 +150,7 @@ pub enum Expression {
     BitwiseXor(Rc<Expression>, Rc<Expression>),
     Or(Rc<Expression>, Rc<Expression>),
     And(Rc<Expression>, Rc<Expression>),
-    Ternary(Rc<Expression>, Rc<Expression>, Rc<Expression>),
+    Conditional(Rc<Expression>, Rc<Expression>, Rc<Expression>),
     List(Vec<Rc<Expression>>),
     Stream(IrStream),
     Variation(Vec<Vec<Rc<Expression>>>),

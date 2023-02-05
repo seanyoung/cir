@@ -46,7 +46,7 @@ peg::parser! {
         #[cache_left_rec]
         rule expression() -> Expression
          = cond:expression() "?" _ left:expression2() ":" _ right:expression2()
-           { Expression::Ternary(Rc::new(cond), Rc::new(left), Rc::new(right)) }
+           { Expression::Conditional(Rc::new(cond), Rc::new(left), Rc::new(right)) }
          / expression2()
 
         #[cache_left_rec]

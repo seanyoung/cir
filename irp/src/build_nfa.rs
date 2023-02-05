@@ -1210,7 +1210,7 @@ impl<'a> Builder<'a> {
                 self.expression_available(left)?;
                 self.expression_available(right)
             }
-            Expression::Ternary(cond, left, right) => {
+            Expression::Conditional(cond, left, right) => {
                 self.expression_available(cond)?;
                 self.expression_available(left)?;
                 self.expression_available(right)
