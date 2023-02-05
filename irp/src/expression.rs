@@ -181,6 +181,7 @@ impl Expression {
         match self {
             Expression::Complement(expr)
             | Expression::Not(expr)
+            | Expression::Negative(expr)
             | Expression::BitCount(expr)
             | Expression::BitReverse(expr, _, _)
             | Expression::Assignment(_, expr) => {
@@ -457,6 +458,18 @@ impl Expression {
                 let (v, l) = expr.eval(vars)?;
 
                 Ok(((v == 0) as i64, l))
+            }
+            Expression::And(left, right) => {
+                let (left, _) = left.eval(vars)?;
+                let (right, _) = right.eval(vars)?;
+
+                Ok(((left != 0 && right != 0) as i64, 1))
+            }
+            Expression::Or(left, right) => {
+                let (left, _) = left.eval(vars)?;
+                let (right, _) = right.eval(vars)?;
+
+                Ok(((left != 0 || right != 0) as i64, 1))
             }
             _ => panic!("not implemented: {self:?}"),
         }
