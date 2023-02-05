@@ -62,15 +62,15 @@ pub enum Pronto {
 }
 
 /// A parsed IRP notation, which can be used for encoding and decoding
-///
 #[derive(Debug)]
 pub struct Irp {
-    general_spec: GeneralSpec,
-    stream: Expression,
-    definitions: Vec<Expression>,
+    pub general_spec: GeneralSpec,
+    pub stream: Expression,
+    pub definitions: Vec<Expression>,
     pub parameters: Vec<ParameterSpec>,
 }
 
+/// The general spec for an IRP
 #[derive(Debug)]
 pub struct GeneralSpec {
     duty_cycle: Option<u8>,
@@ -79,6 +79,7 @@ pub struct GeneralSpec {
     unit: f64,
 }
 
+/// Unit suffix for a duration
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Unit {
     Units,
@@ -87,6 +88,7 @@ pub enum Unit {
     Pulses,
 }
 
+/// The repeat marker for a stream within an IRP
 #[derive(PartialEq, Debug, Clone)]
 pub enum RepeatMarker {
     Any,
@@ -95,13 +97,15 @@ pub enum RepeatMarker {
     CountOrMore(i64),
 }
 
+/// A stream within an IRP
 #[derive(PartialEq, Debug, Clone)]
-pub struct IrStream {
+pub struct Stream {
     bit_spec: Vec<Rc<Expression>>,
     stream: Vec<Rc<Expression>>,
     repeat: Option<RepeatMarker>,
 }
 
+/// An expression within an IRP
 #[derive(PartialEq, Debug, Clone)]
 pub enum Expression {
     FlashConstant(f64, Unit),
@@ -152,12 +156,13 @@ pub enum Expression {
     And(Rc<Expression>, Rc<Expression>),
     Conditional(Rc<Expression>, Rc<Expression>, Rc<Expression>),
     List(Vec<Rc<Expression>>),
-    Stream(IrStream),
+    Stream(Stream),
     Variation(Vec<Vec<Rc<Expression>>>),
     BitReverse(Rc<Expression>, i64, i64),
     Log2(Rc<Expression>),
 }
 
+/// An IRP parameter specification
 #[derive(Debug)]
 pub struct ParameterSpec {
     pub name: String,
@@ -182,6 +187,7 @@ pub enum InfraredData {
     Reset,
 }
 
+/// Decoded key event
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Event {
     Down,

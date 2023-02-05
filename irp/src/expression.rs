@@ -1,4 +1,4 @@
-use super::{Expression, IrStream, RepeatMarker, Unit, Vartable};
+use super::{Expression, RepeatMarker, Stream, Unit, Vartable};
 use std::{fmt, rc::Rc};
 
 impl fmt::Display for Expression {
@@ -800,7 +800,7 @@ where
                     .map(|(index, expr)| expr.unwrap_or_else(|| ir_stream.stream[index].clone()))
                     .collect();
 
-                let new_expr = Rc::new(Expression::Stream(IrStream {
+                let new_expr = Rc::new(Expression::Stream(Stream {
                     bit_spec,
                     stream,
                     repeat: ir_stream.repeat.clone(),

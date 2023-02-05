@@ -1,4 +1,4 @@
-use super::{Expression, GeneralSpec, IrStream, Irp, ParameterSpec, RepeatMarker, Unit, Vartable};
+use super::{Expression, GeneralSpec, Irp, ParameterSpec, RepeatMarker, Stream, Unit, Vartable};
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
@@ -233,7 +233,7 @@ peg::parser! {
         rule irstream() -> Expression
          = "(" _ stream:bare_irstream() ")" _ repeat:repeat_marker()?
          {
-            Expression::Stream(IrStream {
+            Expression::Stream(Stream {
                 bit_spec: Vec::new(),
                 stream,
                 repeat,

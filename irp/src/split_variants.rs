@@ -1,6 +1,6 @@
 use crate::{expression::clone_filter, RepeatMarker};
 
-use super::{Expression, IrStream, Irp};
+use super::{Expression, Irp, Stream};
 use std::rc::Rc;
 
 pub(crate) struct Variants {
@@ -124,7 +124,7 @@ impl Irp {
 
                 let down = if down.is_empty() || all_assignments(&down) {
                     if any_assignments(&repeats) {
-                        Some(Expression::Stream(IrStream {
+                        Some(Expression::Stream(Stream {
                             repeat: None,
                             stream: repeats.clone(),
                             bit_spec: stream.bit_spec.clone(),
@@ -146,12 +146,12 @@ impl Irp {
                         // puth the original in stream
                         if has_extent(&repeats) && has_extent(&down) {
                             down = vec![
-                                Rc::new(Expression::Stream(IrStream {
+                                Rc::new(Expression::Stream(Stream {
                                     bit_spec: Vec::new(),
                                     stream: down,
                                     repeat: None,
                                 })),
-                                Rc::new(Expression::Stream(IrStream {
+                                Rc::new(Expression::Stream(Stream {
                                     bit_spec: Vec::new(),
                                     stream: repeats.clone(),
                                     repeat: None,
@@ -164,7 +164,7 @@ impl Irp {
                         }
                     }
 
-                    Some(Expression::Stream(IrStream {
+                    Some(Expression::Stream(Stream {
                         repeat: None,
                         stream: down,
                         bit_spec: stream.bit_spec.clone(),
@@ -174,14 +174,14 @@ impl Irp {
                 let up = if up.is_empty() || all_assignments(&up) {
                     None
                 } else {
-                    Some(Expression::Stream(IrStream {
+                    Some(Expression::Stream(Stream {
                         repeat: None,
                         stream: up,
                         bit_spec: stream.bit_spec.clone(),
                     }))
                 };
 
-                let repeat = Expression::Stream(IrStream {
+                let repeat = Expression::Stream(Stream {
                     repeat: seen_repeat,
                     stream: repeats,
                     bit_spec: stream.bit_spec.clone(),
@@ -270,7 +270,7 @@ fn has_extent(list: &Vec<Rc<Expression>>) -> bool {
     false
 }
 
-impl IrStream {
+impl Stream {
     /// Every IRP expresion should have at most a single repeat marker. Is this it?
     fn is_repeating(&self) -> bool {
         !matches!(self.repeat, None | Some(crate::RepeatMarker::Count(_)))
