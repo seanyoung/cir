@@ -420,7 +420,7 @@ impl Expression {
                 let (mut b, _) = value.eval(vars)?;
 
                 if let Some(skip) = skip {
-                    b >>= skip.eval(vars)?.0;
+                    b = b.wrapping_shr(skip.eval(vars)?.0 as u32);
                 }
 
                 let (l, _) = length.eval(vars)?;
@@ -438,7 +438,7 @@ impl Expression {
             Expression::InfiniteBitField { value, skip } => {
                 let (mut b, _) = value.eval(vars)?;
 
-                b >>= skip.eval(vars)?.0;
+                b = b.wrapping_shr(skip.eval(vars)?.0 as u32);
 
                 Ok((b, 8))
             }
