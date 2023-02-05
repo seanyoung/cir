@@ -471,6 +471,15 @@ impl Expression {
 
                 Ok(((left != 0 || right != 0) as i64, 1))
             }
+            Expression::Ternary(cond, left, right) => {
+                let (cond, _) = cond.eval(vars)?;
+
+                if cond != 0 {
+                    left.eval(vars)
+                } else {
+                    right.eval(vars)
+                }
+            }
             _ => panic!("not implemented: {self:?}"),
         }
     }
