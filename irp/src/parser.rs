@@ -338,6 +338,7 @@ impl Irp {
 
                 check_parameters(&parameters)?;
                 check_definitions(&definitions)?;
+                check_stream(&stream)?;
 
                 Ok(Irp {
                     general_spec,
@@ -541,6 +542,44 @@ fn check_definitions(definitions: &[Expression]) -> Result<(), String> {
         check_dep(name, name, &deps, &mut visited)?;
     }
 
+    Ok(())
+}
+
+fn check_stream(stream: &Expression) -> Result<(), String> {
+    match stream {
+        Expression::Stream(stream) => {
+            match &stream.repeat {
+                Some(RepeatMarker::Count(count)) | Some(RepeatMarker::CountOrMore(count))
+                    if *count > 64 =>
+                {
+                    return Err(format!("repeat count of {count} too large"))
+                }
+                _ => (),
+            }
+
+            for expr in &stream.stream {
+                // TODO not all expressions allowed here, e.g. infinite bit field makes no sense
+                check_stream(expr)?;
+            }
+
+            for expr in &stream.bit_spec {
+                check_stream(expr)?;
+            }
+        }
+        Expression::List(list) => {
+            for expr in list {
+                check_stream(expr)?;
+            }
+        }
+        Expression::Variation(list) => {
+            for list in list {
+                for expr in list {
+                    check_stream(expr)?;
+                }
+            }
+        }
+        _ => (),
+    }
     Ok(())
 }
 
