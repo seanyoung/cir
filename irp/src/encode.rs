@@ -260,7 +260,13 @@ impl<'a> Encoder<'a> {
         if len == 0 {
             // ignore leading gaps
         } else if (len % 2) == 0 {
-            *self.raw.last_mut().unwrap() += length as u32;
+            let raw = self.raw.last_mut().unwrap();
+
+            if let Some(v) = raw.checked_add(length as u32) {
+                *raw = v;
+            } else {
+                return Err("length overflow".into());
+            }
         } else {
             self.raw.push(length as u32);
         }
