@@ -333,6 +333,7 @@ impl Irp {
                 let general_spec = general_spec(&general)?;
 
                 check_parameters(&parameters)?;
+                check_definitions(&definitions)?;
 
                 Ok(Irp {
                     general_spec,
@@ -468,6 +469,36 @@ fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
         }
     }
 
+    Ok(())
+}
+
+fn check_definitions(definitions: &[Expression]) -> Result<(), String> {
+    let mut seen_names: Vec<&str> = Vec::new();
+
+    for definition in definitions {
+        if let Expression::Assignment(name, expr) = definition {
+            if seen_names.contains(&name.as_str()) {
+                return Err(format!("duplicate definition called {name}"));
+            }
+            seen_names.push(name);
+
+            // definition cannot define itself
+            let mut seen_self = false;
+            expr.visit(&mut seen_self, &|expr, seen_self| {
+                if let Expression::Identifier(var) = expr {
+                    if var == name {
+                        *seen_self = true;
+                    }
+                }
+            });
+
+            if seen_self {
+                return Err(format!("definition {definition} depends on its own value"));
+            }
+        } else {
+            return Err(format!("invalid definition {definition}"));
+        }
+    }
     Ok(())
 }
 
