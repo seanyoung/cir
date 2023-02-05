@@ -453,7 +453,7 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
 
 fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
     let mut seen_names: Vec<&str> = Vec::new();
-    let vars = Vartable::new();
+    let mut vars = Vartable::new();
 
     for parameter in parameters {
         if seen_names.contains(&parameter.name.as_str()) {
@@ -466,6 +466,14 @@ fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
 
         if min < 0 || max < 0 || min > max {
             return Err(format!("invalid minimum {min} and maximum {max}"));
+        }
+
+        vars.set(parameter.name.to_owned(), min, 8);
+    }
+
+    for parameter in parameters {
+        if let Some(default) = &parameter.default {
+            default.eval(&vars)?;
         }
     }
 

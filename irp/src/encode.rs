@@ -554,13 +554,13 @@ fn eval_stream<'a>(
                 }
             }
             Expression::Variation(list) => {
-                let variation = &list[alternative];
+                if let Some(variation) = list.get(alternative) {
+                    if variation.is_empty() {
+                        break;
+                    }
 
-                if variation.is_empty() {
-                    break;
+                    eval_stream(variation, encoder, level, vars, gs, repeats, alternative)?;
                 }
-
-                eval_stream(variation, encoder, level, vars, gs, repeats, alternative)?;
             }
             _ => {
                 let (bits, length) = expr.eval(vars)?;
