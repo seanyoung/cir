@@ -333,18 +333,25 @@ impl<'a> Encoder<'a> {
             std::mem::swap(&mut bits, &mut self.bitspec_scope[level].bitstream);
 
             let len = self.bitspec_scope[level].bit_spec.len();
-            // 2 => 1, 4 => 2, 8 => 3, 16 => 4
-            let bits_step = len.trailing_zeros();
+            let bits_step = match len {
+                2 => 1,
+                4 => 2,
+                8 => 3,
+                16 => 4,
+                _ => {
+                    return Err(format!(
+                        "bitspec contains {len} values, only 2, 4, 8, 16 supported"
+                    ));
+                }
+            };
 
-            if bits_step == 0 || (bits.len() % bits_step as usize) != 0 {
+            if (bits.len() % bits_step as usize) != 0 {
                 return Err(format!(
                     "{} bits found, not multiple of {}",
                     self.bitspec_scope[level].bitstream.len(),
                     bits_step
                 ));
             }
-
-            debug_assert_eq!(1 << bits_step, len);
 
             if !self.general_spec.lsb {
                 for bit in bits.chunks(bits_step as usize) {
