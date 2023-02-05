@@ -273,13 +273,13 @@ impl Expression {
             Expression::Log2(e) => {
                 let (v, l) = e.eval(vars)?;
 
-                for i in 0..(l as i64) {
-                    if (1 << i) == v {
-                        return Ok((i, l));
-                    }
-                }
+                let i = v.ilog2();
 
-                Ok((0, l))
+                if (1 << i) == v {
+                    Ok((i.into(), l))
+                } else {
+                    Ok((0, l))
+                }
             }
             Expression::Add(l, r) => {
                 let (l_val, l_len) = l.eval(vars)?;
