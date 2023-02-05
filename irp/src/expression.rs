@@ -381,6 +381,12 @@ impl Expression {
 
                 Ok((value.wrapping_shr(r as u32), len))
             }
+            Expression::NotEqual(left, right) => {
+                let (left, _) = left.eval(vars)?;
+                let (right, _) = right.eval(vars)?;
+
+                Ok(((left != right) as i64, 1))
+            }
             Expression::Equal(left, right) => {
                 let (left, _) = left.eval(vars)?;
                 let (right, _) = right.eval(vars)?;
