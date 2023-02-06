@@ -22,6 +22,6 @@ peg = "0.8"
 itertools = "0.10"
 
 [dev-dependencies]
-cir = "0.1"
+cir = { path = ".." }
 j4rs = "0.15"
 rand = "0.8"
