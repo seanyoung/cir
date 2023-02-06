@@ -566,8 +566,28 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                     | Expression::ExtentConstant(..)
                     | Expression::ExtentIdentifier(..)
                     | Expression::Assignment(..)
-                    | Expression::BitField { .. }
-                    | Expression::Variation(..) => (),
+                    | Expression::BitField { .. } => (),
+                    Expression::Variation(list) => {
+                        for list in list {
+                            for expr in list {
+                                match expr.as_ref() {
+                                    Expression::FlashConstant(..)
+                                    | Expression::FlashIdentifier(..)
+                                    | Expression::GapConstant(..)
+                                    | Expression::GapIdentifier(..)
+                                    | Expression::ExtentConstant(..)
+                                    | Expression::ExtentIdentifier(..)
+                                    | Expression::Assignment(..)
+                                    | Expression::BitField { .. } => (),
+                                    _ => {
+                                        return Err(format!(
+                                            "expression {expr} not expected in variation"
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Expression::Stream(..) => {
                         check_stream(expr)?;
                     }
