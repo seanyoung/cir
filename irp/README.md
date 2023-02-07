@@ -92,9 +92,9 @@ use irp::{Irp, Vartable};
 fn main() {
     let mut vars = Vartable::new();
     // set D to 255, bit width 8
-    vars.set(String::from("D"), 255, 8);
-    vars.set(String::from("S"), 52, 8);
-    vars.set(String::from("F"), 1, 8);
+    vars.set(String::from("D"), 255);
+    vars.set(String::from("S"), 52);
+    vars.set(String::from("F"), 1);
     // nec protocol
     let irp = Irp::parse(r#"
         {38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*)
@@ -162,7 +162,7 @@ use irp::{Irp, Vartable};
 
 fn main() {
     let mut vars = Vartable::new();
-    vars.set(String::from("F"), 1, 8);
+    vars.set(String::from("F"), 1);
     // sony8 protocol
     let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]")
         .expect("parse should succeed");
@@ -278,8 +278,8 @@ fn main() {
     let mut dev = lirc::open("/dev/lirc0").unwrap();
 
     let mut vars = Vartable::new();
-    vars.set("F".into(), 30, 8);
-    vars.set("D".into(), 0, 8);
+    vars.set("F".into(), 30);
+    vars.set("D".into(), 0);
     let irp = Irp::parse(RC5_IRP).unwrap();
 
     let message = irp.encode(vars, 1).unwrap();

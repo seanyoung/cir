@@ -51,7 +51,7 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
             let values = vars
                 .vars
                 .iter()
-                .map(|(name, (val, _, _))| format!("{name}={val}"))
+                .map(|(name, (val, _))| format!("{name}={val}"))
                 .collect::<Vec<String>>();
 
             labels.push(format!("state: {}", values.join(", ")));

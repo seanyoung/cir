@@ -119,7 +119,7 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
                 if code.code.len() == 2 && remote.repeat.0 != 0 && remote.repeat.1 != 0 {
                     // if remote has a repeat parameter and two scancodes, then just repeat the first scancode
                     let mut vars = Vartable::new();
-                    vars.set(String::from("CODE"), code.code[0] as i64, remote.bits as u8);
+                    vars.set(String::from("CODE"), code.code[0] as i64);
 
                     let m = irp.encode(vars, 1).expect("encode should succeed");
 
@@ -127,7 +127,7 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
                 } else {
                     for code in &code.code {
                         let mut vars = Vartable::new();
-                        vars.set(String::from("CODE"), *code as i64, 32);
+                        vars.set(String::from("CODE"), *code as i64);
 
                         // lircd does not honour toggle bit in RCMM transmit
                         if remote.flags.contains(Flags::RCMM)
@@ -136,7 +136,6 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
                             vars.set(
                                 String::from("T"),
                                 ((*code & remote.toggle_bit_mask) != 0).into(),
-                                32,
                             );
                         }
 

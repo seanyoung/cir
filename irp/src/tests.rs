@@ -15,9 +15,9 @@ use std::{collections::HashMap, path::PathBuf};
 fn test() {
     let mut vars = Vartable::new();
 
-    vars.set("F".to_string(), 1, 8);
-    vars.set("D".to_string(), 0xe9, 8);
-    vars.set("S".to_string(), 0xfe, 8);
+    vars.set("F".to_string(), 1);
+    vars.set("D".to_string(), 0xe9);
+    vars.set("S".to_string(), 0xfe);
 
     let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
 
@@ -31,9 +31,9 @@ fn test() {
 
     let mut vars = Vartable::new();
 
-    vars.set("F".to_string(), 1, 8);
-    vars.set("D".to_string(), 0xe9, 8);
-    vars.set("T".to_string(), 0, 8);
+    vars.set("F".to_string(), 1);
+    vars.set("D".to_string(), 0xe9);
+    vars.set("T".to_string(), 0);
 
     let irp = Irp::parse("{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+").unwrap();
     let res = irp.encode(vars, 0).unwrap();
@@ -47,9 +47,9 @@ fn test() {
 
     let mut vars = Vartable::new();
 
-    vars.set("F".to_string(), 1, 8);
-    vars.set("D".to_string(), 0xe9, 8);
-    vars.set("S".to_string(), 0x88, 8);
+    vars.set("F".to_string(), 1);
+    vars.set("D".to_string(), 0xe9);
+    vars.set("S".to_string(), 0x88);
 
     let irp = Irp::parse("{38k,400}<1,-1|1,-3>(8,-4,170:8,90:8,15:4,D:4,S:8,F:8,E:4,C:4,1,-48)+ {E=1,C=D^S:4:0^S:4:4^F:4:0^F:4:4^E:4}").unwrap();
     let res = irp.encode(vars, 0).unwrap();
@@ -66,12 +66,12 @@ fn rs200() {
 
     let mut vars = Vartable::new();
 
-    vars.set("D".to_string(), 4, 8);
-    vars.set("F".to_string(), 1, 8);
-    vars.set("H1".to_string(), 4, 8);
-    vars.set("H2".to_string(), 2, 8);
-    vars.set("H3".to_string(), 3, 8);
-    vars.set("H4".to_string(), 4, 8);
+    vars.set("D".to_string(), 4);
+    vars.set("F".to_string(), 1);
+    vars.set("H1".to_string(), 4);
+    vars.set("H2".to_string(), 2);
+    vars.set("H3".to_string(), 3);
+    vars.set("H4".to_string(), 4);
 
     let res = irp.encode(vars, 1).unwrap();
 
@@ -85,8 +85,8 @@ fn rs200() {
 fn nec() {
     let mut vars = Vartable::new();
 
-    vars.set("F".to_string(), 1, 8);
-    vars.set("D".to_string(), 0xe9, 8);
+    vars.set("F".to_string(), 1);
+    vars.set("D".to_string(), 0xe9);
 
     let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
     let res = irp.encode(vars, 1).unwrap();
@@ -102,8 +102,8 @@ fn nec() {
 fn keeprite_ac() {
     let mut vars = Vartable::new();
 
-    vars.set("A".to_string(), 1, 32);
-    vars.set("B".to_string(), 0xe9, 32);
+    vars.set("A".to_string(), 1);
+    vars.set("B".to_string(), 0xe9);
 
     let irp = Irp::parse("{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]").unwrap();
     let res = irp.encode(vars, 1).unwrap();
@@ -168,8 +168,8 @@ fn variants() {
 fn vars() {
     let mut vars = Vartable::new();
 
-    vars.set("S".to_string(), 2, 8);
-    vars.set("F".to_string(), 0xe9, 8);
+    vars.set("S".to_string(), 2);
+    vars.set("F".to_string(), 0xe9);
 
     let irp = Irp::parse(
         "{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}[S:0..1,F:1..255]",
@@ -187,8 +187,8 @@ fn vars() {
 
     let mut vars = Vartable::new();
 
-    vars.set("S".to_string(), 1, 8);
-    vars.set("F".to_string(), 0, 8);
+    vars.set("S".to_string(), 1);
+    vars.set("F".to_string(), 0);
 
     let res = irp.encode(vars, 1);
 
@@ -201,8 +201,8 @@ fn vars() {
 
     let mut vars = Vartable::new();
 
-    vars.set("S".to_string(), 1, 8);
-    vars.set("X".to_string(), 0, 8);
+    vars.set("S".to_string(), 1);
+    vars.set("X".to_string(), 0);
 
     let res = irp.encode(vars, 1);
 
@@ -210,9 +210,9 @@ fn vars() {
 
     let mut vars = Vartable::new();
 
-    vars.set("S".to_string(), 1, 8);
-    vars.set("F".to_string(), 2, 8);
-    vars.set("X".to_string(), 0, 8);
+    vars.set("S".to_string(), 1);
+    vars.set("F".to_string(), 2);
+    vars.set("X".to_string(), 0);
 
     let res = irp.encode(vars, 1);
 
@@ -222,9 +222,9 @@ fn vars() {
 
     let irp = Irp::parse("{40k,520,msb}<1,-10|1,-1,1,-8>(S:1,<1:2|2:2>(F:D),-90m)*{D=8}").unwrap();
 
-    vars.set("S".to_string(), 1, 8);
-    vars.set("F".to_string(), 2, 8);
-    vars.set("X".to_string(), 0, 8);
+    vars.set("S".to_string(), 1);
+    vars.set("F".to_string(), 2);
+    vars.set("X".to_string(), 0);
 
     let res = irp.encode(vars, 1);
 
@@ -318,13 +318,13 @@ fn compare_encode_to_transmogrifier() {
         }
 
         for param in &irp.parameters {
-            let min = param.min.eval(&vars).unwrap().0;
-            let max = param.max.eval(&vars).unwrap().0;
+            let min = param.min.eval(&vars).unwrap();
+            let max = param.max.eval(&vars).unwrap();
 
             let value = rng.gen_range(min..=max);
 
             params.insert(param.name.to_owned(), value);
-            vars.set(param.name.to_owned(), value, 32);
+            vars.set(param.name.to_owned(), value);
         }
 
         for repeats in 0..10 {
@@ -425,13 +425,13 @@ fn decode_all() {
             let mut params = HashMap::new();
 
             for param in &irp.parameters {
-                let min = param.min.eval(&vars).unwrap().0;
-                let max = param.max.eval(&vars).unwrap().0;
+                let min = param.min.eval(&vars).unwrap();
+                let max = param.max.eval(&vars).unwrap();
 
                 let value = rng.gen_range(min..=max);
 
                 params.insert(param.name.to_owned(), value);
-                vars.set(param.name.to_owned(), value, 8);
+                vars.set(param.name.to_owned(), value);
             }
 
             let msg = irp.encode(vars, repeats).unwrap();

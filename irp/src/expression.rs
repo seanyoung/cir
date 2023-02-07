@@ -264,13 +264,13 @@ impl Expression {
                 length,
                 skip,
             } => {
-                let (mut b, _) = value.eval(vars)?;
+                let mut b = value.eval(vars)?;
 
                 if let Some(skip) = skip {
-                    b = b.wrapping_shr(skip.eval(vars)?.0 as u32);
+                    b = b.wrapping_shr(skip.eval(vars)? as u32);
                 }
 
-                let (l, _) = length.eval(vars)?;
+                let l = length.eval(vars)?;
 
                 if *reverse {
                     b = b.reverse_bits().rotate_left(l as u32);
@@ -287,109 +287,104 @@ impl Expression {
     }
 
     /// Evaluate an arithmetic expression
-    pub fn eval(&self, vars: &Vartable) -> Result<(i64, u8), String> {
+    pub fn eval(&self, vars: &Vartable) -> Result<i64, String> {
         match self {
-            Expression::Number(n) => Ok((*n, 64)),
+            Expression::Number(n) => Ok(*n),
             Expression::Identifier(id) => vars.get(id),
             Expression::Negative(e) => {
-                let (v, l) = e.eval(vars)?;
+                let v = e.eval(vars)?;
 
-                Ok((-v, l))
+                Ok(-v)
             }
             Expression::Complement(e) => {
-                let (v, l) = e.eval(vars)?;
+                let v = e.eval(vars)?;
 
-                Ok((!v, l))
+                Ok(!v)
             }
             Expression::Log2(e) => {
-                let (v, l) = e.eval(vars)?;
+                let v = e.eval(vars)?;
 
                 let i = v.ilog2();
 
                 if (1 << i) == v {
-                    Ok((i.into(), l))
+                    Ok(i.into())
                 } else {
-                    Ok((0, l))
+                    Ok(0)
                 }
             }
             Expression::Add(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
-                Ok((l_val.overflowing_add(r_val).0, std::cmp::max(l_len, r_len)))
+                Ok(l_val.overflowing_add(r_val).0)
             }
             Expression::Subtract(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
-                Ok((l_val.overflowing_sub(r_val).0, std::cmp::max(l_len, r_len)))
+                Ok(l_val.overflowing_sub(r_val).0)
             }
             Expression::Multiply(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
-                Ok((l_val.overflowing_mul(r_val).0, std::cmp::max(l_len, r_len)))
+                Ok(l_val.overflowing_mul(r_val).0)
             }
             Expression::Divide(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
                 if r_val == 0 {
                     return Err("divide by zero".to_string());
                 }
 
-                Ok(((l_val / r_val), std::cmp::max(l_len, r_len)))
+                Ok(l_val / r_val)
             }
             Expression::Modulo(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
                 if r_val == 0 {
                     return Err("divide by zero".to_string());
                 }
 
-                Ok(((l_val % r_val), std::cmp::max(l_len, r_len)))
+                Ok(l_val % r_val)
             }
             Expression::BitwiseAnd(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
-                Ok(((l_val & r_val), std::cmp::max(l_len, r_len)))
+                Ok(l_val & r_val)
             }
             Expression::BitwiseOr(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
-                Ok(((l_val | r_val), std::cmp::max(l_len, r_len)))
+                Ok(l_val | r_val)
             }
             Expression::BitwiseXor(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, r_len) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
-                Ok(((l_val ^ r_val), std::cmp::max(l_len, r_len)))
+                Ok(l_val ^ r_val)
             }
             Expression::Power(l, r) => {
-                let (l_val, l_len) = l.eval(vars)?;
-                let (r_val, _) = r.eval(vars)?;
+                let l_val = l.eval(vars)?;
+                let r_val = r.eval(vars)?;
 
                 if r_val < 0 {
                     return Err("power to negative not supported".to_string());
                 }
 
-                Ok((l_val.overflowing_pow(r_val as u32).0, l_len))
+                Ok(l_val.overflowing_pow(r_val as u32).0)
             }
             Expression::BitCount(e) => {
-                let (mut val, len) = e.eval(vars)?;
+                let val = e.eval(vars)?;
 
-                if len < 63 {
-                    // mask off any unused bits
-                    val &= (1 << len) - 1;
-                }
-
-                Ok((val.count_ones().into(), len))
+                Ok(val.count_ones().into())
             }
             Expression::BitReverse(e, count, skip) => {
-                let (val, len) = e.eval(vars)?;
+                let val = e.eval(vars)?;
 
                 let mut new_val = 0;
 
@@ -399,88 +394,88 @@ impl Expression {
                     }
                 }
 
-                Ok((new_val, len))
+                Ok(new_val)
             }
             Expression::ShiftLeft(value, r) => {
-                let (value, len) = value.eval(vars)?;
-                let (r, _) = r.eval(vars)?;
+                let value = value.eval(vars)?;
+                let r = r.eval(vars)?;
 
-                Ok((value.wrapping_shl(r as u32), len))
+                Ok(value.wrapping_shl(r as u32))
             }
             Expression::ShiftRight(value, r) => {
-                let (value, len) = value.eval(vars)?;
-                let (r, _) = r.eval(vars)?;
+                let value = value.eval(vars)?;
+                let r = r.eval(vars)?;
 
-                Ok((value.wrapping_shr(r as u32), len))
+                Ok(value.wrapping_shr(r as u32))
             }
             Expression::NotEqual(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
+                let left = left.eval(vars)?;
+                let right = right.eval(vars)?;
 
-                Ok(((left != right) as i64, 1))
+                Ok((left != right) as i64)
             }
             Expression::Equal(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
+                let left = left.eval(vars)?;
+                let right = right.eval(vars)?;
 
-                Ok(((left == right) as i64, 1))
+                Ok((left == right) as i64)
             }
             Expression::More(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
+                let left = left.eval(vars)?;
+                let right = right.eval(vars)?;
 
-                Ok(((left > right) as i64, 1))
+                Ok((left > right) as i64)
             }
             Expression::MoreEqual(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
+                let left = left.eval(vars)?;
+                let right = right.eval(vars)?;
 
-                Ok(((left >= right) as i64, 1))
+                Ok((left >= right) as i64)
             }
             Expression::Less(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
+                let left = left.eval(vars)?;
+                let right = right.eval(vars)?;
 
-                Ok(((left < right) as i64, 1))
+                Ok((left < right) as i64)
             }
             Expression::LessEqual(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
+                let left = left.eval(vars)?;
+                let right = right.eval(vars)?;
 
-                Ok(((left <= right) as i64, 1))
+                Ok((left <= right) as i64)
             }
-            Expression::BitField { .. } => self.bitfield(vars),
+            Expression::BitField { .. } => Ok(self.bitfield(vars)?.0),
             Expression::InfiniteBitField { value, skip } => {
-                let (mut b, _) = value.eval(vars)?;
+                let mut b = value.eval(vars)?;
 
-                b = b.wrapping_shr(skip.eval(vars)?.0 as u32);
+                b = b.wrapping_shr(skip.eval(vars)? as u32);
 
-                Ok((b, 8))
+                Ok(b)
             }
             Expression::List(v) if v.len() == 1 => {
-                let (v, l) = v[0].eval(vars)?;
+                let v = v[0].eval(vars)?;
 
-                Ok((v, l))
+                Ok(v)
             }
             Expression::Not(expr) => {
-                let (v, l) = expr.eval(vars)?;
+                let v = expr.eval(vars)?;
 
-                Ok(((v == 0) as i64, l))
+                Ok((v == 0) as i64)
             }
             Expression::And(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
+                let left = left.eval(vars)?;
+                let right = right.eval(vars)?;
 
-                Ok(((left != 0 && right != 0) as i64, 1))
+                Ok((left != 0 && right != 0) as i64)
             }
             Expression::Or(left, right) => {
-                let (left, _) = left.eval(vars)?;
-                let (right, _) = right.eval(vars)?;
+                let left = left.eval(vars)?;
+                let right = right.eval(vars)?;
 
-                Ok(((left != 0 || right != 0) as i64, 1))
+                Ok((left != 0 || right != 0) as i64)
             }
             Expression::Conditional(cond, left, right) => {
-                let (cond, _) = cond.eval(vars)?;
+                let cond = cond.eval(vars)?;
 
                 if cond != 0 {
                     left.eval(vars)

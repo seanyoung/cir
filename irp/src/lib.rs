@@ -176,7 +176,7 @@ pub struct ParameterSpec {
 /// During IRP evaluation, variables may change their value
 #[derive(Default, Debug, Clone)]
 pub struct Vartable<'a> {
-    vars: HashMap<String, (i64, u8, Option<&'a Expression>)>,
+    vars: HashMap<String, (i64, Option<&'a Expression>)>,
 }
 
 /// Represents input data to the decoder

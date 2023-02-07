@@ -90,7 +90,7 @@ impl fmt::Display for InfraredData {
 impl<'a> fmt::Display for Vartable<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut s = String::new();
-        for (name, (val, _, expr)) in &self.vars {
+        for (name, (val, expr)) in &self.vars {
             if let Some(expr) = expr {
                 write!(s, " {name} = {expr}").unwrap();
             } else {
@@ -131,7 +131,7 @@ impl<'a> Decoder<'a> {
         if self.pos.is_empty() {
             let (success, mut vartab) = self.run_actions(0, &Vartable::new());
 
-            vartab.set("$down".into(), 0, 8);
+            vartab.set("$down".into(), 0);
 
             assert!(success);
 
@@ -187,7 +187,7 @@ impl<'a> Decoder<'a> {
                         }
                     }
                     Edge::FlashVar(var, unit, dest) => {
-                        let (res, _) = Expression::Identifier(var.to_owned())
+                        let res = Expression::Identifier(var.to_owned())
                             .eval(&vartab)
                             .unwrap();
                         let expected = res * unit;
@@ -268,7 +268,7 @@ impl<'a> Decoder<'a> {
                         }
                     }
                     Edge::GapVar(var, unit, dest) => {
-                        let (res, _) = Expression::Identifier(var.to_owned())
+                        let res = Expression::Identifier(var.to_owned())
                             .eval(&vartab)
                             .unwrap();
                         let expected = res * unit;
@@ -325,7 +325,7 @@ impl<'a> Decoder<'a> {
                         }
                     }
                     Edge::BranchCond { expr, yes, no } => {
-                        let (cond, _) = expr.eval(&vartab).unwrap();
+                        let cond = expr.eval(&vartab).unwrap();
 
                         let dest = if cond != 0 { *yes } else { *no };
 
@@ -343,7 +343,7 @@ impl<'a> Decoder<'a> {
                         }
                     }
                     Edge::MayBranchCond { expr, dest } => {
-                        let (cond, _) = expr.eval(&vartab).unwrap();
+                        let cond = expr.eval(&vartab).unwrap();
 
                         if cond != 0 {
                             let (success, vartab) = self.run_actions(*dest, &vartab);
@@ -375,12 +375,12 @@ impl<'a> Decoder<'a> {
         for a in &self.nfa.verts[pos].actions {
             match a {
                 Action::Set { var, expr } => {
-                    let (val, len) = expr.eval(&vartable).unwrap();
+                    let val = expr.eval(&vartable).unwrap();
                     trace!("set {} = {} = {}", var, expr, val);
-                    vartable.vars.insert(var.to_string(), (val, len, None));
+                    vartable.vars.insert(var.to_string(), (val, None));
                 }
                 Action::AssertEq { left, right } => {
-                    if let (Ok((left_val, _)), Ok((right_val, _))) =
+                    if let (Ok(left_val), Ok(right_val)) =
                         (left.eval(&vartable), right.eval(&vartable))
                     {
                         if left_val != right_val {
@@ -408,7 +408,7 @@ impl<'a> Decoder<'a> {
                 Action::Done(event, include) => {
                     let mut res: HashMap<String, i64> = HashMap::new();
 
-                    for (name, (val, _, _)) in &vartable.vars {
+                    for (name, (val, _)) in &vartable.vars {
                         if include.contains(name) {
                             trace!("done {}", event);
 

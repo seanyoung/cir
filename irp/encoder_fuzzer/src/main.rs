@@ -14,8 +14,8 @@ fn main() {
                 let mut rng = rand::thread_rng();
 
                 for param in &irp.parameters {
-                    let min = param.min.eval(&vars).unwrap().0;
-                    let max = param.max.eval(&vars).unwrap().0;
+                    let min = param.min.eval(&vars).unwrap();
+                    let max = param.max.eval(&vars).unwrap();
 
                     if min > max {
                         continue;
@@ -24,7 +24,7 @@ fn main() {
                     let value = rng.gen_range(min..=max);
 
                     params.insert(param.name.to_owned(), value);
-                    vars.set(param.name.to_owned(), value, 32);
+                    vars.set(param.name.to_owned(), value);
                 }
 
                 let _ = irp.encode(vars.clone(), 1);

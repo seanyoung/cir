@@ -87,19 +87,19 @@ impl Irp {
 
     fn check_parameters<'a>(&'a self, vars: &mut Vartable<'a>) -> Result<(), String> {
         for p in &self.parameters {
-            let val = if let Ok((val, _)) = vars.get(&p.name) {
+            let val = if let Ok(val) = vars.get(&p.name) {
                 val
             } else if let Some(e) = &p.default {
-                let (v, l) = e.eval(vars)?;
+                let v = e.eval(vars)?;
 
-                vars.set(p.name.to_owned(), v, l);
+                vars.set(p.name.to_owned(), v);
 
                 v
             } else {
                 return Err(format!("missing value for {}", p.name));
             };
 
-            let (min, _) = p.min.eval(vars)?;
+            let min = p.min.eval(vars)?;
             if val < min {
                 return Err(format!(
                     "{} is less than minimum value {} for parameter {}",
@@ -107,7 +107,7 @@ impl Irp {
                 ));
             }
 
-            let (max, _) = p.max.eval(vars)?;
+            let max = p.max.eval(vars)?;
             if val > max {
                 return Err(format!(
                     "{} is more than maximum value {} for parameter {}",
@@ -146,21 +146,21 @@ impl<'a> Vartable<'a> {
 
     /// IRP definitions are evaluated each time when they are referenced
     fn set_definition(&mut self, id: String, expr: &'a Expression) {
-        self.vars.insert(id, (0, 0, Some(expr)));
+        self.vars.insert(id, (0, Some(expr)));
     }
 
-    pub fn set(&mut self, id: String, value: i64, length: u8) {
-        self.vars.insert(id, (value, length, None));
+    pub fn set(&mut self, id: String, value: i64) {
+        self.vars.insert(id, (value, None));
     }
 
     pub fn is_defined(&self, id: &str) -> bool {
         self.vars.contains_key(id)
     }
 
-    pub fn get(&self, id: &str) -> Result<(i64, u8), String> {
+    pub fn get(&self, id: &str) -> Result<i64, String> {
         match self.vars.get(id) {
-            Some((val, length, None)) => Ok((*val, *length)),
-            Some((_, _, Some(expr))) => expr.eval(self),
+            Some((val, None)) => Ok(*val),
+            Some((_, Some(expr))) => expr.eval(self),
             None => Err(format!("variable `{id}´ not defined")),
         }
     }
@@ -435,7 +435,7 @@ fn eval_stream<'a>(
             }
             Expression::FlashIdentifier(id, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_flash(u.eval(vars.get(id)?.0, gs)?)?;
+                encoder.add_flash(u.eval(vars.get(id)?, gs)?)?;
             }
             Expression::ExtentConstant(p, u) => {
                 encoder.flush_level(level, vars)?;
@@ -443,7 +443,7 @@ fn eval_stream<'a>(
             }
             Expression::ExtentIdentifier(id, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval(vars.get(id)?.0, gs)?)?;
+                encoder.add_extent(u.eval(vars.get(id)?, gs)?)?;
             }
             Expression::GapConstant(p, u) => {
                 encoder.flush_level(level, vars)?;
@@ -451,14 +451,14 @@ fn eval_stream<'a>(
             }
             Expression::GapIdentifier(id, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_gap(u.eval(vars.get(id)?.0, gs)?)?;
+                encoder.add_gap(u.eval(vars.get(id)?, gs)?)?;
             }
             Expression::Assignment(id, expr) => {
                 encoder.flush_level(level, vars)?;
 
-                let (v, l) = expr.eval(vars)?;
+                let v = expr.eval(vars)?;
 
-                vars.set(id.to_string(), v, l);
+                vars.set(id.to_string(), v);
             }
             Expression::Stream(stream) => {
                 let variant_count = stream

@@ -466,14 +466,14 @@ fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
         }
         seen_names.push(&parameter.name);
 
-        let min = parameter.min.eval(&vars)?.0;
-        let max = parameter.max.eval(&vars)?.0;
+        let min = parameter.min.eval(&vars)?;
+        let max = parameter.max.eval(&vars)?;
 
         if min < 0 || max < 0 || min > max {
             return Err(format!("invalid minimum {min} and maximum {max}"));
         }
 
-        vars.set(parameter.name.to_owned(), min, 8);
+        vars.set(parameter.name.to_owned(), min);
     }
 
     for parameter in parameters {

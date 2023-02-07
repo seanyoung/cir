@@ -180,7 +180,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                             }
                         };
 
-                        vars.set(list[0].to_string(), value, 8);
+                        vars.set(list[0].to_string(), value);
                     }
                 }
             }

@@ -291,9 +291,9 @@ impl<'a> Builder<'a> {
                     }
 
                     if self.expression_available(expr).is_ok() {
-                        let (val, len) = expr.eval(&self.constants).unwrap();
+                        let val = expr.eval(&self.constants).unwrap();
 
-                        self.constants.set(name.to_owned(), val, len);
+                        self.constants.set(name.to_owned(), val);
 
                         changes = true;
 
@@ -446,7 +446,7 @@ impl<'a> Builder<'a> {
                         self.decode_bits(Some(min_len), max_len, *reverse, store_length, bit_spec)?;
 
                         let skip = if let Some(skip) = skip {
-                            let (skip, _) = self.const_folding(skip).eval(&Vartable::new())?;
+                            let skip = self.const_folding(skip).eval(&Vartable::new())?;
 
                             skip
                         } else {
@@ -508,14 +508,14 @@ impl<'a> Builder<'a> {
                     reverse,
                 } = expr
                 {
-                    let (length, _) = self.const_folding(length).eval(&Vartable::new())?;
+                    let length = self.const_folding(length).eval(&Vartable::new())?;
 
                     if !self.irp.general_spec.lsb {
                         offset -= length;
                     }
 
                     let skip = if let Some(skip) = skip {
-                        let (skip, _) = self.const_folding(skip).eval(&Vartable::new())?;
+                        let skip = self.const_folding(skip).eval(&Vartable::new())?;
 
                         skip
                     } else {
@@ -624,15 +624,15 @@ impl<'a> Builder<'a> {
             Expression::Number(v) => Ok((*v, *v, None)),
             Expression::Identifier(name) => {
                 if let Some(param) = self.irp.parameters.iter().find(|def| def.name == *name) {
-                    let min = param.min.eval(&self.constants)?.0;
-                    let max = param.max.eval(&self.constants)?.0;
+                    let min = param.min.eval(&self.constants)?;
+                    let max = param.max.eval(&self.constants)?;
 
                     if min > max {
                         Err(format!("parameter {name} has min > max ({min} > {max})",))
                     } else {
                         Ok((
-                            param.min.eval(&self.constants)?.0,
-                            param.max.eval(&self.constants)?.0,
+                            param.min.eval(&self.constants)?,
+                            param.max.eval(&self.constants)?,
                             Some(name.to_owned()),
                         ))
                     }
@@ -1104,7 +1104,7 @@ impl<'a> Builder<'a> {
                 self.subtract_extent(expr);
             }
             Expression::BitField { length, .. } => {
-                let (length, _) = length.eval(&Vartable::new())?;
+                let length = length.eval(&Vartable::new())?;
 
                 self.decode_bits(None, length, false, None, bit_spec)?;
             }
@@ -1286,7 +1286,7 @@ impl<'a> Builder<'a> {
 
     /// For the given parameter, get the mask
     pub fn param_to_mask(&self, param: &ParameterSpec) -> Result<i64, String> {
-        let max = param.max.eval(&self.constants)?.0 as u64;
+        let max = param.max.eval(&self.constants)? as u64;
 
         Ok((max + 1).next_power_of_two() as i64 - 1)
     }
@@ -1354,7 +1354,7 @@ impl<'a> Builder<'a> {
 
         let new = clone_filter(expr, &|expr| match expr.as_ref() {
             Expression::Identifier(name) => {
-                let (val, _) = self.constants.get(name).ok()?;
+                let val = self.constants.get(name).ok()?;
                 Some(Rc::new(Expression::Number(val)))
             }
             Expression::Complement(expr) => unary!(expr, not),

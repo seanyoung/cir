@@ -122,7 +122,7 @@ impl Remote {
 
             debug!("encoding name={} code={}", name, code);
 
-            vars.set(String::from("CODE"), *code as i64, self.bits as u8);
+            vars.set(String::from("CODE"), *code as i64);
 
             let m = irp.encode(vars, repeats).expect("encode should succeed");
 
