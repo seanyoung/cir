@@ -90,16 +90,16 @@ This example encodes an button press using NEC encoding, encodes and then simply
 use irp::{Irp, Vartable};
 
 fn main() {
-    let mut vars = Vartable::new();
-    // Set some values for D, S, and F
-    vars.set(String::from("D"), 255);
-    vars.set(String::from("S"), 52);
-    vars.set(String::from("F"), 1);
     // nec protocol
     let irp = Irp::parse(r#"
         {38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*)
         [D:0..255,S:0..255=255-D,F:0..255]"#)
         .expect("parse should succeed");
+    // Set some values for D, S, and F
+    let mut vars = Vartable::new();
+    vars.set(String::from("D"), 255);
+    vars.set(String::from("S"), 52);
+    vars.set(String::from("F"), 1);
     // encode message with 0 repeats
     let message = irp.encode(vars, 0).expect("encode should succeed");
     if let Some(carrier) = &message.carrier {
@@ -161,11 +161,11 @@ The IRP can also be encoded to pronto hex codes. Pronto hex codes have a repeati
 use irp::{Irp, Vartable};
 
 fn main() {
-    let mut vars = Vartable::new();
-    vars.set(String::from("F"), 1);
     // sony8 protocol
     let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]")
         .expect("parse should succeed");
+    let mut vars = Vartable::new();
+    vars.set(String::from("F"), 1);
     let pronto = irp.encode_pronto(vars).expect("encode should succeed");
     println!("{}", pronto);
 }
