@@ -7,3 +7,4 @@ edition = "2021"
 afl = "*"
 irp = { path = ".." }
 rand = "0.8"
+j4rs = "0.15"
