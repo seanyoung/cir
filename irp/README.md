@@ -91,7 +91,7 @@ use irp::{Irp, Vartable};
 
 fn main() {
     let mut vars = Vartable::new();
-    // set D to 255, bit width 8
+    // Set some values for D, S, and F
     vars.set(String::from("D"), 255);
     vars.set(String::from("S"), 52);
     vars.set(String::from("F"), 1);
