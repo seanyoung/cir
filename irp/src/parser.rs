@@ -342,7 +342,7 @@ impl Irp {
 
                 Ok(Irp {
                     general_spec,
-                    stream,
+                    stream: Rc::new(stream),
                     definitions,
                     parameters,
                 })

@@ -65,7 +65,7 @@ pub enum Pronto {
 #[derive(Debug)]
 pub struct Irp {
     pub general_spec: GeneralSpec,
-    pub stream: Expression,
+    pub stream: Rc<Expression>,
     pub definitions: Vec<Expression>,
     pub parameters: Vec<ParameterSpec>,
 }

@@ -4,16 +4,16 @@ use super::{Expression, Irp, Stream};
 use std::rc::Rc;
 
 pub(crate) struct Variants {
-    pub down: Option<Expression>,
-    pub repeat: Expression,
-    pub up: Option<Expression>,
+    pub down: Option<Rc<Expression>>,
+    pub repeat: Rc<Expression>,
+    pub up: Option<Rc<Expression>>,
 }
 
 impl Irp {
     pub(crate) fn split_variants(&self) -> Result<Variants, String> {
         let expr = &self.stream;
 
-        if let Expression::Stream(stream) = &expr {
+        if let Expression::Stream(stream) = self.stream.as_ref() {
             for expr in &stream.bit_spec {
                 // bitspec should never have repeats
                 check_no_repeats(expr)?;
@@ -67,7 +67,7 @@ impl Irp {
                         if let Expression::Stream(stream) = variants[2].as_ref() {
                             let mut stream = stream.clone();
                             stream.repeat = None;
-                            Some(Expression::Stream(stream))
+                            Some(Rc::new(Expression::Stream(stream)))
                         } else {
                             panic!("stream expected");
                         }
@@ -75,12 +75,12 @@ impl Irp {
                         None
                     };
 
-                    let repeat = variants[1].as_ref().clone();
+                    let repeat = variants[1].clone();
 
                     let down = if let Expression::Stream(stream) = variants[0].as_ref() {
                         let mut stream = stream.clone();
                         stream.repeat = None;
-                        Some(Expression::Stream(stream))
+                        Some(Rc::new(Expression::Stream(stream)))
                     } else {
                         panic!("stream expected");
                     };
@@ -124,11 +124,11 @@ impl Irp {
 
                 let down = if down.is_empty() || all_assignments(&down) {
                     if any_assignments(&repeats) {
-                        Some(Expression::Stream(Stream {
+                        Some(Rc::new(Expression::Stream(Stream {
                             repeat: None,
                             stream: repeats.clone(),
                             bit_spec: stream.bit_spec.clone(),
-                        }))
+                        })))
                     } else {
                         None
                     }
@@ -164,28 +164,28 @@ impl Irp {
                         }
                     }
 
-                    Some(Expression::Stream(Stream {
+                    Some(Rc::new(Expression::Stream(Stream {
                         repeat: None,
                         stream: down,
                         bit_spec: stream.bit_spec.clone(),
-                    }))
+                    })))
                 };
 
                 let up = if up.is_empty() || all_assignments(&up) {
                     None
                 } else {
-                    Some(Expression::Stream(Stream {
+                    Some(Rc::new(Expression::Stream(Stream {
                         repeat: None,
                         stream: up,
                         bit_spec: stream.bit_spec.clone(),
-                    }))
+                    })))
                 };
 
-                let repeat = Expression::Stream(Stream {
+                let repeat = Rc::new(Expression::Stream(Stream {
                     repeat: seen_repeat,
                     stream: repeats,
                     bit_spec: stream.bit_spec.clone(),
-                });
+                }));
 
                 Ok(Variants { down, repeat, up })
             }
