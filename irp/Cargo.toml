@@ -1,6 +1,6 @@
 [package]
 name = "irp"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Sean Young <sean@mess.org>"]
 repository = "https://github.com/seanyoung/cir"
 edition = "2021"
@@ -9,6 +9,7 @@ documentation = "https://docs.rs/irp/"
 keywords = [ "IRP", "IR", "infrared", "pronto" ]
 readme = "README.md"
 license = "MIT"
+rust-version = "1.67.0"
 
 [dependencies]
 num = "0.4"
