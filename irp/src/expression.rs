@@ -255,6 +255,37 @@ impl Expression {
         visit(self, ctx);
     }
 
+    /// Evaluate an bit field
+    pub fn bitfield(&self, vars: &Vartable) -> Result<(i64, u8), String> {
+        match self {
+            Expression::BitField {
+                value,
+                reverse,
+                length,
+                skip,
+            } => {
+                let (mut b, _) = value.eval(vars)?;
+
+                if let Some(skip) = skip {
+                    b = b.wrapping_shr(skip.eval(vars)?.0 as u32);
+                }
+
+                let (l, _) = length.eval(vars)?;
+
+                if *reverse {
+                    b = b.reverse_bits().rotate_left(l as u32);
+                }
+
+                if l > 0 && l < 63 {
+                    b &= (1 << l) - 1;
+                }
+
+                Ok((b, l as u8))
+            }
+            _ => Err("not a bitfield".into()),
+        }
+    }
+
     /// Evaluate an arithmetic expression
     pub fn eval(&self, vars: &Vartable) -> Result<(i64, u8), String> {
         match self {
@@ -418,30 +449,7 @@ impl Expression {
 
                 Ok(((left <= right) as i64, 1))
             }
-            Expression::BitField {
-                value,
-                reverse,
-                length,
-                skip,
-            } => {
-                let (mut b, _) = value.eval(vars)?;
-
-                if let Some(skip) = skip {
-                    b = b.wrapping_shr(skip.eval(vars)?.0 as u32);
-                }
-
-                let (l, _) = length.eval(vars)?;
-
-                if *reverse {
-                    b = b.reverse_bits().rotate_left(l as u32);
-                }
-
-                if l > 0 && l < 63 {
-                    b &= (1 << l) - 1;
-                }
-
-                Ok((b, l as u8))
-            }
+            Expression::BitField { .. } => self.bitfield(vars),
             Expression::InfiniteBitField { value, skip } => {
                 let (mut b, _) = value.eval(vars)?;
 

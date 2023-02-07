@@ -429,19 +429,6 @@ fn eval_stream<'a>(
 ) -> Result<(), String> {
     for expr in stream {
         match expr.as_ref() {
-            Expression::Number(v) => {
-                encoder.flush_level(level, vars)?;
-
-                encoder.add_flash(Unit::Units.eval(*v, gs)?)?;
-            }
-            Expression::Negative(e) => {
-                encoder.flush_level(level, vars)?;
-                match e.as_ref() {
-                    Expression::Number(v) => encoder.add_gap(Unit::Units.eval(*v, gs)?)?,
-                    Expression::FlashConstant(v, u) => encoder.add_gap(u.eval_float(*v, gs)?)?,
-                    _ => unreachable!(),
-                }
-            }
             Expression::FlashConstant(p, u) => {
                 encoder.flush_level(level, vars)?;
                 encoder.add_flash(u.eval_float(*p, gs)?)?;
@@ -568,11 +555,12 @@ fn eval_stream<'a>(
                     eval_stream(variation, encoder, level, vars, gs, repeats, alternative)?;
                 }
             }
-            _ => {
-                let (bits, length) = expr.eval(vars)?;
+            Expression::BitField { .. } => {
+                let (bits, length) = expr.bitfield(vars)?;
 
                 encoder.add_bits(bits, length, level)?;
             }
+            _ => unreachable!(),
         }
     }
 
