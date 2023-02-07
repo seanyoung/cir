@@ -306,7 +306,7 @@ fn compare_encode_to_transmogrifier() {
     for protocol in &protocols {
         let irp = Irp::parse(&protocol.irp).unwrap();
 
-        let trans_irp = IrpTransmogrifierRender::new(&jvm, &protocol.irp);
+        let trans_irp = IrpTransmogrifierRender::new(&jvm, &protocol.irp).unwrap();
 
         let mut vars = Vartable::new();
 
@@ -329,7 +329,9 @@ fn compare_encode_to_transmogrifier() {
 
         for repeats in 0..10 {
             let msg = irp.encode(vars.clone(), repeats).unwrap();
-            let trans_msg = trans_irp.render_raw(params.clone(), repeats as usize);
+            let trans_msg = trans_irp
+                .render_raw(params.clone(), repeats as usize)
+                .unwrap();
 
             if !compare_with_rounding(&msg.raw, &trans_msg.raw) {
                 println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
@@ -346,7 +348,7 @@ fn compare_encode_to_transmogrifier() {
         }
 
         // Test pronto
-        let trans_pronto = trans_irp.render_pronto(params.clone());
+        let trans_pronto = trans_irp.render_pronto(params.clone()).unwrap();
 
         let pronto = irp.encode_pronto(vars).unwrap().to_string();
 
