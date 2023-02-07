@@ -452,11 +452,6 @@ impl Expression {
 
                 Ok(b)
             }
-            Expression::List(v) if v.len() == 1 => {
-                let v = v[0].eval(vars)?;
-
-                Ok(v)
-            }
             Expression::Not(expr) => {
                 let v = expr.eval(vars)?;
 
