@@ -256,7 +256,7 @@ impl Expression {
     }
 
     /// Evaluate an bit field
-    pub fn bitfield(&self, vars: &Vartable) -> Result<(i64, u8), String> {
+    pub fn bitfield(&self, vars: &Vartable) -> Result<(i64, i64), String> {
         match self {
             Expression::BitField {
                 value,
@@ -280,7 +280,7 @@ impl Expression {
                     b &= (1 << l) - 1;
                 }
 
-                Ok((b, l as u8))
+                Ok((b, l))
             }
             _ => Err("not a bitfield".into()),
         }

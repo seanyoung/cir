@@ -289,7 +289,7 @@ impl<'a> Encoder<'a> {
     }
 
     /// Add some bits after evaluating a bitfield.
-    fn add_bits(&mut self, bits: i64, length: u8, level: Option<usize>) -> Result<(), String> {
+    fn add_bits(&mut self, bits: i64, length: i64, level: Option<usize>) -> Result<(), String> {
         match level {
             Some(level) => {
                 let mut bv = BitVec::<usize, LocalBits>::from_element(bits as usize);
