@@ -1,6 +1,6 @@
 use super::{Expression, GeneralSpec, Irp, Message, Pronto, RepeatMarker, Unit, Vartable};
-
 use bitvec::prelude::*;
+use log::warn;
 use std::{collections::HashMap, rc::Rc};
 
 impl Irp {
@@ -219,7 +219,8 @@ impl<'a> Encoder<'a> {
     /// Add a flash of length microseconds
     fn add_flash(&mut self, length: i64) -> Result<(), String> {
         if length <= 0 {
-            return Err("length should be non-zero".into());
+            warn!("length should be non-zero");
+            return Ok(());
         }
 
         if let Some(v) = self.total_length.checked_add(length) {
@@ -245,7 +246,8 @@ impl<'a> Encoder<'a> {
     /// Add a gap of length microseconds
     fn add_gap(&mut self, length: i64) -> Result<(), String> {
         if length <= 0 {
-            return Err("length should be non-zero".into());
+            warn!("length should be non-zero");
+            return Ok(());
         }
 
         // Leading gaps must be added to the totals
