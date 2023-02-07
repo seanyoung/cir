@@ -184,6 +184,7 @@ impl Expression {
             | Expression::Negative(expr)
             | Expression::BitCount(expr)
             | Expression::BitReverse(expr, _, _)
+            | Expression::Log2(expr)
             | Expression::Assignment(_, expr) => {
                 expr.visit(ctx, visit);
             }
@@ -250,7 +251,14 @@ impl Expression {
                     e.visit(ctx, visit);
                 }
             }
-            _ => (),
+            Expression::Number(..)
+            | Expression::Identifier(..)
+            | Expression::FlashConstant(..)
+            | Expression::FlashIdentifier(..)
+            | Expression::GapConstant(..)
+            | Expression::GapIdentifier(..)
+            | Expression::ExtentConstant(..)
+            | Expression::ExtentIdentifier(..) => (),
         }
         visit(self, ctx);
     }
