@@ -337,7 +337,7 @@ impl Irp {
                 let general_spec = general_spec(&general)?;
 
                 check_parameters(&parameters)?;
-                check_definitions(&definitions)?;
+                check_definitions(&definitions, &parameters)?;
                 check_stream(&stream)?;
 
                 Ok(Irp {
@@ -485,7 +485,10 @@ fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
     Ok(())
 }
 
-fn check_definitions(definitions: &[Expression]) -> Result<(), String> {
+fn check_definitions(
+    definitions: &[Expression],
+    parameters: &[ParameterSpec],
+) -> Result<(), String> {
     let mut seen_names: Vec<&str> = Vec::new();
     let mut deps: HashMap<&str, HashSet<String>> = HashMap::new();
 
@@ -507,6 +510,13 @@ fn check_definitions(definitions: &[Expression]) -> Result<(), String> {
             if dependents.contains(name) {
                 return Err(format!("definition {definition} depends on its own value"));
             }
+
+            if parameters.iter().any(|parameter| &parameter.name == name) {
+                return Err(format!(
+                    "definition {name} overrides with parameter with same name"
+                ));
+            }
+
             deps.insert(name, dependents);
         } else {
             return Err(format!("invalid definition {definition}"));
