@@ -1,6 +1,4 @@
-use crate::{expression::clone_filter, RepeatMarker};
-
-use super::{Expression, Irp, Stream};
+use crate::{expression::clone_filter, Expression, Irp, RepeatMarker, Stream};
 use std::rc::Rc;
 
 pub(crate) struct Variants {
