@@ -1,6 +1,7 @@
 use crate::{expression::clone_filter, Expression, Irp, RepeatMarker, Stream};
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub(crate) struct Variants {
     pub down: Option<Rc<Expression>>,
     pub repeat: Rc<Expression>,
@@ -191,6 +192,223 @@ impl Irp {
             Err("expected stream expression".into())
         }
     }
+
+    pub(crate) fn split_variants_encode(&self) -> Result<Variants, String> {
+        let expr = &self.stream;
+
+        if let Expression::Stream(stream) = self.stream.as_ref() {
+            for expr in &stream.bit_spec {
+                // bitspec should never have repeats
+                check_no_repeats(expr)?;
+            }
+
+            // do we have a top-level repeat?
+            if expr.is_repeating() {
+                expr.check_no_contained_repeats()?;
+
+                let mut stream = stream.clone();
+
+                stream.repeat = None;
+
+                let mut ctx = Vec::new();
+
+                expr.visit(&mut ctx, &|expr, ctx| {
+                    if let Expression::Variation(list) = &expr {
+                        ctx.push((list[0].is_empty(), list.len()));
+                    };
+                });
+
+                let mut down_variant_empty = true;
+
+                let variant_count = ctx
+                    .into_iter()
+                    .map(|(down_empty, count)| {
+                        if !down_empty {
+                            down_variant_empty = false;
+                        }
+
+                        count
+                    })
+                    .max();
+
+                if let Some(variant_count) = variant_count {
+                    let expr = Rc::new(expr.clone());
+
+                    let variants: Vec<_> = (0..variant_count)
+                        .map(|variant| {
+                            clone_filter(&expr, &|e| {
+                                if let Expression::Variation(list) = e.as_ref() {
+                                    if let Some(variant) = list.get(variant) {
+                                        if variant.len() == 1 {
+                                            Some(variant[0].clone())
+                                        } else {
+                                            Some(Rc::new(Expression::List(variant.clone())))
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap()
+                        })
+                        .collect();
+
+                    let up = if variants.len() == 3 {
+                        if let Expression::Stream(stream) = variants[2].as_ref() {
+                            let mut stream = stream.clone();
+                            stream.repeat = None;
+                            Some(Rc::new(Expression::Stream(stream)))
+                        } else {
+                            panic!("stream expected");
+                        }
+                    } else {
+                        None
+                    };
+
+                    let repeat = if let Expression::Stream(stream) = variants[1].as_ref() {
+                        let mut stream = stream.clone();
+                        // (foo)* / (foo)0+ not permitted with variantion
+                        stream.repeat = match stream.repeat {
+                            Some(RepeatMarker::Any) | Some(RepeatMarker::CountOrMore(0)) => {
+                                if !down_variant_empty {
+                                    return Err(
+                                        "cannot have variant with '*' repeat, use '+' instead"
+                                            .into(),
+                                    );
+                                }
+                                Some(RepeatMarker::Any)
+                            }
+                            Some(RepeatMarker::OneOrMore) => Some(RepeatMarker::Any),
+                            Some(RepeatMarker::CountOrMore(n)) => {
+                                Some(RepeatMarker::CountOrMore(n - 1))
+                            }
+                            Some(RepeatMarker::Count(_)) | None => unreachable!(),
+                        };
+                        Rc::new(Expression::Stream(stream))
+                    } else {
+                        panic!("stream expected");
+                    };
+
+                    let down = if let Expression::Stream(stream) = variants[0].as_ref() {
+                        let mut stream = stream.clone();
+                        stream.repeat = None;
+                        Some(Rc::new(Expression::Stream(stream)))
+                    } else {
+                        panic!("stream expected");
+                    };
+
+                    Ok(Variants { down, repeat, up })
+                } else {
+                    Ok(Variants {
+                        down: None,
+                        repeat: expr.clone(),
+                        up: None,
+                    })
+                }
+            } else {
+                if let Some(expr) = expr.find_variant() {
+                    return Err(format!("variant {expr} found without repeat marker"));
+                }
+                let mut down = Vec::new();
+                let mut repeats = Vec::new();
+                let mut up = Vec::new();
+
+                let mut seen_repeat = None;
+                let top_level_repeat = stream.repeat.clone();
+
+                for expr in &stream.stream {
+                    expr.check_no_contained_repeats()?;
+
+                    if let Expression::Stream(stream) = expr.as_ref() {
+                        if stream.is_repeating() {
+                            if seen_repeat.is_some() {
+                                return Err("multiple repeat markers in IRP".into());
+                            } else {
+                                repeats = stream.stream.clone();
+                                seen_repeat = stream.repeat.clone();
+                                continue;
+                            }
+                        }
+                    }
+
+                    if seen_repeat.is_some() {
+                        add_flatten(&mut up, expr);
+                    } else {
+                        add_flatten(&mut down, expr);
+                    }
+                }
+
+                if match seen_repeat {
+                    Some(RepeatMarker::OneOrMore) => true,
+                    Some(RepeatMarker::CountOrMore(n)) => n > 0,
+                    _ => false,
+                } {
+                    // if both the original stream and the added stream contain an extend,
+                    // puth the original in stream
+                    if has_extent(&repeats) && has_extent(&down) {
+                        down = vec![
+                            Rc::new(Expression::Stream(Stream {
+                                bit_spec: Vec::new(),
+                                stream: down,
+                                repeat: None,
+                            })),
+                            Rc::new(Expression::Stream(Stream {
+                                bit_spec: Vec::new(),
+                                stream: repeats.clone(),
+                                repeat: None,
+                            })),
+                        ];
+                    } else {
+                        for expr in &repeats {
+                            add_flatten(&mut down, expr);
+                        }
+                    }
+
+                    seen_repeat = if let Some(RepeatMarker::CountOrMore(n)) = seen_repeat {
+                        match n {
+                            1 => Some(RepeatMarker::Any),
+                            2 => Some(RepeatMarker::OneOrMore),
+                            _ => Some(RepeatMarker::CountOrMore(n - 1)),
+                        }
+                    } else {
+                        Some(RepeatMarker::Any)
+                    };
+                }
+
+                let down = if down.is_empty() {
+                    None
+                } else {
+                    Some(Rc::new(Expression::Stream(Stream {
+                        repeat: top_level_repeat.clone(),
+                        stream: down,
+                        bit_spec: stream.bit_spec.clone(),
+                    })))
+                };
+
+                let up = if up.is_empty() {
+                    None
+                } else {
+                    Some(Rc::new(Expression::Stream(Stream {
+                        repeat: top_level_repeat,
+                        stream: up,
+                        bit_spec: stream.bit_spec.clone(),
+                    })))
+                };
+
+                let repeat = Rc::new(Expression::Stream(Stream {
+                    repeat: seen_repeat,
+                    stream: repeats,
+                    bit_spec: stream.bit_spec.clone(),
+                }));
+
+                Ok(Variants { down, repeat, up })
+            }
+        } else {
+            Err("expected stream expression".into())
+        }
+    }
 }
 
 fn check_no_repeats(expr: &Expression) -> Result<(), String> {
@@ -213,7 +431,11 @@ fn add_flatten(expr: &mut Vec<Rc<Expression>>, elem: &Rc<Expression>) {
                 expr.push(elem.clone());
             }
         }
-        Expression::Stream(stream) if stream.bit_spec.is_empty() && !has_extent(&stream.stream) => {
+        Expression::Stream(stream)
+            if stream.bit_spec.is_empty()
+                && !has_extent(&stream.stream)
+                && stream.repeat.is_none() =>
+        {
             for elem in &stream.stream {
                 expr.push(elem.clone());
             }
@@ -300,6 +522,19 @@ impl Expression {
         }
 
         Ok(())
+    }
+
+    fn find_variant(&self) -> Option<&Expression> {
+        let mut found = None;
+        self.visit(
+            &mut found,
+            &|expr: &Expression, found: &mut Option<&Expression>| {
+                if matches!(expr, Expression::Variation(..)) {
+                    *found = Some(expr);
+                }
+            },
+        );
+        found
     }
 }
 
@@ -400,4 +635,35 @@ fn variants() -> Result<(), String> {
     assert_eq!(variants.up, None);
 
     Ok(())
+}
+
+#[test]
+fn encode_variants() {
+    let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33],-100)*").unwrap();
+
+    assert_eq!(
+        irp.split_variants_encode().unwrap_err(),
+        "cannot have variant with '*' repeat, use '+' instead"
+    );
+
+    let irp = Irp::parse("{}<1,-1|1,-3>(100,-10,([11][22][33])2,-100)*").unwrap();
+
+    assert_eq!(
+        irp.split_variants_encode().unwrap_err(),
+        "cannot have variant with '*' repeat, use '+' instead"
+    );
+
+    let irp = Irp::parse("{}<1,-1|1,-3>(100,-10,([][22][33])2,([11][22][33])2,-100)*").unwrap();
+
+    assert_eq!(
+        irp.split_variants_encode().unwrap_err(),
+        "cannot have variant with '*' repeat, use '+' instead"
+    );
+
+    let irp = Irp::parse("{}<1,-1|1,-3>(100,-10,[][22][33],[11][22][33],-100)*").unwrap();
+
+    assert_eq!(
+        irp.split_variants_encode().unwrap_err(),
+        "cannot have variant with '*' repeat, use '+' instead"
+    );
 }

@@ -149,7 +149,7 @@ fn variants() {
 
     assert_eq!(
         res.err(),
-        Some(String::from("cannot have variant without repeat"))
+        Some(String::from("variant [1][2] found without repeat marker"))
     );
 
     let irp = Irp::parse("{}<1,-1|1,-3>([11][22],-100)*").unwrap();

@@ -8,19 +8,49 @@ impl Irp {
     pub fn encode<'a>(&'a self, mut vars: Vartable<'a>, repeats: u64) -> Result<Message, String> {
         self.check_parameters(&mut vars)?;
 
-        let mut encoder = Encoder::new(&self.general_spec);
+        let variants = self.split_variants_encode()?;
 
-        let stream = &[self.stream.clone()];
+        let mut encoder = Encoder::new(&self.general_spec);
+        let stream;
+
+        if let Some(down) = variants.down {
+            stream = [down];
+
+            eval_stream(
+                &stream,
+                &mut encoder,
+                None,
+                &mut vars,
+                &self.general_spec,
+                repeats,
+            )?;
+        }
+
+        let stream = [variants.repeat];
 
         eval_stream(
-            stream,
+            &stream,
             &mut encoder,
             None,
             &mut vars,
             &self.general_spec,
             repeats,
-            0,
         )?;
+
+        let stream;
+
+        if let Some(up) = variants.up {
+            stream = [up];
+
+            eval_stream(
+                &stream,
+                &mut encoder,
+                None,
+                &mut vars,
+                &self.general_spec,
+                repeats,
+            )?;
+        }
 
         Ok(Message {
             carrier: self.general_spec.carrier,
@@ -36,20 +66,6 @@ impl Irp {
     pub fn encode_pronto<'a>(&'a self, mut vars: Vartable<'a>) -> Result<Pronto, String> {
         self.check_parameters(&mut vars)?;
 
-        let mut encoder = Encoder::new(&self.general_spec);
-
-        let stream = &[self.stream.clone()];
-
-        eval_stream(
-            stream,
-            &mut encoder,
-            None,
-            &mut vars,
-            &self.general_spec,
-            1,
-            0,
-        )?;
-
         let carrier = match self.general_spec.carrier {
             // This is the carrier transmogrifier uses for unmodulated signals
             Some(0) => 414514,
@@ -57,18 +73,33 @@ impl Irp {
             Some(c) => c,
         };
 
-        let intro_length = encoder.repeats_starts.unwrap_or(encoder.raw.len());
-        let repeat_length = encoder.ending_starts.unwrap_or(encoder.raw.len());
+        let variants = self.split_variants_encode()?;
 
-        let intro = encoder.raw[0..intro_length]
-            .iter()
-            .map(|v| *v as f64)
-            .collect();
+        let mut encoder = Encoder::new(&self.general_spec);
+        let stream;
 
-        let repeat = encoder.raw[intro_length..repeat_length]
-            .iter()
-            .map(|v| *v as f64)
-            .collect();
+        if let Some(down) = variants.down {
+            stream = [down];
+
+            eval_stream(
+                &stream,
+                &mut encoder,
+                None,
+                &mut vars,
+                &self.general_spec,
+                1,
+            )?;
+        }
+
+        let intro = encoder.raw.iter().map(|v| *v as f64).collect();
+
+        encoder.raw.truncate(0);
+
+        let stream = &[variants.repeat];
+
+        eval_stream(stream, &mut encoder, None, &mut vars, &self.general_spec, 1)?;
+
+        let repeat = encoder.raw.iter().map(|v| *v as f64).collect();
 
         if self.general_spec.carrier != Some(0) {
             Ok(Pronto::LearnedModulated {
@@ -178,10 +209,6 @@ struct Encoder<'a> {
     extent_marker: Vec<i64>,
     /// Nested bitspec scopes
     bitspec_scope: Vec<BitspecScope<'a>>,
-    /// At which point that the repeating section start
-    repeats_starts: Option<usize>,
-    /// At this point the trailing section starts
-    ending_starts: Option<usize>,
 }
 
 /// A single bitscope
@@ -194,15 +221,13 @@ struct BitspecScope<'a> {
 
 impl<'a> Encoder<'a> {
     /// Create a new encoder. One is needed per IRP encode.
-    fn new(gs: &'a GeneralSpec) -> Self {
+    fn new(general_spec: &'a GeneralSpec) -> Self {
         Encoder {
-            general_spec: gs,
+            general_spec,
             raw: Vec::new(),
             total_length: 0,
             extent_marker: Vec::new(),
             bitspec_scope: Vec::new(),
-            repeats_starts: None,
-            ending_starts: None,
         }
     }
 
@@ -372,7 +397,7 @@ impl<'a> Encoder<'a> {
                     let bit = bit_to_usize(bit);
 
                     if let Expression::List(v) = self.bitspec_scope[level].bit_spec[bit].as_ref() {
-                        eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
+                        eval_stream(v, self, lower_level, vars, self.general_spec, 0)?;
                     }
                 }
             } else {
@@ -380,7 +405,7 @@ impl<'a> Encoder<'a> {
                     let bit = bit_to_usize(bit);
 
                     if let Expression::List(v) = self.bitspec_scope[level].bit_spec[bit].as_ref() {
-                        eval_stream(v, self, lower_level, vars, self.general_spec, 0, 0)?;
+                        eval_stream(v, self, lower_level, vars, self.general_spec, 0)?;
                     }
                 }
             }
@@ -401,7 +426,7 @@ impl Unit {
             Unit::Pulses => match spec.carrier {
                 Some(f) if f == 0 => Err("pulses cannot be used with zero carrier".into()),
                 Some(f) => Ok(v * 1_000_000 / f),
-                None => Err("pulses specified but no carrier given".to_string()),
+                None => Err("pulses specified but no carrier given".into()),
             },
         }
     }
@@ -414,7 +439,7 @@ impl Unit {
             Unit::Pulses => match spec.carrier {
                 Some(f) if f == 0 => Err("pulses cannot be used with zero carrier".into()),
                 Some(f) => Ok((v * 1_000_000.0) as i64 / f),
-                None => Err("pulses specified but no carrier given".to_string()),
+                None => Err("pulses specified but no carrier given".into()),
             },
         }
     }
@@ -427,7 +452,6 @@ fn eval_stream<'a>(
     vars: &mut Vartable,
     gs: &GeneralSpec,
     repeats: u64,
-    alternative: usize,
 ) -> Result<(), String> {
     for expr in stream {
         match expr.as_ref() {
@@ -460,49 +484,15 @@ fn eval_stream<'a>(
 
                 let v = expr.eval(vars)?;
 
-                vars.set(id.to_string(), v);
+                vars.set(id.into(), v);
             }
             Expression::Stream(stream) => {
-                let variant_count = stream
-                    .stream
-                    .iter()
-                    .filter_map(|e| {
-                        if let Expression::Variation(list) = e.as_ref() {
-                            Some(list.len())
-                        } else {
-                            None
-                        }
-                    })
-                    .max();
-
-                let (indefinite, count, set_marker) = match stream.repeat {
-                    None if variant_count.is_some() => {
-                        return Err(String::from("cannot have variant without repeat"));
-                    }
-                    None => (1, 0, false),
-                    Some(RepeatMarker::Any) => {
-                        if variant_count.is_some() {
-                            // if the first variant is empty, then Any is permitted
-                            let mut first_variant_empty = false;
-
-                            if let Expression::Variation(list) = stream.stream[0].as_ref() {
-                                if list[0].is_empty() {
-                                    first_variant_empty = true;
-                                }
-                            }
-
-                            if !first_variant_empty {
-                                return Err(String::from(
-                                    "cannot have variant with '*' repeat, use '+' instead",
-                                ));
-                            }
-                        }
-
-                        (0, repeats, true)
-                    }
-                    Some(RepeatMarker::Count(num)) => (num, 0, false),
-                    Some(RepeatMarker::OneOrMore) => (1, repeats, true),
-                    Some(RepeatMarker::CountOrMore(num)) => (num, repeats, true),
+                let repeats = match stream.repeat {
+                    None => 1,
+                    Some(RepeatMarker::Any) => repeats,
+                    Some(RepeatMarker::Count(num)) => num as u64,
+                    Some(RepeatMarker::OneOrMore) => 1 + repeats,
+                    Some(RepeatMarker::CountOrMore(num)) => num as u64 + repeats,
                 };
 
                 let level = if !stream.bit_spec.is_empty() {
@@ -516,31 +506,9 @@ fn eval_stream<'a>(
                     level
                 };
 
-                for _ in 0..indefinite {
+                for _ in 0..repeats {
                     encoder.push_extent_marker();
-                    eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 0)?;
-                    encoder.pop_extend_marker();
-                }
-
-                if count > 0 {
-                    if set_marker && encoder.repeats_starts.is_none() {
-                        encoder.repeats_starts = Some(encoder.raw.len());
-                    }
-
-                    for _ in 0..count {
-                        encoder.push_extent_marker();
-                        eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 1)?;
-                        encoder.pop_extend_marker();
-                    }
-                }
-
-                if set_marker {
-                    encoder.ending_starts = Some(encoder.raw.len());
-                }
-
-                if variant_count == Some(3) {
-                    encoder.push_extent_marker();
-                    eval_stream(&stream.stream, encoder, level, vars, gs, repeats, 2)?;
+                    eval_stream(&stream.stream, encoder, level, vars, gs, repeats)?;
                     encoder.pop_extend_marker();
                 }
 
@@ -548,20 +516,12 @@ fn eval_stream<'a>(
                     encoder.leave_bitspec_scope();
                 }
             }
-            Expression::Variation(list) => {
-                if let Some(variation) = list.get(alternative) {
-                    if variation.is_empty() {
-                        break;
-                    }
-
-                    eval_stream(variation, encoder, level, vars, gs, repeats, alternative)?;
-                }
-            }
             Expression::BitField { .. } => {
                 let (bits, length) = expr.bitfield(vars)?;
 
                 encoder.add_bits(bits, length, level)?;
             }
+            Expression::List(list) if list.is_empty() => break,
             _ => unreachable!(),
         }
     }

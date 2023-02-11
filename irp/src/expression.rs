@@ -174,9 +174,9 @@ impl fmt::Display for RepeatMarker {
 
 impl Expression {
     /// Post-order visit all nodes in an expression
-    pub fn visit<T, F>(&self, ctx: &mut T, visit: &F)
+    pub fn visit<'a, T, F>(&'a self, ctx: &mut T, visit: &F)
     where
-        F: Fn(&Expression, &mut T),
+        F: Fn(&'a Expression, &mut T),
     {
         match self {
             Expression::Complement(expr)
