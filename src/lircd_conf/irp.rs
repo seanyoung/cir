@@ -370,10 +370,10 @@ impl<'a> Builder<'a> {
             };
 
             self.irp
-                .push(if self.remote.flags.contains(Flags::CONST_LENGTH) {
-                    '^'
+                .push_str(if self.remote.flags.contains(Flags::CONST_LENGTH) {
+                    "^^"
                 } else {
-                    '-'
+                    "-"
                 });
 
             if self.remote.gap % 1000 == 0 {

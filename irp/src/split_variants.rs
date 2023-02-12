@@ -479,7 +479,10 @@ fn has_extent(list: &Vec<Rc<Expression>>) -> bool {
     for expr in list {
         if matches!(
             expr.as_ref(),
-            Expression::ExtentConstant(..) | Expression::ExtentIdentifier(..)
+            Expression::ExtentConstant(..)
+                | Expression::ExtentIdentifier(..)
+                | Expression::StrictExtentConstant(..)
+                | Expression::StrictExtentIdentifier(..)
         ) {
             return true;
         }

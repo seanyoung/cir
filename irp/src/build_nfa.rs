@@ -343,19 +343,22 @@ impl<'a> Builder<'a> {
 
         // first find any extent
         for e in list {
-            if let Expression::ExtentConstant(v, u) = e.as_ref() {
-                let len = u.eval_float(*v, &self.irp.general_spec)?;
+            match e.as_ref() {
+                Expression::ExtentConstant(v, u) | Expression::StrictExtentConstant(v, u) => {
+                    let len = u.eval_float(*v, &self.irp.general_spec)?;
 
-                self.add_action(Action::Set {
-                    var: "$extent".to_owned(),
-                    expr: Rc::new(Expression::Number(len)),
-                });
+                    self.add_action(Action::Set {
+                        var: "$extent".to_owned(),
+                        expr: Rc::new(Expression::Number(len)),
+                    });
 
-                if self.is_any_set("$extent") {
-                    return Err("multiple extents not supported".to_owned());
+                    if self.is_any_set("$extent") {
+                        return Err("multiple extents not supported".to_owned());
+                    }
+
+                    self.set("$extent", !0);
                 }
-
-                self.set("$extent", !0);
+                _ => (),
             }
         }
 
@@ -1108,7 +1111,7 @@ impl<'a> Builder<'a> {
 
                 self.decode_bits(None, length, false, None, bit_spec)?;
             }
-            Expression::ExtentConstant(_, _) => {
+            Expression::ExtentConstant(_, _) | Expression::StrictExtentConstant(_, _) => {
                 self.cur.seen_edges = true;
 
                 let node = self.add_vertex();
@@ -1146,10 +1149,12 @@ impl<'a> Builder<'a> {
         match expr {
             Expression::FlashConstant(..)
             | Expression::GapConstant(..)
+            | Expression::StrictExtentConstant(..)
             | Expression::ExtentConstant(..)
             | Expression::Number(..) => Ok(()),
             Expression::FlashIdentifier(name, ..)
             | Expression::GapIdentifier(name, ..)
+            | Expression::StrictExtentIdentifier(name, ..)
             | Expression::ExtentIdentifier(name, ..)
             | Expression::Identifier(name) => {
                 if name.starts_with('$')
