@@ -383,30 +383,25 @@ impl<'a> Encoder<'a> {
             // don't need a mutable reference.
             std::mem::swap(&mut bits, &mut self.bitspec_scope[level].bitstream);
 
-            let len = self.bitspec_scope[level].bit_spec.len();
-            let bits_step = match len {
-                2 => 1,
-                4 => 2,
-                8 => 3,
-                16 => 4,
-                _ => {
-                    return Err(format!(
-                        "bitspec contains {len} values, only 2, 4, 8, 16 supported"
-                    ));
-                }
-            };
+            let max_bit = self.bitspec_scope[level].bit_spec.len();
 
-            if (bits.len() % bits_step as usize) != 0 {
-                return Err(format!(
-                    "{} bits found, not multiple of {}",
-                    self.bitspec_scope[level].bitstream.len(),
-                    bits_step
-                ));
-            }
+            // 1,2 => 2
+            // 3,4 => 4
+            // 5,6,7,8 => 8
+            // 9,10,11,12,13,14,15,16 => 16
+            let bits_step = if max_bit < 2 {
+                2
+            } else {
+                max_bit.next_power_of_two().ilog2()
+            };
 
             if !self.general_spec.lsb {
                 for bit in bits.chunks(bits_step as usize) {
                     let bit = bit_to_usize(bit);
+
+                    if bit >= max_bit {
+                        return Err(format!("Cannot encode {bit} with current bit_spec"));
+                    }
 
                     if let Expression::List(v) = self.bitspec_scope[level].bit_spec[bit].as_ref() {
                         eval_stream(v, self, lower_level, vars, self.general_spec, 0)?;
@@ -415,6 +410,10 @@ impl<'a> Encoder<'a> {
             } else {
                 for bit in bits.chunks(bits_step as usize).rev() {
                     let bit = bit_to_usize(bit);
+
+                    if bit >= max_bit {
+                        return Err(format!("Cannot encode {bit} with current bit_spec"));
+                    }
 
                     if let Expression::List(v) = self.bitspec_scope[level].bit_spec[bit].as_ref() {
                         eval_stream(v, self, lower_level, vars, self.general_spec, 0)?;

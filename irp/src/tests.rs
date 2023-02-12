@@ -5,7 +5,7 @@ mod irptransmogrifier;
 use crate::{
     protocols::parse,
     tests::irptransmogrifier::{create_jvm, IrpTransmogrifierRender},
-    InfraredData, {Irp, Message, Vartable},
+    InfraredData, Irp, Message, Vartable,
 };
 use itertools::Itertools;
 use rand::Rng;
@@ -506,4 +506,49 @@ fn decode_all() {
 
     // TODO: we still have a whole bunch of fails
     assert!(fails <= 49);
+}
+
+#[test]
+fn max_bitspec() {
+    let irp = Irp::parse(
+        "{38.6k,480}<1,-1|-1,1,-1|-1,1>([][P=1][P=2],4,-2,F:6,C:4,-48m)*{C=3+#D+#P+#F}[D:0..31,F:0..63]",
+    )
+    .unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("D".to_string(), 3);
+    vars.set("F".to_string(), 3);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(
+        res.err(),
+        Some(String::from("Cannot encode 3 with current bit_spec"))
+    );
+
+    let mut vars = Vartable::new();
+
+    vars.set("D".to_string(), 2);
+    vars.set("F".to_string(), 1);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(
+        res.unwrap().raw,
+        Message::parse("+1920 -1440 +480 -480 +480 -480 +480 -960 +480 -480 +480 -48480 +1920 -1440 +480 -480 +480 -480 +480 -960 +480 -480 +480 -48480").unwrap().raw,
+    );
+
+    let irp = Irp::parse("{33k,1}<16p,-p>(F:1)2[F:0..1]").unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("F".to_string(), 1);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(
+        res.err(),
+        Some(String::from("Cannot encode 1 with current bit_spec"))
+    );
 }

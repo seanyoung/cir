@@ -611,6 +611,13 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                 }
             }
 
+            if stream.bit_spec.len() > 16 {
+                return Err(format!(
+                    "bitspec contains {} values, no more than 16 supported",
+                    stream.bit_spec.len()
+                ));
+            }
+
             for expr in &stream.bit_spec {
                 if let Expression::List(list) = expr.as_ref() {
                     for expr in list {
