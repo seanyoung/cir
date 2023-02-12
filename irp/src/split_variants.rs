@@ -232,11 +232,9 @@ impl Irp {
                     .max();
 
                 if let Some(variant_count) = variant_count {
-                    let expr = Rc::new(expr.clone());
-
                     let variants: Vec<_> = (0..variant_count)
                         .map(|variant| {
-                            clone_filter(&expr, &|e| {
+                            clone_filter(expr, &|e| {
                                 if let Expression::Variation(list) = e.as_ref() {
                                     if let Some(variant) = list.get(variant) {
                                         if variant.len() == 1 {
