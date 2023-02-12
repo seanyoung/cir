@@ -392,7 +392,7 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
         match item {
             GeneralItem::Lsb | GeneralItem::Msb => {
                 if lsb.is_some() {
-                    return Err("bit order (lsb,msb) specified twice".to_string());
+                    return Err("bit order (lsb,msb) specified twice".into());
                 }
 
                 lsb = Some(*item == GeneralItem::Lsb);
@@ -403,13 +403,13 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
                 let u = match u {
                     Some("%") => {
                         if v < 1.0 {
-                            return Err("duty cycle less than 1% not valid".to_string());
+                            return Err("duty cycle less than 1% not valid".into());
                         }
                         if v > 99.0 {
-                            return Err("duty cycle larger than 99% not valid".to_string());
+                            return Err("duty cycle larger than 99% not valid".into());
                         }
                         if res.duty_cycle.is_some() {
-                            return Err("duty cycle specified twice".to_string());
+                            return Err("duty cycle specified twice".into());
                         }
 
                         res.duty_cycle = Some(v as u8);
@@ -418,7 +418,7 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
                     }
                     Some("k") => {
                         if carrier.is_some() {
-                            return Err("carrier frequency specified twice".to_string());
+                            return Err("carrier frequency specified twice".into());
                         }
 
                         carrier = Some((v * 1000.0) as i64);
@@ -432,7 +432,7 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
                 };
 
                 if v <= 0.0 {
-                    return Err("unit must 0 or larger".to_string());
+                    return Err("unit must be larger than 0".into());
                 }
 
                 unit = Some((v, u));
