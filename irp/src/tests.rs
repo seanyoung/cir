@@ -549,6 +549,19 @@ fn max_bitspec() {
 
     assert_eq!(
         res.err(),
+        Some(String::from("Cannot encode 1 with current bit_spec"))
+    );
+
+    let irp = Irp::parse("{33k,1}<16p,-p|8p,-p|4p,-p>(F:1)2[F:0..1]").unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("F".to_string(), 1);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(
+        res.err(),
         Some(String::from("Cannot encode 3 with current bit_spec"))
     );
 }

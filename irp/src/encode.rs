@@ -396,12 +396,12 @@ impl<'a> Encoder<'a> {
 
             let max_bit = self.bitspec_scope[level].bit_spec.len();
 
-            // 1,2 => 2
-            // 3,4 => 4
-            // 5,6,7,8 => 8
-            // 9,10,11,12,13,14,15,16 => 16
-            let bits_step = if max_bit < 2 {
-                2
+            // 1,2 => 1
+            // 3,4 => 2
+            // 5,6,7,8 => 4
+            // 9,10,11,12,13,14,15,16 => 4
+            let bits_step = if max_bit <= 2 {
+                1
             } else {
                 max_bit.next_power_of_two().ilog2()
             };

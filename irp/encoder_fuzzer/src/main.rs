@@ -133,12 +133,13 @@ fn main() {
                     vars.set(param.name.to_owned(), value);
                 }
 
-                if irp.encode(vars.clone(), 1).is_ok() {
+                if let Ok(our) = irp.encode(vars.clone(), 1) {
                     let trans = IrpTransmogrifierRender::new(&jvm, s).unwrap();
 
-                    let _m = trans.render_raw(params.clone(), 1).unwrap();
+                    let their = trans.render_raw(params.clone(), 1).unwrap();
 
                     // compare irptransmogrifier output with our own
+                    assert!(compare_with_rounding(&our.raw, &their.raw));
                 } else {
                     rust_ok = false;
                 }
@@ -156,4 +157,44 @@ fn main() {
             }
         }
     });
+}
+
+fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
+    if l == r {
+        return true;
+    }
+
+    if l.len() != r.len() {
+        println!(
+            "comparing:\n{:?} with\n{:?}\n have different lengths {} and {}",
+            l,
+            r,
+            l.len(),
+            r.len()
+        );
+
+        return false;
+    }
+
+    for i in 0..l.len() {
+        let diff = if l[i] > r[i] {
+            l[i] - r[i]
+        } else {
+            r[i] - l[i]
+        };
+        // is the difference more than 8 and more than 1 promille
+        if diff > 8 && (diff * 1000 / l[i]) > 0 {
+            println!(
+                "comparing:\nleft:{:?} with\nright:{:?}\nfailed at position {} out of {}",
+                l,
+                r,
+                i,
+                l.len()
+            );
+
+            return false;
+        }
+    }
+
+    true
 }
