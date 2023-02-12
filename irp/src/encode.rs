@@ -65,7 +65,7 @@ impl Irp {
         }
 
         Ok(Message {
-            carrier: self.general_spec.carrier,
+            carrier: Some(self.general_spec.carrier),
             duty_cycle: self.general_spec.duty_cycle,
             raw: encoder.raw,
         })
@@ -80,9 +80,8 @@ impl Irp {
 
         let carrier = match self.general_spec.carrier {
             // This is the carrier transmogrifier uses for unmodulated signals
-            Some(0) => 414514,
-            None => 38000,
-            Some(c) => c,
+            0 => 414514,
+            c => c,
         };
 
         let variants = self.split_variants_encode()?;
@@ -113,7 +112,7 @@ impl Irp {
 
         let repeat = encoder.raw.iter().map(|v| *v as f64).collect();
 
-        if self.general_spec.carrier != Some(0) {
+        if self.general_spec.carrier != 0 {
             Ok(Pronto::LearnedModulated {
                 frequency: carrier as f64,
                 intro,
@@ -435,9 +434,8 @@ impl Unit {
             Unit::Microseconds => Ok(v),
             Unit::Milliseconds => Ok(v * 1000),
             Unit::Pulses => match spec.carrier {
-                Some(f) if f == 0 => Err("pulses cannot be used with zero carrier".into()),
-                Some(f) => Ok(v * 1_000_000 / f),
-                None => Err("pulses specified but no carrier given".into()),
+                0 => Err("pulses cannot be used with zero carrier".into()),
+                f => Ok(v * 1_000_000 / f),
             },
         }
     }
@@ -448,9 +446,8 @@ impl Unit {
             Unit::Microseconds => Ok(v as i64),
             Unit::Milliseconds => Ok((v * 1000.0) as i64),
             Unit::Pulses => match spec.carrier {
-                Some(f) if f == 0 => Err("pulses cannot be used with zero carrier".into()),
-                Some(f) => Ok((v * 1_000_000.0) as i64 / f),
-                None => Err("pulses specified but no carrier given".into()),
+                0 => Err("pulses cannot be used with zero carrier".into()),
+                f => Ok((v * 1_000_000.0) as i64 / f),
             },
         }
     }

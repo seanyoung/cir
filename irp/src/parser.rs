@@ -353,7 +353,7 @@ impl Irp {
 
     /// The carrier frequency in Hertz. None means unknown, Some(0) means
     /// unmodulated.
-    pub fn carrier(&self) -> Option<i64> {
+    pub fn carrier(&self) -> i64 {
         self.general_spec.carrier
     }
     /// Duty cycle of the carrier pulse wave. Between 1% and 99%.
@@ -379,13 +379,14 @@ impl Irp {
 fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
     let mut res = GeneralSpec {
         duty_cycle: None,
-        carrier: None,
+        carrier: 38000,
         lsb: true,
         unit: 1.0,
     };
 
     let mut unit = None;
     let mut lsb = None;
+    let mut carrier = None;
 
     for item in items {
         match item {
@@ -416,11 +417,11 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
                         continue;
                     }
                     Some("k") => {
-                        if res.carrier.is_some() {
+                        if carrier.is_some() {
                             return Err("carrier frequency specified twice".to_string());
                         }
 
-                        res.carrier = Some((v * 1000.0) as i64);
+                        carrier = Some((v * 1000.0) as i64);
 
                         continue;
                     }
@@ -439,15 +440,13 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
         }
     }
 
+    if let Some(carrier) = carrier {
+        res.carrier = carrier;
+    }
+
     if let Some((p, u)) = unit {
         res.unit = match u {
-            Unit::Pulses => {
-                if let Some(f) = res.carrier {
-                    p * 1_000_000.0 / f as f64
-                } else {
-                    return Err("pulse unit specified without carrier frequency".to_string());
-                }
-            }
+            Unit::Pulses => p * 1_000_000.0 / res.carrier as f64,
             Unit::Milliseconds => p * 1000.0,
             Unit::Units | Unit::Microseconds => p,
         }

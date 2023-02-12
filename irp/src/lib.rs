@@ -74,7 +74,7 @@ pub struct Irp {
 #[derive(Debug)]
 pub struct GeneralSpec {
     duty_cycle: Option<u8>,
-    carrier: Option<i64>,
+    carrier: i64,
     lsb: bool,
     unit: f64,
 }
