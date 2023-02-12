@@ -24,6 +24,10 @@ impl Irp {
                 &self.general_spec,
                 repeats,
             )?;
+
+            if (encoder.raw.len() % 2) != 0 {
+                return Err("stream must end with a gap".into());
+            }
         }
 
         let stream = [variants.repeat];
@@ -36,6 +40,10 @@ impl Irp {
             &self.general_spec,
             repeats,
         )?;
+
+        if (encoder.raw.len() % 2) != 0 {
+            return Err("stream must end with a gap".into());
+        }
 
         let stream;
 
@@ -50,6 +58,10 @@ impl Irp {
                 &self.general_spec,
                 repeats,
             )?;
+
+            if (encoder.raw.len() % 2) != 0 {
+                return Err("stream must end with a gap".into());
+            }
         }
 
         Ok(Message {
