@@ -25,6 +25,8 @@ impl Irp {
                 repeats,
             )?;
 
+            encoder.flush_level(None, &mut vars)?;
+
             if (encoder.raw.len() % 2) != 0 {
                 return Err("stream must end with a gap".into());
             }
@@ -40,6 +42,8 @@ impl Irp {
             &self.general_spec,
             repeats,
         )?;
+
+        encoder.flush_level(None, &mut vars)?;
 
         if (encoder.raw.len() % 2) != 0 {
             return Err("stream must end with a gap".into());
@@ -58,6 +62,8 @@ impl Irp {
                 &self.general_spec,
                 repeats,
             )?;
+
+            encoder.flush_level(None, &mut vars)?;
 
             if (encoder.raw.len() % 2) != 0 {
                 return Err("stream must end with a gap".into());
@@ -100,6 +106,8 @@ impl Irp {
                 &self.general_spec,
                 1,
             )?;
+
+            encoder.flush_level(None, &mut vars)?;
         }
 
         let intro = encoder.raw.iter().map(|v| *v as f64).collect();
@@ -109,6 +117,8 @@ impl Irp {
         let stream = &[variants.repeat];
 
         eval_stream(stream, &mut encoder, None, &mut vars, &self.general_spec, 1)?;
+
+        encoder.flush_level(None, &mut vars)?;
 
         let repeat = encoder.raw.iter().map(|v| *v as f64).collect();
 
@@ -530,6 +540,8 @@ fn eval_stream<'a>(
                     encoder.pop_extend_marker();
                 }
 
+                encoder.flush_level(level, vars)?;
+
                 if !stream.bit_spec.is_empty() {
                     encoder.leave_bitspec_scope();
                 }
@@ -543,8 +555,6 @@ fn eval_stream<'a>(
             _ => unreachable!(),
         }
     }
-
-    encoder.flush_level(level, vars)?;
 
     Ok(())
 }

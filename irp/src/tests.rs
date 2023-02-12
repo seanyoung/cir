@@ -549,6 +549,6 @@ fn max_bitspec() {
 
     assert_eq!(
         res.err(),
-        Some(String::from("Cannot encode 1 with current bit_spec"))
+        Some(String::from("Cannot encode 3 with current bit_spec"))
     );
 }
