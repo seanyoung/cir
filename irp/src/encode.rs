@@ -556,6 +556,9 @@ fn eval_stream<'a>(
                 encoder.add_bits(bits, length, level)?;
             }
             Expression::List(list) if list.is_empty() => break,
+            Expression::List(list) => {
+                eval_stream(list, encoder, level, vars, gs, repeats)?;
+            }
             _ => unreachable!(),
         }
     }
