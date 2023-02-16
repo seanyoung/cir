@@ -478,6 +478,13 @@ fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
             return Err(format!("invalid minimum {min} and maximum {max}"));
         }
 
+        if parameter.memory && parameter.default.is_none() {
+            return Err(format!(
+                "memory parameter {} requires default value",
+                parameter.name,
+            ));
+        }
+
         vars.set(parameter.name.to_owned(), min);
     }
 
