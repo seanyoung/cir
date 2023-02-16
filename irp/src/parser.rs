@@ -583,7 +583,7 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                     | Expression::StrictExtentConstant(..)
                     | Expression::StrictExtentIdentifier(..)
                     | Expression::Assignment(..)
-                    | Expression::BitField { .. } => (),
+                    | Expression::BitField { .. } => check_stream(expr)?,
                     Expression::Variation(list) => {
                         for list in list {
                             for expr in list {
@@ -597,7 +597,7 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                                     | Expression::ExtentConstant(..)
                                     | Expression::ExtentIdentifier(..)
                                     | Expression::Assignment(..)
-                                    | Expression::BitField { .. } => (),
+                                    | Expression::BitField { .. } => check_stream(expr)?,
                                     _ => {
                                         return Err(format!(
                                             "expression {expr} not expected in variation"
@@ -632,7 +632,7 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                             | Expression::GapConstant(..)
                             | Expression::GapIdentifier(..)
                             | Expression::Assignment(..)
-                            | Expression::BitField { .. } => (),
+                            | Expression::BitField { .. } => check_stream(expr)?,
                             _ => {
                                 return Err(format!("expression {expr} not expected in bit spec"));
                             }
@@ -652,6 +652,13 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
             for list in list {
                 for expr in list {
                     check_stream(expr)?;
+                }
+            }
+        }
+        Expression::BitField { length, .. } => {
+            if let Ok(length) = length.eval(&Vartable::new()) {
+                if !(0..64).contains(&length) {
+                    return Err(format!("bitfield of length {length} not supported"));
                 }
             }
         }

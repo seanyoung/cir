@@ -549,6 +549,10 @@ fn eval_stream<'a>(
             Expression::BitField { .. } => {
                 let (bits, length) = expr.bitfield(vars)?;
 
+                if !(0..64).contains(&length) {
+                    return Err("bitfields of {length} not supported".into());
+                }
+
                 encoder.add_bits(bits, length, level)?;
             }
             Expression::List(list) if list.is_empty() => break,
