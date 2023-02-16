@@ -206,7 +206,9 @@ peg::parser! {
          {? match i64::from_str_radix(n, 16) { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
          / "0b" n:$(['0'..='1']+) _
          {? match i64::from_str_radix(n, 2) { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
-         / n:$(['0'..='9']+) _
+         / n:$("0" ['0'..='7']*) _
+         {? match i64::from_str_radix(n, 8) { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
+         / n:$(['1'..='9'] ['0'..='9']*) _
          {? match n.parse() { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
          / "UINT8_MAX" _ { Expression::Number(u8::MAX as i64) }
          / "UINT16_MAX" _ { Expression::Number(u16::MAX as i64) }
