@@ -16,14 +16,7 @@ impl Irp {
         if let Some(down) = variants.down {
             stream = [down];
 
-            eval_stream(
-                &stream,
-                &mut encoder,
-                None,
-                &mut vars,
-                &self.general_spec,
-                repeats,
-            )?;
+            encoder.stream(&stream, None, &mut vars, &self.general_spec, repeats)?;
 
             encoder.flush_level(None, &mut vars)?;
 
@@ -34,14 +27,7 @@ impl Irp {
 
         let stream = [variants.repeat];
 
-        eval_stream(
-            &stream,
-            &mut encoder,
-            None,
-            &mut vars,
-            &self.general_spec,
-            repeats,
-        )?;
+        encoder.stream(&stream, None, &mut vars, &self.general_spec, repeats)?;
 
         encoder.flush_level(None, &mut vars)?;
 
@@ -54,14 +40,7 @@ impl Irp {
         if let Some(up) = variants.up {
             stream = [up];
 
-            eval_stream(
-                &stream,
-                &mut encoder,
-                None,
-                &mut vars,
-                &self.general_spec,
-                repeats,
-            )?;
+            encoder.stream(&stream, None, &mut vars, &self.general_spec, repeats)?;
 
             encoder.flush_level(None, &mut vars)?;
 
@@ -98,14 +77,7 @@ impl Irp {
         if let Some(down) = variants.down {
             stream = [down];
 
-            eval_stream(
-                &stream,
-                &mut encoder,
-                None,
-                &mut vars,
-                &self.general_spec,
-                1,
-            )?;
+            encoder.stream(&stream, None, &mut vars, &self.general_spec, 1)?;
 
             encoder.flush_level(None, &mut vars)?;
         }
@@ -116,7 +88,7 @@ impl Irp {
 
         let stream = &[variants.repeat];
 
-        eval_stream(stream, &mut encoder, None, &mut vars, &self.general_spec, 1)?;
+        encoder.stream(stream, None, &mut vars, &self.general_spec, 1)?;
 
         encoder.flush_level(None, &mut vars)?;
 
@@ -411,7 +383,7 @@ impl<'a> Encoder<'a> {
                     }
 
                     if let Expression::List(v) = self.bitspec_scope[level].bit_spec[bit].as_ref() {
-                        eval_stream(v, self, lower_level, vars, self.general_spec, 0)?;
+                        self.stream(v, lower_level, vars, self.general_spec, 0)?;
                     }
                 }
             } else {
@@ -423,13 +395,106 @@ impl<'a> Encoder<'a> {
                     }
 
                     if let Expression::List(v) = self.bitspec_scope[level].bit_spec[bit].as_ref() {
-                        eval_stream(v, self, lower_level, vars, self.general_spec, 0)?;
+                        self.stream(v, lower_level, vars, self.general_spec, 0)?;
                     }
                 }
             }
         }
 
         self.flush_level(lower_level, vars)?;
+
+        Ok(())
+    }
+
+    fn stream(
+        &mut self,
+        stream: &'a [Rc<Expression>],
+        level: Option<usize>,
+        vars: &mut Vartable,
+        gs: &GeneralSpec,
+        repeats: u64,
+    ) -> Result<(), String> {
+        for expr in stream {
+            match expr.as_ref() {
+                Expression::FlashConstant(p, u) => {
+                    self.flush_level(level, vars)?;
+                    self.add_flash(u.eval_float(*p, gs)?)?;
+                }
+                Expression::FlashIdentifier(id, u) => {
+                    self.flush_level(level, vars)?;
+                    self.add_flash(u.eval(vars.get(id)?, gs)?)?;
+                }
+                Expression::ExtentConstant(p, u) => {
+                    self.flush_level(level, vars)?;
+                    self.add_extent(u.eval_float(*p, gs)?)?;
+                }
+                Expression::ExtentIdentifier(id, u) => {
+                    self.flush_level(level, vars)?;
+                    self.add_extent(u.eval(vars.get(id)?, gs)?)?;
+                }
+                Expression::GapConstant(p, u) => {
+                    self.flush_level(level, vars)?;
+                    self.add_gap(u.eval_float(*p, gs)?)?;
+                }
+                Expression::GapIdentifier(id, u) => {
+                    self.flush_level(level, vars)?;
+                    self.add_gap(u.eval(vars.get(id)?, gs)?)?;
+                }
+                Expression::Assignment(id, expr) => {
+                    self.flush_level(level, vars)?;
+
+                    let v = expr.eval(vars)?;
+
+                    vars.set(id.into(), v);
+                }
+                Expression::Stream(stream) => {
+                    let repeats = match stream.repeat {
+                        None => 1,
+                        Some(RepeatMarker::Any) => repeats,
+                        Some(RepeatMarker::Count(num)) => num as u64,
+                        Some(RepeatMarker::OneOrMore) => 1 + repeats,
+                        Some(RepeatMarker::CountOrMore(num)) => num as u64 + repeats,
+                    };
+
+                    let level = if !stream.bit_spec.is_empty() {
+                        self.enter_bitspec_scope(&stream.bit_spec);
+
+                        match level {
+                            None => Some(0),
+                            Some(level) => Some(level + 1),
+                        }
+                    } else {
+                        level
+                    };
+
+                    for _ in 0..repeats {
+                        self.push_extent_marker();
+                        self.stream(&stream.stream, level, vars, gs, repeats)?;
+                        self.pop_extend_marker();
+                    }
+
+                    self.flush_level(level, vars)?;
+
+                    if !stream.bit_spec.is_empty() {
+                        self.leave_bitspec_scope();
+                    }
+                }
+                Expression::BitField { .. } => {
+                    let (bits, length) = expr.bitfield(vars)?;
+
+                    if !(0..64).contains(&length) {
+                        return Err("bitfields of {length} not supported".into());
+                    }
+
+                    self.add_bits(bits, length, level)?;
+                }
+                Expression::List(list) if list.is_empty() => break,
+                Expression::List(list) => {
+                    self.stream(list, level, vars, gs, repeats)?;
+                }
+                _ => unreachable!(),
+            }
+        }
 
         Ok(())
     }
@@ -459,99 +524,6 @@ impl Unit {
             },
         }
     }
-}
-
-fn eval_stream<'a>(
-    stream: &'a [Rc<Expression>],
-    encoder: &mut Encoder<'a>,
-    level: Option<usize>,
-    vars: &mut Vartable,
-    gs: &GeneralSpec,
-    repeats: u64,
-) -> Result<(), String> {
-    for expr in stream {
-        match expr.as_ref() {
-            Expression::FlashConstant(p, u) => {
-                encoder.flush_level(level, vars)?;
-                encoder.add_flash(u.eval_float(*p, gs)?)?;
-            }
-            Expression::FlashIdentifier(id, u) => {
-                encoder.flush_level(level, vars)?;
-                encoder.add_flash(u.eval(vars.get(id)?, gs)?)?;
-            }
-            Expression::ExtentConstant(p, u) => {
-                encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval_float(*p, gs)?)?;
-            }
-            Expression::ExtentIdentifier(id, u) => {
-                encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval(vars.get(id)?, gs)?)?;
-            }
-            Expression::GapConstant(p, u) => {
-                encoder.flush_level(level, vars)?;
-                encoder.add_gap(u.eval_float(*p, gs)?)?;
-            }
-            Expression::GapIdentifier(id, u) => {
-                encoder.flush_level(level, vars)?;
-                encoder.add_gap(u.eval(vars.get(id)?, gs)?)?;
-            }
-            Expression::Assignment(id, expr) => {
-                encoder.flush_level(level, vars)?;
-
-                let v = expr.eval(vars)?;
-
-                vars.set(id.into(), v);
-            }
-            Expression::Stream(stream) => {
-                let repeats = match stream.repeat {
-                    None => 1,
-                    Some(RepeatMarker::Any) => repeats,
-                    Some(RepeatMarker::Count(num)) => num as u64,
-                    Some(RepeatMarker::OneOrMore) => 1 + repeats,
-                    Some(RepeatMarker::CountOrMore(num)) => num as u64 + repeats,
-                };
-
-                let level = if !stream.bit_spec.is_empty() {
-                    encoder.enter_bitspec_scope(&stream.bit_spec);
-
-                    match level {
-                        None => Some(0),
-                        Some(level) => Some(level + 1),
-                    }
-                } else {
-                    level
-                };
-
-                for _ in 0..repeats {
-                    encoder.push_extent_marker();
-                    eval_stream(&stream.stream, encoder, level, vars, gs, repeats)?;
-                    encoder.pop_extend_marker();
-                }
-
-                encoder.flush_level(level, vars)?;
-
-                if !stream.bit_spec.is_empty() {
-                    encoder.leave_bitspec_scope();
-                }
-            }
-            Expression::BitField { .. } => {
-                let (bits, length) = expr.bitfield(vars)?;
-
-                if !(0..64).contains(&length) {
-                    return Err("bitfields of {length} not supported".into());
-                }
-
-                encoder.add_bits(bits, length, level)?;
-            }
-            Expression::List(list) if list.is_empty() => break,
-            Expression::List(list) => {
-                eval_stream(list, encoder, level, vars, gs, repeats)?;
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    Ok(())
 }
 
 // See https://github.com/bitvecto-rs/bitvec/issues/119
