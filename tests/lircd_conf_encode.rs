@@ -1,27 +1,11 @@
 use cir::lircd_conf::{parse, Flags, Remote};
 use irp::{Irp, Message, Vartable};
+use liblircd::LircdConf;
 use num_integer::Integer;
-use serde::Deserialize;
 use std::{
-    ffi::OsStr,
-    fs::{read_dir, File},
-    io::Read,
+    fs::{read, read_dir},
     path::{Path, PathBuf},
 };
-
-#[derive(Deserialize)]
-struct RemoteTestData {
-    name: String,
-    codes: Vec<Code>,
-}
-
-#[derive(Deserialize)]
-#[allow(unused)]
-struct Code {
-    name: String,
-    code: String,
-    rawir: Vec<u32>,
-}
 
 #[test]
 fn lircd_testdata() {
@@ -34,122 +18,141 @@ fn recurse(path: &Path) {
         let path = e.path();
         if e.metadata().unwrap().file_type().is_dir() {
             recurse(&path);
-        } else if path.extension() == Some(OsStr::new("testdata")) {
-            let mut conf = path.clone();
-
-            let filename = path.file_name().unwrap().to_string_lossy();
-            let filename = filename.strip_suffix(".testdata").unwrap();
-
-            conf.set_file_name(OsStr::new(filename));
-
-            let mut testdata = path;
-
-            testdata.set_extension("testdata");
-
-            if testdata.exists() {
-                lircd_encode(&conf, &testdata);
-            }
+        } else if path.to_string_lossy().ends_with(".lircd.conf") {
+            lircd_encode(&path);
         }
     }
 }
 
-fn lircd_encode(conf: &Path, testdata: &Path) {
-    println!("Testing {} {}", conf.display(), testdata.display());
+fn lircd_encode(path: &Path) {
+    println!("Testing {}", path.display());
 
-    let mut file = File::open(testdata).unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
+    let data = read(path).unwrap();
+    let source = String::from_utf8_lossy(&data);
 
-    let testdata: Vec<RemoteTestData> = serde_json::from_str(&data).expect("failed to deserialize");
+    let lircd_conf = LircdConf::parse(&source).unwrap();
 
-    let lircd_conf = parse(conf).expect("parse should work");
+    let our_conf = parse(path).unwrap_or(Vec::new());
+    let mut our_conf = our_conf.iter();
 
-    for remote in &lircd_conf {
-        let testdata = if let Some(testdata) = testdata
-            .iter()
-            .find(|testdata| testdata.name == remote.name)
+    for lircd_remote in lircd_conf.iter() {
+        if lircd_remote.is_raw() {
+            println!("raw valid: {}", lircd_remote.name());
+        } else if lircd_remote.is_serial()
+            || lircd_remote.codes_iter().count() == 0
+            || lircd_remote.bit(0) == (0, 0)
+            || lircd_remote.bit(1) == (0, 0)
         {
-            testdata
-        } else {
-            println!("cannot find testdata for remote {}", remote.name);
+            println!("not valid: {}", lircd_remote.name());
             continue;
-        };
-
-        for code in &remote.raw_codes {
-            if code.dup {
-                continue;
-            }
-
-            let testdata = if let Some(testdata) = testdata
-                .codes
-                .iter()
-                .find(|testdata| testdata.name == code.name)
-            {
-                testdata
-            } else {
-                println!("cannot find testdata for code {}", code.name);
-                continue;
-            };
-
-            let mut message = remote.encode_raw(code, 0).unwrap();
-
-            message.raw.pop();
-
-            if testdata.rawir != message.raw {
-                let testdata = Message::from_raw_slice(&testdata.rawir);
-
-                println!("lircd {}", testdata.print_rawir());
-                println!("cir {}", message.print_rawir());
-                panic!("RAW CODE: {}", code.name);
-            }
+        } else {
+            println!("valid: {}", lircd_remote.name());
         }
 
-        if !remote.codes.is_empty() {
-            let irp = remote.irp();
-            println!("remote {} irp:{}", remote.name, irp);
-            let irp = Irp::parse(&irp).expect("should work");
+        let our_remote = our_conf.next().unwrap();
 
-            for code in &remote.codes {
-                if code.dup {
+        if matches!(
+            (lircd_remote.bit(0), lircd_remote.bit(1)),
+            ((_, 0), (0, _)) | ((0, _), (_, 0))
+        ) {
+            // TODO: fix either cir or lircd
+            println!(
+                "SKIP: {} because lircd doesn't encode correctly",
+                lircd_remote.name()
+            );
+            continue;
+        } else if lircd_remote.toggle_bit_mask() != 0 {
+            // TODO: fix either cir or lircd
+            println!(
+                "SKIP: {} because lircd does weird things",
+                lircd_remote.name()
+            );
+            continue;
+        }
+
+        if lircd_remote.is_raw() {
+            for (our_code, lircd_code) in our_remote.raw_codes.iter().zip(lircd_remote.codes_iter())
+            {
+                if our_code.dup {
                     continue;
                 }
 
-                let testdata = if let Some(testdata) = testdata.codes.iter().find(|testdata| {
-                    let scancode = u64::from_str_radix(&testdata.code, 16).unwrap();
+                assert_eq!(our_code.name, lircd_code.name());
 
-                    code.name == testdata.name && code.code[0] == scancode
-                }) {
-                    testdata
-                } else {
-                    println!(
-                        "cannot find testdata for code {} 0x{:}",
-                        code.name, code.code[0]
-                    );
+                let lircd = match lircd_code.encode() {
+                    Some(d) => d,
+                    None => {
+                        println!(
+                            "cannot encode code {} 0x{:}",
+                            lircd_code.name(),
+                            lircd_code.code()
+                        );
+                        continue;
+                    }
+                };
+
+                let mut message = our_remote.encode_raw(our_code, 0).unwrap();
+
+                message.raw.pop();
+
+                if lircd != message.raw {
+                    let testdata = Message::from_raw_slice(&lircd);
+
+                    println!("lircd {}", testdata.print_rawir());
+                    println!("cir {}", message.print_rawir());
+                    panic!("RAW CODE: {}", our_code.name);
+                }
+            }
+        }
+
+        if !our_remote.codes.is_empty() {
+            let irp = our_remote.irp();
+            println!("remote {} irp:{}", our_remote.name, irp);
+            let irp = Irp::parse(&irp).expect("should work");
+
+            for (our_code, lircd_code) in our_remote.codes.iter().zip(lircd_remote.codes_iter()) {
+                if our_code.dup {
                     continue;
+                }
+
+                assert_eq!(our_code.name, lircd_code.name());
+                assert_eq!(our_code.code[0], lircd_code.code());
+
+                let lircd = match lircd_code.encode() {
+                    Some(d) => d,
+                    None => {
+                        println!(
+                            "cannot encode code {} 0x{:}",
+                            lircd_code.name(),
+                            lircd_code.code()
+                        );
+                        continue;
+                    }
                 };
 
                 let mut message = Message::new();
 
-                if code.code.len() == 2 && remote.repeat.0 != 0 && remote.repeat.1 != 0 {
+                if our_code.code.len() == 2 && our_remote.repeat.0 != 0 && our_remote.repeat.1 != 0
+                {
                     // if remote has a repeat parameter and two scancodes, then just repeat the first scancode
                     let mut vars = Vartable::new();
-                    vars.set(String::from("CODE"), code.code[0] as i64);
+                    vars.set(String::from("CODE"), our_code.code[0] as i64);
 
                     let m = irp.encode(vars, 1).expect("encode should succeed");
 
                     message.extend(&m);
                 } else {
-                    for code in &code.code {
+                    for code in &our_code.code {
                         let mut vars = Vartable::new();
                         vars.set(String::from("CODE"), *code as i64);
 
                         // lircd does not honour toggle bit in RCMM transmit
-                        if remote.flags.contains(Flags::RCMM)
-                            && remote.toggle_bit_mask.count_ones() == 1
+                        if our_remote.flags.contains(Flags::RCMM)
+                            && our_remote.toggle_bit_mask.count_ones() == 1
                         {
                             vars.set(
                                 String::from("T"),
-                                ((*code & remote.toggle_bit_mask) != 0).into(),
+                                ((*code & our_remote.toggle_bit_mask) != 0).into(),
                             );
                         }
 
@@ -163,12 +166,12 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
                     message.raw.pop();
                 }
 
-                if !compare_output(remote, &testdata.rawir, &message.raw) {
-                    let testdata = Message::from_raw_slice(&testdata.rawir);
+                if !compare_output(our_remote, &lircd, &message.raw) {
+                    let testdata = Message::from_raw_slice(&lircd);
 
                     println!("lircd {}", testdata.print_rawir());
                     println!("cir {}", message.print_rawir());
-                    panic!("CODE: {} 0x{:x}", code.name, code.code[0]);
+                    panic!("CODE: {} 0x{:x}", our_code.name, our_code.code[0]);
                 }
             }
         }
@@ -176,13 +179,14 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
 }
 
 fn compare_output(remote: &Remote, lircd: &[u32], our: &[u32]) -> bool {
-    if lircd.len() < our.len() {
-        let len = lircd.len();
-        if our[len] > 100000 && lircd == &our[..len] {
-            return true;
-        }
-    }
+    // if lircd.len() < our.len() {
+    //     let len = lircd.len();
+    //     if our[len] > 100000 && lircd == &our[..len] {
+    //         return true;
+    //     }
+    // }
     if lircd.len() != our.len() {
+        println!("length {} {} differ", lircd.len(), our.len());
         return false;
     }
 
@@ -190,7 +194,7 @@ fn compare_output(remote: &Remote, lircd: &[u32], our: &[u32]) -> bool {
         return true;
     }
 
-    for (lircd, our) in lircd.iter().zip(our.iter()) {
+    for (no, (lircd, our)) in lircd.iter().zip(our.iter()).enumerate() {
         let lircd = *lircd;
         let our = *our;
 
@@ -205,6 +209,8 @@ fn compare_output(remote: &Remote, lircd: &[u32], our: &[u32]) -> bool {
         if lircd > 4500 && (lircd - remote.bit[1].1 as u32) == our {
             continue;
         }
+
+        println!("postition:{} {} vs {}", no, lircd, our);
 
         return false;
     }

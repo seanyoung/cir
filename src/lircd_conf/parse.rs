@@ -710,7 +710,11 @@ impl<'a> LircParser<'a> {
 }
 
 fn gen_mask(v: u64) -> u64 {
-    (1u64 << v) - 1
+    if v < 64 {
+        (1u64 << v) - 1
+    } else {
+        u64::MAX
+    }
 }
 
 fn reverse(val: u64, bits: u64) -> u64 {
