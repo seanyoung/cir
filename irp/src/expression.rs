@@ -104,17 +104,11 @@ impl fmt::Display for Expression {
             Expression::GapIdentifier(v, u) => {
                 write!(f, "-{v}{u}")
             }
-            Expression::StrictExtentConstant(v, u) => {
-                write!(f, "^{v}{u}")
-            }
-            Expression::StrictExtentIdentifier(v, u) => {
-                write!(f, "^{v}{u}")
-            }
             Expression::ExtentConstant(v, u) => {
-                write!(f, "^^{v}{u}")
+                write!(f, "^{v}{u}")
             }
             Expression::ExtentIdentifier(v, u) => {
-                write!(f, "^^{v}{u}")
+                write!(f, "^{v}{u}")
             }
             Expression::Stream(stream) => {
                 // bitspec
@@ -263,8 +257,6 @@ impl Expression {
             | Expression::FlashIdentifier(..)
             | Expression::GapConstant(..)
             | Expression::GapIdentifier(..)
-            | Expression::StrictExtentConstant(..)
-            | Expression::StrictExtentIdentifier(..)
             | Expression::ExtentConstant(..)
             | Expression::ExtentIdentifier(..) => (),
         }
@@ -498,8 +490,6 @@ impl Expression {
             | Expression::FlashIdentifier(..)
             | Expression::GapConstant(..)
             | Expression::GapIdentifier(..)
-            | Expression::StrictExtentConstant(..)
-            | Expression::StrictExtentIdentifier(..)
             | Expression::ExtentConstant(..)
             | Expression::ExtentIdentifier(..)
             | Expression::Assignment(..)

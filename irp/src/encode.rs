@@ -322,18 +322,16 @@ impl<'a> Encoder<'a> {
     }
 
     /// Add an extent.
-    fn add_extent(&mut self, extent: i64, strict: bool) -> Result<(), String> {
+    fn add_extent(&mut self, extent: i64) -> Result<(), String> {
         // remove length of stream generated so far
         let trimmed_extent = extent - (self.total_length - *self.extent_marker.last().unwrap());
 
         if trimmed_extent > 0 {
             self.add_gap(trimmed_extent)?;
-        } else if strict {
+        } else {
             // IrpTransmogrifier will error here with: Argument of extent smaller than actual duration
             // We do this to remain compatible with lircd transmit
             return Err("extend shorter than duration".into());
-        } else {
-            self.add_gap(extent)?;
         }
         Ok(())
     }
@@ -483,19 +481,11 @@ fn eval_stream<'a>(
             }
             Expression::ExtentConstant(p, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval_float(*p, gs)?, false)?;
-            }
-            Expression::StrictExtentConstant(p, u) => {
-                encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval_float(*p, gs)?, true)?;
+                encoder.add_extent(u.eval_float(*p, gs)?)?;
             }
             Expression::ExtentIdentifier(id, u) => {
                 encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval(vars.get(id)?, gs)?, false)?;
-            }
-            Expression::StrictExtentIdentifier(id, u) => {
-                encoder.flush_level(level, vars)?;
-                encoder.add_extent(u.eval(vars.get(id)?, gs)?, true)?;
+                encoder.add_extent(u.eval(vars.get(id)?, gs)?)?;
             }
             Expression::GapConstant(p, u) => {
                 encoder.flush_level(level, vars)?;

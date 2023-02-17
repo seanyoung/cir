@@ -99,26 +99,6 @@ fn main() {
             let mut params = HashMap::new();
 
             if let Ok(irp) = Irp::parse(s) {
-                let mut uses_non_strict_extent = false;
-
-                irp.stream.visit(
-                    &mut uses_non_strict_extent,
-                    &|expr, uses_non_strict_extent| {
-                        if matches!(
-                            expr,
-                            irp::Expression::ExtentConstant(..)
-                                | irp::Expression::ExtentIdentifier(..)
-                        ) {
-                            *uses_non_strict_extent = true;
-                        }
-                    },
-                );
-
-                if uses_non_strict_extent {
-                    // Transmogrifier does not support it
-                    return;
-                }
-
                 let mut vars = Vartable::new();
 
                 let mut rng = rand::thread_rng();

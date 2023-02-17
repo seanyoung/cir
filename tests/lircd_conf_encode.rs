@@ -114,6 +114,20 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
                     continue;
                 }
 
+                let testdata = if let Some(testdata) = testdata.codes.iter().find(|testdata| {
+                    let scancode = u64::from_str_radix(&testdata.code, 16).unwrap();
+
+                    code.name == testdata.name && code.code[0] == scancode
+                }) {
+                    testdata
+                } else {
+                    println!(
+                        "cannot find testdata for code {} 0x{:}",
+                        code.name, code.code[0]
+                    );
+                    continue;
+                };
+
                 let mut message = Message::new();
 
                 if code.code.len() == 2 && remote.repeat.0 != 0 && remote.repeat.1 != 0 {
@@ -148,20 +162,6 @@ fn lircd_encode(conf: &Path, testdata: &Path) {
                 if message.raw.len().is_even() {
                     message.raw.pop();
                 }
-
-                let testdata = if let Some(testdata) = testdata.codes.iter().find(|testdata| {
-                    let scancode = u64::from_str_radix(&testdata.code, 16).unwrap();
-
-                    code.name == testdata.name && code.code[0] == scancode
-                }) {
-                    testdata
-                } else {
-                    println!(
-                        "cannot find testdata for code {} 0x{:}",
-                        code.name, code.code[0]
-                    );
-                    continue;
-                };
 
                 if !compare_output(remote, &testdata.rawir, &message.raw) {
                     let testdata = Message::from_raw_slice(&testdata.rawir);

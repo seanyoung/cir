@@ -371,7 +371,7 @@ impl<'a> Builder<'a> {
 
             self.irp
                 .push_str(if self.remote.flags.contains(Flags::CONST_LENGTH) {
-                    "^^"
+                    "^"
                 } else {
                     "-"
                 });

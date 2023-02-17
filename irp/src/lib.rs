@@ -110,11 +110,9 @@ pub struct Stream {
 pub enum Expression {
     FlashConstant(f64, Unit),
     GapConstant(f64, Unit),
-    StrictExtentConstant(f64, Unit),
     ExtentConstant(f64, Unit),
     FlashIdentifier(String, Unit),
     GapIdentifier(String, Unit),
-    StrictExtentIdentifier(String, Unit),
     ExtentIdentifier(String, Unit),
     Assignment(String, Rc<Expression>),
     Number(i64),

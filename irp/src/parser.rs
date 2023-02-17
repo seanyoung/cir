@@ -218,12 +218,10 @@ peg::parser! {
         rule duration() -> Expression
          = id:identifier() _ unit:unit() { Expression::FlashIdentifier(id.to_owned(), unit) }
          / "-" id:identifier() _ unit:unit() { Expression::GapIdentifier(id.to_owned(), unit) }
-         / "^" id:identifier() _ unit:unit() { Expression::StrictExtentIdentifier(id.to_owned(), unit) }
-         / "^^" id:identifier() _ unit:unit() { Expression::ExtentIdentifier(id.to_owned(), unit) }
+         / "^" id:identifier() _ unit:unit() { Expression::ExtentIdentifier(id.to_owned(), unit) }
          / number:number_decimals() _ unit:unit() { Expression::FlashConstant(number, unit) }
          / "-" number:number_decimals() _ unit:unit() { Expression::GapConstant(number, unit) }
-         / "^" number:number_decimals() _ unit:unit() { Expression::StrictExtentConstant(number, unit)}
-         / "^^" number:number_decimals() _ unit:unit() { Expression::ExtentConstant(number, unit)}
+         / "^" number:number_decimals() _ unit:unit() { Expression::ExtentConstant(number, unit)}
 
         rule unit() -> Unit
          = "m" _ { Unit::Milliseconds }
@@ -589,8 +587,6 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                     | Expression::GapIdentifier(..)
                     | Expression::ExtentConstant(..)
                     | Expression::ExtentIdentifier(..)
-                    | Expression::StrictExtentConstant(..)
-                    | Expression::StrictExtentIdentifier(..)
                     | Expression::Assignment(..)
                     | Expression::BitField { .. } => check_stream(expr)?,
                     Expression::Variation(list) => {
@@ -601,8 +597,6 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                                     | Expression::FlashIdentifier(..)
                                     | Expression::GapConstant(..)
                                     | Expression::GapIdentifier(..)
-                                    | Expression::StrictExtentConstant(..)
-                                    | Expression::StrictExtentIdentifier(..)
                                     | Expression::ExtentConstant(..)
                                     | Expression::ExtentIdentifier(..)
                                     | Expression::Assignment(..)
