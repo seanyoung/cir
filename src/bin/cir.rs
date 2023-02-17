@@ -354,7 +354,7 @@ fn main() {
                 ),
         )
         .subcommand(
-            Command::new("list-devices")
+            Command::new("devices")
                 .about("List IR and CEC devices")
                 .arg(
                     Arg::new("LIRCDEV")
@@ -432,7 +432,7 @@ fn main() {
     match matches.subcommand() {
         Some(("decode", matches)) => commands::decode::decode(matches),
         Some(("transmit", matches)) => commands::transmit::transmit(matches),
-        Some(("list-devices", matches)) => match rcdev::enumerate_rc_dev() {
+        Some(("devices", matches)) => match rcdev::enumerate_rc_dev() {
             Ok(list) => print_rc_dev(&list, matches),
             Err(err) => {
                 eprintln!("error: {err}");
