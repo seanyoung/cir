@@ -93,7 +93,7 @@ pub fn encode(
 
         for code in &remote.codes {
             if code.name == *encode_code {
-                let encoded = remote.encode(code, repeats);
+                let encoded = remote.encode(code, repeats)?;
 
                 message.extend(&encoded);
 
@@ -107,7 +107,7 @@ pub fn encode(
 
 impl Remote {
     /// Encode code for this remote, with the given repeats
-    pub fn encode(&self, code: &Code, repeats: u64) -> Message {
+    pub fn encode(&self, code: &Code, repeats: u64) -> Result<Message, String> {
         let irp = self.irp();
 
         debug!("irp for remote {}: {}", self.name, irp);
@@ -124,12 +124,12 @@ impl Remote {
 
             vars.set(String::from("CODE"), *code as i64);
 
-            let m = irp.encode(vars, repeats).expect("encode should succeed");
+            let m = irp.encode(vars, repeats)?;
 
             message.extend(&m);
         }
 
-        message
+        Ok(message)
     }
 
     /// Encode raw code for this remote, with the given repeats
