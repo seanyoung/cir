@@ -309,6 +309,7 @@ impl Irp {
                 if let Some(expr) = expr.find_variant() {
                     return Err(format!("variant {expr} found without repeat marker"));
                 }
+
                 let mut down = Vec::new();
                 let mut repeats = Vec::new();
                 let mut up = Vec::new();
@@ -316,25 +317,35 @@ impl Irp {
                 let mut seen_repeat = None;
                 let top_level_repeat = stream.repeat.clone();
 
-                for expr in &stream.stream {
-                    expr.check_no_contained_repeats()?;
+                if stream.max_repeat() != Some(0) {
+                    for expr in &stream.stream {
+                        expr.check_no_contained_repeats()?;
 
-                    if let Expression::Stream(stream) = expr.as_ref() {
-                        if stream.is_repeating() {
-                            if seen_repeat.is_some() {
-                                return Err("multiple repeat markers in IRP".into());
-                            } else {
-                                repeats = stream.stream.clone();
-                                seen_repeat = stream.repeat.clone();
-                                continue;
+                        if let Expression::Stream(stream) = expr.as_ref() {
+                            if stream.is_repeating() {
+                                if seen_repeat.is_some() {
+                                    return Err("multiple repeat markers in IRP".into());
+                                } else {
+                                    repeats = stream.stream.clone();
+                                    seen_repeat = stream.repeat.clone();
+                                    continue;
+                                }
                             }
                         }
-                    }
 
-                    if seen_repeat.is_some() {
-                        add_flatten(&mut up, expr);
-                    } else {
-                        add_flatten(&mut down, expr);
+                        if seen_repeat.is_some() {
+                            add_flatten(&mut up, expr);
+                        } else {
+                            add_flatten(&mut down, expr);
+                        }
+                    }
+                }
+
+                if seen_repeat.is_some() {
+                    if let Some(n) = stream.max_repeat() {
+                        if n > 1 {
+                            return Err("multiple repeat markers in IRP".into());
+                        }
                     }
                 }
 
@@ -493,6 +504,23 @@ impl Stream {
     fn is_repeating(&self) -> bool {
         !matches!(self.repeat, None | Some(crate::RepeatMarker::Count(_)))
     }
+
+    #[allow(unused)]
+    fn min_repeat(&self) -> i64 {
+        match self.repeat {
+            Some(RepeatMarker::OneOrMore) | None => 1,
+            Some(RepeatMarker::Count(n) | RepeatMarker::CountOrMore(n)) => n,
+            Some(RepeatMarker::Any) => 0,
+        }
+    }
+
+    fn max_repeat(&self) -> Option<i64> {
+        match self.repeat {
+            None => Some(1),
+            Some(RepeatMarker::Count(n)) => Some(n),
+            _ => None,
+        }
+    }
 }
 
 impl Expression {
@@ -637,6 +665,8 @@ fn variants() -> Result<(), String> {
 
 #[test]
 fn encode_variants() {
+    use crate::Vartable;
+
     let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33],-100)*").unwrap();
 
     assert_eq!(
@@ -664,4 +694,23 @@ fn encode_variants() {
         irp.split_variants_encode().unwrap_err(),
         "cannot have variant with '*' repeat, use '+' instead"
     );
+
+    let irp = Irp::parse("{100}<1|-1>((10:2)+,-100)2").unwrap();
+
+    assert_eq!(
+        irp.split_variants_encode().unwrap_err(),
+        "multiple repeat markers in IRP"
+    );
+
+    let irp = Irp::parse("{100}<1|-1>((10:2)+,-100)1").unwrap();
+
+    let m = irp.encode(Vartable::new(), 1).unwrap();
+
+    assert_eq!(m.raw, vec![100, 100, 100, 10100]);
+
+    let irp = Irp::parse("{100}<1|-1>((10:2)+,-100)0").unwrap();
+
+    let m = irp.encode(Vartable::new(), 1).unwrap();
+
+    assert!(m.raw.is_empty());
 }
