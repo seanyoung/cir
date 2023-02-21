@@ -357,8 +357,16 @@ impl<'a, 'b> Encoder<'a, 'b> {
                 _ => unreachable!(),
             };
 
+            let bits_len = bits.len();
+
+            if (bits_len % bits_step) != 0 {
+                return Err(format!(
+                    "Cannot encode {bits_len} bits with bitspec of {max_bit}"
+                ));
+            }
+
             if !self.general_spec.lsb {
-                for bit in bits.chunks(bits_step as usize) {
+                for bit in bits.chunks(bits_step) {
                     let bit = bit_to_usize(bit);
 
                     if bit >= max_bit {
@@ -371,7 +379,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
                     )?;
                 }
             } else {
-                for bit in bits.chunks(bits_step as usize).rev() {
+                for bit in bits.chunks(bits_step).rev() {
                     let bit = bit_to_usize(bit);
 
                     if bit >= max_bit {
