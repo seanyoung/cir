@@ -115,19 +115,17 @@ impl Irp {
                 return Err(format!("missing value for {}", p.name));
             };
 
-            let min = p.min.eval(vars)?;
-            if val < min {
+            if val < p.min {
                 return Err(format!(
                     "{} is less than minimum value {} for parameter {}",
-                    val, min, p.name
+                    val, p.min, p.name
                 ));
             }
 
-            let max = p.max.eval(vars)?;
-            if val > max {
+            if val > p.max {
                 return Err(format!(
                     "{} is more than maximum value {} for parameter {}",
-                    val, max, p.name
+                    val, p.max, p.name
                 ));
             }
         }

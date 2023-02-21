@@ -168,8 +168,8 @@ pub struct ParameterSpec {
     pub name: String,
     #[allow(unused)]
     pub memory: bool,
-    pub min: Expression,
-    pub max: Expression,
+    pub min: i64,
+    pub max: i64,
     pub default: Option<Expression>,
 }
 

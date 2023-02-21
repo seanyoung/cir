@@ -318,10 +318,7 @@ fn compare_encode_to_transmogrifier() {
         }
 
         for param in &irp.parameters {
-            let min = param.min.eval(&vars).unwrap();
-            let max = param.max.eval(&vars).unwrap();
-
-            let value = rng.gen_range(min..=max);
+            let value = rng.gen_range(param.min..=param.max);
 
             params.insert(param.name.to_owned(), value);
             vars.set(param.name.to_owned(), value);
@@ -425,10 +422,7 @@ fn decode_all() {
             let mut params = HashMap::new();
 
             for param in &irp.parameters {
-                let min = param.min.eval(&vars).unwrap();
-                let max = param.max.eval(&vars).unwrap();
-
-                let value = rng.gen_range(min..=max);
+                let value = rng.gen_range(param.min..=param.max);
 
                 params.insert(param.name.to_owned(), value);
                 vars.set(param.name.to_owned(), value);

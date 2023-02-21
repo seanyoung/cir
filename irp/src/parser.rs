@@ -201,19 +201,22 @@ peg::parser! {
          = quiet!{$([ 'a'..='z' | 'A'..='Z']['a'..='z' | 'A'..='Z' | '0'..='9' ]*)}
          / expected!("identifier")
 
-        rule number() -> Expression
+        rule bare_number() -> i64
          = "0x" n:$(['0'..='9' | 'a'..='f' | 'A'..='F']+) _
-         {? match i64::from_str_radix(n, 16) { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
+         {? i64::from_str_radix(n, 16).map_err(|_| "i64") }
          / "0b" n:$(['0'..='1']+) _
-         {? match i64::from_str_radix(n, 2) { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
+         {? i64::from_str_radix(n, 2).map_err(|_| "i64") }
          / n:$("0" ['0'..='7']*) _
-         {? match i64::from_str_radix(n, 8) { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
+         {? i64::from_str_radix(n, 8).map_err(|_| "i64") }
          / n:$(['1'..='9'] ['0'..='9']*) _
-         {? match n.parse() { Ok(n) => Ok(Expression::Number(n)), Err(_) => Err("i64")} }
-         / "UINT8_MAX" _ { Expression::Number(u8::MAX as i64) }
-         / "UINT16_MAX" _ { Expression::Number(u16::MAX as i64) }
-         / "UINT32_MAX" _ { Expression::Number(u32::MAX as i64) }
-         / "UINT64_MAX" _ { Expression::Number(u64::MAX as i64) }
+         {? n.parse().map_err(|_| "i64") }
+         / "UINT8_MAX" _ { u8::MAX as i64 }
+         / "UINT16_MAX" _ { u16::MAX as i64 }
+         / "UINT32_MAX" _ { u32::MAX as i64 }
+         / "UINT64_MAX" _ { u64::MAX as i64 }
+
+        rule number() -> Expression
+         = n:bare_number() { Expression::Number(n) }
 
         rule duration() -> Expression
          = id:identifier() _ unit:unit() { Expression::FlashIdentifier(id.to_owned(), unit) }
@@ -310,7 +313,7 @@ peg::parser! {
          = "[" _ specs:(parameter_spec() ++ ("," _)) "]" _ { specs }
 
         rule parameter_spec() -> ParameterSpec
-         = id:identifier() _ memory:"@"? _ ":" _ min:number() _ ".." _ max:number() _ default:initializer()?
+         = id:identifier() _ memory:"@"? _ ":" _ min:bare_number() _ ".." _ max:bare_number() _ default:initializer()?
          {
             ParameterSpec {
                 name: id.to_owned(),
@@ -471,8 +474,8 @@ fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
         }
         seen_names.push(&parameter.name);
 
-        let min = parameter.min.eval(&vars)?;
-        let max = parameter.max.eval(&vars)?;
+        let min = parameter.min;
+        let max = parameter.max;
 
         if min < 0 || max < 0 || min > max {
             return Err(format!("invalid minimum {min} and maximum {max}"));

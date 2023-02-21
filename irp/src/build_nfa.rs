@@ -624,17 +624,13 @@ impl<'a> Builder<'a> {
             Expression::Number(v) => Ok((*v, *v, None)),
             Expression::Identifier(name) => {
                 if let Some(param) = self.irp.parameters.iter().find(|def| def.name == *name) {
-                    let min = param.min.eval(&self.constants)?;
-                    let max = param.max.eval(&self.constants)?;
+                    let min = param.min;
+                    let max = param.max;
 
                     if min > max {
                         Err(format!("parameter {name} has min > max ({min} > {max})",))
                     } else {
-                        Ok((
-                            param.min.eval(&self.constants)?,
-                            param.max.eval(&self.constants)?,
-                            Some(name.to_owned()),
-                        ))
+                        Ok((min, max, Some(name.to_owned())))
                     }
                 } else {
                     Err(format!("bit field length {name} is not a parameter"))
@@ -1286,9 +1282,7 @@ impl<'a> Builder<'a> {
 
     /// For the given parameter, get the mask
     pub fn param_to_mask(&self, param: &ParameterSpec) -> Result<i64, String> {
-        let max = param.max.eval(&self.constants)? as u64;
-
-        Ok((max + 1).next_power_of_two() as i64 - 1)
+        Ok((param.max as u64 + 1).next_power_of_two() as i64 - 1)
     }
 
     /// Mask results
