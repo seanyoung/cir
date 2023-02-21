@@ -280,6 +280,14 @@ fn main() {
                                 .multiple_occurrences(true),
                         )
                         .arg(
+                            Arg::new("SCANCODE")
+                                .long("scancode")
+                                .short('S')
+                                .help("Send scancode using old linux kernel protocols")
+                                .takes_value(true)
+                                .multiple_occurrences(true),
+                        )
+                        .arg(
                             Arg::new("GAP")
                                 .long("gap")
                                 .short('g')

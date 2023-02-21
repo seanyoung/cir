@@ -1,8 +1,8 @@
 use super::{open_lirc, Purpose};
 use cir::lircd_conf;
-use irp::{Irp, Message, Pronto};
+use irp::{Irp, Message, Pronto, Vartable};
 use log::{debug, error, info, warn};
-use std::{ffi::OsStr, fs, path::Path};
+use std::{ffi::OsStr, fs, path::Path, str::FromStr};
 use terminal_size::{terminal_size, Width};
 
 pub fn transmit(global_matches: &clap::ArgMatches) {
@@ -356,6 +356,30 @@ fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
         }
     }
 
+    if let Some(scancodes) = matches.values_of("SCANCODE") {
+        let mut indices = matches.indices_of("SCANCODE").unwrap();
+
+        for scancode in scancodes {
+            if let Some((protocol, code)) = scancode.split_once(':') {
+                match encode_scancode(protocol, code) {
+                    Ok(m) => {
+                        part.push((Part::Raw(m), indices.next().unwrap()));
+                    }
+                    Err(msg) => {
+                        error!("{}", msg);
+                        std::process::exit(2);
+                    }
+                }
+            } else {
+                error!(
+                    "{} is not a valid protocol, should be protocol:scancode",
+                    scancode
+                );
+                std::process::exit(2);
+            }
+        }
+    }
+
     if let Some(gaps) = matches.values_of("GAP") {
         let mut indices = matches.indices_of("GAP").unwrap();
 
@@ -463,4 +487,45 @@ fn list_remotes(filename: &OsStr, remotes: &[lircd_conf::Remote], needle: Option
     if !remote_found {
         error!("not remote found");
     }
+}
+
+fn encode_scancode(protocol: &str, code: &str) -> Result<Message, String> {
+    let mut scancode = if let Ok(code) = if let Some(hex) = code.strip_prefix("0x") {
+        u64::from_str_radix(hex, 16)
+    } else {
+        u64::from_str(code)
+    } {
+        code
+    } else {
+        return Err(format!("invalid scancode {code}"));
+    };
+
+    let (irp, mask) = match protocol.to_ascii_lowercase().as_str() {
+        "rc5" => ("{36k,msb,889}<1,-1|-1,1>(1,~CODE:1:6,T:1,CODE:5:8,CODE:6,^114m)[CODE:0..0x1f7f,T:0..1@CODE:1:6]", 0x1f7f),
+        "rc5x_20" => ("{36k,msb,889}<1,-1|-1,1>(1,~CODE:1:6,T:1,CODE:5:16,CODE:4:8,CODE:6,^114m)[CODE:0..0x1f7f,T:0..1@CODE:1:6]", 0x1f7f),
+        "rc5_sz" => ("{36k,msb,889}<1,-1|-1,1>(1,CODE:1:13,T:1,CODE:11,^114m)[CODE:0..0x2fff,T:0..1@CODE:1:12]", 0x2fff),
+        "nec" => ("{38.4k,564}<1,-1|1,-3>(16,-8,CODE:8:8,CODE:8,~CODE:8:8,~CODE:8,1,^108m) [CODE:0..0xffff]", 0xffff),
+        "sony12" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:16,^45m)*[CODE:0..0x1f007f]",0x1f007f),
+        "sony15" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:8:16,^45m)*[CODE:0..0xff007f]",0xff007f),
+        "sony20" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:8,CODE:8:16,^45m)*[CODE:0..0x7f1fff]", 0x7f1fff),
+        "imon" => ("{39k,msb,416}<-2|-1,1|1,-1|2>(LAST=1,1,((BIT=(CODE&0x40000000)!=0),(LAST&BIT):1,BIT:1,LAST=BIT,CODE=(CODE<<1))31,^120m) [CODE:0..0x7fffffff]", 0x7fffffff),
+        _ => {
+            return Err(format!("protocol {protocol} is not known"));
+        }
+    };
+
+    let masked = scancode & mask;
+
+    if masked != scancode {
+        warn!("error: scancode {scancode:#x} masked to {masked:#x}");
+        scancode = masked;
+    }
+
+    let irp = Irp::parse(irp).unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("CODE".into(), scancode as i64);
+
+    irp.encode(vars, 1)
 }
