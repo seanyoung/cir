@@ -284,6 +284,10 @@ impl Expression {
                     b = b.reverse_bits().rotate_left(l as u32);
                 }
 
+                if !(0..64).contains(&l) {
+                    return Err(format!("bitfields of {l} not supported"));
+                }
+
                 if l > 0 && l < 63 {
                     b &= (1 << l) - 1;
                 }

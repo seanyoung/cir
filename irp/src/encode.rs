@@ -469,10 +469,6 @@ impl<'a, 'b> Encoder<'a, 'b> {
             Expression::BitField { .. } => {
                 let (bits, length) = expr.bitfield(&self.vars)?;
 
-                if !(0..64).contains(&length) {
-                    return Err("bitfields of {length} not supported".into());
-                }
-
                 self.add_bits(bits, length, level)?;
             }
             Expression::List(list) => {
