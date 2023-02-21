@@ -173,6 +173,13 @@ pub struct ParameterSpec {
     default: Option<Expression>,
 }
 
+impl ParameterSpec {
+    /// Does this parameter have a default value?s
+    pub fn has_default(&self) -> bool {
+        self.default.is_some()
+    }
+}
+
 /// During IRP evaluation, variables may change their value
 #[derive(Default, Debug, Clone)]
 pub struct Vartable<'a> {
