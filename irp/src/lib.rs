@@ -64,15 +64,15 @@ pub enum Pronto {
 /// A parsed IRP notation, which can be used for encoding and decoding
 #[derive(Debug)]
 pub struct Irp {
-    pub general_spec: GeneralSpec,
-    pub stream: Rc<Expression>,
-    pub definitions: Vec<Expression>,
+    general_spec: GeneralSpec,
+    stream: Rc<Expression>,
+    definitions: Vec<Expression>,
     pub parameters: Vec<ParameterSpec>,
 }
 
 /// The general spec for an IRP
 #[derive(Debug)]
-pub struct GeneralSpec {
+struct GeneralSpec {
     duty_cycle: Option<u8>,
     carrier: i64,
     lsb: bool,
@@ -81,7 +81,7 @@ pub struct GeneralSpec {
 
 /// Unit suffix for a duration
 #[derive(PartialEq, Copy, Clone, Debug)]
-pub enum Unit {
+enum Unit {
     Units,
     Microseconds,
     Milliseconds,
@@ -90,7 +90,7 @@ pub enum Unit {
 
 /// The repeat marker for a stream within an IRP
 #[derive(PartialEq, Debug, Clone)]
-pub enum RepeatMarker {
+enum RepeatMarker {
     Any,
     OneOrMore,
     Count(i64),
@@ -99,7 +99,7 @@ pub enum RepeatMarker {
 
 /// A stream within an IRP
 #[derive(PartialEq, Debug, Clone)]
-pub struct Stream {
+struct Stream {
     bit_spec: Vec<Rc<Expression>>,
     stream: Vec<Rc<Expression>>,
     repeat: Option<RepeatMarker>,
@@ -107,7 +107,7 @@ pub struct Stream {
 
 /// An expression within an IRP
 #[derive(PartialEq, Debug, Clone)]
-pub enum Expression {
+enum Expression {
     FlashConstant(f64, Unit),
     GapConstant(f64, Unit),
     ExtentConstant(f64, Unit),
@@ -170,7 +170,7 @@ pub struct ParameterSpec {
     pub memory: bool,
     pub min: i64,
     pub max: i64,
-    pub default: Option<Expression>,
+    default: Option<Expression>,
 }
 
 /// During IRP evaluation, variables may change their value
