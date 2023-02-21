@@ -12,9 +12,9 @@ impl Irp {
 
         let mut encoder = Encoder::new(&self.general_spec);
 
-        if let Some(down) = variants.down {
+        if let Some(down) = &variants.down {
             encoder.stream(
-                &down,
+                down,
                 None,
                 &mut vars,
                 &self.general_spec,
@@ -40,9 +40,9 @@ impl Irp {
             return Err("stream must end with a gap".into());
         }
 
-        if let Some(up) = variants.up {
+        if let Some(up) = &variants.up {
             encoder.stream(
-                &up,
+                up,
                 None,
                 &mut vars,
                 &self.general_spec,
@@ -62,9 +62,7 @@ impl Irp {
         })
     }
 
-    /// Render it to pronto hex with the given variables. Any trailing part after the repeating section
-    /// cannot be represented in pronto hex, so this is dropped. This part of the IR is commonly use for
-    /// a "key up" type message.
+    /// Render it to pronto hex with the given variables.
     /// This always produces pronto hex long codes, never the short variant.
     pub fn encode_pronto<'a>(&'a self, mut vars: Vartable<'a>) -> Result<Pronto, String> {
         self.check_parameters(&mut vars)?;
@@ -79,9 +77,9 @@ impl Irp {
 
         let mut encoder = Encoder::new(&self.general_spec);
 
-        if let Some(down) = variants.down {
+        if let Some(down) = &variants.down {
             encoder.stream(
-                &down,
+                down,
                 None,
                 &mut vars,
                 &self.general_spec,
@@ -104,6 +102,16 @@ impl Irp {
         )?;
 
         let repeat = encoder.raw.iter().map(|v| *v as f64).collect();
+
+        if let Some(up) = &variants.up {
+            encoder.raw.truncate(0);
+
+            encoder.stream(up, None, &mut vars, &self.general_spec, 1, &mut Vec::new())?;
+
+            if !encoder.raw.is_empty() {
+                warn!("ending sequence cannot be represented in pronto, dropped");
+            }
+        }
 
         if self.general_spec.carrier != 0 {
             Ok(Pronto::LearnedModulated {
