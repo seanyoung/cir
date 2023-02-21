@@ -13,21 +13,21 @@ impl Irp {
         let mut encoder = Encoder::new(&self.general_spec, vars, repeats);
 
         if let Some(down) = &variants.down {
-            encoder.encode(down, None, &mut Vec::new())?;
+            encoder.encode(down, None)?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
             }
         }
 
-        encoder.encode(&variants.repeat, None, &mut Vec::new())?;
+        encoder.encode(&variants.repeat, None)?;
 
         if encoder.has_trailing_pulse() {
             return Err("stream must end with a gap".into());
         }
 
         if let Some(up) = &variants.up {
-            encoder.encode(up, None, &mut Vec::new())?;
+            encoder.encode(up, None)?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
@@ -57,7 +57,7 @@ impl Irp {
         let mut encoder = Encoder::new(&self.general_spec, vars, 1);
 
         if let Some(down) = &variants.down {
-            encoder.encode(down, None, &mut Vec::new())?;
+            encoder.encode(down, None)?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
@@ -68,7 +68,7 @@ impl Irp {
 
         encoder.raw.truncate(0);
 
-        encoder.encode(&variants.repeat, None, &mut Vec::new())?;
+        encoder.encode(&variants.repeat, None)?;
 
         if encoder.has_trailing_pulse() {
             return Err("stream must end with a gap".into());
@@ -79,7 +79,7 @@ impl Irp {
         if let Some(up) = &variants.up {
             encoder.raw.truncate(0);
 
-            encoder.encode(up, None, &mut Vec::new())?;
+            encoder.encode(up, None)?;
 
             if !encoder.raw.is_empty() {
                 warn!("ending sequence cannot be represented in pronto, dropped");
@@ -183,7 +183,7 @@ impl<'a> Vartable<'a> {
 }
 
 /// Encoder. This can be used to add flash, gap, extents and deals with nested bitspec scopes.
-struct Encoder<'a> {
+struct Encoder<'a, 'b> {
     /// Reference to general spec for lsb/msb etc
     general_spec: &'a GeneralSpec,
     /// Raw output. Even entries are flash, odd are gaps
@@ -196,6 +196,8 @@ struct Encoder<'a> {
     repeats: u64,
     /// The variables
     vars: Vartable<'a>,
+    /// bitspec scopes
+    bitspec_scope: Vec<BitspecScope<'b>>,
 }
 
 /// A single bitscope
@@ -206,7 +208,7 @@ struct BitspecScope<'a> {
     bitstream: BitVec<usize, LocalBits>,
 }
 
-impl<'a> Encoder<'a> {
+impl<'a, 'b> Encoder<'a, 'b> {
     /// Create a new encoder. One is needed per IRP encode.
     fn new(general_spec: &'a GeneralSpec, vars: Vartable<'a>, repeats: u64) -> Self {
         Encoder {
@@ -216,6 +218,7 @@ impl<'a> Encoder<'a> {
             raw: Vec::new(),
             total_length: 0,
             extent_marker: Vec::new(),
+            bitspec_scope: Vec::new(),
         }
     }
 
@@ -304,13 +307,7 @@ impl<'a> Encoder<'a> {
     }
 
     /// Add some bits after evaluating a bitfield.
-    fn add_bits(
-        &mut self,
-        bits: i64,
-        length: i64,
-        level: Option<usize>,
-        bitspec_scope: &mut [BitspecScope],
-    ) -> Result<(), String> {
+    fn add_bits(&mut self, bits: i64, length: i64, level: Option<usize>) -> Result<(), String> {
         match level {
             Some(level) => {
                 let mut bv = BitVec::<usize, LocalBits>::from_element(bits as usize);
@@ -319,7 +316,7 @@ impl<'a> Encoder<'a> {
 
                 bv.reverse();
 
-                let level = &mut bitspec_scope[level];
+                let level = &mut self.bitspec_scope[level];
 
                 if self.general_spec.lsb {
                     bv.append(&mut level.bitstream);
@@ -335,11 +332,7 @@ impl<'a> Encoder<'a> {
     }
 
     /// Flush the bitstream for a bitspec scope, which should recurse all the way down the scopes
-    fn flush_level(
-        &mut self,
-        level: Option<usize>,
-        bitspec_scope: &mut Vec<BitspecScope>,
-    ) -> Result<(), String> {
+    fn flush_level(&mut self, level: Option<usize>) -> Result<(), String> {
         let level = match level {
             Some(level) => level,
             None => {
@@ -349,14 +342,14 @@ impl<'a> Encoder<'a> {
 
         let lower_level = if level > 0 { Some(level - 1) } else { None };
 
-        if !bitspec_scope[level].bitstream.is_empty() {
+        if !self.bitspec_scope[level].bitstream.is_empty() {
             let mut bits = BitVec::new();
 
             // Swap in a new empty bitvec, we will consume the enter stream and then we
             // don't need a mutable reference.
-            std::mem::swap(&mut bits, &mut bitspec_scope[level].bitstream);
+            std::mem::swap(&mut bits, &mut self.bitspec_scope[level].bitstream);
 
-            let max_bit = bitspec_scope[level].bit_spec.len();
+            let max_bit = self.bitspec_scope[level].bit_spec.len();
 
             let bits_step = match max_bit {
                 1..=2 => 1,
@@ -375,9 +368,8 @@ impl<'a> Encoder<'a> {
                     }
 
                     self.encode(
-                        bitspec_scope[level].bit_spec[bit].as_ref(),
+                        self.bitspec_scope[level].bit_spec[bit].as_ref(),
                         lower_level,
-                        bitspec_scope,
                     )?;
                 }
             } else {
@@ -389,52 +381,46 @@ impl<'a> Encoder<'a> {
                     }
 
                     self.encode(
-                        bitspec_scope[level].bit_spec[bit].as_ref(),
+                        self.bitspec_scope[level].bit_spec[bit].as_ref(),
                         lower_level,
-                        bitspec_scope,
                     )?;
                 }
             }
         }
 
-        self.flush_level(lower_level, bitspec_scope)?;
+        self.flush_level(lower_level)?;
 
         Ok(())
     }
 
-    fn encode<'b>(
-        &mut self,
-        expr: &'b Expression,
-        level: Option<usize>,
-        bitspec_scope: &mut Vec<BitspecScope<'b>>,
-    ) -> Result<(), String> {
+    fn encode(&mut self, expr: &'b Expression, level: Option<usize>) -> Result<(), String> {
         match expr {
             Expression::FlashConstant(p, u) => {
-                self.flush_level(level, bitspec_scope)?;
+                self.flush_level(level)?;
                 self.add_flash(u.eval_float(*p, self.general_spec)?)?;
             }
             Expression::FlashIdentifier(id, u) => {
-                self.flush_level(level, bitspec_scope)?;
+                self.flush_level(level)?;
                 self.add_flash(u.eval(self.vars.get(id)?, self.general_spec)?)?;
             }
             Expression::ExtentConstant(p, u) => {
-                self.flush_level(level, bitspec_scope)?;
+                self.flush_level(level)?;
                 self.add_extent(u.eval_float(*p, self.general_spec)?)?;
             }
             Expression::ExtentIdentifier(id, u) => {
-                self.flush_level(level, bitspec_scope)?;
+                self.flush_level(level)?;
                 self.add_extent(u.eval(self.vars.get(id)?, self.general_spec)?)?;
             }
             Expression::GapConstant(p, u) => {
-                self.flush_level(level, bitspec_scope)?;
+                self.flush_level(level)?;
                 self.add_gap(u.eval_float(*p, self.general_spec)?)?;
             }
             Expression::GapIdentifier(id, u) => {
-                self.flush_level(level, bitspec_scope)?;
+                self.flush_level(level)?;
                 self.add_gap(u.eval(self.vars.get(id)?, self.general_spec)?)?;
             }
             Expression::Assignment(id, expr) => {
-                self.flush_level(level, bitspec_scope)?;
+                self.flush_level(level)?;
 
                 let v = expr.eval(&self.vars)?;
 
@@ -450,7 +436,7 @@ impl<'a> Encoder<'a> {
                 };
 
                 let level = if !stream.bit_spec.is_empty() {
-                    bitspec_scope.push(BitspecScope {
+                    self.bitspec_scope.push(BitspecScope {
                         bit_spec: &stream.bit_spec,
                         bitstream: BitVec::new(),
                     });
@@ -471,15 +457,15 @@ impl<'a> Encoder<'a> {
                                 break;
                             }
                         }
-                        self.encode(expr, level, bitspec_scope)?;
+                        self.encode(expr, level)?;
                     }
                     self.pop_extend_marker();
                 }
 
-                self.flush_level(level, bitspec_scope)?;
+                self.flush_level(level)?;
 
                 if !stream.bit_spec.is_empty() {
-                    bitspec_scope.pop();
+                    self.bitspec_scope.pop();
                 }
             }
             Expression::BitField { .. } => {
@@ -489,11 +475,11 @@ impl<'a> Encoder<'a> {
                     return Err("bitfields of {length} not supported".into());
                 }
 
-                self.add_bits(bits, length, level, bitspec_scope)?;
+                self.add_bits(bits, length, level)?;
             }
             Expression::List(list) => {
                 for expr in list {
-                    self.encode(expr, level, bitspec_scope)?;
+                    self.encode(expr, level)?;
                 }
             }
             _ => unreachable!(),
