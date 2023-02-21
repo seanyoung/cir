@@ -13,42 +13,21 @@ impl Irp {
         let mut encoder = Encoder::new(&self.general_spec);
 
         if let Some(down) = &variants.down {
-            encoder.stream(
-                down,
-                None,
-                &mut vars,
-                &self.general_spec,
-                repeats,
-                &mut Vec::new(),
-            )?;
+            encoder.stream(down, None, &mut vars, repeats, &mut Vec::new())?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
             }
         }
 
-        encoder.stream(
-            &variants.repeat,
-            None,
-            &mut vars,
-            &self.general_spec,
-            repeats,
-            &mut Vec::new(),
-        )?;
+        encoder.stream(&variants.repeat, None, &mut vars, repeats, &mut Vec::new())?;
 
         if encoder.has_trailing_pulse() {
             return Err("stream must end with a gap".into());
         }
 
         if let Some(up) = &variants.up {
-            encoder.stream(
-                up,
-                None,
-                &mut vars,
-                &self.general_spec,
-                repeats,
-                &mut Vec::new(),
-            )?;
+            encoder.stream(up, None, &mut vars, repeats, &mut Vec::new())?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
@@ -78,14 +57,7 @@ impl Irp {
         let mut encoder = Encoder::new(&self.general_spec);
 
         if let Some(down) = &variants.down {
-            encoder.stream(
-                down,
-                None,
-                &mut vars,
-                &self.general_spec,
-                1,
-                &mut Vec::new(),
-            )?;
+            encoder.stream(down, None, &mut vars, 1, &mut Vec::new())?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
@@ -96,14 +68,7 @@ impl Irp {
 
         encoder.raw.truncate(0);
 
-        encoder.stream(
-            &variants.repeat,
-            None,
-            &mut vars,
-            &self.general_spec,
-            1,
-            &mut Vec::new(),
-        )?;
+        encoder.stream(&variants.repeat, None, &mut vars, 1, &mut Vec::new())?;
 
         if encoder.has_trailing_pulse() {
             return Err("stream must end with a gap".into());
@@ -114,7 +79,7 @@ impl Irp {
         if let Some(up) = &variants.up {
             encoder.raw.truncate(0);
 
-            encoder.stream(up, None, &mut vars, &self.general_spec, 1, &mut Vec::new())?;
+            encoder.stream(up, None, &mut vars, 1, &mut Vec::new())?;
 
             if !encoder.raw.is_empty() {
                 warn!("ending sequence cannot be represented in pronto, dropped");
@@ -408,7 +373,6 @@ impl<'a> Encoder<'a> {
                         bitspec_scope[level].bit_spec[bit].as_ref(),
                         lower_level,
                         vars,
-                        self.general_spec,
                         0,
                         bitspec_scope,
                     )?;
@@ -425,7 +389,6 @@ impl<'a> Encoder<'a> {
                         bitspec_scope[level].bit_spec[bit].as_ref(),
                         lower_level,
                         vars,
-                        self.general_spec,
                         0,
                         bitspec_scope,
                     )?;
@@ -443,34 +406,33 @@ impl<'a> Encoder<'a> {
         stream: &'b Expression,
         level: Option<usize>,
         vars: &mut Vartable,
-        gs: &GeneralSpec,
         repeats: u64,
         bitspec_scope: &mut Vec<BitspecScope<'b>>,
     ) -> Result<(), String> {
         match stream {
             Expression::FlashConstant(p, u) => {
                 self.flush_level(level, vars, bitspec_scope)?;
-                self.add_flash(u.eval_float(*p, gs)?)?;
+                self.add_flash(u.eval_float(*p, self.general_spec)?)?;
             }
             Expression::FlashIdentifier(id, u) => {
                 self.flush_level(level, vars, bitspec_scope)?;
-                self.add_flash(u.eval(vars.get(id)?, gs)?)?;
+                self.add_flash(u.eval(vars.get(id)?, self.general_spec)?)?;
             }
             Expression::ExtentConstant(p, u) => {
                 self.flush_level(level, vars, bitspec_scope)?;
-                self.add_extent(u.eval_float(*p, gs)?)?;
+                self.add_extent(u.eval_float(*p, self.general_spec)?)?;
             }
             Expression::ExtentIdentifier(id, u) => {
                 self.flush_level(level, vars, bitspec_scope)?;
-                self.add_extent(u.eval(vars.get(id)?, gs)?)?;
+                self.add_extent(u.eval(vars.get(id)?, self.general_spec)?)?;
             }
             Expression::GapConstant(p, u) => {
                 self.flush_level(level, vars, bitspec_scope)?;
-                self.add_gap(u.eval_float(*p, gs)?)?;
+                self.add_gap(u.eval_float(*p, self.general_spec)?)?;
             }
             Expression::GapIdentifier(id, u) => {
                 self.flush_level(level, vars, bitspec_scope)?;
-                self.add_gap(u.eval(vars.get(id)?, gs)?)?;
+                self.add_gap(u.eval(vars.get(id)?, self.general_spec)?)?;
             }
             Expression::Assignment(id, expr) => {
                 self.flush_level(level, vars, bitspec_scope)?;
@@ -510,7 +472,7 @@ impl<'a> Encoder<'a> {
                                 break;
                             }
                         }
-                        self.stream(expr, level, vars, gs, repeats, bitspec_scope)?;
+                        self.stream(expr, level, vars, repeats, bitspec_scope)?;
                     }
                     self.pop_extend_marker();
                 }
@@ -532,7 +494,7 @@ impl<'a> Encoder<'a> {
             }
             Expression::List(list) => {
                 for expr in list {
-                    self.stream(expr, level, vars, gs, repeats, bitspec_scope)?;
+                    self.stream(expr, level, vars, repeats, bitspec_scope)?;
                 }
             }
             _ => unreachable!(),
