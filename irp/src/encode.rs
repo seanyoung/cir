@@ -492,27 +492,29 @@ impl<'a, 'b> Encoder<'a, 'b> {
 }
 
 impl Unit {
-    pub fn eval(&self, v: i64, spec: &GeneralSpec) -> Result<i64, String> {
+    pub(crate) fn eval(&self, v: i64, spec: &GeneralSpec) -> Result<i64, String> {
         match self {
+            Unit::Units if spec.unit == 0.0 => Err("cannot use units when unit set to 0".into()),
             Unit::Units => Ok((v as f64 * spec.unit) as i64),
             Unit::Microseconds => Ok(v),
             Unit::Milliseconds => Ok(v * 1000),
-            Unit::Pulses => match spec.carrier {
-                0 => Err("pulses cannot be used with zero carrier".into()),
-                f => Ok(v * 1_000_000 / f),
-            },
+            Unit::Pulses if spec.carrier == 0 => {
+                Err("pulses cannot be used with zero carrier".into())
+            }
+            Unit::Pulses => Ok(v * 1_000_000 / spec.carrier),
         }
     }
 
-    pub fn eval_float(&self, v: f64, spec: &GeneralSpec) -> Result<i64, String> {
+    pub(crate) fn eval_float(&self, v: f64, spec: &GeneralSpec) -> Result<i64, String> {
         match self {
+            Unit::Units if spec.unit == 0.0 => Err("cannot use units when unit set to 0".into()),
             Unit::Units => Ok((v * spec.unit) as i64),
             Unit::Microseconds => Ok(v as i64),
             Unit::Milliseconds => Ok((v * 1000.0) as i64),
-            Unit::Pulses => match spec.carrier {
-                0 => Err("pulses cannot be used with zero carrier".into()),
-                f => Ok((v * 1_000_000.0) as i64 / f),
-            },
+            Unit::Pulses if spec.carrier == 0 => {
+                Err("pulses cannot be used with zero carrier".into())
+            }
+            Unit::Pulses => Ok((v * 1_000_000.0) as i64 / spec.carrier),
         }
     }
 }

@@ -436,10 +436,6 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
                     _ => unreachable!(),
                 };
 
-                if v <= 0.0 {
-                    return Err("unit must be larger than 0".into());
-                }
-
                 unit = Some((v, u));
             }
         }

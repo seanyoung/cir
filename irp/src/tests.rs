@@ -559,3 +559,22 @@ fn max_bitspec() {
         Some(String::from("Cannot encode 3 with current bit_spec"))
     );
 }
+
+#[test]
+fn unit0() {
+    let irp = Irp::parse("{0}<1|-1>(1m,-100m)").unwrap();
+
+    let vars = Vartable::new();
+
+    let res = irp.encode(vars, 1);
+
+    assert!(res.is_ok());
+
+    let irp = Irp::parse("{0}<1|-1>(1m,1:1,-100m)").unwrap();
+
+    let vars = Vartable::new();
+
+    let res = irp.encode(vars, 1);
+
+    assert!(res.is_err());
+}
