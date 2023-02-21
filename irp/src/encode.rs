@@ -22,7 +22,7 @@ impl Irp {
                 &mut Vec::new(),
             )?;
 
-            if (encoder.raw.len() % 2) != 0 {
+            if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
             }
         }
@@ -36,7 +36,7 @@ impl Irp {
             &mut Vec::new(),
         )?;
 
-        if (encoder.raw.len() % 2) != 0 {
+        if encoder.has_trailing_pulse() {
             return Err("stream must end with a gap".into());
         }
 
@@ -50,7 +50,7 @@ impl Irp {
                 &mut Vec::new(),
             )?;
 
-            if (encoder.raw.len() % 2) != 0 {
+            if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
             }
         }
@@ -86,6 +86,10 @@ impl Irp {
                 1,
                 &mut Vec::new(),
             )?;
+
+            if encoder.has_trailing_pulse() {
+                return Err("stream must end with a gap".into());
+            }
         }
 
         let intro = encoder.raw.iter().map(|v| *v as f64).collect();
@@ -100,6 +104,10 @@ impl Irp {
             1,
             &mut Vec::new(),
         )?;
+
+        if encoder.has_trailing_pulse() {
+            return Err("stream must end with a gap".into());
+        }
 
         let repeat = encoder.raw.iter().map(|v| *v as f64).collect();
 
@@ -531,6 +539,10 @@ impl<'a> Encoder<'a> {
         }
 
         Ok(())
+    }
+
+    fn has_trailing_pulse(&self) -> bool {
+        (self.raw.len() % 2) != 0
     }
 }
 
