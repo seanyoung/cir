@@ -277,7 +277,7 @@ peg::parser! {
          = i:identifier() _ "=" _ e:primary_item() _ { Expression::Assignment(i.to_owned(), Rc::new(e)) }
 
         rule bare_bitspec() -> Rc<Expression>
-         = bitspec:(bitspec_item() ++ ("," _))
+         = bitspec:(bitspec_item() ** ("," _))
          { Rc::new(Expression::List(bitspec)) }
 
         rule bitspec() -> Vec<Rc<Expression>>
