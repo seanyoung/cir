@@ -10,24 +10,24 @@ impl Irp {
 
         let variants = self.split_variants_encode()?;
 
-        let mut encoder = Encoder::new(&self.general_spec);
+        let mut encoder = Encoder::new(&self.general_spec, repeats);
 
         if let Some(down) = &variants.down {
-            encoder.stream(down, None, &mut vars, repeats, &mut Vec::new())?;
+            encoder.encode(down, None, &mut vars, &mut Vec::new())?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
             }
         }
 
-        encoder.stream(&variants.repeat, None, &mut vars, repeats, &mut Vec::new())?;
+        encoder.encode(&variants.repeat, None, &mut vars, &mut Vec::new())?;
 
         if encoder.has_trailing_pulse() {
             return Err("stream must end with a gap".into());
         }
 
         if let Some(up) = &variants.up {
-            encoder.stream(up, None, &mut vars, repeats, &mut Vec::new())?;
+            encoder.encode(up, None, &mut vars, &mut Vec::new())?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
@@ -54,10 +54,10 @@ impl Irp {
 
         let variants = self.split_variants_encode()?;
 
-        let mut encoder = Encoder::new(&self.general_spec);
+        let mut encoder = Encoder::new(&self.general_spec, 1);
 
         if let Some(down) = &variants.down {
-            encoder.stream(down, None, &mut vars, 1, &mut Vec::new())?;
+            encoder.encode(down, None, &mut vars, &mut Vec::new())?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
@@ -68,7 +68,7 @@ impl Irp {
 
         encoder.raw.truncate(0);
 
-        encoder.stream(&variants.repeat, None, &mut vars, 1, &mut Vec::new())?;
+        encoder.encode(&variants.repeat, None, &mut vars, &mut Vec::new())?;
 
         if encoder.has_trailing_pulse() {
             return Err("stream must end with a gap".into());
@@ -79,7 +79,7 @@ impl Irp {
         if let Some(up) = &variants.up {
             encoder.raw.truncate(0);
 
-            encoder.stream(up, None, &mut vars, 1, &mut Vec::new())?;
+            encoder.encode(up, None, &mut vars, &mut Vec::new())?;
 
             if !encoder.raw.is_empty() {
                 warn!("ending sequence cannot be represented in pronto, dropped");
@@ -192,6 +192,8 @@ struct Encoder<'a> {
     total_length: i64,
     /// Extents start from this point
     extent_marker: Vec<i64>,
+    /// Number of repeats to encode
+    repeats: u64,
 }
 
 /// A single bitscope
@@ -204,9 +206,10 @@ struct BitspecScope<'a> {
 
 impl<'a> Encoder<'a> {
     /// Create a new encoder. One is needed per IRP encode.
-    fn new(general_spec: &'a GeneralSpec) -> Self {
+    fn new(general_spec: &'a GeneralSpec, repeats: u64) -> Self {
         Encoder {
             general_spec,
+            repeats,
             raw: Vec::new(),
             total_length: 0,
             extent_marker: Vec::new(),
@@ -369,11 +372,10 @@ impl<'a> Encoder<'a> {
                         return Err(format!("Cannot encode {bit} with current bit_spec"));
                     }
 
-                    self.stream(
+                    self.encode(
                         bitspec_scope[level].bit_spec[bit].as_ref(),
                         lower_level,
                         vars,
-                        0,
                         bitspec_scope,
                     )?;
                 }
@@ -385,11 +387,10 @@ impl<'a> Encoder<'a> {
                         return Err(format!("Cannot encode {bit} with current bit_spec"));
                     }
 
-                    self.stream(
+                    self.encode(
                         bitspec_scope[level].bit_spec[bit].as_ref(),
                         lower_level,
                         vars,
-                        0,
                         bitspec_scope,
                     )?;
                 }
@@ -401,15 +402,14 @@ impl<'a> Encoder<'a> {
         Ok(())
     }
 
-    fn stream<'b>(
+    fn encode<'b>(
         &mut self,
-        stream: &'b Expression,
+        expr: &'b Expression,
         level: Option<usize>,
         vars: &mut Vartable,
-        repeats: u64,
         bitspec_scope: &mut Vec<BitspecScope<'b>>,
     ) -> Result<(), String> {
-        match stream {
+        match expr {
             Expression::FlashConstant(p, u) => {
                 self.flush_level(level, vars, bitspec_scope)?;
                 self.add_flash(u.eval_float(*p, self.general_spec)?)?;
@@ -444,10 +444,10 @@ impl<'a> Encoder<'a> {
             Expression::Stream(stream) => {
                 let repeats = match stream.repeat {
                     None => 1,
-                    Some(RepeatMarker::Any) => repeats,
+                    Some(RepeatMarker::Any) => self.repeats,
                     Some(RepeatMarker::Count(num)) => num as u64,
-                    Some(RepeatMarker::OneOrMore) => 1 + repeats,
-                    Some(RepeatMarker::CountOrMore(num)) => num as u64 + repeats,
+                    Some(RepeatMarker::OneOrMore) => 1 + self.repeats,
+                    Some(RepeatMarker::CountOrMore(num)) => num as u64 + self.repeats,
                 };
 
                 let level = if !stream.bit_spec.is_empty() {
@@ -472,7 +472,7 @@ impl<'a> Encoder<'a> {
                                 break;
                             }
                         }
-                        self.stream(expr, level, vars, repeats, bitspec_scope)?;
+                        self.encode(expr, level, vars, bitspec_scope)?;
                     }
                     self.pop_extend_marker();
                 }
@@ -484,7 +484,7 @@ impl<'a> Encoder<'a> {
                 }
             }
             Expression::BitField { .. } => {
-                let (bits, length) = stream.bitfield(vars)?;
+                let (bits, length) = expr.bitfield(vars)?;
 
                 if !(0..64).contains(&length) {
                     return Err("bitfields of {length} not supported".into());
@@ -494,7 +494,7 @@ impl<'a> Encoder<'a> {
             }
             Expression::List(list) => {
                 for expr in list {
-                    self.stream(expr, level, vars, repeats, bitspec_scope)?;
+                    self.encode(expr, level, vars, bitspec_scope)?;
                 }
             }
             _ => unreachable!(),
