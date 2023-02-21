@@ -310,7 +310,7 @@ peg::parser! {
          = "[" _ bare:bare_irstream() "]" _ { bare }
 
         rule parameter_specs() -> Vec<ParameterSpec>
-         = "[" _ specs:(parameter_spec() ++ ("," _)) "]" _ { specs }
+         = "[" _ specs:(parameter_spec() ** ("," _)) "]" _ { specs }
 
         rule parameter_spec() -> ParameterSpec
          = id:identifier() _ memory:"@"? _ ":" _ min:bare_number() _ ".." _ max:bare_number() _ default:initializer()?
