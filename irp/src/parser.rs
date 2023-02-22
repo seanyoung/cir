@@ -34,6 +34,8 @@ peg::parser! {
         rule number_decimals() -> f64
          = n:$(['0'..='9']+ "." ['0'..='9']+)
          {? match f64::from_str(n) { Ok(n) => Ok(n), Err(_) => Err("f64") } }
+         / n:$("." ['0'..='9']+)
+         {? match f64::from_str(n) { Ok(n) => Ok(n), Err(_) => Err("f64") } }
          / n:$(['0'..='9']+)
          {? match f64::from_str(n) { Ok(n) => Ok(n), Err(_) => Err("f64") } }
 
