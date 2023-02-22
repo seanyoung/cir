@@ -18,6 +18,8 @@ impl Irp {
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
             }
+
+            encoder.reset_extent_marker();
         }
 
         encoder.encode(&variants.repeat, None)?;
@@ -27,6 +29,8 @@ impl Irp {
         }
 
         if let Some(up) = &variants.up {
+            encoder.reset_extent_marker();
+
             encoder.encode(up, None)?;
 
             if encoder.has_trailing_pulse() {
@@ -62,6 +66,8 @@ impl Irp {
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
             }
+
+            encoder.reset_extent_marker();
         }
 
         let intro = encoder.raw.iter().map(|v| *v as f64).collect();
@@ -77,6 +83,8 @@ impl Irp {
         let repeat = encoder.raw.iter().map(|v| *v as f64).collect();
 
         if let Some(up) = &variants.up {
+            encoder.reset_extent_marker();
+
             encoder.raw.truncate(0);
 
             encoder.encode(up, None)?;
@@ -189,7 +197,7 @@ struct Encoder<'a, 'b> {
     /// Length of IR generated, including leading gap
     total_length: i64,
     /// Extents start from this point
-    extent_marker: Vec<i64>,
+    extent_marker: i64,
     /// Number of repeats to encode
     repeats: u64,
     /// The variables
@@ -215,19 +223,9 @@ impl<'a, 'b> Encoder<'a, 'b> {
             vars,
             raw: Vec::new(),
             total_length: 0,
-            extent_marker: Vec::new(),
+            extent_marker: 0,
             bitspec_scope: Vec::new(),
         }
-    }
-
-    /// When we enter an IR stream, we should mark reference point for extents
-    fn push_extent_marker(&mut self) {
-        self.extent_marker.push(self.total_length);
-    }
-
-    /// When we are done with an IR stream, the last extent reference point is no longer needed
-    fn pop_extend_marker(&mut self) {
-        self.extent_marker.pop();
     }
 
     /// Add a flash of length microseconds
@@ -292,7 +290,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
     /// Add an extent.
     fn add_extent(&mut self, extent: i64) -> Result<(), String> {
         // remove length of stream generated so far
-        let trimmed_extent = extent - (self.total_length - *self.extent_marker.last().unwrap());
+        let trimmed_extent = extent - (self.total_length - self.extent_marker);
 
         if trimmed_extent > 0 {
             self.add_gap(trimmed_extent)?;
@@ -301,7 +299,15 @@ impl<'a, 'b> Encoder<'a, 'b> {
             // We do this to remain compatible with lircd transmit
             return Err("extend shorter than duration".into());
         }
+
+        self.reset_extent_marker();
+
         Ok(())
+    }
+
+    /// Reset extent marker
+    fn reset_extent_marker(&mut self) {
+        self.extent_marker = self.total_length;
     }
 
     /// Add some bits after evaluating a bitfield.
@@ -456,7 +462,6 @@ impl<'a, 'b> Encoder<'a, 'b> {
                 };
 
                 for _ in 0..repeats {
-                    self.push_extent_marker();
                     for expr in &stream.stream {
                         if let Expression::List(list) = expr.as_ref() {
                             if list.is_empty() {
@@ -465,7 +470,6 @@ impl<'a, 'b> Encoder<'a, 'b> {
                         }
                         self.encode(expr, level)?;
                     }
-                    self.pop_extend_marker();
                 }
 
                 self.flush_level(level)?;
