@@ -1,14 +1,16 @@
-use crate::Message;
+use irp::Message;
 use j4rs::{
     errors::J4RsError, ClasspathEntry, Instance, InvocationArg, JavaClass, Jvm, JvmBuilder,
 };
 use std::collections::HashMap;
 
-pub fn create_jvm() -> Jvm {
+pub fn create_jvm(base: &str) -> Jvm {
+    let mut base = base.to_owned();
+
+    base.push_str("/target/IrpTransmogrifier-1.2.12-SNAPSHOT-jar-with-dependencies.jar");
+
     JvmBuilder::new()
-        .classpath_entry(ClasspathEntry::new(
-            "IrpTransmogrifier/target/IrpTransmogrifier-1.2.12-SNAPSHOT-jar-with-dependencies.jar",
-        ))
+        .classpath_entry(ClasspathEntry::new(&base))
         .build()
         .unwrap()
 }

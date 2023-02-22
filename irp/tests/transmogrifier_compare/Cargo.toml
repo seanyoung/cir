@@ -1,0 +1,11 @@
+[package]
+name = "transmogrifier_compare"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+irp = { path = "../.." }
+irptransmogrifier = { path = "../irptransmogrifier" }
+rand = "0.8"
+
+[workspace]

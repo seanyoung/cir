@@ -11,8 +11,6 @@ mod parser;
 mod pronto;
 pub mod protocols;
 mod split_variants;
-#[cfg(test)]
-mod tests;
 
 use std::{collections::HashMap, fmt, rc::Rc};
 

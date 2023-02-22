@@ -1,0 +1,10 @@
+[package]
+name = "irptransmogrifier"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+afl = "*"
+irp = { path = "../.." }
+rand = "0.8"
+j4rs = "0.15"

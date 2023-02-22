@@ -1,12 +1,5 @@
-#![cfg(test)]
-
-mod irptransmogrifier;
-
-use crate::{
-    protocols::parse,
-    tests::irptransmogrifier::{create_jvm, IrpTransmogrifierRender},
-    InfraredData, Irp, Message, Vartable,
-};
+use irp::{protocols::parse, InfraredData, Irp, Message, Vartable};
+use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
 use rand::Rng;
 use std::{collections::HashMap, path::PathBuf};
@@ -234,7 +227,7 @@ fn vars() {
 #[test]
 fn parse_all_of_them() {
     let protocols = parse(&PathBuf::from(
-        "IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+        "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ));
 
     let mut broken = 0;
@@ -295,12 +288,12 @@ fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
 #[test]
 fn compare_encode_to_transmogrifier() {
     let protocols = parse(&PathBuf::from(
-        "IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+        "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ));
 
     let mut total_tests = 0;
     let mut fails = 0;
-    let jvm = create_jvm();
+    let jvm = create_jvm("tests/IrpTransmogrifier");
     let mut rng = rand::thread_rng();
 
     for protocol in &protocols {
@@ -390,7 +383,7 @@ fn compare_encode_to_transmogrifier() {
 #[test]
 fn decode_all() {
     let protocols = parse(&PathBuf::from(
-        "IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+        "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ));
 
     let mut total_tests = 0;

@@ -37,8 +37,8 @@ liblircd = { path = "liblircd" }
 [workspace]
 members = [
 	"irp",
-	"irp/encoder_fuzzer",
 	"liblircd",
+	"irp/tests/irptransmogrifier",
 ]
 
 [features]

@@ -1,2 +1,4 @@
 Cargo.lock
 /target
+/tests/encoder_fuzzer/target
+/tests/transmogrifier_compare/target

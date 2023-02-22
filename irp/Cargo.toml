@@ -10,7 +10,7 @@ keywords = [ "IRP", "IR", "infrared", "pronto" ]
 readme = "README.md"
 license = "MIT"
 rust-version = "1.67.0"
-exclude = [ "/IrpTransmogrifier" ]
+exclude = [ "/tests" ]
 
 [dependencies]
 num = "0.4"
@@ -27,3 +27,4 @@ itertools = "0.10"
 cir = { path = ".." }
 j4rs = "0.15"
 rand = "0.8"
+irptransmogrifier = { path = "tests/irptransmogrifier" }
