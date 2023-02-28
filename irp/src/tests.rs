@@ -603,3 +603,42 @@ fn leading_gap() {
         vec![200, 3800, 200, 3800, 200, 2000, 200, 2000]
     );
 }
+
+#[test]
+fn complement_definition() {
+    let irp = Irp::parse(
+        "{38.1k,100}<1,-1|1,-3>(C:8,-25m)* { C=~(D+S+F+255):6} [D:0..255,S:0..255,F:0..255]",
+    )
+    .unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("F".to_string(), 1);
+    vars.set("D".to_string(), 13);
+    vars.set("S".to_string(), 251);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(
+        res.unwrap().raw,
+        vec![100, 300, 100, 300, 100, 300, 100, 100, 100, 300, 100, 300, 100, 100, 100, 25100]
+    );
+
+    let irp = Irp::parse(
+        "{38.1k,100}<1,-1|1,-3>(C:8,-25m)* { C=~(D+S+F+255):6+256 } [D:0..255,S:0..255,F:0..255]",
+    )
+    .unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("F".to_string(), 1);
+    vars.set("D".to_string(), 13);
+    vars.set("S".to_string(), 251);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(
+        res.unwrap().raw,
+        vec![100, 300, 100, 300, 100, 300, 100, 100, 100, 300, 100, 300, 100, 100, 100, 25100]
+    );
+}

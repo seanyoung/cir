@@ -151,7 +151,8 @@ peg::parser! {
 
         #[cache_left_rec]
         rule expression16() -> Expression
-         = "~" _ expr:expression17()
+         = complement_bit_field()
+         / "~" _ expr:expression17()
          { Expression::Complement(Rc::new(expr)) }
          / expression17()
 
@@ -160,23 +161,23 @@ peg::parser! {
          = bit_field() / primary_item()
 
         // Bitspec <A=2|3> should be parsed as A=2 and 3, and we should also parse <A=2-3>
-         #[cache_left_rec]
-         rule bitspec_assign_expression() -> Expression
-          = cond:bitspec_assign_expression() "?" _ left:bitspec_assign_expression2() ":" _ right:bitspec_assign_expression2()
-            { Expression::Conditional(Rc::new(cond), Rc::new(left), Rc::new(right)) }
-          / bitspec_assign_expression2()
+        #[cache_left_rec]
+        rule bitspec_assign_expression() -> Expression
+         = cond:bitspec_assign_expression() "?" _ left:bitspec_assign_expression2() ":" _ right:bitspec_assign_expression2()
+          { Expression::Conditional(Rc::new(cond), Rc::new(left), Rc::new(right)) }
+         / bitspec_assign_expression2()
 
-         #[cache_left_rec]
-         rule bitspec_assign_expression2() -> Expression
-          = left:bitspec_assign_expression2() "||" _ right:bitspec_assign_expression3()
-            { Expression::Or(Rc::new(left), Rc::new(right)) }
-          / bitspec_assign_expression3()
+        #[cache_left_rec]
+        rule bitspec_assign_expression2() -> Expression
+         = left:bitspec_assign_expression2() "||" _ right:bitspec_assign_expression3()
+           { Expression::Or(Rc::new(left), Rc::new(right)) }
+         / bitspec_assign_expression3()
 
-         #[cache_left_rec]
-         rule bitspec_assign_expression3() -> Expression
-          = left:bitspec_assign_expression3() "&&" _ right:expression5()
-            { Expression::And(Rc::new(left), Rc::new(right)) }
-          / expression5()
+        #[cache_left_rec]
+        rule bitspec_assign_expression3() -> Expression
+         = left:bitspec_assign_expression3() "&&" _ right:expression5()
+           { Expression::And(Rc::new(left), Rc::new(right)) }
+         / expression5()
 
         rule bit_field() -> Expression
          = complement:"~"? _ value:primary_item() ":" _ reverse:"-"? length:primary_item() skip:skip()?
@@ -201,6 +202,28 @@ peg::parser! {
             } else {
                 Rc::new(value)
             };
+
+            Expression::InfiniteBitField {
+                value,
+                skip: Rc::new(skip),
+            }
+         }
+
+        rule complement_bit_field() -> Expression
+         = "~" _ value:primary_item() ":" _ reverse:"-"? length:primary_item() skip:skip()?
+         {
+            let value = Rc::new(Expression::Complement(Rc::new(value)));
+
+            Expression::BitField {
+                value,
+                reverse: reverse.is_some(),
+                length: Rc::new(length),
+                skip: skip.map(Rc::new),
+            }
+         }
+         / "~" _ value:primary_item() "::" _ skip:primary_item()
+         {
+            let value = Rc::new(Expression::Complement(Rc::new(value)));
 
             Expression::InfiniteBitField {
                 value,
