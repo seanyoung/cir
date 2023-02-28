@@ -589,3 +589,17 @@ fn arithmetic_in_bitspec() {
 
     assert!(res.is_ok());
 }
+
+#[test]
+fn leading_gap() {
+    let irp = Irp::parse("{100}<>(^40,2,-20)3+").unwrap();
+
+    let vars = Vartable::new();
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(
+        res.unwrap().raw,
+        vec![200, 3800, 200, 3800, 200, 2000, 200, 2000]
+    );
+}

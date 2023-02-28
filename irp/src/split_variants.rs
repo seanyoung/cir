@@ -706,7 +706,7 @@ fn encode_variants() {
 
     let m = irp.encode(Vartable::new(), 1).unwrap();
 
-    assert_eq!(m.raw, vec![100, 100, 100, 10100]);
+    assert_eq!(m.raw, vec![100, 100, 100, 100]);
 
     let irp = Irp::parse("{100}<1|-1>((10:2)+,-100)0").unwrap();
 

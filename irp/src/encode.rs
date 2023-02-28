@@ -20,6 +20,7 @@ impl Irp {
             }
 
             encoder.reset_extent_marker();
+            encoder.leading_gap = true;
         }
 
         encoder.encode(&variants.repeat, None)?;
@@ -30,6 +31,7 @@ impl Irp {
 
         if let Some(up) = &variants.up {
             encoder.reset_extent_marker();
+            encoder.leading_gap = true;
 
             encoder.encode(up, None)?;
 
@@ -68,6 +70,7 @@ impl Irp {
             }
 
             encoder.reset_extent_marker();
+            encoder.leading_gap = true;
         }
 
         let intro = encoder.raw.iter().map(|v| *v as f64).collect();
@@ -84,6 +87,7 @@ impl Irp {
 
         if let Some(up) = &variants.up {
             encoder.reset_extent_marker();
+            encoder.leading_gap = true;
 
             encoder.raw.truncate(0);
 
@@ -194,6 +198,8 @@ struct Encoder<'a, 'b> {
     general_spec: &'a GeneralSpec,
     /// Raw output. Even entries are flash, odd are gaps
     raw: Vec<u32>,
+    /// Are we currently in a leading gap
+    leading_gap: bool,
     /// Length of IR generated, including leading gap
     total_length: i64,
     /// Extents start from this point
@@ -222,6 +228,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
             repeats,
             vars,
             raw: Vec::new(),
+            leading_gap: true,
             total_length: 0,
             extent_marker: 0,
             bitspec_scope: Vec::new(),
@@ -252,6 +259,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
         } else {
             self.raw.push(length as u32);
         }
+        self.leading_gap = false;
         Ok(())
     }
 
@@ -271,7 +279,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
 
         let len = self.raw.len();
 
-        if len == 0 {
+        if self.leading_gap {
             // ignore leading gaps
         } else if (len % 2) == 0 {
             let raw = self.raw.last_mut().unwrap();
@@ -439,12 +447,12 @@ impl<'a, 'b> Encoder<'a, 'b> {
                 self.vars.set(id.into(), v);
             }
             Expression::Stream(stream) => {
-                let repeats = match stream.repeat {
-                    None => 1,
-                    Some(RepeatMarker::Any) => self.repeats,
-                    Some(RepeatMarker::Count(num)) => num as u64,
-                    Some(RepeatMarker::OneOrMore) => 1 + self.repeats,
-                    Some(RepeatMarker::CountOrMore(num)) => num as u64 + self.repeats,
+                let (repeats, reset_repeat) = match stream.repeat {
+                    None => (1, 1),
+                    Some(RepeatMarker::Any) => (self.repeats, 0),
+                    Some(RepeatMarker::Count(num)) => (num as u64, num as u64),
+                    Some(RepeatMarker::OneOrMore) => (1 + self.repeats, 1),
+                    Some(RepeatMarker::CountOrMore(num)) => (num as u64 + self.repeats, num as u64),
                 };
 
                 let level = if !stream.bit_spec.is_empty() {
@@ -461,7 +469,11 @@ impl<'a, 'b> Encoder<'a, 'b> {
                     level
                 };
 
-                for _ in 0..repeats {
+                for repeat_no in 0..repeats {
+                    if repeat_no >= reset_repeat {
+                        self.reset_extent_marker();
+                        self.leading_gap = true;
+                    }
                     for expr in &stream.stream {
                         if let Expression::List(list) = expr.as_ref() {
                             if list.is_empty() {
