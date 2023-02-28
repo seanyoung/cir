@@ -581,7 +581,7 @@ fn unit0() {
 
 #[test]
 fn arithmetic_in_bitspec() {
-    let irp = Irp::parse("{0}<A=2-3|-1>(1m,-100m)").unwrap();
+    let irp = Irp::parse("{.0k}<A=2-3|-1>(1m,-100m)").unwrap();
 
     let vars = Vartable::new();
 
