@@ -161,6 +161,25 @@ peg::parser! {
         rule expression17() -> Expression
          = bit_field() / primary_item()
 
+        // Bitspec <A=2|3> should be parsed as A=2 and 3, and we should also parse <A=2-3>
+         #[cache_left_rec]
+         rule bitspec_assign_expression() -> Expression
+          = cond:bitspec_assign_expression() "?" _ left:bitspec_assign_expression2() ":" _ right:bitspec_assign_expression2()
+            { Expression::Conditional(Rc::new(cond), Rc::new(left), Rc::new(right)) }
+          / bitspec_assign_expression2()
+
+         #[cache_left_rec]
+         rule bitspec_assign_expression2() -> Expression
+          = left:bitspec_assign_expression2() "||" _ right:bitspec_assign_expression3()
+            { Expression::Or(Rc::new(left), Rc::new(right)) }
+          / bitspec_assign_expression3()
+
+         #[cache_left_rec]
+         rule bitspec_assign_expression3() -> Expression
+          = left:bitspec_assign_expression3() "&&" _ right:expression5()
+            { Expression::And(Rc::new(left), Rc::new(right)) }
+          / expression5()
+
         rule bit_field() -> Expression
          = complement:"~"? _ value:primary_item() ":" _ reverse:"-"? length:primary_item() skip:skip()?
          {
@@ -276,7 +295,7 @@ peg::parser! {
          / bitspec_irstream()) { Rc::new(item) }
 
         rule bitspec_definition() -> Expression
-         = i:identifier() _ "=" _ e:primary_item() _ { Expression::Assignment(i.to_owned(), Rc::new(e)) }
+         = i:identifier() _ "=" _ e:bitspec_assign_expression() _ { Expression::Assignment(i.to_owned(), Rc::new(e)) }
 
         rule bare_bitspec() -> Rc<Expression>
          = bitspec:(bitspec_item() ** ("," _))

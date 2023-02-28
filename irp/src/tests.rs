@@ -578,3 +578,14 @@ fn unit0() {
 
     assert!(res.is_err());
 }
+
+#[test]
+fn arithmetic_in_bitspec() {
+    let irp = Irp::parse("{0}<A=2-3|-1>(1m,-100m)").unwrap();
+
+    let vars = Vartable::new();
+
+    let res = irp.encode(vars, 1);
+
+    assert!(res.is_ok());
+}
