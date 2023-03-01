@@ -446,9 +446,7 @@ impl<'a> Builder<'a> {
                         self.decode_bits(Some(min_len), max_len, *reverse, store_length, bit_spec)?;
 
                         let skip = if let Some(skip) = skip {
-                            let skip = self.const_folding(skip).eval(&Vartable::new())?;
-
-                            skip
+                            self.const_folding(skip).eval(&Vartable::new())?
                         } else {
                             0
                         };
@@ -515,9 +513,7 @@ impl<'a> Builder<'a> {
                     }
 
                     let skip = if let Some(skip) = skip {
-                        let skip = self.const_folding(skip).eval(&Vartable::new())?;
-
-                        skip
+                        self.const_folding(skip).eval(&Vartable::new())?
                     } else {
                         0
                     };
