@@ -83,7 +83,7 @@ pub fn encode(
 
         for raw_code in &remote.raw_codes {
             if raw_code.name == *encode_code {
-                let encoded = remote.encode_raw(raw_code, repeats);
+                let encoded = remote.encode_raw(raw_code, repeats)?;
 
                 message.extend(&encoded);
 
@@ -133,7 +133,7 @@ impl Remote {
     }
 
     /// Encode raw code for this remote, with the given repeats
-    pub fn encode_raw(&self, raw_code: &RawCode, repeats: u64) -> Message {
+    pub fn encode_raw(&self, raw_code: &RawCode, repeats: u64) -> Result<Message, String> {
         debug!("encoding name={}", raw_code.name);
 
         // remove trailing space
@@ -152,8 +152,15 @@ impl Remote {
         } else {
             let total_length: u32 = raw.iter().sum();
 
-            if self.flags.contains(Flags::CONST_LENGTH) && (total_length as u64) < self.gap {
-                self.gap as u32 - total_length
+            if self.flags.contains(Flags::CONST_LENGTH) {
+                if (total_length as u64) < self.gap {
+                    self.gap as u32 - total_length
+                } else {
+                    return Err(format!(
+                        "const length gap is too short, gap is {} but signal is {}",
+                        self.gap, total_length
+                    ));
+                }
             } else {
                 self.gap as u32
             }
@@ -184,10 +191,10 @@ impl Remote {
             None
         };
 
-        Message {
+        Ok(Message {
             carrier,
             duty_cycle,
             raw,
-        }
+        })
     }
 }
