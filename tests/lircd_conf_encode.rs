@@ -43,6 +43,7 @@ fn lircd_encode(path: &Path) {
             || lircd_remote.bit(0) == (0, 0)
             || lircd_remote.bit(1) == (0, 0)
         {
+            // our rust lircd conf parser will refuse to parse this
             println!("not valid: {}", lircd_remote.name());
             continue;
         } else {
@@ -61,7 +62,7 @@ fn lircd_encode(path: &Path) {
                 lircd_remote.name()
             );
             continue;
-        } else if lircd_remote.toggle_bit_mask() != 0 {
+        } else if lircd_remote.toggle_bit_mask() != 0 && lircd_remote.toggle_bit() == 0 {
             // TODO: fix either cir or lircd
             println!(
                 "SKIP: {} because lircd does weird things",
@@ -179,12 +180,6 @@ fn lircd_encode(path: &Path) {
 }
 
 fn compare_output(remote: &Remote, lircd: &[u32], our: &[u32]) -> bool {
-    // if lircd.len() < our.len() {
-    //     let len = lircd.len();
-    //     if our[len] > 100000 && lircd == &our[..len] {
-    //         return true;
-    //     }
-    // }
     if lircd.len() != our.len() {
         println!("length {} {} differ", lircd.len(), our.len());
         return false;

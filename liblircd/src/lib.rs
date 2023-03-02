@@ -98,7 +98,7 @@ struct ir_remote {
     max_space_length: i32,
     release_detected: i32,
     manual_sort: i32,
-    next: *const ir_remote,
+    next: *mut ir_remote,
 }
 
 #[repr(C)]
@@ -139,7 +139,7 @@ impl LircdConf {
     }
 }
 
-pub struct RemoteIterator<'a>(*const ir_remote, bool, PhantomData<&'a ()>);
+pub struct RemoteIterator<'a>(*mut ir_remote, bool, PhantomData<&'a ()>);
 
 impl<'a> Iterator for RemoteIterator<'a> {
     type Item = Remote<'a>;
@@ -169,7 +169,7 @@ impl Drop for LircdConf {
 }
 
 #[derive(Debug)]
-pub struct Remote<'a>(*const ir_remote, PhantomData<&'a ()>);
+pub struct Remote<'a>(*mut ir_remote, PhantomData<&'a ()>);
 
 impl<'a> Remote<'a> {
     pub fn name(&self) -> String {
@@ -192,6 +192,10 @@ impl<'a> Remote<'a> {
 
     pub fn toggle_bit_mask(&self) -> u64 {
         unsafe { (*self.0).toggle_bit_mask }
+    }
+
+    pub fn toggle_bit(&self) -> i32 {
+        unsafe { (*self.0).toggle_bit }
     }
 
     pub fn bit(&self, bit: usize) -> (i32, i32) {
@@ -245,6 +249,12 @@ impl<'a> Code<'a> {
 
     pub fn encode(&self) -> Option<Vec<u32>> {
         unsafe { send_buffer_init() };
+
+        if unsafe { (*self.1 .0).toggle_mask } != 0 {
+            unsafe {
+                (*self.1 .0).toggle_mask_state = 0;
+            }
+        }
 
         let res = unsafe { send_buffer_put(self.1 .0, self.0) };
         if res != 1 {

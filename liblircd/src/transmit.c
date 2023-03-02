@@ -406,8 +406,6 @@ static int init_send_or_sim(struct ir_remote* remote, struct ir_ncode* code, int
 		else
 			repeat = 1;
 	}
-	/// reset toggle_mask_state, else it will flip with each iteration
-	remote->toggle_mask_state = 0;
 
 init_send_loop:
 	if (repeat && has_repeat(remote)) {
