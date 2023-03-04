@@ -656,3 +656,39 @@ fn negative_vars() {
 
     assert_eq!(res.unwrap().raw, vec![2300, 100300]);
 }
+
+#[test]
+fn parse_or_in_bitspec() {
+    // should be parsed as a single bit spec, last=-1|-2 is an expression
+    let irp = Irp::parse(
+        "{416,38k,msb}<last,1,last=-1|-2,last=1>(1,CODE:31,^106m){last=1} [CODE:0..0x7fffffff]",
+    )
+    .unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("CODE".to_string(), 0x1fffffff);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(
+        res.err(),
+        Some("Cannot encode 1 with current bit_spec".into())
+    );
+
+    // with u to force parser to parse it as
+    // bit 0: last,1,last=-1
+    // bit 1: -2u,last=1
+    let irp = Irp::parse(
+        "{416,38k,msb}<last,1,last=-1|-2u,last=1>(1,CODE:31,^106m){last=1} [CODE:0..0x7fffffff]",
+    )
+    .unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("CODE".to_string(), 0x1fffffff);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(res.unwrap().raw, vec![1248, 416, 416, 103920]);
+}
