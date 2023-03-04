@@ -10,6 +10,7 @@ keywords = [ "IRP", "IR", "infrared", "pronto" ]
 readme = "README.md"
 license = "MIT"
 rust-version = "1.67.0"
+exclude = [ "/IrpTransmogrifier" ]
 
 [dependencies]
 num = "0.4"
