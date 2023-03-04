@@ -635,3 +635,24 @@ fn complement_definition() {
         vec![100, 300, 100, 300, 100, 300, 100, 100, 100, 300, 100, 300, 100, 100, 100, 25100]
     );
 }
+
+#[test]
+fn negative_vars() {
+    let irp = Irp::parse("{100}<1,-1|1,-3>(10,-P,10,P,-1000)").unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("P".to_string(), 3);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(res.unwrap().raw, vec![1000, 300, 1300, 100000]);
+
+    let mut vars = Vartable::new();
+
+    vars.set("P".to_string(), -3);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(res.unwrap().raw, vec![2300, 100300]);
+}

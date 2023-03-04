@@ -421,7 +421,12 @@ impl<'a, 'b> Encoder<'a, 'b> {
             }
             Expression::FlashIdentifier(id, u) => {
                 self.flush_level(level)?;
-                self.add_flash(u.eval(self.vars.get(id)?, self.general_spec)?)?;
+                let v = u.eval(self.vars.get(id)?, self.general_spec)?;
+                if v > 0 {
+                    self.add_flash(v)?;
+                } else {
+                    self.add_gap(-v)?;
+                }
             }
             Expression::ExtentConstant(p, u) => {
                 self.flush_level(level)?;
@@ -437,7 +442,12 @@ impl<'a, 'b> Encoder<'a, 'b> {
             }
             Expression::GapIdentifier(id, u) => {
                 self.flush_level(level)?;
-                self.add_gap(u.eval(self.vars.get(id)?, self.general_spec)?)?;
+                let v = u.eval(self.vars.get(id)?, self.general_spec)?;
+                if v > 0 {
+                    self.add_gap(v)?;
+                } else {
+                    self.add_flash(-v)?;
+                }
             }
             Expression::Assignment(id, expr) => {
                 self.flush_level(level)?;
