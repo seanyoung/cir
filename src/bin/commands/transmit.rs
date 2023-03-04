@@ -508,7 +508,7 @@ fn encode_scancode(protocol: &str, code: &str) -> Result<Message, String> {
         "sony12" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:16,^45m)*[CODE:0..0x1f007f]",0x1f007f),
         "sony15" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:8:16,^45m)*[CODE:0..0xff007f]",0xff007f),
         "sony20" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:8,CODE:8:16,^45m)*[CODE:0..0x7f1fff]", 0x7f1fff),
-        "imon" => ("{39k,msb,416}<-2|-1,1|1,-1|2>(LAST=1,1,((BIT=(CODE&0x40000000)!=0),(LAST&BIT):1,BIT:1,LAST=BIT,CODE=(CODE<<1))31,^120m) [CODE:0..0x7fffffff]", 0x7fffffff),
+        "imon" => ("{416,38k,msb}<last,1u,last=-1|-2u,last=1>(1,CODE:31,^106m){last=1} [CODE:0..0x7fffffff]", 0x7fffffff),
         _ => {
             return Err(format!("protocol {protocol} is not known"));
         }
