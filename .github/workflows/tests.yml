@@ -22,7 +22,7 @@ jobs:
       run: |
           mvn compile
           mvn package
-      working-directory: irp/IrpTransmogrifier
+      working-directory: irp/tests/IrpTransmogrifier
     - name: Build
       run: cargo build --verbose
     - name: Run tests
