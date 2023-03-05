@@ -155,6 +155,46 @@ fn variants() {
             "cannot have variant with \'*\' repeat, use \'+\' instead"
         ))
     );
+
+    let irp = Irp::parse("{58k,10}<1,-2|1,-4>([40][30][20],-100,[1][2][3],-16m)+").unwrap();
+    let res = irp.encode(Vartable::new(), 1).unwrap();
+
+    assert_eq!(
+        res.raw,
+        Message::parse("+400 -1000 +10 -16000 +300 -1000 +20 -16000 +200 -1000 +30 -16000")
+            .unwrap()
+            .raw
+    );
+
+    let irp = Irp::parse("{58k,10}<1,-2|1,-4>([40][30][],-100,[1][2][3],-16m)+").unwrap();
+    let res = irp.encode(Vartable::new(), 1).unwrap();
+
+    assert_eq!(
+        res.raw,
+        Message::parse("+400 -1000 +10 -16000 +300 -1000 +20 -16000")
+            .unwrap()
+            .raw
+    );
+
+    let irp = Irp::parse("{58k,10}<1,-2|1,-4>([40][30],-100,[1][2][3],-16m)+").unwrap();
+    let res = irp.encode(Vartable::new(), 1).unwrap();
+
+    assert_eq!(
+        res.raw,
+        Message::parse("+400 -1000 +10 -16000 +300 -1000 +20 -16000")
+            .unwrap()
+            .raw
+    );
+
+    let irp = Irp::parse("{58k,10}<1,-2|1,-4>([40][30][20],-100,[1][2][],-16m)+").unwrap();
+    let res = irp.encode(Vartable::new(), 1).unwrap();
+
+    assert_eq!(
+        res.raw,
+        Message::parse("+400 -1000 +10 -16000 +300 -1000 +20 -16000 +200 -1000")
+            .unwrap()
+            .raw
+    );
 }
 
 #[test]

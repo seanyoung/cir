@@ -243,7 +243,7 @@ impl Irp {
                                             Some(Rc::new(Expression::List(variant.clone())))
                                         }
                                     } else {
-                                        None
+                                        Some(Rc::new(Expression::List(Vec::new())))
                                     }
                                 } else {
                                     None
