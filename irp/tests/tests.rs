@@ -736,3 +736,16 @@ fn parse_or_in_bitspec() {
 
     assert_eq!(res.unwrap().raw, vec![1248, 416, 416, 103920]);
 }
+
+#[test]
+fn zero_bitspec() {
+    let irp = Irp::parse("{10}<1,-1|1,-3>(C:4){C=255:0}").unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("CODE".to_string(), 0x1fffffff);
+
+    let res = irp.encode(vars, 1);
+
+    assert_eq!(res.unwrap().raw, vec![10, 10, 10, 10, 10, 10, 10, 10]);
+}

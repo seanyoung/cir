@@ -272,27 +272,27 @@ impl Expression {
                 length,
                 skip,
             } => {
-                let mut b = value.eval(vars)?;
+                let mut value = value.eval(vars)?;
 
                 if let Some(skip) = skip {
-                    b = b.wrapping_shr(skip.eval(vars)? as u32);
+                    value = value.wrapping_shr(skip.eval(vars)? as u32);
                 }
 
-                let l = length.eval(vars)?;
+                let length = length.eval(vars)?;
 
                 if *reverse {
-                    b = b.reverse_bits().rotate_left(l as u32);
+                    value = value.reverse_bits().rotate_left(length as u32);
                 }
 
-                if !(0..64).contains(&l) {
-                    return Err(format!("bitfields of {l} not supported"));
+                if !(0..64).contains(&length) {
+                    return Err(format!("bitfields of {length} not supported"));
                 }
 
-                if l > 0 && l < 63 {
-                    b &= (1 << l) - 1;
+                if (0..63).contains(&length) {
+                    value &= (1 << length) - 1;
                 }
 
-                Ok((b, l))
+                Ok((value, length))
             }
             _ => Err("not a bitfield".into()),
         }
