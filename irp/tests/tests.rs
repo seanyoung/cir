@@ -621,11 +621,15 @@ fn arithmetic_in_bitspec() {
     let res = irp.encode(vars, 1);
 
     assert!(res.is_ok());
+
+    let irp = Irp::parse("{.0k}<2,-3||-1>(1m,-100m)");
+
+    assert_eq!(irp.err(), Some("bitspec cannot be empty".into()));
 }
 
 #[test]
 fn leading_gap() {
-    let irp = Irp::parse("{100}<>(^40,2,-20)3+").unwrap();
+    let irp = Irp::parse("{100}<1>(^40,2,-20)3+").unwrap();
 
     let vars = Vartable::new();
 

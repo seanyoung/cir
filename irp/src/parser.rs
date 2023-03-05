@@ -650,6 +650,10 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
 
             for expr in &stream.bit_spec {
                 if let Expression::List(list) = expr.as_ref() {
+                    if list.is_empty() {
+                        return Err("bitspec cannot be empty".into());
+                    }
+
                     for expr in list {
                         match expr.as_ref() {
                             Expression::FlashConstant(..)
