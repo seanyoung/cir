@@ -124,7 +124,7 @@ impl Remote {
 
             vars.set(String::from("CODE"), *code as i64);
 
-            let m = irp.encode(vars, repeats)?;
+            let m = irp.encode_raw(vars, repeats)?;
 
             message.extend(&m);
         }

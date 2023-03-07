@@ -194,9 +194,28 @@ impl Irp {
     }
 
     pub(crate) fn split_variants_encode(&self) -> Result<Variants, String> {
-        let expr = &self.stream;
+        // Normalize the repeat markers
+        let expr = clone_filter(&self.stream, &|e| match e.as_ref() {
+            Expression::Stream(stream) => {
+                let mut stream = stream.clone();
+                stream.repeat = match stream.repeat {
+                    Some(RepeatMarker::CountOrMore(0)) => Some(RepeatMarker::Any),
+                    Some(RepeatMarker::CountOrMore(1)) => Some(RepeatMarker::OneOrMore),
+                    Some(RepeatMarker::Count(1)) => None,
+                    Some(RepeatMarker::Count(0)) => {
+                        stream.stream.truncate(0);
+                        None
+                    }
+                    m => m,
+                };
 
-        if let Expression::Stream(stream) = self.stream.as_ref() {
+                Some(Rc::new(Expression::Stream(stream)))
+            }
+            _ => None,
+        })
+        .unwrap_or(self.stream.clone());
+
+        if let Expression::Stream(stream) = expr.as_ref() {
             for expr in &stream.bit_spec {
                 // bitspec should never have repeats
                 check_no_repeats(expr)?;
@@ -234,7 +253,7 @@ impl Irp {
                 if let Some(variant_count) = variant_count {
                     let variants: Vec<_> = (0..variant_count)
                         .map(|variant| {
-                            clone_filter(expr, &|e| {
+                            clone_filter(&expr, &|e| {
                                 if let Expression::Variation(list) = e.as_ref() {
                                     if let Some(variant) = list.get(variant) {
                                         if variant.len() == 1 {
@@ -265,11 +284,13 @@ impl Irp {
                         None
                     };
 
+                    let mut down_repeat = None;
+
                     let repeat = if let Expression::Stream(stream) = variants[1].as_ref() {
                         let mut stream = stream.clone();
                         // (foo)* / (foo)0+ not permitted with variantion
                         stream.repeat = match stream.repeat {
-                            Some(RepeatMarker::Any) | Some(RepeatMarker::CountOrMore(0)) => {
+                            Some(RepeatMarker::Any) => {
                                 if !down_variant_empty {
                                     return Err(
                                         "cannot have variant with '*' repeat, use '+' instead"
@@ -280,7 +301,10 @@ impl Irp {
                             }
                             Some(RepeatMarker::OneOrMore) => Some(RepeatMarker::Any),
                             Some(RepeatMarker::CountOrMore(n)) => {
-                                Some(RepeatMarker::CountOrMore(n - 1))
+                                if !down_variant_empty {
+                                    down_repeat = Some(RepeatMarker::Count(n));
+                                }
+                                Some(RepeatMarker::Any)
                             }
                             Some(RepeatMarker::Count(_)) | None => unreachable!(),
                         };
@@ -291,7 +315,7 @@ impl Irp {
 
                     let down = if let Expression::Stream(stream) = variants[0].as_ref() {
                         let mut stream = stream.clone();
-                        stream.repeat = None;
+                        stream.repeat = down_repeat;
                         Some(Rc::new(Expression::Stream(stream)))
                     } else {
                         panic!("stream expected");
@@ -301,7 +325,7 @@ impl Irp {
                 } else {
                     Ok(Variants {
                         down: None,
-                        repeat: expr.clone(),
+                        repeat: expr,
                         up: None,
                     })
                 }
@@ -435,7 +459,7 @@ fn check_no_repeats(expr: &Expression) -> Result<(), String> {
 // Add stream item to the list, flattening unnecessary lists/streams
 fn add_flatten(expr: &mut Vec<Rc<Expression>>, elem: &Rc<Expression>) {
     match elem.as_ref() {
-        Expression::List(list) => {
+        Expression::List(list) if !list.is_empty() => {
             for elem in list {
                 expr.push(elem.clone());
             }
@@ -704,13 +728,64 @@ fn encode_variants() {
 
     let irp = Irp::parse("{100}<1|-1>((10:2)+,-100)1").unwrap();
 
-    let m = irp.encode(Vartable::new(), 1).unwrap();
+    let m = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert_eq!(m.raw, vec![100, 100, 100, 100]);
 
     let irp = Irp::parse("{100}<1|-1>((10:2)+,-100)0").unwrap();
 
-    let m = irp.encode(Vartable::new(), 1).unwrap();
+    let m = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert!(m.raw.is_empty());
+}
+
+#[test]
+fn variant_repeats() {
+    use crate::Vartable;
+
+    let irp = Irp::parse("{10}<1|2>([10][20][30],-100)+").unwrap();
+
+    assert_eq!(
+        irp.encode(Vartable::new()).unwrap(),
+        [vec![100, 1000], vec![200, 1000], vec![300, 1000]]
+    );
+
+    let irp = Irp::parse("{10}<1|2>([10][20][30],-100)3+").unwrap();
+
+    assert_eq!(
+        irp.encode(Vartable::new()).unwrap(),
+        [
+            vec![100, 1000, 100, 1000, 100, 1000],
+            vec![200, 1000],
+            vec![300, 1000]
+        ]
+    );
+
+    let irp = Irp::parse("{10}<1|2>([10][20][30],-100)0+").unwrap();
+
+    assert_eq!(
+        irp.encode(Vartable::new()).err(),
+        Some("cannot have variant with '*' repeat, use '+' instead".into())
+    );
+
+    let irp = Irp::parse("{10}<1|2>([][20][30],-100)+").unwrap();
+
+    assert_eq!(
+        irp.encode(Vartable::new()).unwrap(),
+        [vec![], vec![200, 1000], vec![300, 1000]]
+    );
+
+    let irp = Irp::parse("{10}<1|2>([][20][30],-100)*").unwrap();
+
+    assert_eq!(
+        irp.encode(Vartable::new()).unwrap(),
+        [vec![], vec![200, 1000], vec![300, 1000]]
+    );
+
+    let irp = Irp::parse("{10}<1|2>([][20][30],-100)10+").unwrap();
+
+    assert_eq!(
+        irp.encode(Vartable::new()).unwrap(),
+        [vec![], vec![200, 1000], vec![300, 1000]]
+    );
 }

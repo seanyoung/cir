@@ -14,7 +14,7 @@ fn test() {
 
     let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
 
-    let res = irp.encode(vars, 1).unwrap();
+    let res = irp.encode_raw(vars, 1).unwrap();
 
     // irptransmogrifier.sh  --irp "{38.0k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)+" encode -r -n F=1,D=0xe9,S=0xfe
     assert_eq!(
@@ -29,7 +29,7 @@ fn test() {
     vars.set("T".to_string(), 0);
 
     let irp = Irp::parse("{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+").unwrap();
-    let res = irp.encode(vars, 0).unwrap();
+    let res = irp.encode_raw(vars, 0).unwrap();
 
     // irptransmogrifier.sh  --irp "{36k,msb,889}<1,-1|-1,1>(1:1,~F:1:6,T:1,D:5,F:6,^114m)+" encode -r -n F=1,T=0,D=0xe9
 
@@ -45,7 +45,7 @@ fn test() {
     vars.set("S".to_string(), 0x88);
 
     let irp = Irp::parse("{38k,400}<1,-1|1,-3>(8,-4,170:8,90:8,15:4,D:4,S:8,F:8,E:4,C:4,1,-48)+ {E=1,C=D^S:4:0^S:4:4^F:4:0^F:4:4^E:4}").unwrap();
-    let res = irp.encode(vars, 0).unwrap();
+    let res = irp.encode_raw(vars, 0).unwrap();
 
     assert_eq!(
         res.raw,
@@ -66,7 +66,7 @@ fn rs200() {
     vars.set("H3".to_string(), 3);
     vars.set("H4".to_string(), 4);
 
-    let res = irp.encode(vars, 1).unwrap();
+    let res = irp.encode_raw(vars, 1).unwrap();
 
     assert!(compare_with_rounding(
         &res.raw,
@@ -82,7 +82,7 @@ fn nec() {
     vars.set("D".to_string(), 0xe9);
 
     let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
-    let res = irp.encode(vars, 1).unwrap();
+    let res = irp.encode_raw(vars, 1).unwrap();
 
     // irptransmogrifier.sh --irp  "{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m)* [D:0..255,S:0..255=255-D,F:0..255]" encode -r -n F=1,D=0xe9
     assert_eq!(
@@ -99,7 +99,7 @@ fn keeprite_ac() {
     vars.set("B".to_string(), 0xe9);
 
     let irp = Irp::parse("{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]").unwrap();
-    let res = irp.encode(vars, 1).unwrap();
+    let res = irp.encode_raw(vars, 1).unwrap();
 
     // irptransmogrifier.sh --irp  "{38.1k,570,msb}<1,-1|1,-3>(16,-8,A:35,1,-20m,B:32,1,-20m)[A:0..0x7FFFFFFFF, B:0..UINT32_MAX]" encode -r -n A=1,B=0xe9
     assert_eq!(
@@ -111,7 +111,7 @@ fn keeprite_ac() {
 #[test]
 fn variants() {
     let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33],-100)+").unwrap();
-    let res = irp.encode(Vartable::new(), 1).unwrap();
+    let res = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert_eq!(
         res.raw,
@@ -120,7 +120,7 @@ fn variants() {
 
     let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33],-100)+").unwrap();
 
-    let res = irp.encode(Vartable::new(), 1).unwrap();
+    let res = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert_eq!(
         res.raw,
@@ -128,7 +128,7 @@ fn variants() {
     );
 
     let irp = Irp::parse("{}<1,-1|1,-3>(111,-222,[11][][33],-100)+").unwrap();
-    let res = irp.encode(Vartable::new(), 1).unwrap();
+    let res = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert_eq!(
         res.raw,
@@ -138,7 +138,7 @@ fn variants() {
     );
 
     let irp = Irp::parse("{100}<1,-1|1,-3>([1][2],-10,10:10,1,-100m)").unwrap();
-    let res = irp.encode(Vartable::new(), 1);
+    let res = irp.encode_raw(Vartable::new(), 1);
 
     assert_eq!(
         res.err(),
@@ -147,7 +147,7 @@ fn variants() {
 
     let irp = Irp::parse("{}<1,-1|1,-3>([11][22],-100)*").unwrap();
 
-    let res = irp.encode(Vartable::new(), 1);
+    let res = irp.encode_raw(Vartable::new(), 1);
 
     assert_eq!(
         res.err(),
@@ -157,7 +157,7 @@ fn variants() {
     );
 
     let irp = Irp::parse("{58k,10}<1,-2|1,-4>([40][30][20],-100,[1][2][3],-16m)+").unwrap();
-    let res = irp.encode(Vartable::new(), 1).unwrap();
+    let res = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert_eq!(
         res.raw,
@@ -167,7 +167,7 @@ fn variants() {
     );
 
     let irp = Irp::parse("{58k,10}<1,-2|1,-4>([40][30][],-100,[1][2][3],-16m)+").unwrap();
-    let res = irp.encode(Vartable::new(), 1).unwrap();
+    let res = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert_eq!(
         res.raw,
@@ -177,7 +177,7 @@ fn variants() {
     );
 
     let irp = Irp::parse("{58k,10}<1,-2|1,-4>([40][30],-100,[1][2][3],-16m)+").unwrap();
-    let res = irp.encode(Vartable::new(), 1).unwrap();
+    let res = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert_eq!(
         res.raw,
@@ -187,7 +187,7 @@ fn variants() {
     );
 
     let irp = Irp::parse("{58k,10}<1,-2|1,-4>([40][30][20],-100,[1][2][],-16m)+").unwrap();
-    let res = irp.encode(Vartable::new(), 1).unwrap();
+    let res = irp.encode_raw(Vartable::new(), 1).unwrap();
 
     assert_eq!(
         res.raw,
@@ -209,7 +209,7 @@ fn vars() {
     )
     .unwrap();
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.err(),
@@ -223,7 +223,7 @@ fn vars() {
     vars.set("S".to_string(), 1);
     vars.set("F".to_string(), 0);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.err(),
@@ -237,7 +237,7 @@ fn vars() {
     vars.set("S".to_string(), 1);
     vars.set("X".to_string(), 0);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(res.err(), Some(String::from("missing value for F")));
 
@@ -247,7 +247,7 @@ fn vars() {
     vars.set("F".to_string(), 2);
     vars.set("X".to_string(), 0);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(res.err(), Some(String::from("no parameter called X")));
 
@@ -259,7 +259,7 @@ fn vars() {
     vars.set("F".to_string(), 2);
     vars.set("X".to_string(), 0);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert!(res.is_ok());
 }
@@ -358,7 +358,7 @@ fn compare_encode_to_transmogrifier() {
         }
 
         for repeats in 0..10 {
-            let msg = irp.encode(vars.clone(), repeats).unwrap();
+            let msg = irp.encode_raw(vars.clone(), repeats).unwrap();
             let trans_msg = trans_irp
                 .render_raw(params.clone(), repeats as usize)
                 .unwrap();
@@ -461,7 +461,7 @@ fn decode_all() {
                 vars.set(param.name.to_owned(), value);
             }
 
-            let msg = irp.encode(vars, repeats).unwrap();
+            let msg = irp.encode_raw(vars, repeats).unwrap();
 
             if msg.raw.len() < 3 {
                 println!("protocol:{} repeats:{} too short", protocol.name, repeats);
@@ -547,7 +547,7 @@ fn max_bitspec() {
     vars.set("D".to_string(), 3);
     vars.set("F".to_string(), 3);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.err(),
@@ -559,7 +559,7 @@ fn max_bitspec() {
     vars.set("D".to_string(), 2);
     vars.set("F".to_string(), 1);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.unwrap().raw,
@@ -572,7 +572,7 @@ fn max_bitspec() {
 
     vars.set("F".to_string(), 1);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.err(),
@@ -585,7 +585,7 @@ fn max_bitspec() {
 
     vars.set("F".to_string(), 1);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.err(),
@@ -599,7 +599,7 @@ fn unit0() {
 
     let vars = Vartable::new();
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert!(res.is_ok());
 
@@ -607,7 +607,7 @@ fn unit0() {
 
     let vars = Vartable::new();
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert!(res.is_err());
 }
@@ -618,7 +618,7 @@ fn arithmetic_in_bitspec() {
 
     let vars = Vartable::new();
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert!(res.is_ok());
 
@@ -633,7 +633,7 @@ fn leading_gap() {
 
     let vars = Vartable::new();
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.unwrap().raw,
@@ -654,7 +654,7 @@ fn complement_definition() {
     vars.set("D".to_string(), 13);
     vars.set("S".to_string(), 251);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.unwrap().raw,
@@ -672,7 +672,7 @@ fn complement_definition() {
     vars.set("D".to_string(), 13);
     vars.set("S".to_string(), 251);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.unwrap().raw,
@@ -688,7 +688,7 @@ fn negative_vars() {
 
     vars.set("P".to_string(), 3);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(res.unwrap().raw, vec![1000, 300, 1300, 100000]);
 
@@ -696,7 +696,7 @@ fn negative_vars() {
 
     vars.set("P".to_string(), -3);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(res.unwrap().raw, vec![2300, 100300]);
 }
@@ -713,7 +713,7 @@ fn parse_or_in_bitspec() {
 
     vars.set("CODE".to_string(), 0x1fffffff);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(
         res.err(),
@@ -732,7 +732,7 @@ fn parse_or_in_bitspec() {
 
     vars.set("CODE".to_string(), 0x1fffffff);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(res.unwrap().raw, vec![1248, 416, 416, 103920]);
 }
@@ -745,7 +745,7 @@ fn zero_bitspec() {
 
     vars.set("CODE".to_string(), 0x1fffffff);
 
-    let res = irp.encode(vars, 1);
+    let res = irp.encode_raw(vars, 1);
 
     assert_eq!(res.unwrap().raw, vec![10, 10, 10, 10, 10, 10, 10, 10]);
 }

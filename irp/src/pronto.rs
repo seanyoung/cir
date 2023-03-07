@@ -146,7 +146,7 @@ impl Pronto {
                 vars.set("D".into(), *D as i64);
                 vars.set("F".into(), *F as i64);
 
-                irp.encode(vars, repeats as u64).unwrap()
+                irp.encode_raw(vars, repeats as u64).unwrap()
             }
             Pronto::Rc5x { D, S, F } => {
                 let irp = Irp::parse("{36k,msb,889}<1,-1|-1,1>((1,~S:1:6,T:1,D:5,-4,S:6,F:6,^114m)*,T=1-T)[D:0..31,S:0..127,F:0..63,T@:0..1=0]").unwrap();
@@ -156,7 +156,7 @@ impl Pronto {
                 vars.set("S".into(), *S as i64);
                 vars.set("F".into(), *F as i64);
 
-                irp.encode(vars, repeats as u64).unwrap()
+                irp.encode_raw(vars, repeats as u64).unwrap()
             }
             Pronto::Rc6 { D, F } => {
                 let irp = Irp::parse("{36k,444,msb}<-1,1|1,-1>((6,-2,1:1,0:3,<-2,2|2,-2>(T:1),D:8,F:8,^107m)*,T=1-T)[D:0..255,F:0..255,T@:0..1=0]").unwrap();
@@ -165,7 +165,7 @@ impl Pronto {
                 vars.set("D".into(), *D as i64);
                 vars.set("F".into(), *F as i64);
 
-                irp.encode(vars, repeats as u64).unwrap()
+                irp.encode_raw(vars, repeats as u64).unwrap()
             }
             Pronto::Nec1 { D, S, F } => {
                 let irp = Irp::parse("{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,-78,(16,-4,1,-173)*) [D:0..255,S:0..255=255-D,F:0..255]").unwrap();
@@ -175,7 +175,7 @@ impl Pronto {
                 vars.set("S".into(), *S as i64);
                 vars.set("F".into(), *F as i64);
 
-                irp.encode(vars, repeats as u64).unwrap()
+                irp.encode_raw(vars, repeats as u64).unwrap()
             }
         }
     }

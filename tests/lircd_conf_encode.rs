@@ -139,7 +139,7 @@ fn lircd_encode(path: &Path) {
                     let mut vars = Vartable::new();
                     vars.set(String::from("CODE"), our_code.code[0] as i64);
 
-                    let m = irp.encode(vars, 1).expect("encode should succeed");
+                    let m = irp.encode_raw(vars, 1).expect("encode should succeed");
 
                     message.extend(&m);
                 } else {
@@ -157,7 +157,7 @@ fn lircd_encode(path: &Path) {
                             );
                         }
 
-                        let m = irp.encode(vars, 0).expect("encode should succeed");
+                        let m = irp.encode_raw(vars, 0).expect("encode should succeed");
 
                         message.extend(&m);
                     }

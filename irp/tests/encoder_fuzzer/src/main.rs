@@ -24,7 +24,7 @@ fn main() {
                     vars.set(param.name.to_owned(), value);
                 }
 
-                if let Ok(our) = irp.encode(vars.clone(), 1) {
+                if let Ok(our) = irp.encode_raw(vars.clone(), 1) {
                     let trans = IrpTransmogrifierRender::new(&jvm, s).unwrap();
 
                     let their = trans.render_raw(params.clone(), 1).unwrap();

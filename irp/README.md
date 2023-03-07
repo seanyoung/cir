@@ -101,7 +101,7 @@ fn main() {
     vars.set(String::from("S"), 52);
     vars.set(String::from("F"), 1);
     // encode message with 0 repeats
-    let message = irp.encode(vars, 0).expect("encode should succeed");
+    let message = irp.encode_raw(vars, 0).expect("encode should succeed");
     if let Some(carrier) = &message.carrier {
         println!("carrier: {}Hz", carrier);
     }
@@ -282,7 +282,7 @@ fn main() {
     vars.set("D".into(), 0);
     let irp = Irp::parse(RC5_IRP).unwrap();
 
-    let message = irp.encode(vars, 1).unwrap();
+    let message = irp.encode_raw(vars, 1).unwrap();
 
     if let Some(carrier) = &message.carrier {
         // set the carrier frequency (see the 36k in the IRP definition)

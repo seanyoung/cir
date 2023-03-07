@@ -216,7 +216,7 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                     }
                 }
             } else {
-                match irp.encode(vars, repeats) {
+                match irp.encode_raw(vars, repeats) {
                     Ok(m) => (m, matches),
                     Err(s) => {
                         eprintln!("error: {s}");
@@ -527,5 +527,5 @@ fn encode_scancode(protocol: &str, code: &str) -> Result<Message, String> {
 
     vars.set("CODE".into(), scancode as i64);
 
-    irp.encode(vars, 1)
+    irp.encode_raw(vars, 1)
 }

@@ -5,7 +5,64 @@ use std::{collections::HashMap, rc::Rc};
 
 impl Irp {
     /// Render it to raw IR with the given variables
-    pub fn encode<'a>(&'a self, mut vars: Vartable<'a>, repeats: u64) -> Result<Message, String> {
+    pub fn encode<'a>(&'a self, mut vars: Vartable<'a>) -> Result<[Vec<u32>; 3], String> {
+        self.check_parameters(&mut vars)?;
+
+        let variants = self.split_variants_encode()?;
+
+        let mut encoder = Encoder::new(&self.general_spec, vars, 1);
+
+        let down: Vec<u32> = if let Some(down) = &variants.down {
+            encoder.encode(down, None)?;
+
+            if encoder.has_trailing_pulse() {
+                return Err("stream must end with a gap".into());
+            }
+
+            encoder.reset_extent_marker();
+            encoder.leading_gap = true;
+
+            encoder.raw.clone()
+        } else {
+            Vec::new()
+        };
+
+        encoder.raw.clear();
+
+        encoder.encode(&variants.repeat, None)?;
+
+        if encoder.has_trailing_pulse() {
+            return Err("stream must end with a gap".into());
+        }
+
+        let repeat = encoder.raw.clone();
+
+        let up = if let Some(up) = &variants.up {
+            encoder.raw.clear();
+
+            encoder.reset_extent_marker();
+            encoder.leading_gap = true;
+
+            encoder.encode(up, None)?;
+
+            if encoder.has_trailing_pulse() {
+                return Err("stream must end with a gap".into());
+            }
+
+            encoder.raw.clone()
+        } else {
+            Vec::new()
+        };
+
+        Ok([down, repeat, up])
+    }
+
+    /// Render it to raw IR with the given variables
+    pub fn encode_raw<'a>(
+        &'a self,
+        mut vars: Vartable<'a>,
+        repeats: u64,
+    ) -> Result<Message, String> {
         self.check_parameters(&mut vars)?;
 
         let variants = self.split_variants_encode()?;
@@ -49,64 +106,27 @@ impl Irp {
 
     /// Render it to pronto hex with the given variables.
     /// This always produces pronto hex long codes, never the short variant.
-    pub fn encode_pronto<'a>(&'a self, mut vars: Vartable<'a>) -> Result<Pronto, String> {
-        self.check_parameters(&mut vars)?;
+    pub fn encode_pronto<'a>(&'a self, vars: Vartable<'a>) -> Result<Pronto, String> {
+        let [intro, repeat, up] = self.encode(vars)?;
 
-        let carrier = match self.general_spec.carrier {
-            // This is the carrier transmogrifier uses for unmodulated signals
-            0 => 414514,
-            c => c,
-        };
+        let intro = intro.iter().map(|v| *v as f64).collect();
 
-        let variants = self.split_variants_encode()?;
+        let repeat = repeat.iter().map(|v| *v as f64).collect();
 
-        let mut encoder = Encoder::new(&self.general_spec, vars, 1);
-
-        if let Some(down) = &variants.down {
-            encoder.encode(down, None)?;
-
-            if encoder.has_trailing_pulse() {
-                return Err("stream must end with a gap".into());
-            }
-
-            encoder.reset_extent_marker();
-            encoder.leading_gap = true;
-        }
-
-        let intro = encoder.raw.iter().map(|v| *v as f64).collect();
-
-        encoder.raw.truncate(0);
-
-        encoder.encode(&variants.repeat, None)?;
-
-        if encoder.has_trailing_pulse() {
-            return Err("stream must end with a gap".into());
-        }
-
-        let repeat = encoder.raw.iter().map(|v| *v as f64).collect();
-
-        if let Some(up) = &variants.up {
-            encoder.reset_extent_marker();
-            encoder.leading_gap = true;
-
-            encoder.raw.truncate(0);
-
-            encoder.encode(up, None)?;
-
-            if !encoder.raw.is_empty() {
-                warn!("ending sequence cannot be represented in pronto, dropped");
-            }
+        if !up.is_empty() {
+            warn!("ending sequence cannot be represented in pronto, dropped");
         }
 
         if self.general_spec.carrier != 0 {
             Ok(Pronto::LearnedModulated {
-                frequency: carrier as f64,
+                frequency: self.general_spec.carrier as f64,
                 intro,
                 repeat,
             })
         } else {
             Ok(Pronto::LearnedUnmodulated {
-                frequency: carrier as f64,
+                // This is the carrier transmogrifier uses for unmodulated signals
+                frequency: 414514.0,
                 intro,
                 repeat,
             })
@@ -155,7 +175,7 @@ impl Irp {
             if let Expression::Assignment(name, expr) = e {
                 vars.set_definition(name.clone(), expr.as_ref());
             } else {
-                panic!("definition not correct expression: {e:?}");
+                unreachable!();
             }
         }
 
