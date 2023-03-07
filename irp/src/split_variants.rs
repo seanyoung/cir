@@ -368,6 +368,8 @@ impl Irp {
                 if seen_repeat.is_some() {
                     if let Some(n) = stream.max_repeat() {
                         if n > 1 {
+                            // So outer stream repeats >1 but there is a repeat marker inside it
+                            // e.g. {10}<1>(10,-10,(5,-10)*)2
                             return Err("multiple repeat markers in IRP".into());
                         }
                     }
@@ -378,7 +380,7 @@ impl Irp {
                     Some(RepeatMarker::CountOrMore(n)) => n > 0,
                     _ => false,
                 } {
-                    // if both the original stream and the added stream contain an extend,
+                    // if both the original stream and the added stream contain an extent,
                     // puth the original in stream
                     if has_extent(&repeats) && has_extent(&down) {
                         down = vec![
@@ -390,24 +392,29 @@ impl Irp {
                             Rc::new(Expression::Stream(Stream {
                                 bit_spec: Vec::new(),
                                 stream: repeats.clone(),
-                                repeat: None,
+                                repeat: if let Some(RepeatMarker::CountOrMore(n)) = seen_repeat {
+                                    Some(RepeatMarker::Count(n))
+                                } else {
+                                    None
+                                },
                             })),
                         ];
+                    } else if let Some(RepeatMarker::CountOrMore(n)) = seen_repeat {
+                        add_flatten(
+                            &mut down,
+                            &Rc::new(Expression::Stream(Stream {
+                                bit_spec: Vec::new(),
+                                stream: repeats.clone(),
+                                repeat: Some(RepeatMarker::Count(n)),
+                            })),
+                        );
                     } else {
                         for expr in &repeats {
                             add_flatten(&mut down, expr);
                         }
                     }
 
-                    seen_repeat = if let Some(RepeatMarker::CountOrMore(n)) = seen_repeat {
-                        match n {
-                            1 => Some(RepeatMarker::Any),
-                            2 => Some(RepeatMarker::OneOrMore),
-                            _ => Some(RepeatMarker::CountOrMore(n - 1)),
-                        }
-                    } else {
-                        Some(RepeatMarker::Any)
-                    };
+                    seen_repeat = Some(RepeatMarker::Any);
                 }
 
                 let down = if down.is_empty() {
