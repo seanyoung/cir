@@ -4,13 +4,13 @@ use log::warn;
 use std::{collections::HashMap, rc::Rc};
 
 impl Irp {
-    /// Render it to raw IR with the given variables
+    /// Render it to raw IR with the given variables, separated into intro, repeat, ending
     pub fn encode<'a>(&'a self, mut vars: Vartable<'a>) -> Result<[Vec<u32>; 3], String> {
         self.check_parameters(&mut vars)?;
 
         let variants = self.split_variants_encode()?;
 
-        let mut encoder = Encoder::new(&self.general_spec, vars, 1);
+        let mut encoder = Encoder::new(&self.general_spec, vars);
 
         let down: Vec<u32> = if let Some(down) = &variants.down {
             encoder.encode(down, None)?;
@@ -58,49 +58,21 @@ impl Irp {
     }
 
     /// Render it to raw IR with the given variables
-    pub fn encode_raw<'a>(
-        &'a self,
-        mut vars: Vartable<'a>,
-        repeats: u64,
-    ) -> Result<Message, String> {
-        self.check_parameters(&mut vars)?;
+    pub fn encode_raw<'a>(&'a self, vars: Vartable<'a>, repeats: u64) -> Result<Message, String> {
+        let [down, repeat, up] = self.encode(vars)?;
 
-        let variants = self.split_variants_encode()?;
+        let mut raw = down;
 
-        let mut encoder = Encoder::new(&self.general_spec, vars, repeats);
-
-        if let Some(down) = &variants.down {
-            encoder.encode(down, None)?;
-
-            if encoder.has_trailing_pulse() {
-                return Err("stream must end with a gap".into());
-            }
-
-            encoder.reset_extent_marker();
-            encoder.leading_gap = true;
+        for _ in 0..repeats {
+            raw.extend_from_slice(&repeat);
         }
 
-        encoder.encode(&variants.repeat, None)?;
-
-        if encoder.has_trailing_pulse() {
-            return Err("stream must end with a gap".into());
-        }
-
-        if let Some(up) = &variants.up {
-            encoder.reset_extent_marker();
-            encoder.leading_gap = true;
-
-            encoder.encode(up, None)?;
-
-            if encoder.has_trailing_pulse() {
-                return Err("stream must end with a gap".into());
-            }
-        }
+        raw.extend(up);
 
         Ok(Message {
             carrier: Some(self.general_spec.carrier),
             duty_cycle: self.general_spec.duty_cycle,
-            raw: encoder.raw,
+            raw,
         })
     }
 
@@ -224,8 +196,6 @@ struct Encoder<'a, 'b> {
     total_length: i64,
     /// Extents start from this point
     extent_marker: i64,
-    /// Number of repeats to encode
-    repeats: u64,
     /// The variables
     vars: Vartable<'a>,
     /// bitspec scopes
@@ -242,10 +212,9 @@ struct BitspecScope<'a> {
 
 impl<'a, 'b> Encoder<'a, 'b> {
     /// Create a new encoder. One is needed per IRP encode.
-    fn new(general_spec: &'a GeneralSpec, vars: Vartable<'a>, repeats: u64) -> Self {
+    fn new(general_spec: &'a GeneralSpec, vars: Vartable<'a>) -> Self {
         Encoder {
             general_spec,
-            repeats,
             vars,
             raw: Vec::new(),
             leading_gap: true,
@@ -479,10 +448,10 @@ impl<'a, 'b> Encoder<'a, 'b> {
             Expression::Stream(stream) => {
                 let (repeats, reset_repeat) = match stream.repeat {
                     None => (1, 1),
-                    Some(RepeatMarker::Any) => (self.repeats, 0),
+                    Some(RepeatMarker::Any) => (1, 0),
                     Some(RepeatMarker::Count(num)) => (num as u64, num as u64),
-                    Some(RepeatMarker::OneOrMore) => (1 + self.repeats, 1),
-                    Some(RepeatMarker::CountOrMore(num)) => (num as u64 + self.repeats, num as u64),
+                    Some(RepeatMarker::OneOrMore) => (2, 1),
+                    Some(RepeatMarker::CountOrMore(num)) => (num as u64 + 1, num as u64),
                 };
 
                 let level = if !stream.bit_spec.is_empty() {

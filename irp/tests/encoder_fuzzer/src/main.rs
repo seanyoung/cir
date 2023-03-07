@@ -24,13 +24,15 @@ fn main() {
                     vars.set(param.name.to_owned(), value);
                 }
 
-                if let Ok(our) = irp.encode_raw(vars.clone(), 1) {
+                if let Ok(our) = irp.encode(vars.clone()) {
                     let trans = IrpTransmogrifierRender::new(&jvm, s).unwrap();
 
-                    let their = trans.render_raw(params.clone(), 1).unwrap();
+                    let their = trans.render_raw(params.clone()).unwrap();
 
                     // compare irptransmogrifier output with our own
-                    assert!(compare_with_rounding(&our.raw, &their.raw));
+                    for i in 0..3 {
+                        assert!(compare_with_rounding(&our[i], &their[i]));
+                    }
                 } else {
                     rust_ok = false;
                 }
@@ -40,7 +42,7 @@ fn main() {
 
             if !rust_ok {
                 if let Ok(trans) = IrpTransmogrifierRender::new(&jvm, s) {
-                    if trans.render_raw(params, 1).is_ok() {
+                    if trans.render_raw(params).is_ok() {
                         // IrpTransmogrifier parsed & rendered what we could not! EH?
                         panic!();
                     }

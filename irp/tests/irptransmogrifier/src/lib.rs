@@ -1,4 +1,3 @@
-use irp::Message;
 use j4rs::{
     errors::J4RsError, ClasspathEntry, Instance, InvocationArg, JavaClass, Jvm, JvmBuilder,
 };
@@ -38,19 +37,8 @@ impl<'a> IrpTransmogrifierRender<'a> {
             .invoke(&self.protocol, "toIrSignal", &[jparam.into()])
     }
 
-    pub fn render_raw(
-        &self,
-        param: HashMap<String, i64>,
-        repeats: usize,
-    ) -> Result<Message, J4RsError> {
+    pub fn render_raw(&self, param: HashMap<String, i64>) -> Result<[Vec<u32>; 3], J4RsError> {
         let res = self.render(param)?;
-
-        let frequency: f64 = self
-            .jvm
-            .to_rust(self.jvm.invoke(&res, "getFrequency", &[])?)?;
-        let duty_cycle: Option<f64> =
-            self.jvm
-                .to_rust(self.jvm.invoke(&res, "getDutyCycle", &[])?)?;
 
         let intro: Vec<u32> = self
             .jvm
@@ -64,19 +52,7 @@ impl<'a> IrpTransmogrifierRender<'a> {
             .jvm
             .to_rust(self.jvm.invoke(&res, "getEndingInts", &[])?)?;
 
-        let mut raw = intro;
-
-        for _ in 0..repeats {
-            raw.extend(&repeat);
-        }
-
-        raw.extend(ending);
-
-        Ok(Message {
-            carrier: Some(frequency as i64),
-            duty_cycle: duty_cycle.map(|d| (d * 100.0) as u8),
-            raw,
-        })
+        Ok([intro, repeat, ending])
     }
 
     pub fn render_pronto(&self, param: HashMap<String, i64>) -> Result<String, J4RsError> {

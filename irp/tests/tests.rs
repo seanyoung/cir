@@ -357,25 +357,22 @@ fn compare_encode_to_transmogrifier() {
             vars.set(param.name.to_owned(), value);
         }
 
-        for repeats in 0..10 {
-            let msg = irp.encode_raw(vars.clone(), repeats).unwrap();
-            let trans_msg = trans_irp
-                .render_raw(params.clone(), repeats as usize)
-                .unwrap();
+        let msg = irp.encode(vars.clone()).unwrap();
+        let trans_msg = trans_irp.render_raw(params.clone()).unwrap();
 
-            if !compare_with_rounding(&msg.raw, &trans_msg.raw) {
+        for i in 0..3 {
+            if !compare_with_rounding(&msg[i], &trans_msg[i]) {
                 println!("FAIL testing {} irp {}", protocol.name, protocol.irp);
 
                 for (name, value) in &params {
                     println!("{name} = {value}");
                 }
-                println!("repeats {repeats}");
 
                 fails += 1;
             }
-
-            total_tests += 1;
         }
+
+        total_tests += 1;
 
         // Test pronto
         let trans_pronto = trans_irp.render_pronto(params.clone()).unwrap();

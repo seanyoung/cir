@@ -195,7 +195,7 @@ impl Irp {
 
     pub(crate) fn split_variants_encode(&self) -> Result<Variants, String> {
         // Normalize the repeat markers
-        let expr = clone_filter(&self.stream, &|e| match e.as_ref() {
+        let mut expr = clone_filter(&self.stream, &|e| match e.as_ref() {
             Expression::Stream(stream) => {
                 let mut stream = stream.clone();
                 stream.repeat = match stream.repeat {
@@ -227,8 +227,6 @@ impl Irp {
 
                 let mut stream = stream.clone();
 
-                stream.repeat = None;
-
                 let mut ctx = Vec::new();
 
                 expr.visit(&mut ctx, &|expr, ctx| {
@@ -251,6 +249,8 @@ impl Irp {
                     .max();
 
                 if let Some(variant_count) = variant_count {
+                    stream.repeat = None;
+
                     let variants: Vec<_> = (0..variant_count)
                         .map(|variant| {
                             clone_filter(&expr, &|e| {
@@ -323,8 +323,26 @@ impl Irp {
 
                     Ok(Variants { down, repeat, up })
                 } else {
+                    let min_repeat = stream.min_repeat();
+
+                    let down = if min_repeat >= 1 {
+                        stream.repeat = Some(RepeatMarker::Any);
+
+                        expr = Rc::new(Expression::Stream(stream.clone()));
+
+                        stream.repeat = if min_repeat > 1 {
+                            Some(RepeatMarker::Count(min_repeat))
+                        } else {
+                            None
+                        };
+
+                        Some(Rc::new(Expression::Stream(stream)))
+                    } else {
+                        None
+                    };
+
                     Ok(Variants {
-                        down: None,
+                        down,
                         repeat: expr,
                         up: None,
                     })
@@ -375,11 +393,13 @@ impl Irp {
                     }
                 }
 
-                if match seen_repeat {
-                    Some(RepeatMarker::OneOrMore) => true,
-                    Some(RepeatMarker::CountOrMore(n)) => n > 0,
-                    _ => false,
-                } {
+                let minimum_repeats = match seen_repeat {
+                    Some(RepeatMarker::OneOrMore) => 1,
+                    Some(RepeatMarker::CountOrMore(n)) => n,
+                    _ => 0,
+                };
+
+                if minimum_repeats > 0 {
                     // if both the original stream and the added stream contain an extent,
                     // puth the original in stream
                     if has_extent(&repeats) && has_extent(&down) {
@@ -392,20 +412,20 @@ impl Irp {
                             Rc::new(Expression::Stream(Stream {
                                 bit_spec: Vec::new(),
                                 stream: repeats.clone(),
-                                repeat: if let Some(RepeatMarker::CountOrMore(n)) = seen_repeat {
-                                    Some(RepeatMarker::Count(n))
+                                repeat: if minimum_repeats > 1 {
+                                    Some(RepeatMarker::Count(minimum_repeats))
                                 } else {
                                     None
                                 },
                             })),
                         ];
-                    } else if let Some(RepeatMarker::CountOrMore(n)) = seen_repeat {
+                    } else if minimum_repeats > 1 {
                         add_flatten(
                             &mut down,
                             &Rc::new(Expression::Stream(Stream {
                                 bit_spec: Vec::new(),
                                 stream: repeats.clone(),
-                                repeat: Some(RepeatMarker::Count(n)),
+                                repeat: Some(RepeatMarker::Count(minimum_repeats)),
                             })),
                         );
                     } else {
@@ -536,7 +556,6 @@ impl Stream {
         !matches!(self.repeat, None | Some(crate::RepeatMarker::Count(_)))
     }
 
-    #[allow(unused)]
     fn min_repeat(&self) -> i64 {
         match self.repeat {
             Some(RepeatMarker::OneOrMore) | None => 1,
