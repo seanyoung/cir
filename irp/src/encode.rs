@@ -12,7 +12,7 @@ impl Irp {
 
         let mut encoder = Encoder::new(&self.general_spec, vars);
 
-        let down: Vec<u32> = if let Some(down) = &variants.down {
+        let down = if let Some(down) = &variants.down {
             encoder.encode(down, None)?;
 
             if encoder.has_trailing_pulse() {
@@ -69,9 +69,9 @@ impl Irp {
     /// Render it to pronto hex with the given variables.
     /// This always produces pronto hex long codes, never the short variant.
     pub fn encode_pronto<'a>(&'a self, vars: Vartable<'a>) -> Result<Pronto, String> {
-        let [intro, repeat, up] = self.encode(vars)?;
+        let [down, repeat, up] = self.encode(vars)?;
 
-        let intro = intro.iter().map(|v| *v as f64).collect();
+        let intro = down.iter().map(|v| *v as f64).collect();
 
         let repeat = repeat.iter().map(|v| *v as f64).collect();
 
@@ -287,14 +287,10 @@ impl<'a, 'b> Encoder<'a, 'b> {
             return Err("extend shorter than duration".into());
         }
 
-        self.reset_extent_marker();
+        // Reset extent marker
+        self.extent_marker = self.total_length;
 
         Ok(())
-    }
-
-    /// Reset extent marker
-    fn reset_extent_marker(&mut self) {
-        self.extent_marker = self.total_length;
     }
 
     /// Add some bits after evaluating a bitfield.

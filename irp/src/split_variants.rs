@@ -203,7 +203,7 @@ impl Irp {
                     Some(RepeatMarker::CountOrMore(1)) => Some(RepeatMarker::OneOrMore),
                     Some(RepeatMarker::Count(1)) => None,
                     Some(RepeatMarker::Count(0)) => {
-                        stream.stream.truncate(0);
+                        stream.stream.clear();
                         None
                     }
                     m => m,
@@ -355,7 +355,7 @@ impl Irp {
                 let mut repeats = Vec::new();
                 let mut up = Vec::new();
 
-                let mut seen_repeat = None;
+                let mut repeat_marker = None;
                 let top_level_repeat = if matches!(stream.repeat, Some(RepeatMarker::Count(_))) {
                     stream.repeat.clone()
                 } else {
@@ -363,32 +363,30 @@ impl Irp {
                 };
                 let mut min_repeat = 0;
 
-                if stream.max_repeat() != Some(0) {
-                    for expr in &stream.stream {
-                        expr.check_no_contained_repeats()?;
+                for expr in &stream.stream {
+                    expr.check_no_contained_repeats()?;
 
-                        if let Expression::Stream(stream) = expr.as_ref() {
-                            if stream.is_repeating() {
-                                if seen_repeat.is_some() {
-                                    return Err("multiple repeat markers in IRP".into());
-                                } else {
-                                    repeats = stream.stream.clone();
-                                    seen_repeat = stream.repeat.clone();
-                                    min_repeat = stream.min_repeat();
-                                    continue;
-                                }
+                    if let Expression::Stream(stream) = expr.as_ref() {
+                        if stream.is_repeating() {
+                            if repeat_marker.is_some() {
+                                return Err("multiple repeat markers in IRP".into());
+                            } else {
+                                repeats = stream.stream.clone();
+                                repeat_marker = stream.repeat.clone();
+                                min_repeat = stream.min_repeat();
+                                continue;
                             }
                         }
+                    }
 
-                        if seen_repeat.is_some() {
-                            add_flatten(&mut up, expr);
-                        } else {
-                            add_flatten(&mut down, expr);
-                        }
+                    if repeat_marker.is_some() {
+                        add_flatten(&mut up, expr);
+                    } else {
+                        add_flatten(&mut down, expr);
                     }
                 }
 
-                if seen_repeat.is_some() {
+                if repeat_marker.is_some() {
                     if let Some(n) = stream.max_repeat() {
                         if n > 1 {
                             // So outer stream repeats >1 but there is a repeat marker inside it
@@ -398,20 +396,18 @@ impl Irp {
                     }
                 }
 
-                if min_repeat > 0 {
-                    if min_repeat > 1 {
-                        add_flatten(
-                            &mut down,
-                            &Rc::new(Expression::Stream(Stream {
-                                bit_spec: Vec::new(),
-                                stream: repeats.clone(),
-                                repeat: Some(RepeatMarker::Count(min_repeat)),
-                            })),
-                        );
-                    } else {
-                        for expr in &repeats {
-                            add_flatten(&mut down, expr);
-                        }
+                if min_repeat > 1 {
+                    add_flatten(
+                        &mut down,
+                        &Rc::new(Expression::Stream(Stream {
+                            bit_spec: Vec::new(),
+                            stream: repeats.clone(),
+                            repeat: Some(RepeatMarker::Count(min_repeat)),
+                        })),
+                    );
+                } else if min_repeat > 0 {
+                    for expr in &repeats {
+                        add_flatten(&mut down, expr);
                     }
                 }
 
