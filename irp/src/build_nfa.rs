@@ -87,18 +87,20 @@ impl Irp {
             down_needed = true;
         }
 
-        builder.expression(&variants.repeat, &[])?;
+        if let Some(repeat) = &variants.repeat {
+            builder.expression(repeat, &[])?;
 
-        if down_needed {
-            builder.add_action(Action::AssertEq {
-                left: Rc::new(Expression::Identifier("$down".into())),
-                right: Rc::new(Expression::Number(1)),
-            });
+            if down_needed {
+                builder.add_action(Action::AssertEq {
+                    left: Rc::new(Expression::Identifier("$down".into())),
+                    right: Rc::new(Expression::Number(1)),
+                });
+            }
+
+            builder.add_done(Event::Repeat)?;
+
+            builder.add_edge(Edge::Branch(0));
         }
-
-        builder.add_done(Event::Repeat)?;
-
-        builder.add_edge(Edge::Branch(0));
 
         if let Some(up) = &variants.up {
             builder.set_head(0);

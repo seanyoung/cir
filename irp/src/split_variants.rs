@@ -4,7 +4,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub(crate) struct Variants {
     pub down: Option<Rc<Expression>>,
-    pub repeat: Rc<Expression>,
+    pub repeat: Option<Rc<Expression>>,
     pub up: Option<Rc<Expression>>,
 }
 
@@ -84,11 +84,15 @@ impl Irp {
                         panic!("stream expected");
                     };
 
-                    Ok(Variants { down, repeat, up })
+                    Ok(Variants {
+                        down,
+                        repeat: Some(repeat),
+                        up,
+                    })
                 } else {
                     Ok(Variants {
                         down: None,
-                        repeat: expr.clone(),
+                        repeat: Some(expr.clone()),
                         up: None,
                     })
                 }
@@ -186,7 +190,11 @@ impl Irp {
                     bit_spec: stream.bit_spec.clone(),
                 }));
 
-                Ok(Variants { down, repeat, up })
+                Ok(Variants {
+                    down,
+                    repeat: Some(repeat),
+                    up,
+                })
             }
         } else {
             Err("expected stream expression".into())
@@ -320,7 +328,11 @@ impl Irp {
                         panic!("stream expected");
                     };
 
-                    Ok(Variants { down, repeat, up })
+                    Ok(Variants {
+                        down,
+                        repeat: Some(repeat),
+                        up,
+                    })
                 } else {
                     let min_repeat = stream.min_repeat();
 
@@ -342,7 +354,7 @@ impl Irp {
 
                     Ok(Variants {
                         down,
-                        repeat: expr,
+                        repeat: Some(expr),
                         up: None,
                     })
                 }
@@ -431,11 +443,15 @@ impl Irp {
                     })))
                 };
 
-                let repeat = Rc::new(Expression::Stream(Stream {
-                    repeat: None,
-                    stream: repeats,
-                    bit_spec: stream.bit_spec.clone(),
-                }));
+                let repeat = if repeats.is_empty() {
+                    None
+                } else {
+                    Some(Rc::new(Expression::Stream(Stream {
+                        repeat: None,
+                        stream: repeats,
+                        bit_spec: stream.bit_spec.clone(),
+                    })))
+                };
 
                 Ok(Variants { down, repeat, up })
             }
@@ -599,7 +615,10 @@ fn variants() -> Result<(), String> {
         "<(1,-1)|(1,-3)>(11,-100)"
     );
 
-    assert_eq!(format!("{}", variants.repeat), "<(1,-1)|(1,-3)>(22,-100)*");
+    assert_eq!(
+        format!("{}", variants.repeat.unwrap()),
+        "<(1,-1)|(1,-3)>(22,-100)*"
+    );
 
     assert_eq!(variants.up, None);
 
@@ -612,7 +631,10 @@ fn variants() -> Result<(), String> {
         "<(1,-1)|(1,-3)>(11,-100)"
     );
 
-    assert_eq!(format!("{}", variants.repeat), "<(1,-1)|(1,-3)>(22,-100)*");
+    assert_eq!(
+        format!("{}", variants.repeat.unwrap()),
+        "<(1,-1)|(1,-3)>(22,-100)*"
+    );
 
     assert_eq!(
         format!("{}", variants.up.unwrap()),
@@ -630,7 +652,7 @@ fn variants() -> Result<(), String> {
     );
 
     assert_eq!(
-        format!("{}", variants.repeat),
+        format!("{}", variants.repeat.unwrap()),
         "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>(4,-1,D:8,T1:2,OBC:6,T2:2,S:8,1,-75ms)*"
     );
 
@@ -649,7 +671,7 @@ fn variants() -> Result<(), String> {
     );
 
     assert_eq!(
-        format!("{}", variants.repeat),
+        format!("{}", variants.repeat.unwrap()),
         "<(-1,1)|(1,-1)>(1,-5,1:1,F:6,D:3,-236)+"
     );
 
@@ -678,7 +700,7 @@ fn variants() -> Result<(), String> {
     );
 
     assert_eq!(
-        format!("{}", variants.repeat),
+        format!("{}", variants.repeat.unwrap()),
         "<(1,-1)|(2,-1)>(4,-1,F:8,^45ms)"
     );
 

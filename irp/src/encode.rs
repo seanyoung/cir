@@ -24,13 +24,17 @@ impl Irp {
             Vec::new()
         };
 
-        encoder.encode(&variants.repeat, None)?;
+        let repeat = if let Some(down) = &variants.repeat {
+            encoder.encode(down, None)?;
 
-        if encoder.has_trailing_pulse() {
-            return Err("stream must end with a gap".into());
-        }
+            if encoder.has_trailing_pulse() {
+                return Err("stream must end with a gap".into());
+            }
 
-        let repeat = encoder.done();
+            encoder.done()
+        } else {
+            Vec::new()
+        };
 
         let up = if let Some(up) = &variants.up {
             encoder.encode(up, None)?;
