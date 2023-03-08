@@ -718,16 +718,15 @@ fn gen_mask(v: u64) -> u64 {
 }
 
 fn reverse(val: u64, bits: u64) -> u64 {
-    let mut res = 0u64;
-    let mut val = val;
+    let val = val.reverse_bits();
 
-    for _ in 0..bits {
-        res <<= 1;
-        res |= val & 1;
-        val >>= 1;
+    assert!(bits <= 64);
+
+    if bits == 64 {
+        val
+    } else {
+        val >> (64 - bits)
     }
-
-    res
 }
 
 /// Parse a number like strtoull in lirc daemon
