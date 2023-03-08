@@ -19,15 +19,10 @@ impl Irp {
                 return Err("stream must end with a gap".into());
             }
 
-            encoder.reset_extent_marker();
-            encoder.leading_gap = true;
-
-            encoder.raw.clone()
+            encoder.done()
         } else {
             Vec::new()
         };
-
-        encoder.raw.clear();
 
         encoder.encode(&variants.repeat, None)?;
 
@@ -35,21 +30,16 @@ impl Irp {
             return Err("stream must end with a gap".into());
         }
 
-        let repeat = encoder.raw.clone();
+        let repeat = encoder.done();
 
         let up = if let Some(up) = &variants.up {
-            encoder.raw.clear();
-
-            encoder.reset_extent_marker();
-            encoder.leading_gap = true;
-
             encoder.encode(up, None)?;
 
             if encoder.has_trailing_pulse() {
                 return Err("stream must end with a gap".into());
             }
 
-            encoder.raw.clone()
+            encoder.done()
         } else {
             Vec::new()
         };
@@ -501,6 +491,18 @@ impl<'a, 'b> Encoder<'a, 'b> {
 
     fn has_trailing_pulse(&self) -> bool {
         (self.raw.len() % 2) != 0
+    }
+
+    fn done(&mut self) -> Vec<u32> {
+        self.total_length = 0;
+        self.extent_marker = 0;
+        self.leading_gap = true;
+
+        let mut res = Vec::new();
+
+        std::mem::swap(&mut res, &mut self.raw);
+
+        res
     }
 }
 
