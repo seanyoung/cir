@@ -78,28 +78,32 @@ impl Irp {
                 expr: Rc::new(Expression::Number(1)),
             });
 
-            builder.add_done(Event::Down)?;
+            if builder.cur.seen_edges {
+                builder.add_done(Event::Down)?;
 
-            builder.add_edge(Edge::Branch(0));
+                builder.add_edge(Edge::Branch(0));
 
-            builder.set_head(0);
-            builder.cur.seen_edges = false;
-            down_needed = true;
+                builder.set_head(0);
+                builder.cur.seen_edges = false;
+                down_needed = true;
+            }
         }
 
         if let Some(repeat) = &variants.repeat {
             builder.expression(repeat, &[])?;
 
-            if down_needed {
-                builder.add_action(Action::AssertEq {
-                    left: Rc::new(Expression::Identifier("$down".into())),
-                    right: Rc::new(Expression::Number(1)),
-                });
+            if builder.cur.seen_edges {
+                if down_needed {
+                    builder.add_action(Action::AssertEq {
+                        left: Rc::new(Expression::Identifier("$down".into())),
+                        right: Rc::new(Expression::Number(1)),
+                    });
+                }
+
+                builder.add_done(Event::Repeat)?;
+
+                builder.add_edge(Edge::Branch(0));
             }
-
-            builder.add_done(Event::Repeat)?;
-
-            builder.add_edge(Edge::Branch(0));
         }
 
         if let Some(up) = &variants.up {
@@ -108,16 +112,18 @@ impl Irp {
 
             builder.expression(up, &[])?;
 
-            if down_needed {
-                builder.add_action(Action::AssertEq {
-                    left: Rc::new(Expression::Identifier("$down".into())),
-                    right: Rc::new(Expression::Number(1)),
-                });
+            if builder.cur.seen_edges {
+                if down_needed {
+                    builder.add_action(Action::AssertEq {
+                        left: Rc::new(Expression::Identifier("$down".into())),
+                        right: Rc::new(Expression::Number(1)),
+                    });
+                }
+
+                builder.add_done(Event::Up)?;
+
+                builder.add_edge(Edge::Branch(0));
             }
-
-            builder.add_done(Event::Up)?;
-
-            builder.add_edge(Edge::Branch(0));
         }
 
         Ok(NFA {
@@ -1114,7 +1120,7 @@ impl<'a> Builder<'a> {
                 self.set_head(node);
             }
             Expression::Assignment(var, expr) => {
-                if var == "T" {
+                if self.is_any_set(var) {
                     return Ok(());
                 }
 

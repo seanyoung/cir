@@ -540,7 +540,7 @@ mod test {
         let  (event, res) = munge(&mut matcher,
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");
 
-        assert_eq!(event, Event::Down);
+        assert_eq!(event, Event::Repeat);
         assert_eq!(res["F"], 1);
         assert_eq!(res["D"], 30);
         assert_eq!(res["T"], 0);

@@ -10,198 +10,6 @@ pub(crate) struct Variants {
 
 impl Irp {
     pub(crate) fn split_variants(&self) -> Result<Variants, String> {
-        let expr = &self.stream;
-
-        if let Expression::Stream(stream) = self.stream.as_ref() {
-            for expr in &stream.bit_spec {
-                // bitspec should never have repeats
-                check_no_repeats(expr)?;
-            }
-
-            // do we have a top-level repeat?
-            if expr.is_repeating() {
-                expr.check_no_contained_repeats()?;
-
-                let mut stream = stream.clone();
-
-                stream.repeat = None;
-
-                let variant_count = stream
-                    .stream
-                    .iter()
-                    .filter_map(|e| {
-                        if let Expression::Variation(list) = e.as_ref() {
-                            Some(list.len())
-                        } else {
-                            None
-                        }
-                    })
-                    .max();
-
-                if let Some(variant_count) = variant_count {
-                    let expr = Rc::new(expr.clone());
-
-                    let variants: Vec<_> = (0..variant_count)
-                        .map(|variant| {
-                            clone_filter(&expr, &|e| {
-                                if let Expression::Variation(list) = e.as_ref() {
-                                    if let Some(variant) = list.get(variant) {
-                                        if variant.len() == 1 {
-                                            Some(variant[0].clone())
-                                        } else {
-                                            Some(Rc::new(Expression::List(variant.clone())))
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                } else {
-                                    None
-                                }
-                            })
-                            .unwrap()
-                        })
-                        .collect();
-
-                    let up = if variants.len() == 3 {
-                        if let Expression::Stream(stream) = variants[2].as_ref() {
-                            let mut stream = stream.clone();
-                            stream.repeat = None;
-                            Some(Rc::new(Expression::Stream(stream)))
-                        } else {
-                            panic!("stream expected");
-                        }
-                    } else {
-                        None
-                    };
-
-                    let repeat = variants[1].clone();
-
-                    let down = if let Expression::Stream(stream) = variants[0].as_ref() {
-                        let mut stream = stream.clone();
-                        stream.repeat = None;
-                        Some(Rc::new(Expression::Stream(stream)))
-                    } else {
-                        panic!("stream expected");
-                    };
-
-                    Ok(Variants {
-                        down,
-                        repeat: Some(repeat),
-                        up,
-                    })
-                } else {
-                    Ok(Variants {
-                        down: None,
-                        repeat: Some(expr.clone()),
-                        up: None,
-                    })
-                }
-            } else {
-                let mut down = Vec::new();
-                let mut repeats = Vec::new();
-                let mut up = Vec::new();
-
-                let mut seen_repeat = None;
-
-                for expr in &stream.stream {
-                    expr.check_no_contained_repeats()?;
-
-                    if let Expression::Stream(stream) = expr.as_ref() {
-                        if stream.is_repeating() {
-                            if seen_repeat.is_some() {
-                                return Err("multiple repeat markers in IRP".into());
-                            } else {
-                                repeats = stream.stream.clone();
-                                seen_repeat = stream.repeat.clone();
-                                continue;
-                            }
-                        }
-                    }
-
-                    if seen_repeat.is_some() {
-                        add_flatten(&mut up, expr);
-                    } else {
-                        add_flatten(&mut down, expr);
-                    }
-                }
-
-                let down = if down.is_empty() || all_assignments(&down) {
-                    if any_assignments(&repeats) {
-                        Some(Rc::new(Expression::Stream(Stream {
-                            repeat: None,
-                            stream: repeats.clone(),
-                            bit_spec: stream.bit_spec.clone(),
-                        })))
-                    } else {
-                        None
-                    }
-                } else {
-                    if repeats.is_empty() {
-                        repeats = down.clone();
-                    }
-
-                    if match seen_repeat {
-                        Some(RepeatMarker::OneOrMore) => true,
-                        Some(RepeatMarker::CountOrMore(n)) => n > 0,
-                        _ => false,
-                    } {
-                        // if both the original stream and the added stream contain an extend,
-                        // puth the original in stream
-                        if has_extent(&repeats) && has_extent(&down) {
-                            down = vec![
-                                Rc::new(Expression::Stream(Stream {
-                                    bit_spec: Vec::new(),
-                                    stream: down,
-                                    repeat: None,
-                                })),
-                                Rc::new(Expression::Stream(Stream {
-                                    bit_spec: Vec::new(),
-                                    stream: repeats.clone(),
-                                    repeat: None,
-                                })),
-                            ];
-                        } else {
-                            for expr in &repeats {
-                                add_flatten(&mut down, expr);
-                            }
-                        }
-                    }
-
-                    Some(Rc::new(Expression::Stream(Stream {
-                        repeat: None,
-                        stream: down,
-                        bit_spec: stream.bit_spec.clone(),
-                    })))
-                };
-
-                let up = if up.is_empty() || all_assignments(&up) {
-                    None
-                } else {
-                    Some(Rc::new(Expression::Stream(Stream {
-                        repeat: None,
-                        stream: up,
-                        bit_spec: stream.bit_spec.clone(),
-                    })))
-                };
-
-                let repeat = Rc::new(Expression::Stream(Stream {
-                    repeat: seen_repeat,
-                    stream: repeats,
-                    bit_spec: stream.bit_spec.clone(),
-                }));
-
-                Ok(Variants {
-                    down,
-                    repeat: Some(repeat),
-                    up,
-                })
-            }
-        } else {
-            Err("expected stream expression".into())
-        }
-    }
-
-    pub(crate) fn split_variants_encode(&self) -> Result<Variants, String> {
         // Normalize the repeat markers
         let mut expr = clone_filter(&self.stream, &|e| match e.as_ref() {
             Expression::Stream(stream) => {
@@ -497,36 +305,6 @@ fn add_flatten(expr: &mut Vec<Rc<Expression>>, elem: &Rc<Expression>) {
 }
 
 /// Do we only have assignments - nothing to do here
-fn all_assignments(list: &Vec<Rc<Expression>>) -> bool {
-    for expr in list {
-        match expr.as_ref() {
-            Expression::Assignment(..) => (),
-            Expression::List(list) if !all_assignments(list) => return false,
-            Expression::Stream(stream) if !all_assignments(&stream.stream) => return false,
-            _ => return false,
-        }
-    }
-
-    true
-}
-
-/// Do we have any assignments
-fn any_assignments(list: &Vec<Rc<Expression>>) -> bool {
-    for expr in list {
-        let mut changes = false;
-        expr.visit(&mut changes, &|e, changes| {
-            *changes |= matches!(e, Expression::Assignment(..) | Expression::Identifier(..));
-        });
-
-        if changes {
-            return true;
-        }
-    }
-
-    false
-}
-
-/// Do we only have assignments - nothing to do here
 fn has_extent(list: &Vec<Rc<Expression>>) -> bool {
     for expr in list {
         if matches!(
@@ -606,9 +384,9 @@ impl Expression {
 
 #[test]
 fn variants() -> Result<(), String> {
-    let irp = Irp::parse("{}<1,-1|1,-3>([11][22],-100)*").unwrap();
+    let irp = Irp::parse("{}<1,-1|1,-3>([11][22],-100)+").unwrap();
 
-    let variants = irp.split_variants()?;
+    let variants = irp.split_variants().unwrap();
 
     assert_eq!(
         format!("{}", variants.down.unwrap()),
@@ -617,12 +395,12 @@ fn variants() -> Result<(), String> {
 
     assert_eq!(
         format!("{}", variants.repeat.unwrap()),
-        "<(1,-1)|(1,-3)>(22,-100)*"
+        "<(1,-1)|(1,-3)>(22,-100)"
     );
 
     assert_eq!(variants.up, None);
 
-    let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33,44],-100)*").unwrap();
+    let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33,44],-100)+").unwrap();
 
     let variants = irp.split_variants()?;
 
@@ -633,7 +411,7 @@ fn variants() -> Result<(), String> {
 
     assert_eq!(
         format!("{}", variants.repeat.unwrap()),
-        "<(1,-1)|(1,-3)>(22,-100)*"
+        "<(1,-1)|(1,-3)>(22,-100)"
     );
 
     assert_eq!(
@@ -646,14 +424,11 @@ fn variants() -> Result<(), String> {
 
     let variants = irp.split_variants()?;
 
-    assert_eq!(
-        format!("{}", variants.down.unwrap()),
-        "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>(4,-1,D:8,T1:2,OBC:6,T2:2,S:8,1,-75ms)"
-    );
+    assert_eq!(variants.down, None);
 
     assert_eq!(
         format!("{}", variants.repeat.unwrap()),
-        "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>(4,-1,D:8,T1:2,OBC:6,T2:2,S:8,1,-75ms)*"
+        "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>(4,-1,D:8,T1:2,OBC:6,T2:2,S:8,1,-75ms)"
     );
 
     assert_eq!(
@@ -672,7 +447,7 @@ fn variants() -> Result<(), String> {
 
     assert_eq!(
         format!("{}", variants.repeat.unwrap()),
-        "<(-1,1)|(1,-1)>(1,-5,1:1,F:6,D:3,-236)+"
+        "<(-1,1)|(1,-1)>(1,-5,1:1,F:6,D:3,-236)"
     );
 
     assert_eq!(
@@ -687,7 +462,7 @@ fn variants() -> Result<(), String> {
 
     assert_eq!(
         format!("{}", variants.down.unwrap()),
-        "<(-1,1)|(1,-1)>((1,-5,^100ms),(1,-5,1:1,F:6,D:3,^100ms))"
+        "<(-1,1)|(1,-1)>(1,-5,^100ms,1,-5,1:1,F:6,D:3,^100ms)"
     );
 
     let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]").unwrap();
@@ -699,10 +474,7 @@ fn variants() -> Result<(), String> {
         "<(1,-1)|(2,-1)>(4,-1,F:8,^45ms)"
     );
 
-    assert_eq!(
-        format!("{}", variants.repeat.unwrap()),
-        "<(1,-1)|(2,-1)>(4,-1,F:8,^45ms)"
-    );
+    assert_eq!(variants.repeat, None);
 
     assert_eq!(variants.up, None);
 
@@ -716,35 +488,35 @@ fn encode_variants() {
     let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33],-100)*").unwrap();
 
     assert_eq!(
-        irp.split_variants_encode().unwrap_err(),
+        irp.split_variants().unwrap_err(),
         "cannot have variant with '*' repeat, use '+' instead"
     );
 
     let irp = Irp::parse("{}<1,-1|1,-3>(100,-10,([11][22][33])2,-100)*").unwrap();
 
     assert_eq!(
-        irp.split_variants_encode().unwrap_err(),
+        irp.split_variants().unwrap_err(),
         "cannot have variant with '*' repeat, use '+' instead"
     );
 
     let irp = Irp::parse("{}<1,-1|1,-3>(100,-10,([][22][33])2,([11][22][33])2,-100)*").unwrap();
 
     assert_eq!(
-        irp.split_variants_encode().unwrap_err(),
+        irp.split_variants().unwrap_err(),
         "cannot have variant with '*' repeat, use '+' instead"
     );
 
     let irp = Irp::parse("{}<1,-1|1,-3>(100,-10,[][22][33],[11][22][33],-100)*").unwrap();
 
     assert_eq!(
-        irp.split_variants_encode().unwrap_err(),
+        irp.split_variants().unwrap_err(),
         "cannot have variant with '*' repeat, use '+' instead"
     );
 
     let irp = Irp::parse("{100}<1|-1>((10:2)+,-100)2").unwrap();
 
     assert_eq!(
-        irp.split_variants_encode().unwrap_err(),
+        irp.split_variants().unwrap_err(),
         "multiple repeat markers in IRP"
     );
 
