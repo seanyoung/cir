@@ -289,7 +289,7 @@ impl Irp {
                     let repeat = if let Expression::Stream(stream) = variants[1].as_ref() {
                         let mut stream = stream.clone();
                         // (foo)* / (foo)0+ not permitted with variantion
-                        stream.repeat = match stream.repeat {
+                        match stream.repeat {
                             Some(RepeatMarker::Any) => {
                                 if !down_variant_empty {
                                     return Err(
@@ -297,17 +297,16 @@ impl Irp {
                                             .into(),
                                     );
                                 }
-                                Some(RepeatMarker::Any)
                             }
-                            Some(RepeatMarker::OneOrMore) => Some(RepeatMarker::Any),
+                            Some(RepeatMarker::OneOrMore) => (),
                             Some(RepeatMarker::CountOrMore(n)) => {
                                 if !down_variant_empty {
                                     down_repeat = Some(RepeatMarker::Count(n));
                                 }
-                                Some(RepeatMarker::Any)
                             }
                             Some(RepeatMarker::Count(_)) | None => unreachable!(),
                         };
+                        stream.repeat = None;
                         Rc::new(Expression::Stream(stream))
                     } else {
                         panic!("stream expected");
@@ -325,11 +324,11 @@ impl Irp {
                 } else {
                     let min_repeat = stream.min_repeat();
 
+                    stream.repeat = None;
+
+                    expr = Rc::new(Expression::Stream(stream.clone()));
+
                     let down = if min_repeat >= 1 {
-                        stream.repeat = Some(RepeatMarker::Any);
-
-                        expr = Rc::new(Expression::Stream(stream.clone()));
-
                         stream.repeat = if min_repeat > 1 {
                             Some(RepeatMarker::Count(min_repeat))
                         } else {
@@ -357,7 +356,12 @@ impl Irp {
                 let mut up = Vec::new();
 
                 let mut seen_repeat = None;
-                let top_level_repeat = stream.repeat.clone();
+                let top_level_repeat = if matches!(stream.repeat, Some(RepeatMarker::Count(_))) {
+                    stream.repeat.clone()
+                } else {
+                    None
+                };
+                let mut min_repeat = 0;
 
                 if stream.max_repeat() != Some(0) {
                     for expr in &stream.stream {
@@ -370,6 +374,7 @@ impl Irp {
                                 } else {
                                     repeats = stream.stream.clone();
                                     seen_repeat = stream.repeat.clone();
+                                    min_repeat = stream.min_repeat();
                                     continue;
                                 }
                             }
@@ -393,39 +398,14 @@ impl Irp {
                     }
                 }
 
-                let minimum_repeats = match seen_repeat {
-                    Some(RepeatMarker::OneOrMore) => 1,
-                    Some(RepeatMarker::CountOrMore(n)) => n,
-                    _ => 0,
-                };
-
-                if minimum_repeats > 0 {
-                    // if both the original stream and the added stream contain an extent,
-                    // puth the original in stream
-                    if has_extent(&repeats) && has_extent(&down) {
-                        down = vec![
-                            Rc::new(Expression::Stream(Stream {
-                                bit_spec: Vec::new(),
-                                stream: down,
-                                repeat: None,
-                            })),
-                            Rc::new(Expression::Stream(Stream {
-                                bit_spec: Vec::new(),
-                                stream: repeats.clone(),
-                                repeat: if minimum_repeats > 1 {
-                                    Some(RepeatMarker::Count(minimum_repeats))
-                                } else {
-                                    None
-                                },
-                            })),
-                        ];
-                    } else if minimum_repeats > 1 {
+                if min_repeat > 0 {
+                    if min_repeat > 1 {
                         add_flatten(
                             &mut down,
                             &Rc::new(Expression::Stream(Stream {
                                 bit_spec: Vec::new(),
                                 stream: repeats.clone(),
-                                repeat: Some(RepeatMarker::Count(minimum_repeats)),
+                                repeat: Some(RepeatMarker::Count(min_repeat)),
                             })),
                         );
                     } else {
@@ -433,8 +413,6 @@ impl Irp {
                             add_flatten(&mut down, expr);
                         }
                     }
-
-                    seen_repeat = Some(RepeatMarker::Any);
                 }
 
                 let down = if down.is_empty() {
@@ -458,7 +436,7 @@ impl Irp {
                 };
 
                 let repeat = Rc::new(Expression::Stream(Stream {
-                    repeat: seen_repeat,
+                    repeat: None,
                     stream: repeats,
                     bit_spec: stream.bit_spec.clone(),
                 }));

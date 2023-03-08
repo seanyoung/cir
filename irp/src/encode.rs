@@ -446,12 +446,10 @@ impl<'a, 'b> Encoder<'a, 'b> {
                 self.vars.set(id.into(), v);
             }
             Expression::Stream(stream) => {
-                let (repeats, reset_repeat) = match stream.repeat {
-                    None => (1, 1),
-                    Some(RepeatMarker::Any) => (1, 0),
-                    Some(RepeatMarker::Count(num)) => (num as u64, num as u64),
-                    Some(RepeatMarker::OneOrMore) => (2, 1),
-                    Some(RepeatMarker::CountOrMore(num)) => (num as u64 + 1, num as u64),
+                let repeats = match stream.repeat {
+                    None => 1,
+                    Some(RepeatMarker::Count(num)) => num,
+                    _ => unreachable!(),
                 };
 
                 let level = if !stream.bit_spec.is_empty() {
@@ -468,11 +466,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
                     level
                 };
 
-                for repeat_no in 0..repeats {
-                    if repeat_no >= reset_repeat {
-                        self.reset_extent_marker();
-                        self.leading_gap = true;
-                    }
+                for _ in 0..repeats {
                     for expr in &stream.stream {
                         if let Expression::List(list) = expr.as_ref() {
                             if list.is_empty() {
