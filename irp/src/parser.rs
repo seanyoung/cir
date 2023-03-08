@@ -221,7 +221,7 @@ peg::parser! {
          / "(" _ e:expression() ")" _ { e }
 
         rule identifier() -> &'input str
-         = quiet!{$([ 'a'..='z' | 'A'..='Z']['a'..='z' | 'A'..='Z' | '0'..='9' ]*)}
+         = quiet!{$(['_' | 'a'..='z' | 'A'..='Z']['_' | 'a'..='z' | 'A'..='Z' | '0'..='9']*)}
          / expected!("identifier")
 
         rule bare_number() -> i64
