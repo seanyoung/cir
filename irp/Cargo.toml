@@ -27,4 +27,4 @@ itertools = "0.10"
 cir = { path = ".." }
 j4rs = "0.15"
 rand = "0.8"
-irptransmogrifier = { path = "tests/irptransmogrifier" }
+irptransmogrifier = { path = "tests/rust-irptransmogrifier" }

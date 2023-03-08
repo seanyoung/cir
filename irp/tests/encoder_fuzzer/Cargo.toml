@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 afl = "*"
 irp = { path = "../.." }
-irptransmogrifier = { path = "../irptransmogrifier" }
+irptransmogrifier = { path = "../rust-irptransmogrifier" }
 rand = "0.8"
 j4rs = "0.15"
 

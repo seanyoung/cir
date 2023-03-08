@@ -38,7 +38,7 @@ liblircd = { path = "liblircd" }
 members = [
 	"irp",
 	"liblircd",
-	"irp/tests/irptransmogrifier",
+	"irp/tests/rust-irptransmogrifier",
 ]
 
 [features]
