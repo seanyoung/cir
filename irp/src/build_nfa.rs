@@ -1119,7 +1119,7 @@ impl<'a> Builder<'a> {
                 self.set_head(node);
             }
             Expression::Assignment(var, expr) => {
-                if self.is_any_set(var) {
+                if self.is_any_set(var) && self.irp.parameters.iter().any(|p| &p.name == var) {
                     return Ok(());
                 }
 
