@@ -154,8 +154,8 @@ impl fmt::Display for Unit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Unit::Pulses => write!(f, "p"),
-            Unit::Microseconds => write!(f, "µs"),
-            Unit::Milliseconds => write!(f, "ms"),
+            Unit::Microseconds => write!(f, "u"),
+            Unit::Milliseconds => write!(f, "m"),
             Unit::Units => write!(f, ""),
         }
     }
