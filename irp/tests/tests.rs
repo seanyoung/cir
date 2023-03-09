@@ -743,3 +743,32 @@ fn zero_bitspec() {
 
     assert_eq!(res.unwrap().raw, vec![10, 10, 10, 10, 10, 10, 10, 10]);
 }
+
+#[test]
+fn logical_and_or() {
+    let irp = Irp::parse("{10}<-1,1|-3,1>(10,C:4,D:4,-10){C=A&&B,D=A||B}").unwrap();
+
+    let mut vars = Vartable::new();
+
+    vars.set("A".to_string(), 0x00);
+    vars.set("B".to_string(), 0xa);
+
+    let res = irp.encode_raw(vars, 1);
+
+    assert_eq!(
+        res.unwrap().raw,
+        vec![100, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 30, 10, 10, 10, 30, 10, 100]
+    );
+
+    let mut vars = Vartable::new();
+
+    vars.set("A".to_string(), 0x5);
+    vars.set("B".to_string(), 0x1);
+
+    let res = irp.encode_raw(vars, 1);
+
+    assert_eq!(
+        res.unwrap().raw,
+        vec![100, 30, 10, 10, 10, 10, 10, 10, 10, 30, 10, 10, 10, 30, 10, 10, 10, 100]
+    );
+}

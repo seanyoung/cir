@@ -471,15 +471,21 @@ impl Expression {
             }
             Expression::And(left, right) => {
                 let left = left.eval(vars)?;
-                let right = right.eval(vars)?;
 
-                Ok((left != 0 && right != 0) as i64)
+                if left == 0 {
+                    Ok(0)
+                } else {
+                    right.eval(vars)
+                }
             }
             Expression::Or(left, right) => {
                 let left = left.eval(vars)?;
-                let right = right.eval(vars)?;
 
-                Ok((left != 0 || right != 0) as i64)
+                if left != 0 {
+                    Ok(left)
+                } else {
+                    right.eval(vars)
+                }
             }
             Expression::Conditional(cond, left, right) => {
                 let cond = cond.eval(vars)?;
