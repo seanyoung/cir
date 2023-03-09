@@ -1,9 +1,7 @@
 use crate::{expression::clone_filter, Expression, RepeatMarker, Stream};
 use std::rc::Rc;
 
-pub(crate) fn split_variants(
-    stream: &Rc<Expression>,
-) -> Result<[Option<Rc<Expression>>; 3], String> {
+pub(crate) fn variants(stream: &Rc<Expression>) -> Result<[Option<Rc<Expression>>; 3], String> {
     // Normalize the repeat markers
     let mut expr = clone_filter(stream, &|e| match e.as_ref() {
         Expression::Stream(stream) => {
@@ -367,7 +365,7 @@ impl Expression {
 }
 
 #[test]
-fn variants() -> Result<(), String> {
+fn decode_variants() -> Result<(), String> {
     use crate::Irp;
 
     let irp = Irp::parse("{}<1,-1|1,-3>([11][22],-100)+").unwrap();

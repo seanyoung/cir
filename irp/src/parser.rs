@@ -1,6 +1,6 @@
 use super::{
-    split_variants::split_variants, Expression, GeneralSpec, Irp, ParameterSpec, RepeatMarker,
-    Stream, Unit, Vartable,
+    variants::variants, Expression, GeneralSpec, Irp, ParameterSpec, RepeatMarker, Stream, Unit,
+    Vartable,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -372,7 +372,7 @@ impl Irp {
                 check_stream(&stream)?;
 
                 let stream = Rc::new(stream);
-                let variants = split_variants(&stream)?;
+                let variants = variants(&stream)?;
 
                 Ok(Irp {
                     general_spec,

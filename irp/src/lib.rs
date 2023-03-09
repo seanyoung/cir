@@ -10,7 +10,7 @@ mod message;
 mod parser;
 mod pronto;
 pub mod protocols;
-mod split_variants;
+mod variants;
 
 use std::{collections::HashMap, fmt, rc::Rc};
 
