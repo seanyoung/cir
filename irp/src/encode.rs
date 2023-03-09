@@ -8,13 +8,11 @@ impl Irp {
     pub fn encode<'a>(&'a self, mut vars: Vartable<'a>) -> Result<[Vec<u32>; 3], String> {
         self.check_parameters(&mut vars)?;
 
-        let variants = self.split_variants()?;
-
         let mut encoder = Encoder::new(&self.general_spec, vars);
 
         let mut res = [Vec::new(), Vec::new(), Vec::new()];
 
-        for (i, variant) in variants.iter().enumerate() {
+        for (i, variant) in self.variants.iter().enumerate() {
             if let Some(down) = variant {
                 encoder.encode(down, None)?;
 

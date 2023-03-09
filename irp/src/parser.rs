@@ -1,4 +1,7 @@
-use super::{Expression, GeneralSpec, Irp, ParameterSpec, RepeatMarker, Stream, Unit, Vartable};
+use super::{
+    split_variants::split_variants, Expression, GeneralSpec, Irp, ParameterSpec, RepeatMarker,
+    Stream, Unit, Vartable,
+};
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
@@ -357,8 +360,8 @@ peg::parser! {
     }
 }
 
-/// Parse an irp into an AST type representation
 impl Irp {
+    /// Parse an irp and validate. The result can be used for encoding or decoding.
     pub fn parse(input: &str) -> Result<Irp, String> {
         match irp_parser::irp(input) {
             Ok((general, stream, definitions, parameters)) => {
@@ -368,11 +371,15 @@ impl Irp {
                 check_definitions(&definitions, &parameters)?;
                 check_stream(&stream)?;
 
+                let stream = Rc::new(stream);
+                let variants = split_variants(&stream)?;
+
                 Ok(Irp {
                     general_spec,
-                    stream: Rc::new(stream),
+                    stream,
                     definitions,
                     parameters,
+                    variants,
                 })
             }
             Err(pos) => Err(format!("parse error at {pos}")),

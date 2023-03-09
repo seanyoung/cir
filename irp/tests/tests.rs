@@ -137,20 +137,17 @@ fn variants() {
             .raw
     );
 
-    let irp = Irp::parse("{100}<1,-1|1,-3>([1][2],-10,10:10,1,-100m)").unwrap();
-    let res = irp.encode_raw(Vartable::new(), 1);
+    let irp = Irp::parse("{100}<1,-1|1,-3>([1][2],-10,10:10,1,-100m)");
 
     assert_eq!(
-        res.err(),
+        irp.err(),
         Some(String::from("variant [1][2] found without repeat marker"))
     );
 
-    let irp = Irp::parse("{}<1,-1|1,-3>([11][22],-100)*").unwrap();
-
-    let res = irp.encode_raw(Vartable::new(), 1);
+    let irp = Irp::parse("{}<1,-1|1,-3>([11][22],-100)*");
 
     assert_eq!(
-        res.err(),
+        irp.err(),
         Some(String::from(
             "cannot have variant with \'*\' repeat, use \'+\' instead"
         ))

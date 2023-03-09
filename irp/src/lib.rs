@@ -66,6 +66,7 @@ pub struct Irp {
     stream: Rc<Expression>,
     definitions: Vec<Expression>,
     pub parameters: Vec<ParameterSpec>,
+    variants: [Option<Rc<Expression>>; 3],
 }
 
 /// The general spec for an IRP
