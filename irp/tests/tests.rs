@@ -1,4 +1,4 @@
-use irp::{protocols::parse, InfraredData, Irp, Message, Vartable};
+use irp::{protocols::parse, Event, InfraredData, Irp, Message, Vartable};
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
 use rand::Rng;
@@ -470,7 +470,10 @@ fn decode_all() {
 
             let mut ok = true;
 
-            if let Some((_, res)) = decoder.get() {
+            if let Some((ev, res)) = decoder.get() {
+                if ev == Event::Down && res.is_empty() {
+                    continue;
+                }
                 for param in &irp.parameters {
                     let mask = match (protocol.name.as_str(), param.name.as_str()) {
                         ("Zenith5", "F") => 31,
@@ -526,7 +529,7 @@ fn decode_all() {
     println!("tests: {total_tests} fails: {fails}");
 
     // TODO: we still have a whole bunch of fails
-    assert!(fails <= 71);
+    assert!(fails <= 43);
 }
 
 #[test]
