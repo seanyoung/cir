@@ -1,5 +1,5 @@
 use super::{expression::clone_filter, Event, Expression, Irp, ParameterSpec, Vartable};
-use log::{trace, warn};
+use log::trace;
 use std::{
     collections::HashMap,
     ops::{Add, BitAnd, BitOr, BitXor, Neg, Not, Rem, Shl, Shr, Sub},
@@ -1016,6 +1016,7 @@ impl<'a> Builder<'a> {
     ) -> Result<(), String> {
         match expr {
             Expression::Stream(irstream) => {
+                // TODO: handle repeat marker RepeatMarker::Count(n)
                 let mut bit_spec = bit_spec.to_vec();
 
                 if !irstream.bit_spec.is_empty() {
@@ -1128,9 +1129,6 @@ impl<'a> Builder<'a> {
                     var: var.to_owned(),
                     expr: self.const_folding(expr),
                 })
-            }
-            Expression::Variation(_) => {
-                warn!("expression {} ignored", expr)
             }
             _ => return Err(format!("expression {expr} not supported")),
         }
