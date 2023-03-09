@@ -12,43 +12,21 @@ impl Irp {
 
         let mut encoder = Encoder::new(&self.general_spec, vars);
 
-        let down = if let Some(down) = &variants.down {
-            encoder.encode(down, None)?;
+        let mut res = [Vec::new(), Vec::new(), Vec::new()];
 
-            if encoder.has_trailing_pulse() {
-                return Err("stream must end with a gap".into());
+        for (i, variant) in variants.iter().enumerate() {
+            if let Some(down) = variant {
+                encoder.encode(down, None)?;
+
+                if encoder.has_trailing_pulse() {
+                    return Err("stream must end with a gap".into());
+                }
+
+                res[i] = encoder.done()
             }
+        }
 
-            encoder.done()
-        } else {
-            Vec::new()
-        };
-
-        let repeat = if let Some(down) = &variants.repeat {
-            encoder.encode(down, None)?;
-
-            if encoder.has_trailing_pulse() {
-                return Err("stream must end with a gap".into());
-            }
-
-            encoder.done()
-        } else {
-            Vec::new()
-        };
-
-        let up = if let Some(up) = &variants.up {
-            encoder.encode(up, None)?;
-
-            if encoder.has_trailing_pulse() {
-                return Err("stream must end with a gap".into());
-            }
-
-            encoder.done()
-        } else {
-            Vec::new()
-        };
-
-        Ok([down, repeat, up])
+        Ok(res)
     }
 
     /// Render it to raw IR with the given variables

@@ -1,15 +1,8 @@
 use crate::{expression::clone_filter, Expression, Irp, RepeatMarker, Stream};
 use std::rc::Rc;
 
-#[derive(Debug)]
-pub(crate) struct Variants {
-    pub down: Option<Rc<Expression>>,
-    pub repeat: Option<Rc<Expression>>,
-    pub up: Option<Rc<Expression>>,
-}
-
 impl Irp {
-    pub(crate) fn split_variants(&self) -> Result<Variants, String> {
+    pub(crate) fn split_variants(&self) -> Result<[Option<Rc<Expression>>; 3], String> {
         // Normalize the repeat markers
         let mut expr = clone_filter(&self.stream, &|e| match e.as_ref() {
             Expression::Stream(stream) => {
@@ -136,11 +129,7 @@ impl Irp {
                         panic!("stream expected");
                     };
 
-                    Ok(Variants {
-                        down,
-                        repeat: Some(repeat),
-                        up,
-                    })
+                    Ok([down, Some(repeat), up])
                 } else {
                     let min_repeat = stream.min_repeat();
 
@@ -160,11 +149,7 @@ impl Irp {
                         None
                     };
 
-                    Ok(Variants {
-                        down,
-                        repeat: Some(expr),
-                        up: None,
-                    })
+                    Ok([down, Some(expr), None])
                 }
             } else {
                 if let Some(expr) = expr.find_variant() {
@@ -261,7 +246,7 @@ impl Irp {
                     })))
                 };
 
-                Ok(Variants { down, repeat, up })
+                Ok([down, repeat, up])
             }
         } else {
             Err("expected stream expression".into())
@@ -389,33 +374,33 @@ fn variants() -> Result<(), String> {
     let variants = irp.split_variants().unwrap();
 
     assert_eq!(
-        format!("{}", variants.down.unwrap()),
+        format!("{}", variants[0].as_ref().unwrap()),
         "<(1,-1)|(1,-3)>(11,-100)"
     );
 
     assert_eq!(
-        format!("{}", variants.repeat.unwrap()),
+        format!("{}", variants[1].as_ref().unwrap()),
         "<(1,-1)|(1,-3)>(22,-100)"
     );
 
-    assert_eq!(variants.up, None);
+    assert_eq!(variants[2], None);
 
     let irp = Irp::parse("{}<1,-1|1,-3>([11][22][33,44],-100)+").unwrap();
 
     let variants = irp.split_variants()?;
 
     assert_eq!(
-        format!("{}", variants.down.unwrap()),
+        format!("{}", variants[0].as_ref().unwrap()),
         "<(1,-1)|(1,-3)>(11,-100)"
     );
 
     assert_eq!(
-        format!("{}", variants.repeat.unwrap()),
+        format!("{}", variants[1].as_ref().unwrap()),
         "<(1,-1)|(1,-3)>(22,-100)"
     );
 
     assert_eq!(
-        format!("{}", variants.up.unwrap()),
+        format!("{}", variants[2].as_ref().unwrap()),
         "<(1,-1)|(1,-3)>((33,44),-100)"
     );
 
@@ -424,15 +409,15 @@ fn variants() -> Result<(), String> {
 
     let variants = irp.split_variants()?;
 
-    assert_eq!(variants.down, None);
+    assert_eq!(variants[0], None);
 
     assert_eq!(
-        format!("{}", variants.repeat.unwrap()),
+        format!("{}", variants[1].as_ref().unwrap()),
         "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>(4,-1,D:8,T1:2,OBC:6,T2:2,S:8,1,-75ms)"
     );
 
     assert_eq!(
-        format!("{}", variants.up.unwrap()),
+        format!("{}", variants[2].as_ref().unwrap()),
         "<(2,-1)|(1,-2)|(1,-1)|(2,-2)>(4,-1,D:8,~F1:2,OBC:6,~F2:2,S:8,1,-250ms)"
     );
 
@@ -441,17 +426,17 @@ fn variants() -> Result<(), String> {
     let variants = irp.split_variants()?;
 
     assert_eq!(
-        format!("{}", variants.down.unwrap()),
+        format!("{}", variants[0].as_ref().unwrap()),
         "<(-1,1)|(1,-1)>(1,-5,1023:10,-44,1,-5,1:1,F:6,D:3,-236)"
     );
 
     assert_eq!(
-        format!("{}", variants.repeat.unwrap()),
+        format!("{}", variants[1].as_ref().unwrap()),
         "<(-1,1)|(1,-1)>(1,-5,1:1,F:6,D:3,-236)"
     );
 
     assert_eq!(
-        format!("{}", variants.up.unwrap()),
+        format!("{}", variants[2].as_ref().unwrap()),
         "<(-1,1)|(1,-1)>(1,-5,1023:10,-44)"
     );
 
@@ -461,7 +446,7 @@ fn variants() -> Result<(), String> {
     let variants = irp.split_variants()?;
 
     assert_eq!(
-        format!("{}", variants.down.unwrap()),
+        format!("{}", variants[0].as_ref().unwrap()),
         "<(-1,1)|(1,-1)>(1,-5,^100ms,1,-5,1:1,F:6,D:3,^100ms)"
     );
 
@@ -470,13 +455,13 @@ fn variants() -> Result<(), String> {
     let variants = irp.split_variants()?;
 
     assert_eq!(
-        format!("{}", variants.down.unwrap()),
+        format!("{}", variants[0].as_ref().unwrap()),
         "<(1,-1)|(2,-1)>(4,-1,F:8,^45ms)"
     );
 
-    assert_eq!(variants.repeat, None);
+    assert_eq!(variants[1], None);
 
-    assert_eq!(variants.up, None);
+    assert_eq!(variants[2], None);
 
     Ok(())
 }

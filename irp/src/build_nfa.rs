@@ -70,7 +70,7 @@ impl Irp {
 
         let mut down_needed = false;
 
-        if let Some(down) = &variants.down {
+        if let Some(down) = &variants[0] {
             builder.expression(down, &[])?;
 
             builder.add_action(Action::Set {
@@ -89,7 +89,7 @@ impl Irp {
             }
         }
 
-        if let Some(repeat) = &variants.repeat {
+        if let Some(repeat) = &variants[1] {
             builder.expression(repeat, &[])?;
 
             if builder.cur.seen_edges {
@@ -106,7 +106,7 @@ impl Irp {
             }
         }
 
-        if let Some(up) = &variants.up {
+        if let Some(up) = &variants[2] {
             builder.set_head(0);
             builder.cur.seen_edges = false;
 
