@@ -68,7 +68,7 @@ impl Irp {
         let mut down_needed = false;
 
         if let Some(down) = &self.variants[0] {
-            builder.expression(down, &[])?;
+            builder.build(down, &[])?;
 
             builder.add_action(Action::Set {
                 var: "$down".into(),
@@ -87,7 +87,7 @@ impl Irp {
         }
 
         if let Some(repeat) = &self.variants[1] {
-            builder.expression(repeat, &[])?;
+            builder.build(repeat, &[])?;
 
             if builder.cur.seen_edges {
                 if down_needed {
@@ -107,7 +107,7 @@ impl Irp {
             builder.set_head(0);
             builder.cur.seen_edges = false;
 
-            builder.expression(up, &[])?;
+            builder.build(up, &[])?;
 
             if builder.cur.seen_edges {
                 if down_needed {
@@ -146,6 +146,7 @@ pub(crate) struct Builder<'a> {
     cur: BuilderLocation,
     saved: Vec<BuilderLocation>,
     verts: Vec<Vertex>,
+    extents: Vec<i64>,
     constants: Vartable<'a>,
     definitions: HashMap<String, Rc<Expression>>,
     pub irp: &'a Irp,
@@ -166,6 +167,7 @@ impl<'a> Builder<'a> {
         Builder {
             cur: BuilderLocation::default(),
             saved: Vec::new(),
+            extents: Vec::new(),
             constants: Vartable::new(),
             definitions: HashMap::new(),
             verts,
@@ -284,6 +286,7 @@ impl<'a> Builder<'a> {
                     // is this variable modified anywhere
                     self.irp.stream.visit(
                         &mut modified_anywhere,
+                        false,
                         &|expr: &Expression, modified: &mut bool| {
                             if let Expression::Assignment(var_name, _) = expr {
                                 if var_name == name {
@@ -349,24 +352,6 @@ impl<'a> Builder<'a> {
         bit_spec: &[&[Rc<Expression>]],
     ) -> Result<(), String> {
         let mut pos = 0;
-
-        // first find any extent
-        for e in list {
-            if let Expression::ExtentConstant(v, u) = e.as_ref() {
-                let len = u.eval_float(*v, &self.irp.general_spec)?;
-
-                self.add_action(Action::Set {
-                    var: "$extent".to_owned(),
-                    expr: Rc::new(Expression::Number(len)),
-                });
-
-                if self.is_any_set("$extent") {
-                    return Err("multiple extents not supported".to_owned());
-                }
-
-                self.set("$extent", !0);
-            }
-        }
 
         while pos < list.len() {
             let mut bit_count = 0;
@@ -1001,6 +986,37 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
+    fn build(&mut self, expr: &Expression, bit_spec: &[&[Rc<Expression>]]) -> Result<(), String> {
+        // find all extents
+        self.extents = Vec::new();
+
+        expr.visit(self, true, &|expr, builder: &mut Builder| {
+            if let Expression::ExtentConstant(v, u) = expr {
+                builder
+                    .extents
+                    .insert(0, u.eval_float(*v, &builder.irp.general_spec).unwrap());
+            }
+        });
+
+        // start with the first extent
+        self.next_extent();
+
+        self.expression(expr, bit_spec)
+    }
+
+    fn next_extent(&mut self) {
+        if let Some(v) = self.extents.pop() {
+            self.add_action(Action::Set {
+                var: "$extent".to_owned(),
+                expr: Rc::new(Expression::Number(v)),
+            });
+
+            self.set("$extent", !0);
+        } else {
+            self.unset("$extent");
+        }
+    }
+
     fn expression(
         &mut self,
         expr: &Expression,
@@ -1113,7 +1129,7 @@ impl<'a> Builder<'a> {
 
                 self.add_edge(Edge::GapVar("$extent".to_owned(), 1, node));
 
-                self.unset("$extent");
+                self.next_extent();
 
                 self.set_head(node);
             }

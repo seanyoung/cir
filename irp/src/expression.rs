@@ -174,7 +174,7 @@ impl fmt::Display for RepeatMarker {
 
 impl Expression {
     /// Post-order visit all nodes in an expression
-    pub fn visit<'a, T, F>(&'a self, ctx: &mut T, visit: &F)
+    pub fn visit<'a, T, F>(&'a self, ctx: &mut T, repeats: bool, visit: &F)
     where
         F: Fn(&'a Expression, &mut T),
     {
@@ -186,7 +186,7 @@ impl Expression {
             | Expression::BitReverse(expr, _, _)
             | Expression::Log2(expr)
             | Expression::Assignment(_, expr) => {
-                expr.visit(ctx, visit);
+                expr.visit(ctx, repeats, visit);
             }
             Expression::Add(left, right)
             | Expression::Subtract(left, right)
@@ -207,13 +207,13 @@ impl Expression {
             | Expression::NotEqual(left, right)
             | Expression::And(left, right)
             | Expression::Or(left, right) => {
-                left.visit(ctx, visit);
-                right.visit(ctx, visit);
+                left.visit(ctx, repeats, visit);
+                right.visit(ctx, repeats, visit);
             }
             Expression::Conditional(cond, left, right) => {
-                cond.visit(ctx, visit);
-                left.visit(ctx, visit);
-                right.visit(ctx, visit);
+                cond.visit(ctx, repeats, visit);
+                left.visit(ctx, repeats, visit);
+                right.visit(ctx, repeats, visit);
             }
             Expression::BitField {
                 value,
@@ -221,35 +221,52 @@ impl Expression {
                 skip,
                 ..
             } => {
-                value.visit(ctx, visit);
-                length.visit(ctx, visit);
+                value.visit(ctx, repeats, visit);
+                length.visit(ctx, repeats, visit);
                 if let Some(skip) = skip {
-                    skip.visit(ctx, visit);
+                    skip.visit(ctx, repeats, visit);
                 }
             }
             Expression::InfiniteBitField { value, skip } => {
-                value.visit(ctx, visit);
-                skip.visit(ctx, visit);
+                value.visit(ctx, repeats, visit);
+                skip.visit(ctx, repeats, visit);
             }
             Expression::List(list) => {
                 for e in list {
-                    e.visit(ctx, visit);
+                    e.visit(ctx, repeats, visit);
                 }
             }
             Expression::Variation(variants) => {
                 for list in variants {
                     for e in list {
-                        e.visit(ctx, visit);
+                        e.visit(ctx, repeats, visit);
                     }
                 }
             }
             Expression::Stream(stream) => {
-                for bit_spec in &stream.bit_spec {
-                    bit_spec.visit(ctx, visit);
-                }
-                for e in &stream.stream {
-                    e.visit(ctx, visit);
-                }
+                if !repeats {
+                    for bit_spec in &stream.bit_spec {
+                        bit_spec.visit(ctx, repeats, visit);
+                    }
+                    for e in &stream.stream {
+                        e.visit(ctx, repeats, visit);
+                    }
+                } else {
+                    let rep = match stream.repeat {
+                        Some(RepeatMarker::Count(n)) => n,
+                        // FIXME: This should be None, other repeats should not occur but they do
+                        _ => 1,
+                    };
+
+                    for _ in 0..rep {
+                        for bit_spec in &stream.bit_spec {
+                            bit_spec.visit(ctx, repeats, visit);
+                        }
+                        for e in &stream.stream {
+                            e.visit(ctx, repeats, visit);
+                        }
+                    }
+                };
             }
             Expression::Number(..)
             | Expression::Identifier(..)

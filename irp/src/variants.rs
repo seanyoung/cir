@@ -37,7 +37,7 @@ pub(crate) fn variants(stream: &Rc<Expression>) -> Result<[Option<Rc<Expression>
 
             let mut ctx = Vec::new();
 
-            expr.visit(&mut ctx, &|expr, ctx| {
+            expr.visit(&mut ctx, false, &|expr, ctx| {
                 if let Expression::Variation(list) = &expr {
                     ctx.push((list[0].is_empty(), list.len()));
                 };
@@ -254,7 +254,9 @@ pub(crate) fn variants(stream: &Rc<Expression>) -> Result<[Option<Rc<Expression>
 fn check_no_repeats(expr: &Expression) -> Result<(), String> {
     let mut repeats = false;
 
-    expr.visit(&mut repeats, &|e, repeats| *repeats |= e.is_repeating());
+    expr.visit(&mut repeats, false, &|e, repeats| {
+        *repeats |= e.is_repeating()
+    });
 
     if repeats {
         Err("multiple repeat markers in IRP".into())
@@ -354,6 +356,7 @@ impl Expression {
         let mut found = None;
         self.visit(
             &mut found,
+            false,
             &|expr: &Expression, found: &mut Option<&Expression>| {
                 if matches!(expr, Expression::Variation(..)) {
                     *found = Some(expr);

@@ -542,7 +542,7 @@ fn check_definitions(
 
             // definition cannot define itself
             let mut dependents = HashSet::new();
-            expr.visit(&mut dependents, &|expr, dependents| {
+            expr.visit(&mut dependents, false, &|expr, dependents| {
                 if let Expression::Identifier(var) = &expr {
                     dependents.insert(var.to_owned());
                 }
