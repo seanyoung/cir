@@ -1,4 +1,6 @@
-use super::{expression::clone_filter, Event, Expression, Irp, ParameterSpec, Vartable};
+use super::{
+    expression::clone_filter, Event, Expression, Irp, ParameterSpec, RepeatMarker, Vartable,
+};
 use log::trace;
 use std::{
     collections::HashMap,
@@ -8,9 +10,6 @@ use std::{
 
 /**
  * Here we build the decoder nfa (non-deterministic finite automation)
- *
- * TODO
- * - (..)2 and other repeat markers are not supported
  */
 
 #[derive(PartialEq, Debug, Clone)]
@@ -148,6 +147,7 @@ pub(crate) struct Builder<'a> {
     saved: Vec<BuilderLocation>,
     verts: Vec<Vertex>,
     constants: Vartable<'a>,
+    definitions: HashMap<String, Rc<Expression>>,
     pub irp: &'a Irp,
 }
 
@@ -167,6 +167,7 @@ impl<'a> Builder<'a> {
             cur: BuilderLocation::default(),
             saved: Vec::new(),
             constants: Vartable::new(),
+            definitions: HashMap::new(),
             verts,
             irp,
         }
@@ -296,7 +297,7 @@ impl<'a> Builder<'a> {
                         continue;
                     }
 
-                    if self.expression_available(expr).is_ok() {
+                    if self.expression_available(expr, false).is_ok() {
                         let val = expr.eval(&self.constants).unwrap();
 
                         self.constants.set(name.to_owned(), val);
@@ -322,7 +323,7 @@ impl<'a> Builder<'a> {
                         continue;
                     }
 
-                    if self.expression_available(expr).is_ok() {
+                    if self.expression_available(expr, false).is_ok() {
                         // just set an initial value
                         self.add_action(Action::Set {
                             var: name.to_owned(),
@@ -333,6 +334,8 @@ impl<'a> Builder<'a> {
 
                         self.set(name, !0);
                     }
+
+                    self.definitions.insert(name.to_owned(), expr.clone());
                 }
             }
 
@@ -571,10 +574,10 @@ impl<'a> Builder<'a> {
                         }
                     };
 
-                    match self.expression_available(expr) {
+                    match self.expression_available(expr, true) {
                         Ok(_) => {
                             // We know all the variables in here or its constant
-                            self.check_bits_in_var(value, bits, mask)?;
+                            self.check_bits_in_var(value, bits, mask)?
                         }
                         Err(name) => match self.inverse(bits, value.clone(), &name) {
                             Some((bits, actions, _)) => {
@@ -649,25 +652,10 @@ impl<'a> Builder<'a> {
         mask: i64,
         delayed: &mut Vec<Action>,
     ) -> Result<(), String> {
-        if self.is_set(name, mask) {
-            let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
-                Rc::new(Expression::Identifier(name.to_owned())),
-                Rc::new(Expression::Number(mask)),
-            )));
+        if let Some(def) = self.definitions.get(name) {
+            let def = def.clone();
 
-            self.add_action(Action::AssertEq {
-                left,
-                right: self.const_folding(&bits),
-            });
-        } else if let Some(def) = self.irp.definitions.iter().find_map(|def| {
-            if let Expression::Assignment(var, expr) = def {
-                if name == var {
-                    return Some(expr);
-                }
-            }
-            None
-        }) {
-            let expr = if self.is_any_set(name) {
+            let expr = if self.is_set(name, !mask) {
                 Rc::new(Expression::BitwiseOr(
                     Rc::new(Expression::Identifier(name.to_owned())),
                     bits.clone(),
@@ -687,7 +675,7 @@ impl<'a> Builder<'a> {
 
             self.set(name, mask);
 
-            let def = self.const_folding(def);
+            let def = self.const_folding(&def);
 
             let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
                 def.clone(),
@@ -704,6 +692,16 @@ impl<'a> Builder<'a> {
             } else {
                 delayed.push(action);
             }
+        } else if self.is_set(name, mask) {
+            let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
+                Rc::new(Expression::Identifier(name.to_owned())),
+                Rc::new(Expression::Number(mask)),
+            )));
+
+            self.add_action(Action::AssertEq {
+                left,
+                right: self.const_folding(&bits),
+            });
         } else {
             let expr = if self.is_any_set(name) {
                 Rc::new(Expression::BitwiseOr(
@@ -745,22 +743,16 @@ impl<'a> Builder<'a> {
     /// add it to the actions. This function works recursively, so if a definition
     /// requires a further definition, then that definition will be included too
     fn add_definition(&mut self, name: &str) -> bool {
-        if let Some(def) = self.irp.definitions.iter().find_map(|def| {
-            if let Expression::Assignment(var, expr) = def {
-                if name == var {
-                    return Some(expr);
-                }
-            }
-            None
-        }) {
+        if let Some(def) = self.definitions.get(name) {
+            let def = def.clone();
             for _ in 0..2 {
-                match self.expression_available(def) {
+                match self.expression_available(&def, false) {
                     Ok(_) => {
                         trace!("found definition {} = {}", name, def);
 
                         self.add_action(Action::Set {
                             var: name.to_owned(),
-                            expr: self.const_folding(def),
+                            expr: self.const_folding(&def),
                         });
 
                         self.set(name, !0);
@@ -786,7 +778,7 @@ impl<'a> Builder<'a> {
                 if let Some((expr, actions, mask)) =
                     self.inverse(Rc::new(Expression::Identifier(var.to_string())), expr, name)
                 {
-                    if self.expression_available(&expr).is_err() {
+                    if self.expression_available(&expr, false).is_err() {
                         continue;
                     }
 
@@ -830,7 +822,7 @@ impl<'a> Builder<'a> {
     /// no definitions can be found
     fn have_definitions(&mut self, expr: &Expression) -> Result<(), String> {
         loop {
-            match self.expression_available(expr) {
+            match self.expression_available(expr, false) {
                 Ok(_) => {
                     return Ok(());
                 }
@@ -1016,14 +1008,21 @@ impl<'a> Builder<'a> {
     ) -> Result<(), String> {
         match expr {
             Expression::Stream(irstream) => {
-                // TODO: handle repeat marker RepeatMarker::Count(n)
+                let repeats = match irstream.repeat {
+                    Some(RepeatMarker::Count(n)) => n,
+                    None => 1,
+                    _ => unreachable!(),
+                };
+
                 let mut bit_spec = bit_spec.to_vec();
 
                 if !irstream.bit_spec.is_empty() {
                     bit_spec.insert(0, &irstream.bit_spec);
                 }
 
-                self.expression_list(&irstream.stream, &bit_spec)?;
+                for _ in 0..repeats {
+                    self.expression_list(&irstream.stream, &bit_spec)?;
+                }
             }
             Expression::List(list) => {
                 self.expression_list(list, bit_spec)?;
@@ -1138,7 +1137,11 @@ impl<'a> Builder<'a> {
 
     /// Do we have all the vars to evaluate an expression, i.e. can this
     /// expression be evaluated now.
-    fn expression_available(&self, expr: &Expression) -> Result<(), String> {
+    fn expression_available(
+        &self,
+        expr: &Expression,
+        ignore_definitions: bool,
+    ) -> Result<(), String> {
         match expr {
             Expression::FlashConstant(..)
             | Expression::GapConstant(..)
@@ -1148,9 +1151,10 @@ impl<'a> Builder<'a> {
             | Expression::GapIdentifier(name, ..)
             | Expression::ExtentIdentifier(name, ..)
             | Expression::Identifier(name) => {
-                if name.starts_with('$')
+                if (name.starts_with('$')
                     || self.cur.vars.contains_key(name)
-                    || self.constants.is_defined(name)
+                    || self.constants.is_defined(name))
+                    && (!ignore_definitions || !self.definitions.contains_key(name))
                 {
                     Ok(())
                 } else {
@@ -1163,19 +1167,19 @@ impl<'a> Builder<'a> {
                 skip,
                 ..
             } => {
-                if let Some(res) = self.bitfield_known(value, length, skip) {
+                if let Some(res) = self.bitfield_known(value, length, skip, ignore_definitions) {
                     res
                 } else {
                     if let Some(skip) = &skip {
-                        self.expression_available(skip)?;
+                        self.expression_available(skip, ignore_definitions)?;
                     }
-                    self.expression_available(value)?;
-                    self.expression_available(length)
+                    self.expression_available(value, ignore_definitions)?;
+                    self.expression_available(length, ignore_definitions)
                 }
             }
             Expression::InfiniteBitField { value, skip } => {
-                self.expression_available(value)?;
-                self.expression_available(skip)
+                self.expression_available(value, ignore_definitions)?;
+                self.expression_available(skip, ignore_definitions)
             }
             Expression::Assignment(_, expr)
             | Expression::Complement(expr)
@@ -1183,7 +1187,9 @@ impl<'a> Builder<'a> {
             | Expression::Negative(expr)
             | Expression::BitCount(expr)
             | Expression::Log2(expr)
-            | Expression::BitReverse(expr, ..) => self.expression_available(expr),
+            | Expression::BitReverse(expr, ..) => {
+                self.expression_available(expr, ignore_definitions)
+            }
             Expression::Add(left, right)
             | Expression::Subtract(left, right)
             | Expression::Multiply(left, right)
@@ -1203,32 +1209,32 @@ impl<'a> Builder<'a> {
             | Expression::BitwiseXor(left, right)
             | Expression::Or(left, right)
             | Expression::And(left, right) => {
-                self.expression_available(left)?;
-                self.expression_available(right)
+                self.expression_available(left, ignore_definitions)?;
+                self.expression_available(right, ignore_definitions)
             }
             Expression::Conditional(cond, left, right) => {
-                self.expression_available(cond)?;
-                self.expression_available(left)?;
-                self.expression_available(right)
+                self.expression_available(cond, ignore_definitions)?;
+                self.expression_available(left, ignore_definitions)?;
+                self.expression_available(right, ignore_definitions)
             }
             Expression::List(list) => {
                 for expr in list {
-                    self.expression_available(expr)?;
+                    self.expression_available(expr, ignore_definitions)?;
                 }
                 Ok(())
             }
             Expression::Variation(list) => {
                 for expr in list.iter().flatten() {
-                    self.expression_available(expr)?;
+                    self.expression_available(expr, ignore_definitions)?;
                 }
                 Ok(())
             }
             Expression::Stream(stream) => {
                 for expr in &stream.bit_spec {
-                    self.expression_available(expr)?;
+                    self.expression_available(expr, ignore_definitions)?;
                 }
                 for expr in &stream.stream {
-                    self.expression_available(expr)?;
+                    self.expression_available(expr, ignore_definitions)?;
                 }
                 Ok(())
             }
@@ -1240,6 +1246,7 @@ impl<'a> Builder<'a> {
         value: &Rc<Expression>,
         length: &Rc<Expression>,
         skip: &Option<Rc<Expression>>,
+        ignore_definitions: bool,
     ) -> Option<Result<(), String>> {
         let name = match value.as_ref() {
             Expression::Identifier(name) => name,
@@ -1273,7 +1280,8 @@ impl<'a> Builder<'a> {
 
         let mask = gen_mask(length) << skip;
 
-        if self.is_set(name, mask) {
+        if self.is_set(name, mask) && (!ignore_definitions || !self.definitions.contains_key(name))
+        {
             Some(Ok(()))
         } else {
             Some(Err(name.to_string()))
