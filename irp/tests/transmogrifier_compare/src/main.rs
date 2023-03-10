@@ -1,5 +1,6 @@
-use irp::{Irp, Vartable};
+use irp::{InfraredData, Irp, Vartable};
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
+use itertools::Itertools;
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -28,15 +29,51 @@ fn main() {
                     vars.set(param.name.to_owned(), value);
                 }
 
+                // encode with irp crate
                 match irp.encode(vars.clone()) {
                     Ok(our) => {
+                        // encode with transmogrifier
                         let trans = IrpTransmogrifierRender::new(&jvm, s).unwrap();
 
                         let their = trans.render_raw(params.clone()).unwrap();
 
-                        // compare irptransmogrifier output with our own
+                        // compare irptransmogrifier output
                         for i in 0..3 {
                             assert!(compare_with_rounding(&our[i], &their[i]));
+                        }
+
+                        match irp.compile() {
+                            Ok(nfa) => {
+                                let mut decoder = nfa.decoder(100, 3, 20000);
+                                let mut decoded = false;
+
+                                for (i, part) in our.into_iter().enumerate() {
+                                    let ir = InfraredData::from_u32_slice(&part);
+
+                                    for i in ir {
+                                        decoder.input(i);
+                                    }
+
+                                    while let Some((ev, fields)) = decoder.get() {
+                                        println!(
+                                            "decode {i} {ev}: {}",
+                                            fields
+                                                .iter()
+                                                .map(|(name, v)| format!("{name}={v}"))
+                                                .join(", ")
+                                        );
+
+                                        if fields == params {
+                                            decoded = true;
+                                        }
+                                    }
+                                }
+
+                                assert!(decoded);
+                            }
+                            Err(e) => {
+                                panic!("compile {e}");
+                            }
                         }
                     }
                     Err(e) => {
