@@ -428,7 +428,7 @@ fn decode_all() {
         println!("trying {}", protocol.name);
 
         if protocol.name == "NEC-Shirriff" {
-            protocol.irp = "{38.4k,msb,564}<1,-1|1,-3>(16,-8,data:length,1,^108m) [data:0..UINT32_MAX,length:1..64]".into();
+            protocol.irp = "{38.4k,msb,564}<1,-1|1,-3>(16,-8,data:length,1,^108m) [data:0..UINT32_MAX,length:1..63]".into();
         }
 
         let irp = Irp::parse(&protocol.irp).unwrap();
