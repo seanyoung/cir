@@ -71,7 +71,7 @@ pub(crate) struct Vertex {
 /// match IR and hopefully, one day, create the dfa (deterministic finite
 /// automation).
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NFA {
     pub(crate) verts: Vec<Vertex>,
 }
@@ -132,7 +132,6 @@ struct BuilderLocation {
     vars: HashMap<String, i64>,
 }
 
-#[allow(dead_code)]
 impl<'a> Builder<'a> {
     pub fn new(irp: &'a Irp) -> Self {
         let verts = vec![Vertex::default()];
@@ -381,17 +380,19 @@ impl<'a> Builder<'a> {
                     ..
                 } = list[pos].as_ref()
                 {
-                    let last = last && pos == list.len() - 1;
-
                     if let Expression::Number(value) = self.const_folding(value).as_ref() {
                         if self.irp.general_spec.lsb ^ reverse {
                             for bit in 0..bit_count {
+                                let last = last && bit == bit_count - 1;
+
                                 let e = &bit_spec[0][((value >> bit) & 1) as usize];
 
                                 self.expression(e, &bit_spec[1..], last)?;
                             }
                         } else {
                             for bit in (0..bit_count).rev() {
+                                let last = last && bit == 0;
+
                                 let e = &bit_spec[0][((value >> bit) & 1) as usize];
 
                                 self.expression(e, &bit_spec[1..], last)?;
@@ -432,7 +433,6 @@ impl<'a> Builder<'a> {
 
                         let bits = Expression::Identifier(String::from("$bits"));
 
-                        #[allow(clippy::comparison_chain)]
                         let bits = if skip > 0 {
                             Expression::ShiftLeft(Rc::new(bits), Rc::new(Expression::Number(skip)))
                         } else {
@@ -501,7 +501,6 @@ impl<'a> Builder<'a> {
 
                     let bits = Rc::new(Expression::Identifier(String::from("$bits")));
 
-                    #[allow(clippy::comparison_chain)]
                     let mut bits = if offset > skip {
                         Rc::new(Expression::ShiftRight(
                             bits,
@@ -1194,9 +1193,7 @@ impl<'a> Builder<'a> {
             | Expression::GapIdentifier(name, ..)
             | Expression::ExtentIdentifier(name, ..)
             | Expression::Identifier(name) => {
-                if (name.starts_with('$')
-                    || self.cur.vars.contains_key(name)
-                    || self.constants.is_defined(name))
+                if (name.starts_with('$') || self.cur.vars.contains_key(name))
                     && (!ignore_definitions || !self.definitions.contains_key(name))
                 {
                     Ok(())

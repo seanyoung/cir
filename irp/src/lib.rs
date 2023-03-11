@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![allow(clippy::comparison_chain)]
 
 mod build_nfa;
 mod decoder_nfa;
