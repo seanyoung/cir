@@ -1,4 +1,4 @@
-use irp::{InfraredData, Irp, Vartable};
+use irp::{InfraredData, Irp, Message, Vartable};
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
 use rand::Rng;
@@ -44,7 +44,7 @@ fn main() {
 
                         match irp.compile() {
                             Ok(nfa) => {
-                                let mut decoder = nfa.decoder(100, 3, 20000);
+                                let mut decoder = nfa.decoder(100, 3, 100000);
                                 let mut decoded = false;
 
                                 for (i, part) in our.into_iter().enumerate() {
@@ -53,6 +53,8 @@ fn main() {
                                     for i in ir {
                                         decoder.input(i);
                                     }
+
+                                    let mut failed = false;
 
                                     while let Some((ev, fields)) = decoder.get() {
                                         println!(
@@ -65,7 +67,21 @@ fn main() {
 
                                         if fields == params {
                                             decoded = true;
+                                        } else {
+                                            for (n, v) in fields {
+                                                if params[&n] != v {
+                                                    failed = true;
+                                                    println!(
+                                                        "{n} decoded as {} should be {}",
+                                                        v, params[&n]
+                                                    );
+                                                }
+                                            }
                                         }
+                                    }
+
+                                    if failed {
+                                        panic!("{}", Message::from_raw_slice(&part).print_rawir());
                                     }
                                 }
 

@@ -295,7 +295,7 @@ fn process(
     let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa-step");
 
     for (remote, nfa) in irps {
-        let mut matcher = nfa.decoder(abs_tolerance, rel_tolerance, 20000);
+        let mut matcher = nfa.decoder(abs_tolerance, rel_tolerance, 100000);
 
         for (index, raw) in raw.iter().enumerate() {
             let ir = if index.is_odd() {
