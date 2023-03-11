@@ -253,8 +253,7 @@ impl Expression {
                     }
                 } else {
                     let rep = match stream.repeat {
-                        Some(RepeatMarker::Count(n)) => n,
-                        // FIXME: This should be None, other repeats should not occur but they do
+                        Some(RepeatMarker::CountOrMore(n)) | Some(RepeatMarker::Count(n)) => n,
                         _ => 1,
                     };
 
