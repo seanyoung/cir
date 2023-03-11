@@ -424,8 +424,12 @@ fn decode_all() {
     let mut fails = 0;
     let mut rng = rand::thread_rng();
 
-    for protocol in &protocols {
+    for mut protocol in protocols {
         println!("trying {}", protocol.name);
+
+        if protocol.name == "NEC-Shirriff" {
+            protocol.irp = "{38.4k,msb,564}<1,-1|1,-3>(16,-8,data:length,1,^108m) [data:0..UINT32_MAX,length:1..64]".into();
+        }
 
         let irp = Irp::parse(&protocol.irp).unwrap();
 
@@ -529,7 +533,7 @@ fn decode_all() {
     println!("tests: {total_tests} fails: {fails}");
 
     // TODO: we still have a whole bunch of fails
-    assert!(fails <= 21);
+    assert!(fails <= 20);
 }
 
 #[test]
