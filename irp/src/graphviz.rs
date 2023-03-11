@@ -81,25 +81,33 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
     for (i, v) in nfa.verts.iter().enumerate() {
         for edge in &v.edges {
             match edge {
-                Edge::Flash(len, dest) => writeln!(
+                Edge::Flash { length: len, dest } => writeln!(
                     &mut file,
                     "\t\"{}\" -> \"{}\" [label=\"flash {}μs\"]",
                     vert_names[i], vert_names[*dest], len
                 )
                 .unwrap(),
-                Edge::Gap(len, dest) => writeln!(
+                Edge::Gap { length: len, dest } => writeln!(
                     &mut file,
                     "\t\"{}\" -> \"{}\" [label=\"gap {}μs\"]",
                     vert_names[i], vert_names[*dest], len
                 )
                 .unwrap(),
-                Edge::FlashVar(var, unit, dest) => writeln!(
+                Edge::FlashVar {
+                    name: var,
+                    unit,
+                    dest,
+                } => writeln!(
                     &mut file,
                     "\t\"{}\" -> \"{}\" [label=\"flash {}*{}\"]",
                     vert_names[i], vert_names[*dest], var, unit
                 )
                 .unwrap(),
-                Edge::GapVar(var, unit, dest) => writeln!(
+                Edge::GapVar {
+                    name: var,
+                    unit,
+                    dest,
+                } => writeln!(
                     &mut file,
                     "\t\"{}\" -> \"{}\" [label=\"gap {}*{}\"]",
                     vert_names[i], vert_names[*dest], var, unit

@@ -155,7 +155,10 @@ impl<'a> Decoder<'a> {
                 //trace!(&format!("edge:{:?}", edge));
 
                 match edge {
-                    Edge::Flash(expected, dest) => {
+                    Edge::Flash {
+                        length: expected,
+                        dest,
+                    } => {
                         if let Some(ir @ InfraredData::Flash(received)) = ir {
                             if self.tolerance_eq(*expected as u32, received) {
                                 trace!(
@@ -186,7 +189,11 @@ impl<'a> Decoder<'a> {
                             new_pos.push((pos, vartab.clone()));
                         }
                     }
-                    Edge::FlashVar(var, unit, dest) => {
+                    Edge::FlashVar {
+                        name: var,
+                        unit,
+                        dest,
+                    } => {
                         let res = Expression::Identifier(var.to_owned())
                             .eval(&vartab)
                             .unwrap();
@@ -222,7 +229,10 @@ impl<'a> Decoder<'a> {
                             new_pos.push((pos, vartab.clone()));
                         }
                     }
-                    Edge::Gap(expected, dest) => {
+                    Edge::Gap {
+                        length: expected,
+                        dest,
+                    } => {
                         if let Some(ir @ InfraredData::Gap(received)) = ir {
                             if *expected >= self.max_gap as i64 {
                                 if received >= self.max_gap {
@@ -267,7 +277,11 @@ impl<'a> Decoder<'a> {
                             new_pos.push((pos, vartab.clone()));
                         }
                     }
-                    Edge::GapVar(var, unit, dest) => {
+                    Edge::GapVar {
+                        name: var,
+                        unit,
+                        dest,
+                    } => {
                         let res = Expression::Identifier(var.to_owned())
                             .eval(&vartab)
                             .unwrap();

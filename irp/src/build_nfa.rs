@@ -14,10 +14,24 @@ use std::{
 
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum Edge {
-    Flash(i64, usize),
-    Gap(i64, usize),
-    FlashVar(String, i64, usize),
-    GapVar(String, i64, usize),
+    Flash {
+        length: i64,
+        dest: usize,
+    },
+    Gap {
+        length: i64,
+        dest: usize,
+    },
+    FlashVar {
+        name: String,
+        unit: i64,
+        dest: usize,
+    },
+    GapVar {
+        name: String,
+        unit: i64,
+        dest: usize,
+    },
     BranchCond {
         expr: Rc<Expression>,
         yes: usize,
@@ -42,6 +56,7 @@ pub(crate) enum Action {
     },
     Done(Event, Vec<String>),
 }
+
 #[derive(PartialEq, Default, Clone, Debug)]
 pub(crate) struct Vertex {
     pub actions: Vec<Action>,
@@ -1050,7 +1065,10 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::Flash(len, node));
+                self.add_edge(Edge::Flash {
+                    length: len,
+                    dest: node,
+                });
 
                 self.set_head(node);
 
@@ -1063,7 +1081,10 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::Gap(len, node));
+                self.add_edge(Edge::Gap {
+                    length: len,
+                    dest: node,
+                });
 
                 self.set_head(node);
 
@@ -1078,7 +1099,11 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::FlashVar(var.to_owned(), unit, node));
+                self.add_edge(Edge::FlashVar {
+                    name: var.to_owned(),
+                    unit,
+                    dest: node,
+                });
 
                 self.set_head(node);
 
@@ -1102,7 +1127,11 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::GapVar(var.to_owned(), unit, node));
+                self.add_edge(Edge::GapVar {
+                    name: var.to_owned(),
+                    unit,
+                    dest: node,
+                });
 
                 self.set_head(node);
 
@@ -1127,7 +1156,11 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::GapVar("$extent".to_owned(), 1, node));
+                self.add_edge(Edge::GapVar {
+                    name: "$extent".to_owned(),
+                    unit: 1,
+                    dest: node,
+                });
 
                 self.next_extent();
 
