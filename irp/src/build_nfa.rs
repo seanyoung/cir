@@ -16,20 +16,24 @@ use std::{
 pub(crate) enum Edge {
     Flash {
         length: i64,
+        complete: bool,
         dest: usize,
     },
     Gap {
         length: i64,
+        complete: bool,
         dest: usize,
     },
     FlashVar {
         name: String,
         unit: i64,
+        complete: bool,
         dest: usize,
     },
     GapVar {
         name: String,
         unit: i64,
+        complete: bool,
         dest: usize,
     },
     BranchCond {
@@ -83,7 +87,10 @@ impl Irp {
         let mut down_needed = false;
 
         if let Some(down) = &self.variants[0] {
-            builder.build(down, &[])?;
+            builder.build(
+                down,
+                self.variants[1].is_some() | self.variants[2].is_some(),
+            )?;
 
             builder.add_action(Action::Set {
                 var: "$down".into(),
@@ -102,7 +109,7 @@ impl Irp {
         }
 
         if let Some(repeat) = &self.variants[1] {
-            builder.build(repeat, &[])?;
+            builder.build(repeat, self.variants[2].is_some())?;
 
             if builder.cur.seen_edges {
                 if down_needed {
@@ -122,7 +129,7 @@ impl Irp {
             builder.set_head(0);
             builder.cur.seen_edges = false;
 
-            builder.build(up, &[])?;
+            builder.build(up, false)?;
 
             if builder.cur.seen_edges {
                 if down_needed {
@@ -365,6 +372,7 @@ impl<'a> Builder<'a> {
         &mut self,
         list: &[Rc<Expression>],
         bit_spec: &[&[Rc<Expression>]],
+        last: bool,
     ) -> Result<(), String> {
         let mut pos = 0;
 
@@ -404,9 +412,11 @@ impl<'a> Builder<'a> {
                 }
             }
 
+            let last = last && pos == list.len() - 1;
+
             if expr_count == 0 {
                 // not a bit field
-                self.expression(&list[pos], bit_spec)?;
+                self.expression(&list[pos], bit_spec, last)?;
                 pos += 1;
                 continue;
             }
@@ -420,18 +430,20 @@ impl<'a> Builder<'a> {
                     ..
                 } = list[pos].as_ref()
                 {
+                    let last = last && pos == list.len() - 1;
+
                     if let Expression::Number(value) = self.const_folding(value).as_ref() {
                         if self.irp.general_spec.lsb ^ reverse {
                             for bit in 0..bit_count {
                                 let e = &bit_spec[0][((value >> bit) & 1) as usize];
 
-                                self.expression(e, &bit_spec[1..])?;
+                                self.expression(e, &bit_spec[1..], last)?;
                             }
                         } else {
                             for bit in (0..bit_count).rev() {
                                 let e = &bit_spec[0][((value >> bit) & 1) as usize];
 
-                                self.expression(e, &bit_spec[1..])?;
+                                self.expression(e, &bit_spec[1..], last)?;
                             }
                         }
 
@@ -452,7 +464,14 @@ impl<'a> Builder<'a> {
                     let (min_len, max_len, store_length) = self.bit_field_length(length)?;
 
                     if min_len != max_len {
-                        self.decode_bits(Some(min_len), max_len, *reverse, store_length, bit_spec)?;
+                        self.decode_bits(
+                            Some(min_len),
+                            max_len,
+                            *reverse,
+                            store_length,
+                            bit_spec,
+                            last,
+                        )?;
 
                         let skip = if let Some(skip) = skip {
                             self.const_folding(skip).eval(&Vartable::new())?
@@ -494,7 +513,7 @@ impl<'a> Builder<'a> {
                 false
             };
 
-            self.decode_bits(None, bit_count, do_reverse, None, bit_spec)?;
+            self.decode_bits(None, bit_count, do_reverse, None, bit_spec, last)?;
 
             let mut delayed = Vec::new();
 
@@ -845,6 +864,7 @@ impl<'a> Builder<'a> {
         reverse: bool,
         store_length: Option<String>,
         bit_spec: &[&[Rc<Expression>]],
+        last: bool,
     ) -> Result<(), String> {
         self.cur.seen_edges = true;
 
@@ -864,7 +884,7 @@ impl<'a> Builder<'a> {
             for (bit, e) in bit_spec[0].iter().enumerate() {
                 self.push_location();
 
-                self.expression(e, &bit_spec[1..])?;
+                self.expression(e, &bit_spec[1..], last)?;
 
                 self.add_action(Action::Set {
                     var: String::from("$bits"),
@@ -902,7 +922,7 @@ impl<'a> Builder<'a> {
         for (bit, e) in bit_spec[0].iter().enumerate() {
             self.push_location();
 
-            self.expression(e, &bit_spec[1..])?;
+            self.expression(e, &bit_spec[1..], last)?;
 
             self.add_action(Action::Set {
                 var: String::from("$v"),
@@ -1001,7 +1021,7 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    fn build(&mut self, expr: &Expression, bit_spec: &[&[Rc<Expression>]]) -> Result<(), String> {
+    fn build(&mut self, expr: &Expression, last: bool) -> Result<(), String> {
         // find all extents
         self.extents = Vec::new();
 
@@ -1016,7 +1036,7 @@ impl<'a> Builder<'a> {
         // start with the first extent
         self.next_extent();
 
-        self.expression(expr, bit_spec)
+        self.expression(expr, &[], last)
     }
 
     fn next_extent(&mut self) {
@@ -1036,6 +1056,7 @@ impl<'a> Builder<'a> {
         &mut self,
         expr: &Expression,
         bit_spec: &[&[Rc<Expression>]],
+        last: bool,
     ) -> Result<(), String> {
         match expr {
             Expression::Stream(irstream) => {
@@ -1051,12 +1072,12 @@ impl<'a> Builder<'a> {
                     bit_spec.insert(0, &irstream.bit_spec);
                 }
 
-                for _ in 0..repeats {
-                    self.expression_list(&irstream.stream, &bit_spec)?;
+                for n in 0..repeats {
+                    self.expression_list(&irstream.stream, &bit_spec, last && (n == repeats - 1))?;
                 }
             }
             Expression::List(list) => {
-                self.expression_list(list, bit_spec)?;
+                self.expression_list(list, bit_spec, last)?;
             }
             Expression::FlashConstant(v, u) => {
                 self.cur.seen_edges = true;
@@ -1067,6 +1088,7 @@ impl<'a> Builder<'a> {
 
                 self.add_edge(Edge::Flash {
                     length: len,
+                    complete: last,
                     dest: node,
                 });
 
@@ -1083,6 +1105,7 @@ impl<'a> Builder<'a> {
 
                 self.add_edge(Edge::Gap {
                     length: len,
+                    complete: last,
                     dest: node,
                 });
 
@@ -1102,6 +1125,7 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge::FlashVar {
                     name: var.to_owned(),
                     unit,
+                    complete: last,
                     dest: node,
                 });
 
@@ -1130,6 +1154,7 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge::GapVar {
                     name: var.to_owned(),
                     unit,
+                    complete: last,
                     dest: node,
                 });
 
@@ -1149,7 +1174,7 @@ impl<'a> Builder<'a> {
             Expression::BitField { length, .. } => {
                 let length = length.eval(&Vartable::new())?;
 
-                self.decode_bits(None, length, false, None, bit_spec)?;
+                self.decode_bits(None, length, false, None, bit_spec, last)?;
             }
             Expression::ExtentConstant(_, _) => {
                 self.cur.seen_edges = true;
@@ -1159,6 +1184,7 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge::GapVar {
                     name: "$extent".to_owned(),
                     unit: 1,
+                    complete: last,
                     dest: node,
                 });
 

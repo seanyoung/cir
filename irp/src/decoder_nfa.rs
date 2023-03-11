@@ -157,6 +157,7 @@ impl<'a> Decoder<'a> {
                 match edge {
                     Edge::Flash {
                         length: expected,
+                        complete,
                         dest,
                     } => {
                         if let Some(ir @ InfraredData::Flash(received)) = ir {
@@ -172,7 +173,7 @@ impl<'a> Decoder<'a> {
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
-                            } else if received > *expected as u32 {
+                            } else if !complete && received > *expected as u32 {
                                 trace!(
                                     "matched flash {} (expected {}) (incomplete consume) => {}",
                                     received,
@@ -192,6 +193,7 @@ impl<'a> Decoder<'a> {
                     Edge::FlashVar {
                         name: var,
                         unit,
+                        complete,
                         dest,
                     } => {
                         let res = Expression::Identifier(var.to_owned())
@@ -212,7 +214,7 @@ impl<'a> Decoder<'a> {
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
-                            } else if received > expected as u32 {
+                            } else if !complete && received > expected as u32 {
                                 trace!(
                                     "matched flash {} (expected {}) (incomplete consume) => {}",
                                     received,
@@ -231,6 +233,7 @@ impl<'a> Decoder<'a> {
                     }
                     Edge::Gap {
                         length: expected,
+                        complete,
                         dest,
                     } => {
                         if let Some(ir @ InfraredData::Gap(received)) = ir {
@@ -260,7 +263,7 @@ impl<'a> Decoder<'a> {
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
-                            } else if received > *expected as u32 {
+                            } else if !complete && received > *expected as u32 {
                                 trace!(
                                     "matched gap {} (expected {}) (incomplete consume) => {}",
                                     received,
@@ -280,6 +283,7 @@ impl<'a> Decoder<'a> {
                     Edge::GapVar {
                         name: var,
                         unit,
+                        complete,
                         dest,
                     } => {
                         let res = Expression::Identifier(var.to_owned())
@@ -314,7 +318,7 @@ impl<'a> Decoder<'a> {
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
-                            } else if received > expected as u32 {
+                            } else if !complete && received > expected as u32 {
                                 trace!(
                                     "matched gap {} (expected {}) (incomplete consume) => {}",
                                     received,

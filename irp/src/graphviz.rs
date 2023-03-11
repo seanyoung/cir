@@ -81,36 +81,60 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
     for (i, v) in nfa.verts.iter().enumerate() {
         for edge in &v.edges {
             match edge {
-                Edge::Flash { length: len, dest } => writeln!(
+                Edge::Flash {
+                    length: len,
+                    complete,
+                    dest,
+                } => writeln!(
                     &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"flash {}μs\"]",
-                    vert_names[i], vert_names[*dest], len
+                    "\t\"{}\" -> \"{}\" [label=\"flash {}μs {}\"]",
+                    vert_names[i],
+                    vert_names[*dest],
+                    len,
+                    if *complete { " complete" } else { "" }
                 )
                 .unwrap(),
-                Edge::Gap { length: len, dest } => writeln!(
+                Edge::Gap {
+                    length: len,
+                    complete,
+                    dest,
+                } => writeln!(
                     &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"gap {}μs\"]",
-                    vert_names[i], vert_names[*dest], len
+                    "\t\"{}\" -> \"{}\" [label=\"gap {}μs {}\"]",
+                    vert_names[i],
+                    vert_names[*dest],
+                    len,
+                    if *complete { " complete" } else { "" }
                 )
                 .unwrap(),
                 Edge::FlashVar {
                     name: var,
                     unit,
+                    complete,
                     dest,
                 } => writeln!(
                     &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"flash {}*{}\"]",
-                    vert_names[i], vert_names[*dest], var, unit
+                    "\t\"{}\" -> \"{}\" [label=\"flash {}*{} {}\"]",
+                    vert_names[i],
+                    vert_names[*dest],
+                    var,
+                    unit,
+                    if *complete { " complete" } else { "" }
                 )
                 .unwrap(),
                 Edge::GapVar {
                     name: var,
                     unit,
+                    complete,
                     dest,
                 } => writeln!(
                     &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"gap {}*{}\"]",
-                    vert_names[i], vert_names[*dest], var, unit
+                    "\t\"{}\" -> \"{}\" [label=\"gap {}*{} {}\"]",
+                    vert_names[i],
+                    vert_names[*dest],
+                    var,
+                    unit,
+                    if *complete { " complete" } else { "" }
                 )
                 .unwrap(),
                 Edge::BranchCond { yes, no, .. } => {
