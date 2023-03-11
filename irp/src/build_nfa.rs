@@ -161,9 +161,17 @@ impl<'a> Builder<'a> {
         self.cur.vars.remove(name);
     }
 
-    pub fn is_set(&self, name: &str, fields: i64) -> bool {
+    pub fn all_field_set(&self, name: &str, fields: i64) -> bool {
         if let Some(e) = self.cur.vars.get(name) {
             (e & fields) == fields
+        } else {
+            false
+        }
+    }
+
+    pub fn any_field_set(&self, name: &str, fields: i64) -> bool {
+        if let Some(e) = self.cur.vars.get(name) {
+            (e & fields) != 0
         } else {
             false
         }
@@ -624,7 +632,7 @@ impl<'a> Builder<'a> {
         if let Some(def) = self.definitions.get(name) {
             let def = def.clone();
 
-            let expr = if self.is_set(name, !mask) {
+            let expr = if self.any_field_set(name, !mask) {
                 Rc::new(Expression::BitwiseOr(
                     Rc::new(Expression::Identifier(name.to_owned())),
                     bits.clone(),
@@ -661,7 +669,7 @@ impl<'a> Builder<'a> {
             } else {
                 delayed.push(action);
             }
-        } else if self.is_set(name, mask) {
+        } else if self.all_field_set(name, mask) {
             let left = self.const_folding(&Rc::new(Expression::BitwiseAnd(
                 Rc::new(Expression::Identifier(name.to_owned())),
                 Rc::new(Expression::Number(mask)),
@@ -672,7 +680,7 @@ impl<'a> Builder<'a> {
                 right: self.const_folding(&bits),
             });
         } else {
-            let expr = if self.is_any_set(name) {
+            let expr = if self.any_field_set(name, !mask) {
                 Rc::new(Expression::BitwiseOr(
                     Rc::new(Expression::Identifier(name.to_owned())),
                     bits,
@@ -752,7 +760,7 @@ impl<'a> Builder<'a> {
                     }
 
                     if let Some(mask) = mask {
-                        if self.is_set(name, mask) {
+                        if self.all_field_set(name, mask) {
                             continue;
                         }
                     }
@@ -1320,7 +1328,8 @@ impl<'a> Builder<'a> {
 
         let mask = gen_mask(length) << skip;
 
-        if self.is_set(name, mask) && (!ignore_definitions || !self.definitions.contains_key(name))
+        if self.all_field_set(name, mask)
+            && (!ignore_definitions || !self.definitions.contains_key(name))
         {
             Some(Ok(()))
         } else {
