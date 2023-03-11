@@ -120,7 +120,7 @@ impl<'a> Decoder<'a> {
         }
     }
 
-    /// Feed intrared data to the decoder
+    /// Feed infrared data to the decoder
     pub fn input(&mut self, ir: InfraredData) {
         if ir == InfraredData::Reset {
             trace!("decoder reset");

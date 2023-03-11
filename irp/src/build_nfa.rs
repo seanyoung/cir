@@ -1062,8 +1062,8 @@ impl<'a> Builder<'a> {
         last: bool,
     ) -> Result<(), String> {
         match expr {
-            Expression::Stream(irstream) => {
-                let repeats = match irstream.repeat {
+            Expression::Stream(stream) => {
+                let repeats = match stream.repeat {
                     Some(RepeatMarker::Count(n)) => n,
                     None => 1,
                     _ => unreachable!(),
@@ -1071,12 +1071,12 @@ impl<'a> Builder<'a> {
 
                 let mut bit_spec = bit_spec.to_vec();
 
-                if !irstream.bit_spec.is_empty() {
-                    bit_spec.insert(0, &irstream.bit_spec);
+                if !stream.bit_spec.is_empty() {
+                    bit_spec.insert(0, &stream.bit_spec);
                 }
 
                 for n in 0..repeats {
-                    self.expression_list(&irstream.stream, &bit_spec, last && (n == repeats - 1))?;
+                    self.expression_list(&stream.stream, &bit_spec, last && (n == repeats - 1))?;
                 }
             }
             Expression::List(list) => {
@@ -1407,7 +1407,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// Constanting folding of expressions. This simply folds constants values and a few
+    /// Constant folding of expressions. This simply folds constants values and a few
     /// expression. More to be done.
     pub fn const_folding(&self, expr: &Rc<Expression>) -> Rc<Expression> {
         macro_rules! unary {
