@@ -78,68 +78,22 @@ pub struct NFA {
 
 impl Irp {
     /// Generate an NFA decoder for this IRP. This may fail if it is impossible
-    /// to generate a decoder for this Irp.
+    /// for this IRP.
     pub fn compile(&self) -> Result<NFA, String> {
         let mut builder = Builder::new(self);
 
         builder.add_constants();
 
-        let mut down_needed = false;
-
         if let Some(down) = &self.variants[0] {
-            builder.build(down)?;
-
-            builder.add_action(Action::Set {
-                var: "$down".into(),
-                expr: Rc::new(Expression::Number(1)),
-            });
-
-            if builder.cur.seen_edges {
-                builder.add_done(Event::Down)?;
-
-                builder.add_edge(Edge::Branch(0));
-
-                builder.set_head(0);
-                builder.cur.seen_edges = false;
-                down_needed = true;
-            }
+            builder.build(Event::Down, down)?;
         }
 
         if let Some(repeat) = &self.variants[1] {
-            builder.build(repeat)?;
-
-            if builder.cur.seen_edges {
-                if down_needed {
-                    builder.add_action(Action::AssertEq {
-                        left: Rc::new(Expression::Identifier("$down".into())),
-                        right: Rc::new(Expression::Number(1)),
-                    });
-                }
-
-                builder.add_done(Event::Repeat)?;
-
-                builder.add_edge(Edge::Branch(0));
-            }
+            builder.build(Event::Repeat, repeat)?;
         }
 
         if let Some(up) = &self.variants[2] {
-            builder.set_head(0);
-            builder.cur.seen_edges = false;
-
-            builder.build(up)?;
-
-            if builder.cur.seen_edges {
-                if down_needed {
-                    builder.add_action(Action::AssertEq {
-                        left: Rc::new(Expression::Identifier("$down".into())),
-                        right: Rc::new(Expression::Number(1)),
-                    });
-                }
-
-                builder.add_done(Event::Up)?;
-
-                builder.add_edge(Edge::Branch(0));
-            }
+            builder.build(Event::Up, up)?;
         }
 
         Ok(NFA {
@@ -1018,7 +972,7 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    fn build(&mut self, expr: &Expression) -> Result<(), String> {
+    fn build(&mut self, event: Event, expr: &Expression) -> Result<(), String> {
         // find all extents
         self.extents = Vec::new();
 
@@ -1039,7 +993,18 @@ impl<'a> Builder<'a> {
         // start with the first extent
         self.next_extent();
 
-        self.expression(expr, &[], true)
+        self.expression(expr, &[], true)?;
+
+        if self.cur.seen_edges {
+            self.add_done(event)?;
+
+            self.add_edge(Edge::Branch(0));
+
+            self.set_head(0);
+            self.cur.seen_edges = false;
+        }
+
+        Ok(())
     }
 
     fn next_extent(&mut self) {
