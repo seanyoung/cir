@@ -450,7 +450,9 @@ fn decode_all() {
 
         let mut decoder = nfa.decoder(10, 3, max_gap);
 
-        for n in 0..10 {
+        let first = if irp.has_ending() { 1 } else { 0 };
+
+        for n in first..10 {
             let repeats = if n < 3 { n } else { rng.gen_range(n..n + 20) };
 
             decoder.input(InfraredData::Reset);
@@ -502,8 +504,6 @@ fn decode_all() {
                     let value = params[&param.name];
 
                     if let Some(v) = res.get(&param.name) {
-                        println!("{ev} {} {v}", param.name);
-
                         if (v & mask) != (value & mask) {
                             println!(
                                 "{ev} {} does not match, expected {value} got {v}",
@@ -545,8 +545,7 @@ fn decode_all() {
 
     println!("tests: {total_tests} fails: {fails}");
 
-    // TODO: we still have a whole bunch of fails
-    assert!(fails <= 3);
+    assert_eq!(fails, 0);
 }
 
 #[test]

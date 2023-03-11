@@ -409,6 +409,11 @@ impl Irp {
     pub fn unit(&self) -> f64 {
         self.general_spec.unit
     }
+
+    /// Does this IRP have an ending part
+    pub fn has_ending(&self) -> bool {
+        self.variants[2].is_some()
+    }
 }
 
 fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
