@@ -87,10 +87,7 @@ impl Irp {
         let mut down_needed = false;
 
         if let Some(down) = &self.variants[0] {
-            builder.build(
-                down,
-                self.variants[1].is_some() | self.variants[2].is_some(),
-            )?;
+            builder.build(down)?;
 
             builder.add_action(Action::Set {
                 var: "$down".into(),
@@ -109,7 +106,7 @@ impl Irp {
         }
 
         if let Some(repeat) = &self.variants[1] {
-            builder.build(repeat, self.variants[2].is_some())?;
+            builder.build(repeat)?;
 
             if builder.cur.seen_edges {
                 if down_needed {
@@ -129,7 +126,7 @@ impl Irp {
             builder.set_head(0);
             builder.cur.seen_edges = false;
 
-            builder.build(up, false)?;
+            builder.build(up)?;
 
             if builder.cur.seen_edges {
                 if down_needed {
@@ -1021,7 +1018,7 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    fn build(&mut self, expr: &Expression, last: bool) -> Result<(), String> {
+    fn build(&mut self, expr: &Expression) -> Result<(), String> {
         // find all extents
         self.extents = Vec::new();
 
@@ -1033,10 +1030,16 @@ impl<'a> Builder<'a> {
             }
         });
 
+        let node = self.add_vertex();
+
+        self.add_edge(Edge::Branch(node));
+
+        self.set_head(node);
+
         // start with the first extent
         self.next_extent();
 
-        self.expression(expr, &[], last)
+        self.expression(expr, &[], true)
     }
 
     fn next_extent(&mut self) {

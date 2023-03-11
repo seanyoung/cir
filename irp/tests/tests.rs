@@ -442,7 +442,13 @@ fn decode_all() {
             }
         };
 
-        let mut decoder = nfa.decoder(10, 3, 20000);
+        let max_gap = if protocol.name == "Epson" {
+            100000
+        } else {
+            20000
+        };
+
+        let mut decoder = nfa.decoder(10, 3, max_gap);
 
         for n in 0..10 {
             let repeats = if n < 3 { n } else { rng.gen_range(n..n + 20) };
@@ -472,12 +478,13 @@ fn decode_all() {
                 decoder.input(data);
             }
 
-            let mut ok = true;
+            let mut ok = false;
 
-            if let Some((ev, res)) = decoder.get() {
+            while let Some((ev, mut res)) = decoder.get() {
                 if ev == Event::Down && res.is_empty() {
                     continue;
                 }
+
                 for param in &irp.parameters {
                     let mask = match (protocol.name.as_str(), param.name.as_str()) {
                         ("Zenith5", "F") => 31,
@@ -489,24 +496,30 @@ fn decode_all() {
                             mask as i64
                         }
                         ("Fujitsu_Aircon_old", "tOn") => !0xf0,
-
                         _ => !0,
                     };
 
                     let value = params[&param.name];
 
-                    if res.get(&param.name) != Some(&(value & mask)) {
-                        println!(
-                            "{} does not match, expected {} got {:?}",
-                            param.name,
-                            value,
-                            res.get(&param.name),
-                        );
-                        ok = false;
+                    if let Some(v) = res.get(&param.name) {
+                        println!("{ev} {} {v}", param.name);
+
+                        if (v & mask) != (value & mask) {
+                            println!(
+                                "{ev} {} does not match, expected {value} got {v}",
+                                param.name
+                            );
+                        } else {
+                            res.insert(param.name.to_owned(), value);
+                        }
+                    } else {
+                        println!("{ev} {} not decoded", param.name);
                     }
                 }
-            } else {
-                ok = false;
+
+                if params == res {
+                    ok = true;
+                }
             }
 
             if !ok {
@@ -533,7 +546,7 @@ fn decode_all() {
     println!("tests: {total_tests} fails: {fails}");
 
     // TODO: we still have a whole bunch of fails
-    assert!(fails <= 20);
+    assert!(fails <= 3);
 }
 
 #[test]
