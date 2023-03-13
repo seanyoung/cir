@@ -307,7 +307,8 @@ peg::parser! {
          { Rc::new(Expression::List(bitspec)) }
 
         rule bitspec() -> Vec<Rc<Expression>>
-         = "<" _ bare:(bare_bitspec() ++ ("|" _)) ">" _ { bare }
+         // !"!!" is for IrpTransmogrifier compatibility, no other reason
+         = "<" _ bare:(bare_bitspec() ++ (!"||" "|" _)) ">" _ { bare }
 
         rule bitspec_irstream() -> Expression
          = bit_spec:bitspec() irstream:irstream() {
@@ -662,10 +663,6 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
 
             for expr in &stream.bit_spec {
                 if let Expression::List(list) = expr.as_ref() {
-                    if list.is_empty() {
-                        return Err("bitspec cannot be empty".into());
-                    }
-
                     for expr in list {
                         match expr.as_ref() {
                             Expression::FlashConstant(..)

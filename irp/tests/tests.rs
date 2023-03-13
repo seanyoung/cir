@@ -637,7 +637,23 @@ fn arithmetic_in_bitspec() {
 
     let irp = Irp::parse("{.0k}<2,-3||-1>(1m,-100m)");
 
-    assert_eq!(irp.err(), Some("bitspec cannot be empty".into()));
+    assert_eq!(irp.err(), Some("parse error at error at 1:11: expected one of \",\", \".\", \">\", \"m\", \"p\", \"u\", ['0' ..= '9']".into()));
+
+    let irp = Irp::parse("{100}<>(1,-2,2u,-100m)").unwrap();
+
+    let vars = Vartable::new();
+
+    let res = irp.encode_raw(vars, 1);
+
+    assert_eq!(res.unwrap().raw, vec![100, 200, 2, 100000]);
+
+    let irp = Irp::parse("{100}<| |>(1,-2,2u,-100m)").unwrap();
+
+    let vars = Vartable::new();
+
+    let res = irp.encode_raw(vars, 1);
+
+    assert_eq!(res.unwrap().raw, vec![100, 200, 2, 100000]);
 }
 
 #[test]
