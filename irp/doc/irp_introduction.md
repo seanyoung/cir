@@ -1,0 +1,361 @@
+# Introduction to the IRP language
+
+This is an introduction the IRP mini language (or dsl). When a protocol
+is described using IRP, it is be possible to both encode and decode
+the protocol.
+
+When IRP is encoded, it is represented as raw IR. This is a list of lengths in
+microseconds, alternating flash and gap. Flash means infrared light on, gap means
+infrared light off. Sometimes this is known as as pulse and space. The gap is
+prefixed with `+` and a gap is prefixed with `-`.
+
+```
++100 -200 +200 -100000
+```
+This means a pulse of 100 microseconds, a gap of 200 microseconds, a flash of
+200 microseconds, and lastly a gap of 100 milliseconds. The trailing gap is
+useful for when multiple messages are sent after each other; the trailing gap
+ensures correct spacing, and in fact IRP requires a trailing space — more on that later.
+
+You can experiment with IRP using the cir command line tool like so:
+
+```
+$ cir transmit irp --dry-run '{40k,600}<1,-1|2,-1>(4,-1,F:7,D:5,^45m)*[D:0..31,F:0..127]' -fD=12,F=64
+info: carrier: 40000Hz
+info: rawir: +2400 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +1200 -600 +1200 -600 +600 -26400
+```
+
+Alternatively you could use IrpTransmogrifier:
+
+```
+$ irptransmogrifier  --irp '{40k,600}<1,-1|2,-1>(4,-1,F:7,D:5,^45m)*[D:0..31,F:0..127]' render -r -n D=12,F=64
+Freq=40000Hz[][+2400,-600,+600,-600,+600,-600,+600,-600,+600,-600,+600,-600,+600,-600,+1200,-600,+600,-600,+600,-600,+1200,-600,+1200,-600,+600,-26400][]
+```
+
+We will be describing a very simple IRP and then building from there.
+
+## The simplest IRP
+
+```
+{100}<>(1,-2,2u,-100m)
+```
+
+The IRP has three sections, the first part is known as the "general spec", which is
+enclosed with curly braces `{` and `}`. Here we have a single number `100`. This number is the unit.
+Every IR protocol uses signal lengths that are a multiple of some value, which we call
+the unit. The value is expression in microseconds.
+
+The second part `<>` is the bitspec. We will talk about this later.
+
+The last part `(1,-2,2u,-100m)` is called the stream. The stream is a comma separated
+list of expressions to encode. The first is `1`, which means a flash (aka pulse) of
+one unit. So, we start with a flash of 100 microseconds. The second is `-2`. A
+negative value means gap (aka space), so we have two units of gap, so 200 microseconds.
+The third part is a number followed by `u`, which means microseconds. This is simply
+a flash of 2 microseconds. The last is `-200m` which is a gap of 200 milliseconds.
+
+So, we end up with this signal:
+
+```
++100 -200 +2 -100000
+```
+
+The stream must always end with a gap, it is an error if is not.
+
+These values do not have to be whole integers. Lastly the general spec can also list the
+carrier and duty cycle. The carrier is in kilohertz and has the `k` suffix. The duty cycle
+ is in percentage and has the `%` suffix. If the carrier is not specified it defaults to
+38kHz.
+
+```
+{38.5k,33%,100.1}<>(1.5,-2,10,-99.5m)
+
++150 -200 +1001 -99500
+```
+
+If the unit is omitted, it defaults to 1.
+
+## The bit spec
+
+In our simple IRP we left the bit spec `<>` empty. The bit spec specifies how bits
+are encoded, i.e. how should a 0 bit be encoded and how should 1 bit be encoded. Bit 0
+and bit 1 are separated by `|`. So, for example in the nec protocol, bit 0 is encoded
+by 560µs pulse followed by 560µs space, and bit 1 is encoded by 560µs pulse followed
+by 1680µs space. So, you would write this as:
+
+```
+{560}<1,-1|1,-3>(..)
+```
+In order to encode actual data, the stream needs bit fields. Bit fields look like
+`value:length`, so for example:
+
+```
+{560}<1,-1|1,-3>(10:4,-100m)
+```
+The value 10 is `1010` in binary, and this is encoded least significant bit first (lsb),
+so we get `0`, `1`, `0`, and `1`. So this will encode to:
+
+```
++560 -560 +560 -1680 +560 -560 +560 -101680
+```
+Now you'll thinking, wait what happened to the last bit? Since the last bit ended with
+a gap 1680, this got merged with the `-100m` gap. In order for this work, you'll need
+to introduce a flash, for example:
+```
+{560}<1,-1|1,-3>(10:4,2,-100m)
+
++560 -560 +560 -1680 +560 -560 +560 -1680 +1120 -100000
+```
+Some protocols like NEC encode most significant bit first (msb). There are two ways of
+reversing the bit order. The first is to change all the bit ordering by specifying `msb`
+in the general spec:
+```
+{560,msb}<1,-1|1,-3>(10:4,1,-100m)
+```
+The other is to add a `-` after `:` in the bit field, which reverses the bit order for that
+specific bit field, but not others.
+```
+{560,lsb}<1,-1|1,-3>(10:-4,1,-100m)
+```
+Note that here we specified `lsb` in the general spec, which is already the default so
+this is redundant, but permitted. If both `msb` is specified and the bit field uses `:-`
+then the order is back to least significant bit for that particular bit field.
+
+## Parameters
+
+Remote control protocols encode various values, like which button you pressed, which device
+the remote wants to control (e.g. is play for your tape deck or CD player?). For airconditioning
+units this might be heating target. These parameters need a definition which tells the encoder
+and decoder which values it may have.
+
+```
+{560}<1,-1|1,-3>(F:4,1,-100m) [F:0..15]
+```
+
+So now we have a parameterized IRP which allows us to encode and decode different values of F,
+from 0 to 15 (inclusive). Parameters may have a default, this means that its value does not
+need to be specified for encoding, the default value is not used for encoding. This is commonly
+used for toggle values `T`:
+
+```
+{560}<1,-1|1,-3>(F:4,T:1,1,-100m) [F:0..15,T:0..1=0]
+```
+
+## Extents
+
+With the IRP given above, the total length of the encoded infrared in microseconds depends on the
+value of F. A 1 bit is encoded with gap of 1680 microsecond, and a 0 bit with with 560. So a `F` value
+of 0 will be 560 * 2 * 4 shorter than a F value of 15. However, when you hold down a button, with
+most protocols the infrared is repeated at a constant interval irrespective of the length of the
+infrared signals. This is what extents are for. They use the caret `^` rather than a minus `-`.
+
+```
+{560}<1,-1|1,-3>(F:4,T:1,1,^100m) [F:0..15,T:0..1=0]
+```
+The `^100m` means: introduce gap so that the entire message will 100 milliseconds, irrespective of
+the length of the previous data.
+
+```
+F=0 => +560 -560 +560 -560 +560 -560 +560 -560 +560 -560 +560 -93840
+F=15 => +560 -1680 +560 -1680 +560 -1680 +560 -1680 +560 -560 +560 -89360
+```
+
+Multiple extents are permitted. Any following extent will introduce a gap calculated from on
+the last extent rather than the beginning of the stream.
+
+```
+{560}<1,-1|1,-3>(F:4,T:1,1,^100m,F:1,1,^10m) [F:0..15,T:0..1=0]
+
+F=15 => +560 -1680 +560 -1680 +560 -1680 +560 -1680 +560 -560 +560 -89360 +560 -1680 +560 -7200
+```
+
+## More on bit spec and bit fields
+
+Some protocols encode 2 bits, 3 bits, or even 4 bits at time. This can be done to get more bits
+encoded per millisecond. The Human 4Phase protocol is an example of this:
+
+```
+bit 0: -2,2
+bit 1: -3,1
+bit 2: 1,-3
+bit 3: 2,-2
+```
+
+This can be written like so:
+
+```
+{105}<-2,2|-3,1|1,-3|2,-2>(1,F:4,1,-100m) [F:0..15]
+```
+
+If there are 4 bit values in the bit spec, then the value of `F:4` is encoded into two parts:
+the lower two bits and the higher two bits. This also means that if you try:
+
+```
+{105}<-2,2|-3,1|1,-3|2,-2>(1,T:1,F:4,1,-100m) [F:0..15,T:0..1=0]
+```
+This will not work, because now we're encoding 5 bits in total, which is not a multiple of 2,
+so there is no way to encode this. You will get an error saying this is an invalid IRP.
+
+Now you may have the another bit of `F` encoded before `T:1`. This can be done with the
+bit field syntax _expression:length:offset_. `F:1:4` means encode 1 bit of F, from offset
+4.
+
+```
+{105}<-2,2|-3,1|1,-3|2,-2>(1,F:1:4,T:1,F:4,1,-100m) [F:0..31,T:0..1=0]
+```
+
+Now the total number of bits to encode is 6, and the IRP is valid.
+
+In the bit spec, it is permitted to omit trailing bit values, as long as they those bit values
+do not occur. For example:
+
+```
+{105}<-2,2|-3,1|1,-3>(1,F:4,1,-100m) [F:0..15]
+```
+
+Now we do not know how to encode a bit value of 3. So, this is valid a long as `F` does not begin
+or end with two set bits.
+
+```
+F=0 => +105 -210 +210 -210 +315 -100000
+F=3 => error
+F=5 => +105 -315 +105 -315 +210 -100000
+F=10 => +210 -315 +105 -315 +105 -100000
+F=12 => error
+```
+
+## Expressions and operators
+
+Some protocols include a checksum. This can simply be some inverted bits like in the NEC protocol,
+or more involved checksums. The value of a bit field can be an _expression_. Here is an example.
+
+```
+{105}<-2,2|-3,1|1,-3>(1,F:4,D:4,(F^D):4,1,-100m) [F:0..15,D:0..15]
+```
+
+The expression should be in parenthesis, with the exception of `~` which is permitted without. The
+following operators are allowed:
+
+| Operator              |  Name                | Description                                     |
+|-----------------------|----------------------|-------------------------------------------------|
+| `(expr)`              | parenthesis          |                                                 |
+| `cond ? left : right` | conditional operator | if _cond__ is true, return _left_, else _right_ |
+| `left \|\| right`     | or                   | if _left_ is false, return _right_, else _left_ |
+| `left && right`       | and                  | if _left_ is true, return _right_, else _left_  |
+| `left \| right`       | bitwise or           | bitwise or of _left_ and _right_                |
+| `left & right`        | bitwise and          | bitwise and of _left_ and _right_               |
+| `left ^ right`        | bitwise xor          | bitwise xor of _left_ and _right_               |
+| `left == right`       | not equal            |                                                 |
+| `left != right`       | equal                |                                                 |
+| `left > right`        | more than            |                                                 |
+| `left >= right`       | more than or equal   |                                                 |
+| `left < right`        | less than            |                                                 |
+| `left <= right`       | less than or equal   |                                                 |
+| `left << right`       | bitwise shift left   |                                                 |
+| `left >> right`       | bitwise shift right  |                                                 |
+| `left + right`        | add                  |                                                 |
+| `left - right`        | subtract             |                                                 |
+| `left * right`        | mulitply             |                                                 |
+| `left / right`        | divide               |                                                 |
+| `left % right`        | modulo               |                                                 |
+| `left ** right`       | power                |                                                 |
+| `#expr`               | population count     | count number of set bits                        |
+| `!expr`               | logical not          | if _expr_ is non-zero, return 1, else 0.        |
+| `-expr`               | negate               |                                                 |
+| `~expr`               | bitwise not          | one's complement                                |
+| `expr:length[:offset]`| bit field            | see bit field description  above                |
+| `expr::offset`        | infinite bit field   | equivalent to `expr >> offset`                  |
+
+
+## Definitions and Assignments
+
+The IRP has an optional definition section, which is useful when a checksum has to be used more
+than once. The definitions follow the stream, and is a comma separated list of assignments.
+
+```
+{105}<-2,2|-3,1>(1,F:4,C:2:2,D:4,C:2:0,1,-100m){C=F^D} [F:0..15,D:0..15]
+```
+
+
+## Simple constant repeats
+
+Sometimes, a section of the stream has to be repeat a fixed number of number of times. This
+can be achieved by putting the repeated items in the stream in parenthesis, and adding a constant
+number.
+
+```
+{36k,msb,889}<1,-1|-1,1>(2,(T:1,D:5)2,F:6,^114m) [D:0..31,F:0..63,T@:0..1=0]
+```
+
+Note that this is unrelated to repeat markers `*` and `+` which are discussed below. The simple
+constant repeats have no special handling other than repeating the section a constant number of times.
+
+## Repeat markers
+
+This is arguably the trickest part of IRP so we've left it until last. Some protocols have a
+distinct message for:
+
+* down: this button is being pressed
+* repeat: this button is being held down
+* up: this button is being released
+
+All the three parts are optional, and very few protocols have an up section. The up section is useful
+because without it, the IR decoder needs to wait for the absense of following IR to detect that a button
+is released. This delay may cause perceptible sticky buttons. The down section is useful to distinquish
+between a button being held and being released and then held again (also known as toggled).
+
+For a button press, there always one down section (if present), any number of repeat sections, and then
+followed by a up section if present. When encoding IRP, you specify the number of repeats with a command
+line option, e.g. `--repeats=2` with cir or `--number-repeats=2` with IrpTransmogrifier.
+
+There are two ways of marking the down, repeat, and up section. One is with a repeat marker `+` or `*`
+and the other is with variants, `[down][repeat][up]`. Which one is more suitable depends on the protocol.
+First we'll discuss the repeat markers, and then move on to variants.
+
+In an IRP, the repeat marker `+` or `*` marks the item which is the repeating part. Anything before the
+repeating part is the down section, and anything following it the up section.
+
+```
+{38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]
+```
+
+Here down section is `16,-8,D:8,S:8,F:8,~F:8,1,^108m` and the repeating part `16,-4,1,^108m`. Since nothing
+follows that, there is no up section. The repeat maker can have the following forms:
+
+* `*`: any number of repeats
+* `+`: 1 or more repeats
+* `2+`: two or more repeats.
+
+If a repeating section is marked with `+`, then even if you encode it with 0 repeats, the repeating
+section will still be encoded once, and with `2+` it will be encoded twice + number of repeats.
+
+There is silly variants like `0+` which is equivalent to `*` and `1+` which is equivalent to `+`. It is
+an error to have more than one repeat marker in an IRP.
+
+## Variants
+
+If the down, repeat, and up are very similar then variants might a shorter notation. A protocol may
+simply encode a 1 for down, 2 for repeat and 3 for up. This can be easily represented with variants:
+
+```
+{560}<1,-1|1,-3>([V=1][V=2][V=3],F:4,V:2,1,-100m)+ [F:0..15]
+```
+This IRP has a down section with V=1, repeat with V=2, and up with V=3. The entire stream must be
+marked with a `+` repeater, but the repeat variant will not encode anything with repeats set to 0.
+
+The up variant is optional, and variants may be occur multiple times.
+
+```
+{560}<1,-1|1,-3>([V=1][V=2],F:4,V:2,[1][2],-100m)+ [F:0..15]
+```
+
+Empty variants `[]` have special significance. For repeat or up, it simply means "stop processing here",
+for example:
+
+```
+{560}<1,-1|1,-3>([V=1][V=2][V=3],V:2,[1][2][],F:4,-100m)+ [F:0..15]
+```
+In this case `F:4` is not encoded for the up part.
+
+An empty `[]` variants for the down part has special obscure handling. If there is any variant
+with an empty `[]` down part, then the down part is completely empty.
