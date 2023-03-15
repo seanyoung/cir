@@ -1,8 +1,11 @@
-# Introduction to the IRP language
+# IRP Notation
 
-This is an introduction the IRP mini language (or dsl). When a protocol
-is described using IRP, it is be possible to both encode and decode
-the protocol.
+This is an introduction the IRP Notation, a domain specific langauge that describes
+infrared protocols. It is possible to both encode and decode an infrared protocol
+using an IRP encoder or decoder, given its IRP notation.
+
+You may want to refer to the
+[Specification of IRP Notation by Graham Dixon](http://hifi-remote.com/wiki/index.php?title=IRP_Notation).
 
 When IRP is encoded, it is represented as raw IR. This is a list of lengths in
 microseconds, alternating flash and gap. Flash means infrared light on, gap means
@@ -34,7 +37,7 @@ Freq=40000Hz[][+2400,-600,+600,-600,+600,-600,+600,-600,+600,-600,+600,-600,+600
 
 We will be describing a very simple IRP and then building from there.
 
-## The simplest IRP
+## A simple IRP
 
 ```
 {100}<>(1,-2,2u,-100m)
@@ -45,14 +48,14 @@ enclosed with curly braces `{` and `}`. Here we have a single number `100`. This
 Every IR protocol uses signal lengths that are a multiple of some value, which we call
 the unit. The value is expression in microseconds.
 
-The second part `<>` is the bitspec. We will talk about this later.
+The second part `<>` is the bitspec. We will talk about this later, so ignore that for now.
 
 The last part `(1,-2,2u,-100m)` is called the stream. The stream is a comma separated
-list of expressions to encode. The first is `1`, which means a flash (aka pulse) of
-one unit. So, we start with a flash of 100 microseconds. The second is `-2`. A
-negative value means gap (aka space), so we have two units of gap, so 200 microseconds.
-The third part is a number followed by `u`, which means microseconds. This is simply
-a flash of 2 microseconds. The last is `-200m` which is a gap of 200 milliseconds.
+list of things to encode. The first is `1`, which means a flash of one unit. So, we start with
+a flash of 100 microseconds. The second is `-2`. A negative value means gap, so we have two
+units of gap, so 200 microseconds. The third part is a number followed by `u`, which means
+microseconds. This is simply a flash of 2 microseconds. The last is `-200m` which is a gap
+of 200 milliseconds.
 
 So, we end up with this signal:
 
@@ -60,12 +63,12 @@ So, we end up with this signal:
 +100 -200 +2 -100000
 ```
 
-The stream must always end with a gap, it is an error if is not.
+The stream must always end with a gap, else the IRP is invalid.
 
-These values do not have to be whole integers. Lastly the general spec can also list the
+The values do not have to be whole integers. The general spec can also list the
 carrier and duty cycle. The carrier is in kilohertz and has the `k` suffix. The duty cycle
  is in percentage and has the `%` suffix. If the carrier is not specified it defaults to
-38kHz.
+`38k`.
 
 ```
 {38.5k,33%,100.1}<>(1.5,-2,10,-99.5m)
@@ -75,19 +78,21 @@ carrier and duty cycle. The carrier is in kilohertz and has the `k` suffix. The 
 
 If the unit is omitted, it defaults to 1.
 
+FIXME: discuss `p` suffix.
+
 ## The bit spec
 
 In our simple IRP we left the bit spec `<>` empty. The bit spec specifies how bits
 are encoded, i.e. how should a 0 bit be encoded and how should 1 bit be encoded. Bit 0
 and bit 1 are separated by `|`. So, for example in the nec protocol, bit 0 is encoded
-by 560µs pulse followed by 560µs space, and bit 1 is encoded by 560µs pulse followed
-by 1680µs space. So, you would write this as:
+by 560 microsecond pulse followed by 560 microsecond space, and bit 1 is encoded by
+560µ microsecond pulse followed by a 1680 microsecond space. So, you would write this as:
 
 ```
-{560}<1,-1|1,-3>(..)
+{560}<1,-1|1,-3>(1,-2,2u,-100m)
 ```
-In order to encode actual data, the stream needs bit fields. Bit fields look like
-`value:length`, so for example:
+We don't use the bit spec in this IRP. So in order to encode bits, the stream
+needs bit fields. Bit fields look like `value:length`, for example:
 
 ```
 {560}<1,-1|1,-3>(10:4,-100m)
@@ -98,9 +103,8 @@ so we get `0`, `1`, `0`, and `1`. So this will encode to:
 ```
 +560 -560 +560 -1680 +560 -560 +560 -101680
 ```
-Now you'll thinking, wait what happened to the last bit? Since the last bit ended with
-a gap 1680, this got merged with the `-100m` gap. In order for this work, you'll need
-to introduce a flash, for example:
+The last bit ended with `-1068` and was followed by the `-100m` gap, so the two gaps
+got merged into one larger gap. A flash between the two will prevent this from happening:
 ```
 {560}<1,-1|1,-3>(10:4,2,-100m)
 
@@ -123,10 +127,10 @@ then the order is back to least significant bit for that particular bit field.
 
 ## Parameters
 
-Remote control protocols encode various values, like which button you pressed, which device
-the remote wants to control (e.g. is play for your tape deck or CD player?). For airconditioning
-units this might be heating target. These parameters need a definition which tells the encoder
-and decoder which values it may have.
+Remote control protocols encode various values, like the button, which device
+the remote wants to control. For air conditioning units this might be heating
+target. These parameters need a definition which tells the encoder and decoder
+which values it may have.
 
 ```
 {560}<1,-1|1,-3>(F:4,1,-100m) [F:0..15]
@@ -224,6 +228,20 @@ F=10 => +210 -315 +105 -315 +105 -100000
 F=12 => error
 ```
 
+Some protocols use a different encoding for some bits. For example the rc6 protocol has a
+different encoding for the toggle bits than the rest of the bits. We can override the bit spec
+for some bit fields in the stream with the inner bit spec syntax.
+
+```
+{105}<1,-1|1,-3>(1,F:4,<2,-2|2,-6>(T:3),1,-100m) [F:0..15,T:0..7]
+```
+
+The inner bit spec may contain bit fields which then get encoded using the outer bit spec:
+
+```
+{105}<1,-1|1,-3>(1,F:4,<1:2|2:2>(T:3),1,-100m) [F:0..15,T:0..7]
+```
+
 ## Expressions and operators
 
 Some protocols include a checksum. This can simply be some inverted bits like in the NEC protocol,
@@ -233,16 +251,18 @@ or more involved checksums. The value of a bit field can be an _expression_. Her
 {105}<-2,2|-3,1|1,-3>(1,F:4,D:4,(F^D):4,1,-100m) [F:0..15,D:0..15]
 ```
 
-The expression should be in parenthesis, with the exception of `~` which is permitted without. The
+In a bit field, the expression should be in parenthesis, with the exception of
+`~` which is permitted without, e.g `~F:4` is allowed but `#F:4` is not,
+
 following operators are allowed:
 
 | Operator              |  Name                | Description                                     |
 |-----------------------|----------------------|-------------------------------------------------|
 | `(expr)`              | parenthesis          |                                                 |
 | `cond ? left : right` | conditional operator | if _cond__ is true, return _left_, else _right_ |
-| `left \|\| right`     | or                   | if _left_ is false, return _right_, else _left_ |
+| `left || right`       | or                   | if _left_ is false, return _right_, else _left_ |
 | `left && right`       | and                  | if _left_ is true, return _right_, else _left_  |
-| `left \| right`       | bitwise or           | bitwise or of _left_ and _right_                |
+| `left | right`        | bitwise or           | bitwise or of _left_ and _right_                |
 | `left & right`        | bitwise and          | bitwise and of _left_ and _right_               |
 | `left ^ right`        | bitwise xor          | bitwise xor of _left_ and _right_               |
 | `left == right`       | not equal            |                                                 |
@@ -266,6 +286,11 @@ following operators are allowed:
 | `expr:length[:offset]`| bit field            | see bit field description  above                |
 | `expr::offset`        | infinite bit field   | equivalent to `expr >> offset`                  |
 
+Note that infinite bit fields may not appear in the stream.
+
+Expressions and variables use signed 64 bit values, and are limited to 63 bit. The 63 bit
+limit is due to compatibility with IrpTransmogrifier which uses the java `long` type, which
+is limited to 63 bits. This means that the `length` field of bit fields cannot exceed 63.
 
 ## Definitions and Assignments
 
@@ -275,11 +300,31 @@ than once. The definitions follow the stream, and is a comma separated list of a
 ```
 {105}<-2,2|-3,1>(1,F:4,C:2:2,D:4,C:2:0,1,-100m){C=F^D} [F:0..15,D:0..15]
 ```
+Rather than adding a definition, you can also add an assignment in the stream:
 
+```
+{105}<-2,2|-3,1>(1,F:4,C=F^D,C:2:2,D:4,C:2:0,1,-100m) [F:0..15,D:0..15]
+```
+
+## Flash and gap using variables
+
+So far, each flash and gap in the stream have been constant values. It is also possible
+to have variables for these.
+
+```
+{105}<-2,2,X|-3,1,-X>(1,X=1,F:4,C=F^D,C:2:2,D:4,X=2,C:2:0,1,-100m) [F:0..15,D:0..15]
+```
+
+Just like constants, variables may have a `u`, `m`, or `p` suffix. You will need a space
+to separate the name from the suffix.
+
+```
+{105}<-2,2,X=1|-3,1,X=2>(1,F:4,1,X m,2,-100m) [F:0..15,D:0..15]
+```
 
 ## Simple constant repeats
 
-Sometimes, a section of the stream has to be repeat a fixed number of number of times. This
+Sometimes, a section of the stream has to be repeated a fixed number of number of times. This
 can be achieved by putting the repeated items in the stream in parenthesis, and adding a constant
 number.
 
@@ -355,7 +400,7 @@ for example:
 ```
 {560}<1,-1|1,-3>([V=1][V=2][V=3],V:2,[1][2][],F:4,-100m)+ [F:0..15]
 ```
-In this case `F:4` is not encoded for the up part.
+In this case `F:4` and everything following it is not encoded for the up part.
 
 An empty `[]` variants for the down part has special obscure handling. If there is any variant
 with an empty `[]` down part, then the down part is completely empty.
