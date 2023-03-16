@@ -9,7 +9,7 @@ You may want to refer to the
 
 When IRP is encoded, the output is represented as raw IR. This is a list of lengths in
 microseconds, alternating flash and gap. Flash means infrared light on, gap means
-infrared light off. Sometimes this is known as pulse and space. In the notation used
+infrared light off. Sometimes flash and gap is known as pulse and space. In the notation used
 here, flash is prefixed with `+` and a gap is prefixed with `-`.
 
 ```
@@ -57,16 +57,16 @@ things.
 After the general spec there is `<>`, the bitspec. We will talk about this later, so ignore
 that for now.
 
-The last part `(1,-2,2u,-100m)` is called the stream. The stream is a comma separated
-list of things to encode, or decode as the case might be. The first is `1`, which
+The last part `(1,-2,200u,-100m)` is called the stream. The stream is a comma separated
+list of things to encode, or decode, as the case might be. The first is `1`, which
 means a flash of one unit. So, we start with a flash of 100 microseconds. The
 second is `-2`. A negative value means gap, so we have two units of gap, so 200
 microseconds. The third part is a number followed by `u`, which means
-microseconds. This is simply a flash of 2 microseconds. The last is `-200m`
-which is a gap of 200 milliseconds. This encodes to:
+microseconds. This is simply a flash of 200 microseconds, independent of the value of the
+unit. The last is `-200m` which is a gap of 200 milliseconds. This encodes to:
 
 ```
-+100 -200 +2 -100000
++100 -200 +200 -100000
 ```
 
 The stream must always end with a gap, else the IRP is invalid. The values do
@@ -82,15 +82,16 @@ If the unit is omitted, it defaults to 1.
 
 Both flash and gap can have the following suffix:
 
-* `m`: milliseconds. The value is value is mulitplied by 1000.
+* `m`: milliseconds. The value is value is multiplied by 1000.
 * `u`: microseconds. The value is used as-is.
-* `p`: periods. The value is the number of carrier periods. The carrier period calculated with `1000000 / carrier_in_hz`.
+* `p`: periods. The value is the number of carrier periods. The carrier period
+  in microseconds can be calculated using `1000000 / carrier_in_hz`.
 * no suffix: units. The value is multiplied by the unit value from the general spec.
 
 ## The bit spec
 
 In our simple IRP we left the bit spec `<>` empty. The bit spec specifies how bits
-are encoded, i.e. how should a 0 bit be encoded and how should 1 bit be encoded. The
+are encoded, i.e. how should a 0 bit be encoded and how should a 1 bit be encoded. The
 encoding for a 0 bit value and a 1 bit value are separated by `|`. So, for example
 in the nec protocol, a 0 bit is encoded by a 560 microsecond pulse followed by 560
 microsecond space, and a 1 bit is encoded by 560 microsecond pulse followed by a 1680
@@ -107,7 +108,7 @@ fields. Bit fields look like `value:length`, for example:
 ```
 The value 10 is `1010` in binary, and it is encoded least significant bit first (lsb),
 so `0` becomes `1,-1`, then `+560 -560`, the second `1` becomes `1,-3` then `+560 -1680`,
-and then the same for the folling `0` and `1`. This will encode to:
+and then the same for the following `0` and `1`. This will encode to:
 
 ```
 +560 -560 +560 -1680 +560 -560 +560 -101680
@@ -119,9 +120,9 @@ got merged into one larger gap. A flash between the two will prevent this from h
 
 +560 -560 +560 -1680 +560 -560 +560 -1680 +1120 -100000
 ```
-Some protocols like NEC encode most significant bit first (msb). There are two ways of
-reversing the bit order. The first is to change all the bit ordering by specifying `msb`
-in the general spec:
+Some protocols like NEC encode most significant bit first (msb). There are
+two ways of reversing the bit order. The first is to change the bit ordering
+globally by specifying `msb` in the general spec:
 ```
 {560,msb}<1,-1|1,-3>(10:4,1,-100m)
 ```
@@ -155,6 +156,7 @@ used for toggle values `T`:
 ```
 {560}<1,-1|1,-3>(F:4,T:1,1,-100m) [F:0..15,T:0..1=0]
 ```
+FIXME: @ memory parameters
 
 ## Extents
 
@@ -163,8 +165,8 @@ constant interval irrespective of which button is being pressed. With the IRP gi
 above, the total length of the encoded infrared in microseconds depends on the value
 of `F`. A 1 bit is encoded with gap of 1680 microsecond, and a 0 bit with a gap of 560.
 After encoding, the total signal length with a `F` value of 0 will be 560 * 2 * 4
-shorter than a `F` value of 15. However, Extents use the caret `^` rather
-than a minus `-`.
+shorter than a `F` value of 15. Extents can be used to make a signal constant length.
+They use the caret `^` rather than a minus `-`.
 
 ```
 {560}<1,-1|1,-3>(F:4,T:1,1,^100m) [F:0..15,T:0..1=0]
@@ -192,10 +194,10 @@ Some protocols encode 2 bits, 3 bits, or even 4 bits at time. The Human 4Phase
 protocol is an example of this:
 
 ```
-bit 0: -2,2
-bit 1: -3,1
-bit 2: 1,-3
-bit 3: 2,-2
+bit 0: -210 +210
+bit 1: -315 +105
+bit 2: +105 -315
+bit 3: +210 -210
 ```
 
 This can be written like so (this is not the actual Human 4Phase protocol):
@@ -273,35 +275,35 @@ or more involved checksums. The value of a bit field can be an _expression_. Her
 
 following operators are allowed:
 
-| Operator              |  Name                | Description                                         |
-|-----------------------|----------------------|-----------------------------------------------------|
-| `(expr)`              | parenthesis          |                                                     |
-| `cond ? left : right` | conditional operator | if _cond__ is non-zero, return _left_, else _right_ |
-| `left \|\| right`     | or                   | if _left_ is non-zero, return _left_, else _right_  |
-| `left && right`       | and                  | if _left_ is non-zero, return _right_, else _left_  |
-| `left \| right`       | bitwise or           | bitwise or of _left_ and _right_                    |
-| `left & right`        | bitwise and          | bitwise and of _left_ and _right_                   |
-| `left ^ right`        | bitwise xor          | bitwise xor of _left_ and _right_                   |
-| `left == right`       | not equal            |                                                     |
-| `left != right`       | equal                |                                                     |
-| `left > right`        | more than            |                                                     |
-| `left >= right`       | more than or equal   |                                                     |
-| `left < right`        | less than            |                                                     |
-| `left <= right`       | less than or equal   |                                                     |
-| `left << right`       | bitwise shift left   |                                                     |
-| `left >> right`       | bitwise shift right  |                                                     |
-| `left + right`        | add                  |                                                     |
-| `left - right`        | subtract             |                                                     |
-| `left * right`        | mulitply             |                                                     |
-| `left / right`        | divide               |                                                     |
-| `left % right`        | modulo               |                                                     |
-| `left ** right`       | power                |                                                     |
-| `#expr`               | population count     | count number of set bits                            |
-| `!expr`               | logical not          | if _expr_ is non-zero, return 1, else 0.            |
-| `-expr`               | negate               |                                                     |
-| `~expr`               | bitwise not          | one's complement                                    |
-| `expr:length[:offset]`| bit field            | see bit field description  above                    |
-| `expr::offset`        | infinite bit field   | equivalent to `expr >> offset`                      |
+| Operator              |  Name                 | Description                                        |
+|-----------------------|-----------------------|----------------------------------------------------|
+| `(expr)`              | parenthesis           |                                                    |
+| `cond ? left : right` | conditional operator  | if _cond_ is non-zero, return _left_, else _right_ |
+| `left \|\| right`     | or                    | if _left_ is non-zero, return _left_, else _right_ |
+| `left && right`       | and                   | if _left_ is non-zero, return _right_, else _left_ |
+| `left \| right`       | bitwise or            | bitwise or of _left_ and _right_                   |
+| `left & right`        | bitwise and           | bitwise and of _left_ and _right_                  |
+| `left ^ right`        | bitwise xor           | bitwise xor of _left_ and _right_                  |
+| `left == right`       | not equal             |                                                    |
+| `left != right`       | equal                 |                                                    |
+| `left > right`        | greater than          |                                                    |
+| `left >= right`       | greater than or equal |                                                    |
+| `left < right`        | less than             |                                                    |
+| `left <= right`       | less than or equal    |                                                    |
+| `left << right`       | bitwise shift left    |                                                    |
+| `left >> right`       | bitwise shift right   |                                                    |
+| `left + right`        | add                   |                                                    |
+| `left - right`        | subtract              |                                                    |
+| `left * right`        | mulitply              |                                                    |
+| `left / right`        | divide                |                                                    |
+| `left % right`        | modulo                |                                                    |
+| `left ** right`       | power                 |                                                    |
+| `#expr`               | population count      | count number of set bits                           |
+| `!expr`               | logical not           | if _expr_ is non-zero, return 0, else 1            |
+| `-expr`               | negate                |                                                    |
+| `~expr`               | bitwise not           | one's complement                                   |
+| `expr:length[:offset]`| bit field             | see bit field description  above                   |
+| `expr::offset`        | infinite bit field    | equivalent to `expr >> offset`                     |
 
 In a bit field, the expression should be enclosed parenthesis, with the exception of
 `~` which is permitted without parenthesis, e.g `~F:4` is allowed but `!F:4` is not,
@@ -333,7 +335,7 @@ or a bit spec.
 ## Flash and gap using variables
 
 So far, each flash and gap in the stream have been constant values. It is also possible
-to have variables for these.
+to use variables.
 
 ```
 {105}<-2,2,X|-3,1,-X>(1,X=1,F:4,C=F^D,C:2:2,D:4,X=2,C:2:0,1,-100m) [F:0..15,D:0..15]
@@ -372,21 +374,22 @@ All the three parts are optional, and very few protocols have an up part.
 The up section is useful because without it, the IR decoder needs to wait for
 the absense of following IR to detect that a button is released, as there is
 no message indicating it has been released. This delay may cause perceptible
-sticky buttons. The down section is useful to distinquish between a button
-being held and being released and then held again (also known
-as toggled).
+sticky buttons if the timeout is too long. The down section is useful to
+distinquish between a button being held and being released and then held
+again (also known as toggled).
 
 For a button press, there always one down section (if present), zero or more
 repeat sections, and then followed by a up section if present. When encoding IRP,
 you specify the number of repeats with a command line option, e.g. `--repeats=2`
-with cir or `--number-repeats=2` with IrpTransmogrifier.
+with cir or `--number-repeats=2` with IrpTransmogrifier. By default, this is
+set to 1 repeats.
 
 There are two ways of marking the down, repeat, and up section. One is with a
 repeat marker `+` or `*` and the other is with variants, `[down][repeat][up]`.
 Which one is more suitable depends on the protocol. First we'll discuss the
 repeat markers, and then move on to variants.
 
-In an IRP, the repeat marker `+` or `*` marks the item which is the repeating
+In an IRP, the repeat marker `+` or `*` marks the part which is the repeating
 part. Anything before the repeating part is the down section, and anything
 following it the up section.
 
@@ -394,16 +397,17 @@ following it the up section.
 {38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*) [D:0..255,S:0..255=255-D,F:0..255]
 ```
 
-Here down section is `16,-8,D:8,S:8,F:8,~F:8,1,^108m` and the repeating part
+Here the down section is `16,-8,D:8,S:8,F:8,~F:8,1,^108m` and the repeating part
 `16,-4,1,^108m`. Since nothing follows that, there is no up section. The repeat
-maker can have the following forms:
+marker can have the following forms:
 
 * `*`: any number of repeats
 * `+`: 1 or more repeats
 * `2+`: two or more repeats.
 
-If a repeating section is marked with `+`, then even if you encode it with 0 repeats, the repeating
-section will still be encoded once, and with `2+` it will be encoded twice + number of repeats.
+If a repeating section is marked with `+`, then even if you encode it with 0
+repeats, the repeating section will still be encoded once, and with `2+` it
+will be encoded twice + number of repeats specified on the command line.
 
 It is an error to have more than one repeat marker with a `+` or `*` in an IRP.
 
@@ -428,6 +432,7 @@ Empty variants `[]` have special significance. For repeat or up, it simply means
 for example:
 
 ```
-{560}<1,-1|1,-3>([V=1][V=2][V=3],V:2,[1][2][],F:4,-100m)+ [F:0..15]
+{560}<1,-1|1,-3>([V=1][V=2][V=3],V:2,[1,-2][2,-2][],F:4,-100m)+ [F:0..15]
 ```
-In this case `F:4` and everything following it is not encoded for the up part. An empty `[]` variant for down anywhere will make the entire down part empty.
+In this case `F:4` and everything following it is not encoded for the up part.
+An empty `[]` variant for down anywhere will make the entire down part empty.
