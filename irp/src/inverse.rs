@@ -91,7 +91,7 @@ impl<'a> Builder<'a> {
                         if skip.is_zero() {
                             if let Expression::BitField {
                                 length: prev_length,
-                                skip: None,
+                                offset: None,
                                 ..
                             } = &*left
                             {
@@ -103,7 +103,7 @@ impl<'a> Builder<'a> {
                             if **prev_skip == Expression::Number(skip.into()) {
                                 if let Expression::BitField {
                                     length: prev_length,
-                                    skip: Some(prev_skip),
+                                    offset: Some(prev_skip),
                                     ..
                                 } = &**right
                                 {
@@ -120,7 +120,7 @@ impl<'a> Builder<'a> {
                             value: left.clone(),
                             reverse: false,
                             length: Rc::new(Expression::Number(length.into())),
-                            skip: if !skip.is_zero() {
+                            offset: if !skip.is_zero() {
                                 Some(Rc::new(Expression::Number(skip.into())))
                             } else {
                                 None
@@ -318,7 +318,7 @@ impl<'a> Builder<'a> {
                 value,
                 reverse: false,
                 length,
-                skip,
+                offset,
             } => {
                 let mut complement = false;
 
@@ -345,9 +345,9 @@ impl<'a> Builder<'a> {
                     return None;
                 };
 
-                let skip = if let Some(skip) = skip {
-                    if let Expression::Number(skip) = skip.as_ref() {
-                        *skip
+                let offset = if let Some(offset) = offset {
+                    if let Expression::Number(offset) = offset.as_ref() {
+                        *offset
                     } else {
                         return None;
                     }
@@ -367,10 +367,10 @@ impl<'a> Builder<'a> {
                             left,
                             Rc::new(Expression::Number(gen_mask(length))),
                         )),
-                        Rc::new(Expression::Number(skip)),
+                        Rc::new(Expression::Number(offset)),
                     )),
                     vec![],
-                    Some(gen_mask(length) << skip),
+                    Some(gen_mask(length) << offset),
                 ))
             }
             _ => None,
@@ -621,7 +621,7 @@ fn inverse1() {
         value: Rc::new(Expression::Identifier("B".to_owned())),
         reverse: false,
         length: Rc::new(Expression::Number(3)),
-        skip: Some(Rc::new(Expression::Number(1))),
+        offset: Some(Rc::new(Expression::Number(1))),
     });
 
     let inv = builder.inverse(left.clone(), right.clone(), "B").unwrap();
@@ -702,7 +702,7 @@ fn inverse2() {
             value: Rc::new(Expression::Identifier("D".to_owned())),
             reverse: false,
             length: Rc::new(Expression::Number(3)),
-            skip: Some(Rc::new(Expression::Number(8))),
+            offset: Some(Rc::new(Expression::Number(8))),
         }),
     ));
 

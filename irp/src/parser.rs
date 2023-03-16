@@ -164,7 +164,7 @@ peg::parser! {
          = bit_field() / primary_item()
 
         rule bit_field() -> Expression
-         = complement:"~"? _ value:primary_item() ":" _ reverse:"-"? length:primary_item() skip:skip()?
+         = complement:"~"? _ value:primary_item() ":" _ reverse:"-"? length:primary_item() offset:offset()?
          {
             let value = if complement.is_some() {
                 Rc::new(Expression::Complement(Rc::new(value)))
@@ -176,10 +176,10 @@ peg::parser! {
                 value,
                 reverse: reverse.is_some(),
                 length: Rc::new(length),
-                skip: skip.map(Rc::new),
+                offset: offset.map(Rc::new),
             }
          }
-         / complement:"~"? _ value:primary_item() "::" _ skip:primary_item()
+         / complement:"~"? _ value:primary_item() "::" _ offset:primary_item()
          {
             let value = if complement.is_some() {
                 Rc::new(Expression::Complement(Rc::new(value)))
@@ -189,12 +189,12 @@ peg::parser! {
 
             Expression::InfiniteBitField {
                 value,
-                skip: Rc::new(skip),
+                offset: Rc::new(offset),
             }
          }
 
         rule complement_bit_field() -> Expression
-         = "~" _ value:primary_item() ":" _ reverse:"-"? length:primary_item() skip:skip()?
+         = "~" _ value:primary_item() ":" _ reverse:"-"? length:primary_item() offset:offset()?
          {
             let value = Rc::new(Expression::Complement(Rc::new(value)));
 
@@ -202,21 +202,21 @@ peg::parser! {
                 value,
                 reverse: reverse.is_some(),
                 length: Rc::new(length),
-                skip: skip.map(Rc::new),
+                offset: offset.map(Rc::new),
             }
          }
-         / "~" _ value:primary_item() "::" _ skip:primary_item()
+         / "~" _ value:primary_item() "::" _ offset:primary_item()
          {
             let value = Rc::new(Expression::Complement(Rc::new(value)));
 
             Expression::InfiniteBitField {
                 value,
-                skip: Rc::new(skip),
+                offset: Rc::new(offset),
             }
          }
 
-        rule skip() -> Expression
-         = ":" _ skip:primary_item() { skip }
+        rule offset() -> Expression
+         = ":" _ offset:primary_item() { offset }
 
         rule primary_item() -> Expression
          = number()

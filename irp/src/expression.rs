@@ -39,7 +39,7 @@ impl fmt::Display for Expression {
                 value,
                 reverse,
                 length,
-                skip: Some(skip),
+                offset: Some(offset),
             } => {
                 write!(
                     f,
@@ -47,22 +47,22 @@ impl fmt::Display for Expression {
                     value,
                     if *reverse { "-" } else { "" },
                     length,
-                    skip
+                    offset
                 )
             }
             Expression::BitField {
                 value,
                 reverse,
                 length,
-                skip: None,
+                offset: None,
             } => {
                 write!(f, "{}:{}{}", value, if *reverse { "-" } else { "" }, length,)
             }
-            Expression::InfiniteBitField { value, skip } => {
-                write!(f, "{value}::{skip}")
+            Expression::InfiniteBitField { value, offset } => {
+                write!(f, "{value}::{offset}")
             }
-            Expression::BitReverse(expr, count, skip) => {
-                write!(f, "BITREV({expr},{count},{skip})")
+            Expression::BitReverse(expr, count, offset) => {
+                write!(f, "BITREV({expr},{count},{offset})")
             }
             Expression::Assignment(name, expr) => write!(f, "{name}={expr}"),
             Expression::List(list) => {
@@ -218,18 +218,18 @@ impl Expression {
             Expression::BitField {
                 value,
                 length,
-                skip,
+                offset,
                 ..
             } => {
                 value.visit(ctx, repeats, visit);
                 length.visit(ctx, repeats, visit);
-                if let Some(skip) = skip {
-                    skip.visit(ctx, repeats, visit);
+                if let Some(offset) = offset {
+                    offset.visit(ctx, repeats, visit);
                 }
             }
-            Expression::InfiniteBitField { value, skip } => {
+            Expression::InfiniteBitField { value, offset } => {
                 value.visit(ctx, repeats, visit);
-                skip.visit(ctx, repeats, visit);
+                offset.visit(ctx, repeats, visit);
             }
             Expression::List(list) => {
                 for e in list {
@@ -286,12 +286,12 @@ impl Expression {
                 value,
                 reverse,
                 length,
-                skip,
+                offset,
             } => {
                 let mut value = value.eval(vars)?;
 
-                if let Some(skip) = skip {
-                    value = value.wrapping_shr(skip.eval(vars)? as u32);
+                if let Some(offset) = offset {
+                    value = value.wrapping_shr(offset.eval(vars)? as u32);
                 }
 
                 let length = length.eval(vars)?;
@@ -411,14 +411,14 @@ impl Expression {
 
                 Ok(val.count_ones().into())
             }
-            Expression::BitReverse(e, count, skip) => {
+            Expression::BitReverse(e, count, offset) => {
                 let val = e.eval(vars)?;
 
                 let mut new_val = 0;
 
                 for i in 0..*count {
-                    if (val & (1 << (i + skip))) != 0 {
-                        new_val |= 1 << (skip + count - 1 - i);
+                    if (val & (1 << (i + offset))) != 0 {
+                        new_val |= 1 << (offset + count - 1 - i);
                     }
                 }
 
@@ -473,10 +473,10 @@ impl Expression {
                 Ok((left <= right) as i64)
             }
             Expression::BitField { .. } => Ok(self.bitfield(vars)?.0),
-            Expression::InfiniteBitField { value, skip } => {
+            Expression::InfiniteBitField { value, offset } => {
                 let mut b = value.eval(vars)?;
 
-                b = b.wrapping_shr(skip.eval(vars)? as u32);
+                b = b.wrapping_shr(offset.eval(vars)? as u32);
 
                 Ok(b)
             }
@@ -578,12 +578,12 @@ where
         Expression::Complement(expr) => unary!(expr, Complement),
         Expression::Not(expr) => unary!(expr, Not),
         Expression::BitCount(expr) => unary!(expr, BitCount),
-        Expression::BitReverse(expr, count, skip) => {
+        Expression::BitReverse(expr, count, offset) => {
             let expr1 = clone_filter(expr, filter);
 
             if expr1.is_some() {
                 let expr = expr1.unwrap_or_else(|| expr.clone());
-                let new_expr = Rc::new(Expression::BitReverse(expr, *count, *skip));
+                let new_expr = Rc::new(Expression::BitReverse(expr, *count, *offset));
                 let filtered = filter(&new_expr);
 
                 if filtered.is_some() {
@@ -666,22 +666,22 @@ where
             value,
             reverse,
             length,
-            skip: Some(skip),
+            offset: Some(offset),
         } => {
             let value1 = clone_filter(value, filter);
             let length1 = clone_filter(length, filter);
-            let skip1 = clone_filter(skip, filter);
+            let offset1 = clone_filter(offset, filter);
 
-            if value1.is_some() || length1.is_some() || skip1.is_some() {
+            if value1.is_some() || length1.is_some() || offset1.is_some() {
                 let value = value1.unwrap_or_else(|| value.clone());
                 let length = length1.unwrap_or_else(|| length.clone());
-                let skip = Some(skip1.unwrap_or_else(|| skip.clone()));
+                let offset = Some(offset1.unwrap_or_else(|| offset.clone()));
                 let reverse = *reverse;
                 let new_expr = Rc::new(Expression::BitField {
                     value,
                     reverse,
                     length,
-                    skip,
+                    offset,
                 });
                 let filtered = filter(&new_expr);
 
@@ -698,7 +698,7 @@ where
             value,
             reverse,
             length,
-            skip: None,
+            offset: None,
         } => {
             let value1 = clone_filter(value, filter);
             let length1 = clone_filter(length, filter);
@@ -706,14 +706,14 @@ where
             if value1.is_some() || length1.is_some() {
                 let value = value1.unwrap_or_else(|| value.clone());
                 let length = length1.unwrap_or_else(|| length.clone());
-                let skip = None;
+                let offset = None;
                 let reverse = *reverse;
 
                 let new_expr = Rc::new(Expression::BitField {
                     value,
                     reverse,
                     length,
-                    skip,
+                    offset,
                 });
                 let filtered = filter(&new_expr);
 
@@ -727,15 +727,18 @@ where
             }
         }
 
-        Expression::InfiniteBitField { value, skip } => {
+        Expression::InfiniteBitField {
+            value,
+            offset: offste,
+        } => {
             let value1 = clone_filter(value, filter);
-            let skip1 = clone_filter(skip, filter);
+            let offset1 = clone_filter(offste, filter);
 
-            if value1.is_some() || skip1.is_some() {
+            if value1.is_some() || offset1.is_some() {
                 let value = value1.unwrap_or_else(|| value.clone());
-                let skip = skip1.unwrap_or_else(|| skip.clone());
+                let offset = offset1.unwrap_or_else(|| offste.clone());
 
-                let new_expr = Rc::new(Expression::InfiniteBitField { value, skip });
+                let new_expr = Rc::new(Expression::InfiniteBitField { value, offset });
                 let filtered = filter(&new_expr);
 
                 if filtered.is_some() {

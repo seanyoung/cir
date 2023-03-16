@@ -383,7 +383,7 @@ impl<'a> Builder<'a> {
             if expr_count == 1 && bit_count <= 8 {
                 if let Expression::BitField {
                     value,
-                    skip: None,
+                    offset: None,
                     reverse,
                     ..
                 } = list[pos].as_ref()
@@ -416,7 +416,7 @@ impl<'a> Builder<'a> {
             let do_reverse = if expr_count == 1 {
                 if let Expression::BitField {
                     value,
-                    skip,
+                    offset,
                     reverse,
                     length,
                 } = list[pos].as_ref()
@@ -433,16 +433,19 @@ impl<'a> Builder<'a> {
                             last,
                         )?;
 
-                        let skip = if let Some(skip) = skip {
-                            self.const_folding(skip).eval(&Vartable::new())?
+                        let offset = if let Some(offset) = offset {
+                            self.const_folding(offset).eval(&Vartable::new())?
                         } else {
                             0
                         };
 
                         let bits = Expression::Identifier(String::from("$bits"));
 
-                        let bits = if skip > 0 {
-                            Expression::ShiftLeft(Rc::new(bits), Rc::new(Expression::Number(skip)))
+                        let bits = if offset > 0 {
+                            Expression::ShiftLeft(
+                                Rc::new(bits),
+                                Rc::new(Expression::Number(offset)),
+                            )
                         } else {
                             bits
                         };
@@ -489,7 +492,7 @@ impl<'a> Builder<'a> {
                 if let Expression::BitField {
                     value,
                     length,
-                    skip,
+                    offset: bitfield_offset,
                     reverse,
                 } = expr
                 {
@@ -499,8 +502,8 @@ impl<'a> Builder<'a> {
                         offset -= length;
                     }
 
-                    let skip = if let Some(skip) = skip {
-                        self.const_folding(skip).eval(&Vartable::new())?
+                    let bitfield_offset = if let Some(bitfield_offset) = bitfield_offset {
+                        self.const_folding(bitfield_offset).eval(&Vartable::new())?
                     } else {
                         0
                     };
@@ -509,25 +512,25 @@ impl<'a> Builder<'a> {
 
                     let bits = Rc::new(Expression::Identifier(String::from("$bits")));
 
-                    let mut bits = if offset > skip {
+                    let mut bits = if offset > bitfield_offset {
                         Rc::new(Expression::ShiftRight(
                             bits,
-                            Rc::new(Expression::Number(offset - skip)),
+                            Rc::new(Expression::Number(offset - bitfield_offset)),
                         ))
-                    } else if offset < skip {
+                    } else if offset < bitfield_offset {
                         Rc::new(Expression::ShiftLeft(
                             bits,
-                            Rc::new(Expression::Number(skip - offset)),
+                            Rc::new(Expression::Number(bitfield_offset - offset)),
                         ))
                     } else {
                         bits
                     };
 
                     if *reverse && !do_reverse {
-                        bits = Rc::new(Expression::BitReverse(bits, length, skip));
+                        bits = Rc::new(Expression::BitReverse(bits, length, bitfield_offset));
                     }
 
-                    let mask = gen_mask(length) << skip;
+                    let mask = gen_mask(length) << bitfield_offset;
 
                     // F:4 => ($bits & 15) = (F & 15)
                     // ~F:4 => (~$bits & 15) = (F & 15)
@@ -1212,22 +1215,22 @@ impl<'a> Builder<'a> {
             Expression::BitField {
                 value,
                 length,
-                skip,
+                offset,
                 ..
             } => {
-                if let Some(res) = self.bitfield_known(value, length, skip, ignore_definitions) {
+                if let Some(res) = self.bitfield_known(value, length, offset, ignore_definitions) {
                     res
                 } else {
-                    if let Some(skip) = &skip {
-                        self.expression_available(skip, ignore_definitions)?;
+                    if let Some(offset) = &offset {
+                        self.expression_available(offset, ignore_definitions)?;
                     }
                     self.expression_available(value, ignore_definitions)?;
                     self.expression_available(length, ignore_definitions)
                 }
             }
-            Expression::InfiniteBitField { value, skip } => {
+            Expression::InfiniteBitField { value, offset } => {
                 self.expression_available(value, ignore_definitions)?;
-                self.expression_available(skip, ignore_definitions)
+                self.expression_available(offset, ignore_definitions)
             }
             Expression::Assignment(_, expr)
             | Expression::Complement(expr)
@@ -1293,7 +1296,7 @@ impl<'a> Builder<'a> {
         &self,
         value: &Rc<Expression>,
         length: &Rc<Expression>,
-        skip: &Option<Rc<Expression>>,
+        offset: &Option<Rc<Expression>>,
         ignore_definitions: bool,
     ) -> Option<Result<(), String>> {
         let name = match value.as_ref() {
@@ -1316,8 +1319,8 @@ impl<'a> Builder<'a> {
             return None;
         };
 
-        let skip = if let Some(skip) = skip {
-            if let Expression::Number(v) = self.const_folding(skip).as_ref() {
+        let offset = if let Some(offset) = offset {
+            if let Expression::Number(v) = self.const_folding(offset).as_ref() {
                 *v
             } else {
                 return None;
@@ -1326,7 +1329,7 @@ impl<'a> Builder<'a> {
             0
         };
 
-        let mask = gen_mask(length) << skip;
+        let mask = gen_mask(length) << offset;
 
         if self.all_field_set(name, mask)
             && (!ignore_definitions || !self.definitions.contains_key(name))

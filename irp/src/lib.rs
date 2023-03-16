@@ -121,11 +121,11 @@ enum Expression {
         value: Rc<Expression>,
         reverse: bool,
         length: Rc<Expression>,
-        skip: Option<Rc<Expression>>,
+        offset: Option<Rc<Expression>>,
     },
     InfiniteBitField {
         value: Rc<Expression>,
-        skip: Rc<Expression>,
+        offset: Rc<Expression>,
     },
     Complement(Rc<Expression>),
     Not(Rc<Expression>),
