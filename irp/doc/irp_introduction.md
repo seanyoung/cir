@@ -43,7 +43,8 @@ We will be describing a very simple IRP and then building from there.
 ```
 
 The IRP has three sections, the first part is known as the "general spec", which is
-enclosed with curly braces `{` and `}`. In the general spec have three things:
+enclosed with curly braces `{` and `}`. In this example the general spec has three
+things.
 
 * `40k`, which is the carrier for protocol, in kHz. If the carrier is omitted,
   then the carrier is `38k`. This value always has the `k` suffix.
@@ -83,7 +84,7 @@ Both flash and gap can have the following suffix:
 
 * `m`: milliseconds. The value is value is mulitplied by 1000.
 * `u`: microseconds. The value is used as-is.
-* `p`: pulses. The value is the number of carrier periods. The carrier period calculated by `1000000 / carrier_in_hz`.
+* `p`: periods. The value is the number of carrier periods. The carrier period calculated with `1000000 / carrier_in_hz`.
 * no suffix: units. The value is multiplied by the unit value from the general spec.
 
 ## The bit spec
@@ -259,7 +260,7 @@ The inner bit spec may contain bit fields which then get encoded using the outer
 Each bit of `T` gets encoded like this:
 
 * `0`: => `1:2` => 1,-3,1,-1 => +105 -315 +105 -105
-* `1`: => `2:2` => 1,-3,1,-1 => +105 -105 +105 -315
+* `1`: => `2:2` => 1,-1,1,-3 => +105 -105 +105 -315
 
 ## Expressions and operators
 
