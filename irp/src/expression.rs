@@ -20,8 +20,8 @@ impl fmt::Display for Expression {
 
             Expression::Equal(left, right) => write!(f, "({left} == {right})"),
             Expression::NotEqual(left, right) => write!(f, "({left} != {right})"),
-            Expression::More(left, right) => write!(f, "({left} > {right})"),
-            Expression::MoreEqual(left, right) => write!(f, "({left} >= {right})"),
+            Expression::Greater(left, right) => write!(f, "({left} > {right})"),
+            Expression::GreaterEqual(left, right) => write!(f, "({left} >= {right})"),
             Expression::Less(left, right) => write!(f, "({left} < {right})"),
             Expression::LessEqual(left, right) => write!(f, "({left} <= {right})"),
 
@@ -199,8 +199,8 @@ impl Expression {
             | Expression::BitwiseAnd(left, right)
             | Expression::BitwiseOr(left, right)
             | Expression::BitwiseXor(left, right)
-            | Expression::More(left, right)
-            | Expression::MoreEqual(left, right)
+            | Expression::Greater(left, right)
+            | Expression::GreaterEqual(left, right)
             | Expression::Less(left, right)
             | Expression::LessEqual(left, right)
             | Expression::Equal(left, right)
@@ -448,13 +448,13 @@ impl Expression {
 
                 Ok((left == right) as i64)
             }
-            Expression::More(left, right) => {
+            Expression::Greater(left, right) => {
                 let left = left.eval(vars)?;
                 let right = right.eval(vars)?;
 
                 Ok((left > right) as i64)
             }
-            Expression::MoreEqual(left, right) => {
+            Expression::GreaterEqual(left, right) => {
                 let left = left.eval(vars)?;
                 let right = right.eval(vars)?;
 
@@ -627,8 +627,8 @@ where
         Expression::BitwiseOr(left, right) => binary!(left, right, BitwiseOr),
         Expression::BitwiseXor(left, right) => binary!(left, right, BitwiseXor),
 
-        Expression::More(left, right) => binary!(left, right, More),
-        Expression::MoreEqual(left, right) => binary!(left, right, MoreEqual),
+        Expression::Greater(left, right) => binary!(left, right, Greater),
+        Expression::GreaterEqual(left, right) => binary!(left, right, GreaterEqual),
         Expression::Less(left, right) => binary!(left, right, Less),
         Expression::LessEqual(left, right) => binary!(left, right, LessEqual),
         Expression::Equal(left, right) => binary!(left, right, Equal),

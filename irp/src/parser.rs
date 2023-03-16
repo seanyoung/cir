@@ -95,11 +95,11 @@ peg::parser! {
          = left:expression8() "<=" _ right:expression9()
          { Expression::LessEqual(Rc::new(left), Rc::new(right)) }
          / left:expression8() ">=" _ right:expression9()
-         { Expression::MoreEqual(Rc::new(left), Rc::new(right)) }
+         { Expression::GreaterEqual(Rc::new(left), Rc::new(right)) }
          / left:expression8() "<" _ right:expression9()
          { Expression::Less(Rc::new(left), Rc::new(right)) }
          / left:expression8() ">" _ right:expression9()
-         { Expression::More(Rc::new(left), Rc::new(right)) }
+         { Expression::Greater(Rc::new(left), Rc::new(right)) }
          / expression9()
 
         #[cache_left_rec]

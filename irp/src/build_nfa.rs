@@ -965,7 +965,7 @@ impl<'a> Builder<'a> {
             self.add_edge_at_node(
                 next,
                 Edge::MayBranchCond {
-                    expr: Rc::new(Expression::MoreEqual(
+                    expr: Rc::new(Expression::GreaterEqual(
                         Rc::new(Expression::Identifier(length)),
                         Rc::new(Expression::Number(min)),
                     )),
@@ -1248,8 +1248,8 @@ impl<'a> Builder<'a> {
             | Expression::ShiftRight(left, right)
             | Expression::LessEqual(left, right)
             | Expression::Less(left, right)
-            | Expression::More(left, right)
-            | Expression::MoreEqual(left, right)
+            | Expression::Greater(left, right)
+            | Expression::GreaterEqual(left, right)
             | Expression::NotEqual(left, right)
             | Expression::Equal(left, right)
             | Expression::BitwiseAnd(left, right)

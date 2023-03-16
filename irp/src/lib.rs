@@ -144,8 +144,8 @@ enum Expression {
 
     LessEqual(Rc<Expression>, Rc<Expression>),
     Less(Rc<Expression>, Rc<Expression>),
-    More(Rc<Expression>, Rc<Expression>),
-    MoreEqual(Rc<Expression>, Rc<Expression>),
+    Greater(Rc<Expression>, Rc<Expression>),
+    GreaterEqual(Rc<Expression>, Rc<Expression>),
     Equal(Rc<Expression>, Rc<Expression>),
     NotEqual(Rc<Expression>, Rc<Expression>),
 
