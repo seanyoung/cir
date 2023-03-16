@@ -34,15 +34,15 @@ $ irptransmogrifier --irp '{40k,600}<1,-1|2,-1>(4,-1,F:7,D:5,^45m)*[D:0..31,F:0.
 Freq=40000Hz[][+2400,-600,+600,-600,+600,-600,+600,-600,+600,-600,+600,-600,+600,-600,+1200,-600,+600,-600,+600,-600,+1200,-600,+1200,-600,+600,-26400][]
 ```
 
+## General spec and Durations
+
 We will be describing a very simple IRP and then building from there.
 
-## A simple IRP
-
 ```
-{40k,30%,100}<>(1,-2,2u,-100m)
+{40k,30%,100}<>(1,-2,200u,-100m)
 ```
 
-The IRP has three sections, the first part is known as the "general spec", which is
+The IRP has three sections, the first part is known as the general spec, which is
 enclosed with curly braces `{` and `}`. In this example the general spec has three
 things.
 
@@ -135,8 +135,6 @@ Note that here we specified `lsb` in the general spec, which is already the defa
 this is redundant. If both `msb` is specified and the bit field uses `:-` then the order
 is back to least significant bit for that particular bit field.
 
-FIXME: what happens with msb/lsb with multiple consecutive bit fields?
-
 ## Parameter Spec
 
 Remote control protocols encode various values, like the button code, or which
@@ -156,7 +154,11 @@ used for toggle values `T`:
 ```
 {560}<1,-1|1,-3>(F:4,T:1,1,-100m) [F:0..15,T:0..1=0]
 ```
-FIXME: @ memory parameters
+Parameters can be marked with `@` to signify that the parameter is persistent. This does not
+affect decoding or encoding, it means that the variable is expected to stay the same, even
+if other variables change value. This is useful for a toggle bit: the toggle does not
+change when the user changes the button they are pressing, it only changes when the user
+toggle a button.
 
 ## Extents
 
@@ -273,7 +275,7 @@ or more involved checksums. The value of a bit field can be an _expression_. Her
 {105}<-2,2|-3,1|1,-3>(1,F:4,D:4,(F^D):4,1,-100m) [F:0..15,D:0..15]
 ```
 
-following operators are allowed:
+The following operators are supported:
 
 | Operator              |  Name                 | Description                                        |
 |-----------------------|-----------------------|----------------------------------------------------|

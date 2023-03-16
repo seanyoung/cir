@@ -340,11 +340,11 @@ peg::parser! {
          = "[" _ specs:(parameter_spec() ** ("," _)) "]" _ { specs }
 
         rule parameter_spec() -> ParameterSpec
-         = id:identifier() _ memory:"@"? _ ":" _ min:bare_number() _ ".." _ max:bare_number() _ default:initializer()?
+         = id:identifier() _ persistent:"@"? _ ":" _ min:bare_number() _ ".." _ max:bare_number() _ default:initializer()?
          {
             ParameterSpec {
                 name: id.to_owned(),
-                memory: memory.is_some(),
+                persistent: persistent.is_some(),
                 min,
                 max,
                 default,
@@ -513,9 +513,9 @@ fn check_parameters(parameters: &[ParameterSpec]) -> Result<(), String> {
             return Err(format!("invalid minimum {min} and maximum {max}"));
         }
 
-        if parameter.memory && parameter.default.is_none() {
+        if parameter.persistent && parameter.default.is_none() {
             return Err(format!(
-                "memory parameter {} requires default value",
+                "persistent parameter {} requires default value",
                 parameter.name,
             ));
         }
