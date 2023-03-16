@@ -671,6 +671,11 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                             | Expression::GapIdentifier(..)
                             | Expression::Assignment(..)
                             | Expression::BitField { .. } => check_stream(expr)?,
+                            Expression::Stream(stream)
+                                if stream.bit_spec.is_empty() && stream.repeat.is_none() =>
+                            {
+                                check_stream(expr)?
+                            }
                             _ => {
                                 return Err(format!("expression {expr} not expected in bit spec"));
                             }
