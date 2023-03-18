@@ -675,7 +675,11 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                             | Expression::Assignment(..)
                             | Expression::BitField { .. } => check_stream(expr)?,
                             Expression::Stream(stream)
-                                if stream.bit_spec.is_empty() && stream.repeat.is_none() =>
+                                if stream.bit_spec.is_empty()
+                                    && matches!(
+                                        stream.repeat,
+                                        Some(RepeatMarker::Count(_)) | None
+                                    ) =>
                             {
                                 check_stream(expr)?
                             }
