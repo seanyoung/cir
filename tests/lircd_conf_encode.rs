@@ -52,17 +52,7 @@ fn lircd_encode(path: &Path) {
 
         let our_remote = our_conf.next().unwrap();
 
-        if matches!(
-            (lircd_remote.bit(0), lircd_remote.bit(1)),
-            ((_, 0), (0, _)) | ((0, _), (_, 0))
-        ) {
-            // TODO: fix either cir or lircd
-            println!(
-                "SKIP: {} because lircd doesn't encode correctly",
-                lircd_remote.name()
-            );
-            continue;
-        } else if lircd_remote.toggle_bit_mask() != 0 && lircd_remote.toggle_bit() == 0 {
+        if lircd_remote.toggle_bit_mask() != 0 && lircd_remote.toggle_bit() == 0 {
             // TODO: fix either cir or lircd
             println!(
                 "SKIP: {} because lircd does weird things",

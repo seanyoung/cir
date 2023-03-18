@@ -85,31 +85,35 @@ static void add_send_buffer(lirc_t data)
 
 static void send_pulse(lirc_t data)
 {
-	if (send_buffer.pendingp > 0) {
-		send_buffer.pendingp += data;
-	} else {
-		if (send_buffer.pendings > 0) {
-			add_send_buffer(send_buffer.pendings);
-			send_buffer.pendings = 0;
+	if (data != 0) {
+		if (send_buffer.pendingp > 0) {
+			send_buffer.pendingp += data;
+		} else {
+			if (send_buffer.pendings > 0) {
+				add_send_buffer(send_buffer.pendings);
+				send_buffer.pendings = 0;
+			}
+			send_buffer.pendingp = data;
 		}
-		send_buffer.pendingp = data;
 	}
 }
 
 static void send_space(lirc_t data)
 {
-	if (send_buffer.wptr == 0 && send_buffer.pendingp == 0) {
-		log_trace("first signal is a space!");
-		return;
-	}
-	if (send_buffer.pendings > 0) {
-		send_buffer.pendings += data;
-	} else {
-		if (send_buffer.pendingp > 0) {
-			add_send_buffer(send_buffer.pendingp);
-			send_buffer.pendingp = 0;
+	if (data != 0) {
+		if (send_buffer.wptr == 0 && send_buffer.pendingp == 0) {
+			log_trace("first signal is a space!");
+			return;
 		}
-		send_buffer.pendings = data;
+		if (send_buffer.pendings > 0) {
+			send_buffer.pendings += data;
+		} else {
+			if (send_buffer.pendingp > 0) {
+				add_send_buffer(send_buffer.pendingp);
+				send_buffer.pendingp = 0;
+			}
+			send_buffer.pendings = data;
+		}
 	}
 }
 
