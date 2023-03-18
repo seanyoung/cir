@@ -322,7 +322,7 @@ impl Expression {
             Expression::Negative(e) => {
                 let v = e.eval(vars)?;
 
-                Ok(-v)
+                Ok(v.wrapping_neg())
             }
             Expression::Complement(e) => {
                 let v = e.eval(vars)?;

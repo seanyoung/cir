@@ -380,7 +380,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
                 if v > 0 {
                     self.add_flash(v)?;
                 } else {
-                    self.add_gap(-v)?;
+                    self.add_gap(v.wrapping_neg())?;
                 }
             }
             Expression::ExtentConstant(p, u) => {
@@ -401,7 +401,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
                 if v > 0 {
                     self.add_gap(v)?;
                 } else {
-                    self.add_flash(-v)?;
+                    self.add_flash(v.wrapping_neg())?;
                 }
             }
             Expression::Assignment(id, expr) => {
