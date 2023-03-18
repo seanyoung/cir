@@ -1,4 +1,7 @@
-use irp::{protocols::parse, Event, InfraredData, Irp, Message, Vartable};
+use irp::{
+    protocols::{parse, Protocol},
+    Event, InfraredData, Irp, Message, Vartable,
+};
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
 use rand::Rng;
@@ -324,7 +327,7 @@ fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
 
 #[test]
 fn compare_encode_to_transmogrifier() {
-    let protocols = parse(&PathBuf::from(
+    let mut protocols = parse(&PathBuf::from(
         "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ));
 
@@ -332,6 +335,11 @@ fn compare_encode_to_transmogrifier() {
     let mut fails = 0;
     let jvm = create_jvm("tests/IrpTransmogrifier");
     let mut rng = rand::thread_rng();
+
+    protocols.push(Protocol {
+        irp: "{37k,432}<1,-1|1,-3>(8,-4,84:8,50:8,0:4,D:4,S:4,F:12,((D)^S^(F*16)):8,1,-173)* [D:0..15,S:0..15,F:0..4095]".into(),
+        ..Default::default()
+    });
 
     for protocol in &protocols {
         let irp = Irp::parse(&protocol.irp).unwrap();

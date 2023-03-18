@@ -72,17 +72,17 @@ peg::parser! {
 
         #[cache_left_rec]
         rule expression5() -> Expression
-         = left:expression5() "&" _ right:expression6()
-         { Expression::BitwiseAnd(Rc::new(left), Rc::new(right)) }
+         = left:expression5() "^" _ right:expression6()
+         { Expression::BitwiseXor(Rc::new(left), Rc::new(right)) }
          / expression6()
 
-        #[cache_left_rec]
+          #[cache_left_rec]
         rule expression6() -> Expression
-        = left:expression6() "^" _ right:expression7()
-        { Expression::BitwiseXor(Rc::new(left), Rc::new(right)) }
-        / expression7()
+         = left:expression6() "&" _ right:expression7()
+         { Expression::BitwiseAnd(Rc::new(left), Rc::new(right)) }
+         / expression7()
 
-        #[cache_left_rec]
+       #[cache_left_rec]
         rule expression7() -> Expression
          = left:expression7() "!=" _ right:expression8()
          { Expression::NotEqual(Rc::new(left), Rc::new(right)) }
@@ -727,7 +727,7 @@ fn precedence() {
 
     assert_eq!(
         format!("{}", irp.definitions[0]),
-        "A=(F || (G && (H | (I & (J ^ K)))))"
+        "A=(F || (G && (H | ((I & J) ^ K))))"
     );
 
     let irp = Irp::parse("{}<1|-1>(){A=F>G*10&&H*20<J}").unwrap();
