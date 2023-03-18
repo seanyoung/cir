@@ -637,7 +637,8 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                                     | Expression::ExtentConstant(..)
                                     | Expression::ExtentIdentifier(..)
                                     | Expression::Assignment(..)
-                                    | Expression::BitField { .. } => check_stream(expr)?,
+                                    | Expression::BitField { .. }
+                                    | Expression::Stream(..) => check_stream(expr)?,
                                     _ => {
                                         return Err(format!(
                                             "expression {expr} not expected in variation"

@@ -13,8 +13,8 @@ impl Irp {
         let mut res = [Vec::new(), Vec::new(), Vec::new()];
 
         for (i, variant) in self.variants.iter().enumerate() {
-            if let Some(down) = variant {
-                encoder.encode(down, None)?;
+            if let Some(variant) = variant {
+                encoder.encode(variant, None)?;
 
                 if encoder.has_trailing_pulse() {
                     return Err("stream must end with a gap".into());
