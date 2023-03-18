@@ -554,6 +554,8 @@ fn check_definitions(
                 }
             });
 
+            check_stream(expr)?;
+
             if dependents.contains(name) {
                 return Err(format!("definition {definition} depends on its own value"));
             }
@@ -698,12 +700,59 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
                 }
             }
         }
-        Expression::BitField { length, .. } => {
+        Expression::InfiniteBitField { value, offset } => {
+            check_stream(value)?;
+            check_stream(offset)?;
+        }
+        Expression::BitField {
+            value,
+            length,
+            offset,
+            ..
+        } => {
             if let Ok(length) = length.eval(&Vartable::new()) {
                 if !(0..64).contains(&length) {
                     return Err(format!("bitfield of length {length} not supported"));
                 }
             }
+
+            check_stream(value)?;
+            check_stream(length)?;
+            if let Some(offset) = offset {
+                check_stream(offset)?;
+            }
+        }
+        Expression::Negative(expr)
+        | Expression::BitCount(expr)
+        | Expression::Complement(expr)
+        | Expression::Not(expr)
+        | Expression::BitReverse(expr, ..)
+        | Expression::Log2(expr) => check_stream(expr)?,
+        Expression::Add(left, right)
+        | Expression::Subtract(left, right)
+        | Expression::Multiply(left, right)
+        | Expression::Divide(left, right)
+        | Expression::Modulo(left, right)
+        | Expression::Power(left, right)
+        | Expression::ShiftLeft(left, right)
+        | Expression::ShiftRight(left, right)
+        | Expression::LessEqual(left, right)
+        | Expression::Less(left, right)
+        | Expression::Greater(left, right)
+        | Expression::GreaterEqual(left, right)
+        | Expression::Equal(left, right)
+        | Expression::NotEqual(left, right)
+        | Expression::BitwiseAnd(left, right)
+        | Expression::BitwiseOr(left, right)
+        | Expression::BitwiseXor(left, right)
+        | Expression::Or(left, right) => {
+            check_stream(left)?;
+            check_stream(right)?;
+        }
+        Expression::Conditional(cond, left, right) => {
+            check_stream(cond)?;
+            check_stream(left)?;
+            check_stream(right)?;
         }
         _ => (),
     }
