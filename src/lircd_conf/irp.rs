@@ -355,18 +355,27 @@ impl<'a> Builder<'a> {
     }
 
     fn add_gap(&mut self, repeat: bool) {
-        if self.remote.gap != 0 || (self.remote.repeat_gap != 0 && repeat) {
+        if self.remote.gap != 0 || self.remote.gap2 != 0 || (self.remote.repeat_gap != 0 && repeat)
+        {
             let gap = if repeat && self.remote.repeat_gap != 0 {
                 self.remote.repeat_gap
-            } else if !repeat
-                && self
-                    .remote
-                    .flags
-                    .contains(Flags::NO_HEAD_REP | Flags::CONST_LENGTH)
-            {
-                self.remote.gap + self.remote.header.0 + self.remote.header.1
             } else {
-                self.remote.gap
+                let mut gap = match (self.remote.gap, self.remote.gap2) {
+                    (0, gap2) => gap2,
+                    (gap, 0) => gap,
+                    (gap, gap2) => gap.min(gap2),
+                };
+
+                if !repeat
+                    && self
+                        .remote
+                        .flags
+                        .contains(Flags::NO_HEAD_REP | Flags::CONST_LENGTH)
+                {
+                    gap += self.remote.header.0 + self.remote.header.1;
+                }
+
+                gap
             };
 
             self.irp
@@ -378,6 +387,8 @@ impl<'a> Builder<'a> {
 
             if gap % 1000 == 0 {
                 write!(&mut self.irp, "{}m,", gap / 1000).unwrap();
+            } else if gap % 100 == 0 {
+                write!(&mut self.irp, "{}.{}m,", gap / 1000, (gap / 100) % 10).unwrap();
             } else {
                 write!(&mut self.irp, "{gap},").unwrap();
             }
