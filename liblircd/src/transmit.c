@@ -464,9 +464,10 @@ init_send_loop:
 		remote->min_remaining_gap = remote->repeat_gap;
 		remote->max_remaining_gap = remote->repeat_gap;
 	} else if (is_const(remote)) {
-		if (min_gap(remote) > send_buffer.sum) {
-			remote->min_remaining_gap = min_gap(remote) - send_buffer.sum;
-			remote->max_remaining_gap = max_gap(remote) - send_buffer.sum;
+		lirc_t sum = send_buffer.sum + send_buffer.pendings;
+		if (min_gap(remote) > sum) {
+			remote->min_remaining_gap = min_gap(remote) - sum;
+			remote->max_remaining_gap = max_gap(remote) - sum;
 		} else {
 			log_error("too short gap: %u", remote->gap);
 			remote->min_remaining_gap = min_gap(remote);

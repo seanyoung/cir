@@ -1,4 +1,4 @@
-use cir::lircd_conf::{parse, Flags, Remote};
+use cir::lircd_conf::{parse, Flags};
 use irp::{Irp, Message, Vartable};
 use liblircd::LircdConf;
 use num_integer::Integer;
@@ -157,7 +157,7 @@ fn lircd_encode(path: &Path) {
                     message.raw.pop();
                 }
 
-                if !compare_output(our_remote, &lircd, &message.raw) {
+                if !compare_output(&lircd, &message.raw) {
                     let testdata = Message::from_raw_slice(&lircd);
 
                     println!("lircd {}", testdata.print_rawir());
@@ -169,7 +169,7 @@ fn lircd_encode(path: &Path) {
     }
 }
 
-fn compare_output(remote: &Remote, lircd: &[u32], our: &[u32]) -> bool {
+fn compare_output(lircd: &[u32], our: &[u32]) -> bool {
     if lircd.len() != our.len() {
         println!("length {} {} differ", lircd.len(), our.len());
         return false;
@@ -187,15 +187,7 @@ fn compare_output(remote: &Remote, lircd: &[u32], our: &[u32]) -> bool {
             continue;
         }
 
-        if lircd > 4500 && (lircd - remote.bit[0].1 as u32) == our {
-            continue;
-        }
-
-        if lircd > 4500 && (lircd - remote.bit[1].1 as u32) == our {
-            continue;
-        }
-
-        println!("postition:{} {} vs {}", no, lircd, our);
+        println!("postition:{} lircd {} vs our {}", no, lircd, our);
 
         return false;
     }

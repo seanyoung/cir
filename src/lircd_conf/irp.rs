@@ -376,7 +376,7 @@ impl<'a> Builder<'a> {
                     "-"
                 });
 
-            if self.remote.gap % 1000 == 0 {
+            if gap % 1000 == 0 {
                 write!(&mut self.irp, "{}m,", gap / 1000).unwrap();
             } else {
                 write!(&mut self.irp, "{gap},").unwrap();
