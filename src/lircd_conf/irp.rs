@@ -179,6 +179,10 @@ impl<'a> Builder<'a> {
         {
             self.irp.push('(');
 
+            if self.remote.repeat_mask != 0 {
+                write!(&mut self.irp, "CODE=CODE^{:#x},", self.remote.repeat_mask).unwrap();
+            }
+
             self.add_irp_body(true);
 
             self.irp.pop();
@@ -355,15 +359,14 @@ impl<'a> Builder<'a> {
     }
 
     fn add_gap(&mut self, repeat: bool) {
-        if self.remote.gap != 0 || self.remote.gap2 != 0 || (self.remote.repeat_gap != 0 && repeat)
-        {
+        if self.remote.gap != 0 || (self.remote.repeat_gap != 0 && repeat) {
             let gap = if repeat && self.remote.repeat_gap != 0 {
                 self.remote.repeat_gap
             } else {
-                let mut gap = match (self.remote.gap, self.remote.gap2) {
-                    (0, gap2) => gap2,
-                    (gap, 0) => gap,
-                    (gap, gap2) => gap.min(gap2),
+                let mut gap = if self.remote.gap2 != 0 && self.remote.gap2 < self.remote.gap {
+                    self.remote.gap2
+                } else {
+                    self.remote.gap
                 };
 
                 if !repeat

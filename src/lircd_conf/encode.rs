@@ -145,16 +145,20 @@ impl Remote {
 
         let mut raw = raw_code.rawir[..length].to_vec();
 
-        // TODO: use gap2
         let mut gap = if self.gap == 0 {
             // TODO: is this right?
             20000
         } else {
+            let gap = if self.gap2 != 0 && self.gap2 < self.gap {
+                self.gap2
+            } else {
+                self.gap
+            };
             let total_length: u32 = raw.iter().sum();
 
             if self.flags.contains(Flags::CONST_LENGTH) {
-                if (total_length as u64) < self.gap {
-                    self.gap as u32 - total_length
+                if (total_length as u64) < gap {
+                    gap as u32 - total_length
                 } else {
                     return Err(format!(
                         "const length gap is too short, gap is {} but signal is {}",
@@ -162,7 +166,7 @@ impl Remote {
                     ));
                 }
             } else {
-                self.gap as u32
+                gap as u32
             }
         };
 

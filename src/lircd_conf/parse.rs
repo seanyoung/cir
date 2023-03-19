@@ -174,6 +174,7 @@ impl<'a> LircParser<'a> {
                 | Some(name @ "rc6_mask")
                 | Some(name @ "baud")
                 | Some(name @ "repeat_gap")
+                | Some(name @ "repeat_mask")
                 | Some(name @ "suppress_repeat")
                 | Some(name @ "manual_sort")
                 | Some(name @ "min_code_repeat")
@@ -199,6 +200,7 @@ impl<'a> LircParser<'a> {
                         "rc6_mask" => remote.rc6_mask = val,
                         "baud" => remote.baud = val,
                         "repeat_gap" => remote.repeat_gap = val,
+                        "repeat_mask" => remote.repeat_mask = val,
                         "suppress_repeat" => remote.suppress_repeat = val,
                         "manual_sort" => remote.manual_sort = val,
                         "min_code_repeat" => remote.min_code_repeat = val,
@@ -589,7 +591,7 @@ impl<'a> LircParser<'a> {
         }
 
         if remote.gap == 0 {
-            warn!("{}:{}: missing gap", self.path.display(), self.line_no,);
+            warn!("{}:{}: missing gap", self.path.display(), self.line_no);
         }
 
         if remote.duty_cycle > 99 {
@@ -627,7 +629,7 @@ impl<'a> LircParser<'a> {
         }
 
         if remote.codes.is_empty() {
-            error!("{}:{}: missing codes", self.path.display(), self.line_no,);
+            error!("{}:{}: missing codes", self.path.display(), self.line_no);
             return false;
         }
 
@@ -644,7 +646,7 @@ impl<'a> LircParser<'a> {
         }
 
         if (remote.pre_data & !gen_mask(remote.pre_data_bits)) != 0 {
-            warn!("{}:{}: invalid pre_data", self.path.display(), self.line_no,);
+            warn!("{}:{}: invalid pre_data", self.path.display(), self.line_no);
             remote.pre_data &= gen_mask(remote.pre_data_bits);
         }
 
