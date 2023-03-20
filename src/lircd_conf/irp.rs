@@ -21,10 +21,10 @@ struct Builder<'a> {
     irp: String,
 }
 
-#[derive(Clone, Copy)]
-enum Stream<'a> {
+#[derive(Clone)]
+enum Stream {
     Constant(u64),
-    Variable(&'a str),
+    Expression(String),
     Toggle,
 }
 
@@ -39,7 +39,7 @@ impl<'a> Builder<'a> {
     fn build(mut self) -> String {
         self.irp = "{".into();
 
-        if self.remote.frequency != 0 {
+        if self.remote.frequency != 38000 {
             write!(
                 &mut self.irp,
                 "{}k,",
@@ -176,12 +176,9 @@ impl<'a> Builder<'a> {
             .remote
             .flags
             .intersects(Flags::NO_HEAD_REP | Flags::NO_FOOT_REP)
+            || self.remote.repeat_mask != 0
         {
             self.irp.push('(');
-
-            if self.remote.repeat_mask != 0 {
-                write!(&mut self.irp, "CODE=CODE^{:#x},", self.remote.repeat_mask).unwrap();
-            }
 
             self.add_irp_body(true);
 
@@ -284,8 +281,14 @@ impl<'a> Builder<'a> {
             }
         }
 
+        let code = if repeat && self.remote.repeat_mask != 0 {
+            format!("(CODE^{:#x})", self.remote.repeat_mask)
+        } else {
+            "CODE".into()
+        };
+
         self.add_bit_stream(
-            Stream::Variable("CODE"),
+            Stream::Expression(code),
             self.remote.bits,
             toggle_bit_mask >> self.remote.post_data_bits,
             self.remote.rc6_mask >> self.remote.post_data_bits,
@@ -293,7 +296,7 @@ impl<'a> Builder<'a> {
 
         if self.remote.post_data_bits != 0 {
             let stream = if self.toggle_post_data() {
-                Stream::Variable("POST")
+                Stream::Expression("POST".into())
             } else {
                 Stream::Constant(self.remote.post_data)
             };
@@ -428,7 +431,11 @@ impl<'a> Builder<'a> {
                 .unwrap();
             }
 
-            let stream = if is_toggle { Stream::Toggle } else { stream };
+            let stream = if is_toggle {
+                Stream::Toggle
+            } else {
+                stream.clone()
+            };
 
             let bit_count = highest_bit - bit;
             let offset = bit;
@@ -443,10 +450,10 @@ impl<'a> Builder<'a> {
                         write!(&mut self.irp, "0x{v:x}:{bit_count},").unwrap();
                     }
                 }
-                Stream::Variable(v) if offset == 0 => {
+                Stream::Expression(v) if offset == 0 => {
                     write!(&mut self.irp, "{v}:{bit_count},").unwrap();
                 }
-                Stream::Variable(v) => {
+                Stream::Expression(v) => {
                     write!(&mut self.irp, "{v}:{bit_count}:{offset},").unwrap();
                 }
                 Stream::Toggle => {
