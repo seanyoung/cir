@@ -197,8 +197,15 @@ impl<'a> Builder<'a> {
             }
         }
 
-        if self.toggle_post_data() || self.remote.flags.contains(Flags::BO) {
+        if self.toggle_post_data()
+            || self.toggle_pre_data()
+            || self.remote.flags.contains(Flags::BO)
+        {
             self.irp.push('{');
+
+            if self.toggle_pre_data() {
+                write!(&mut self.irp, "PRE={:#x},", self.remote.pre_data).unwrap();
+            }
 
             if self.toggle_post_data() {
                 write!(&mut self.irp, "POST={:#x},", self.remote.post_data).unwrap();
@@ -264,8 +271,14 @@ impl<'a> Builder<'a> {
         };
 
         if self.remote.pre_data_bits != 0 {
+            let stream = if self.toggle_pre_data() {
+                Stream::Expression("PRE".into())
+            } else {
+                Stream::Constant(self.remote.pre_data)
+            };
+
             self.add_bit_stream(
-                Stream::Constant(self.remote.pre_data),
+                stream,
                 self.remote.pre_data_bits,
                 toggle_bit_mask >> (self.remote.bits + self.remote.post_data_bits),
                 self.remote.rc6_mask >> (self.remote.bits + self.remote.post_data_bits),
@@ -343,7 +356,8 @@ impl<'a> Builder<'a> {
             write!(
                 &mut self.irp,
                 "CODE=CODE^{:#x},",
-                self.remote.toggle_mask >> self.remote.post_data_bits
+                (self.remote.toggle_mask >> self.remote.post_data_bits)
+                    & gen_mask(self.remote.bits)
             )
             .unwrap();
         }
@@ -353,6 +367,16 @@ impl<'a> Builder<'a> {
                 &mut self.irp,
                 "CODE=CODE^{:#x},",
                 self.remote.toggle_bit_mask >> self.remote.post_data_bits
+            )
+            .unwrap();
+        }
+
+        if self.toggle_pre_data() {
+            write!(
+                &mut self.irp,
+                "PRE=PRE^{:#x},",
+                (self.remote.toggle_mask >> (self.remote.post_data_bits + self.remote.bits))
+                    & gen_mask(self.remote.pre_data_bits)
             )
             .unwrap();
         }
@@ -410,6 +434,14 @@ impl<'a> Builder<'a> {
     fn toggle_post_data(&self) -> bool {
         self.remote.toggle_mask != 0
             && (self.remote.toggle_mask & gen_mask(self.remote.post_data_bits)) != 0
+    }
+
+    fn toggle_pre_data(&self) -> bool {
+        self.remote.toggle_mask != 0
+            && (self.remote.toggle_mask
+                & (gen_mask(self.remote.pre_data_bits)
+                    << (self.remote.bits + self.remote.post_data_bits)))
+                != 0
     }
 
     fn add_bit_stream(&mut self, stream: Stream, bits: u64, toggle_mask: u64, rc6_mask: u64) {
