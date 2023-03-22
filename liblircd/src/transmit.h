@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-#define WBUF_SIZE 256
+#define WBUF_SIZE 2560
 
 /** Clear and re-initiate the buffer. */
 void send_buffer_init(void);

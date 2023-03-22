@@ -164,7 +164,7 @@ impl<'a> Builder<'a> {
             if self.remote.ptrail != 0 {
                 write!(&mut self.irp, "{},", self.remote.ptrail).unwrap();
             }
-            self.add_gap(true);
+            self.add_gap(true, true);
 
             self.irp.pop();
             match self.remote.min_repeat {
@@ -350,7 +350,7 @@ impl<'a> Builder<'a> {
             write!(&mut self.irp, "{},", self.remote.ptrail).unwrap();
         }
 
-        self.add_gap(repeat);
+        self.add_gap(repeat, false);
 
         if self.remote.toggle_mask != 0 {
             write!(
@@ -391,9 +391,9 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn add_gap(&mut self, repeat: bool) {
-        if self.remote.gap != 0 || (self.remote.repeat_gap != 0 && repeat) {
-            let gap = if repeat && self.remote.repeat_gap != 0 {
+    fn add_gap(&mut self, repeat: bool, use_repeat_gap: bool) {
+        if self.remote.gap != 0 || (self.remote.repeat_gap != 0 && use_repeat_gap) {
+            let gap = if use_repeat_gap && self.remote.repeat_gap != 0 {
                 self.remote.repeat_gap
             } else {
                 let mut gap = if self.remote.gap2 != 0 && self.remote.gap2 < self.remote.gap {
