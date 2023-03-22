@@ -271,6 +271,9 @@ impl<'a> Builder<'a> {
                 self.remote.rc6_mask >> (self.remote.bits + self.remote.post_data_bits),
             );
 
+            // pre should only be sent if there are pre_data_bits, see
+            // https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=890374
+            // this is inline with lirc transmitter/decoder
             if self.remote.pre.0 != 0 && self.remote.pre.1 != 0 {
                 write!(
                     &mut self.irp,
@@ -301,13 +304,9 @@ impl<'a> Builder<'a> {
                 Stream::Constant(self.remote.post_data)
             };
 
-            self.add_bit_stream(
-                stream,
-                self.remote.post_data_bits,
-                toggle_bit_mask,
-                self.remote.rc6_mask,
-            );
-
+            // post should only be sent if there are post_data_bits, see
+            // https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=890374
+            // this is inline with lirc transmitter/decoder
             if self.remote.post.0 != 0 && self.remote.post.1 != 0 {
                 write!(
                     &mut self.irp,
@@ -316,6 +315,13 @@ impl<'a> Builder<'a> {
                 )
                 .unwrap();
             }
+
+            self.add_bit_stream(
+                stream,
+                self.remote.post_data_bits,
+                toggle_bit_mask,
+                self.remote.rc6_mask,
+            );
         }
 
         if !supress_footer && self.remote.foot.0 != 0 && self.remote.foot.1 != 0 {
