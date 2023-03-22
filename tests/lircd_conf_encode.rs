@@ -162,7 +162,7 @@ fn lircd_encode(path: &Path) {
 
                     println!("lircd {}", testdata.print_rawir());
                     println!("cir {}", message.print_rawir());
-                    panic!("CODE: {} 0x{:x}", our_code.name, our_code.code[0]);
+                    panic!("CODE: {} {:#x}", our_code.name, our_code.code[0]);
                 }
             }
         }

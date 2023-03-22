@@ -201,7 +201,7 @@ impl<'a> Builder<'a> {
             self.irp.push('{');
 
             if self.toggle_post_data() {
-                write!(&mut self.irp, "POST=0x{:x},", self.remote.post_data).unwrap();
+                write!(&mut self.irp, "POST={:#x},", self.remote.post_data).unwrap();
             }
 
             if self.remote.flags.contains(Flags::BO) {
@@ -342,7 +342,7 @@ impl<'a> Builder<'a> {
         if self.remote.toggle_mask != 0 {
             write!(
                 &mut self.irp,
-                "CODE=CODE^0x{:x},",
+                "CODE=CODE^{:#x},",
                 self.remote.toggle_mask >> self.remote.post_data_bits
             )
             .unwrap();
@@ -351,7 +351,7 @@ impl<'a> Builder<'a> {
         if self.remote.toggle_bit_mask.count_ones() > 1 {
             write!(
                 &mut self.irp,
-                "CODE=CODE^0x{:x},",
+                "CODE=CODE^{:#x},",
                 self.remote.toggle_bit_mask >> self.remote.post_data_bits
             )
             .unwrap();
@@ -360,7 +360,7 @@ impl<'a> Builder<'a> {
         if self.toggle_post_data() {
             write!(
                 &mut self.irp,
-                "POST=POST^0x{:x},",
+                "POST=POST^{:#x},",
                 self.remote.toggle_mask & gen_mask(self.remote.post_data_bits)
             )
             .unwrap();

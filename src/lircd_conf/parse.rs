@@ -663,7 +663,7 @@ impl<'a> LircParser<'a> {
             for code in &mut code.code {
                 if (*code & !gen_mask(remote.bits)) != 0 {
                     warn!(
-                        "{}:{}: invalid code 0x{:x} truncated",
+                        "{}:{}: invalid code {:#x} truncated",
                         self.path.display(),
                         self.line_no,
                         code
