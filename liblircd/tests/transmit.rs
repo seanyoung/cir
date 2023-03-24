@@ -72,8 +72,6 @@ fn encode() {
 
     let conf = read_to_string("../testdata/lircd_conf/motorola/QIP2500.lircd.conf").unwrap();
 
-    // unsafe { lirc_log_set_stdout() };
-
     let conf = LircdConf::parse(&conf).unwrap();
 
     let lircd_conf: Vec<_> = conf.iter().collect();
@@ -102,6 +100,8 @@ fn encode() {
                     519, 87708, 8980, 2247, 519, 87708, 8980, 2247, 519
                 ]
             );
+
+            assert_eq!(remote.decode(&raw), vec!(0x5006));
         }
     }
 }

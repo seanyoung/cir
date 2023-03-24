@@ -164,6 +164,21 @@ fn lircd_encode(path: &Path) {
                     println!("cir {}", message.print_rawir());
                     panic!("CODE: {} {:#x}", our_code.name, our_code.code[0]);
                 }
+
+                // so now we know that cir and lircd agree on the exact transmit encoding
+
+                // let's see if lircd can decode its own creation
+
+                let decoded = lircd_remote.decode(&lircd);
+
+                if decoded != vec![our_code.code[0]] {
+                    println!(
+                        "DECODE MISMATCH got: {decoded:#x?} expected: {:#x?}",
+                        our_code.code
+                    );
+                } else {
+                    println!("LIRCD DECODE {:#x?} OK", decoded);
+                }
             }
         }
     }

@@ -1,7 +1,7 @@
 use std::{
     ffi::{c_char, CStr},
     marker::PhantomData,
-    slice,
+    ptr, slice,
 };
 
 #[allow(unused)]
@@ -15,7 +15,25 @@ extern "C" {
     fn send_buffer_length() -> i32;
     fn send_buffer_data() -> *const u32;
     fn send_buffer_sum() -> i32;
+    fn set_fake_data(data: *const u32, len: u32);
+    fn decode_all(remote: *const ir_remote) -> *const c_char;
+    fn rec_buffer_init();
     pub fn lirc_log_set_stdout();
+    static mut last_remote: *const ir_remote;
+}
+
+static mut CODES: Vec<u64> = Vec::new();
+
+#[no_mangle]
+extern "C" fn register_button_press(
+    _remote: *mut ir_remote,
+    ncode: *const ir_ncode,
+    code: u64,
+    reps: i32,
+) {
+    let n = unsafe { (*ncode).code };
+    unsafe { CODES.push(n) };
+    println!("registered {code:#x} {n:#x} {reps}");
 }
 
 #[repr(C)]
@@ -208,6 +226,19 @@ impl<'a> Remote<'a> {
                 _ => unreachable!(),
             }
         }
+    }
+
+    pub fn decode(&self, data: &[u32]) -> Vec<u64> {
+        unsafe {
+            rec_buffer_init();
+            CODES.clear();
+            last_remote = ptr::null();
+            set_fake_data(data.as_ptr(), data.len() as u32);
+        }
+
+        unsafe { decode_all(self.0) };
+
+        unsafe { CODES.clone() }
     }
 }
 
