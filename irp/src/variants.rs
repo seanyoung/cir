@@ -566,4 +566,9 @@ fn variant_repeats() {
         irp.encode(Vartable::new()).unwrap(),
         [vec![], vec![200, 1000], vec![300, 1000]]
     );
+
+    assert_eq!(
+        irp.normal_form(),
+        "{}<>([<1|2>((),-100)][<1|2>(20,-100)][<1|2>(30,-100)])"
+    );
 }

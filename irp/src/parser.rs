@@ -2,8 +2,10 @@ use super::{
     variants::variants, Expression, GeneralSpec, Irp, ParameterSpec, RepeatMarker, Stream, Unit,
     Vartable,
 };
+use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     rc::Rc,
     str::FromStr,
 };
@@ -76,13 +78,13 @@ peg::parser! {
          { Expression::BitwiseXor(Rc::new(left), Rc::new(right)) }
          / expression6()
 
-          #[cache_left_rec]
+        #[cache_left_rec]
         rule expression6() -> Expression
          = left:expression6() "&" _ right:expression7()
          { Expression::BitwiseAnd(Rc::new(left), Rc::new(right)) }
          / expression7()
 
-       #[cache_left_rec]
+        #[cache_left_rec]
         rule expression7() -> Expression
          = left:expression7() "!=" _ right:expression8()
          { Expression::NotEqual(Rc::new(left), Rc::new(right)) }
@@ -414,6 +416,41 @@ impl Irp {
     /// Does this IRP have an ending part
     pub fn has_ending(&self) -> bool {
         self.variants[2].is_some()
+    }
+
+    /// Give the IRP in normal form
+    pub fn normal_form(&self) -> String {
+        let mut s = format!("{}<>(", self.general_spec);
+
+        for variant in &self.variants {
+            if let Some(variant) = variant {
+                s.push_str(&format!("[{}]", variant));
+            } else {
+                s.push_str("[]");
+            }
+        }
+        s.push(')');
+        if !self.definitions.is_empty() {
+            s.push_str(&format!(
+                "{{{}}}",
+                self.definitions
+                    .iter()
+                    .map(|expr| format!("{}", expr))
+                    .join(",")
+            ));
+        }
+
+        if !self.parameters.is_empty() {
+            s.push_str(&format!(
+                " [{}]",
+                self.parameters
+                    .iter()
+                    .map(|param| format!("{}", param))
+                    .join(",")
+            ));
+        }
+
+        s
     }
 }
 
@@ -762,6 +799,49 @@ fn check_stream(stream: &Expression) -> Result<(), String> {
         _ => (),
     }
     Ok(())
+}
+
+impl fmt::Display for GeneralSpec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{")?;
+
+        let mut needs_comma = false;
+
+        if self.carrier != 38000 {
+            write!(f, "{}k", self.carrier as f64 / 1000.0)?;
+            needs_comma = true;
+        }
+
+        if let Some(duty) = self.duty_cycle {
+            if needs_comma {
+                write!(f, ",")?;
+            }
+            write!(f, "{}%", duty)?;
+            needs_comma = true;
+        }
+
+        if !self.lsb {
+            if needs_comma {
+                write!(f, ",msb")?;
+            } else {
+                write!(f, "msb")?;
+            }
+        }
+
+        write!(f, "}}")
+    }
+}
+
+impl fmt::Display for ParameterSpec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}..{}", self.name, self.min, self.max)?;
+
+        if let Some(default) = &self.default {
+            write!(f, "={}", default)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[test]

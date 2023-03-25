@@ -65,6 +65,9 @@ impl fmt::Display for Expression {
                 write!(f, "BITREV({expr},{count},{offset})")
             }
             Expression::Assignment(name, expr) => write!(f, "{name}={expr}"),
+            Expression::List(list) if list.len() == 1 => {
+                write!(f, "{}", &list[0])
+            }
             Expression::List(list) => {
                 write!(f, "(")?;
                 let mut first = true;
