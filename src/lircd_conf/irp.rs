@@ -164,7 +164,13 @@ impl<'a> Builder<'a> {
             if self.remote.ptrail != 0 {
                 write!(&mut self.irp, "{},", self.remote.ptrail).unwrap();
             }
-            self.add_gap(true, true);
+
+            if self.remote.repeat_gap != 0 {
+                // repeat_gap ignores CONST_LENGTH flag
+                self.gap(false, self.remote.repeat_gap);
+            } else {
+                self.add_gap(true);
+            }
 
             self.irp.pop();
             match self.remote.min_repeat {
@@ -350,7 +356,7 @@ impl<'a> Builder<'a> {
             write!(&mut self.irp, "{},", self.remote.ptrail).unwrap();
         }
 
-        self.add_gap(repeat, false);
+        self.add_gap(repeat);
 
         if self.remote.toggle_mask != 0 {
             write!(
@@ -391,43 +397,36 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn add_gap(&mut self, repeat: bool, use_repeat_gap: bool) {
-        if self.remote.gap != 0 || (self.remote.repeat_gap != 0 && use_repeat_gap) {
-            let gap = if use_repeat_gap && self.remote.repeat_gap != 0 {
-                self.remote.repeat_gap
+    fn add_gap(&mut self, repeat: bool) {
+        if self.remote.gap != 0 {
+            let mut gap = if self.remote.gap2 != 0 && self.remote.gap2 < self.remote.gap {
+                self.remote.gap2
             } else {
-                let mut gap = if self.remote.gap2 != 0 && self.remote.gap2 < self.remote.gap {
-                    self.remote.gap2
-                } else {
-                    self.remote.gap
-                };
-
-                if !repeat
-                    && self
-                        .remote
-                        .flags
-                        .contains(Flags::NO_HEAD_REP | Flags::CONST_LENGTH)
-                {
-                    gap += self.remote.header.0 + self.remote.header.1;
-                }
-
-                gap
+                self.remote.gap
             };
 
-            self.irp
-                .push_str(if self.remote.flags.contains(Flags::CONST_LENGTH) {
-                    "^"
-                } else {
-                    "-"
-                });
-
-            if gap % 1000 == 0 {
-                write!(&mut self.irp, "{}m,", gap / 1000).unwrap();
-            } else if gap % 100 == 0 {
-                write!(&mut self.irp, "{}.{}m,", gap / 1000, (gap / 100) % 10).unwrap();
-            } else {
-                write!(&mut self.irp, "{gap},").unwrap();
+            if !repeat
+                && self
+                    .remote
+                    .flags
+                    .contains(Flags::NO_HEAD_REP | Flags::CONST_LENGTH)
+            {
+                gap += self.remote.header.0 + self.remote.header.1;
             }
+
+            self.gap(self.remote.flags.contains(Flags::CONST_LENGTH), gap)
+        }
+    }
+
+    fn gap(&mut self, extent: bool, gap: u64) {
+        self.irp.push_str(if extent { "^" } else { "-" });
+
+        if gap % 1000 == 0 {
+            write!(&mut self.irp, "{}m,", gap / 1000).unwrap();
+        } else if gap % 100 == 0 {
+            write!(&mut self.irp, "{}.{}m,", gap / 1000, (gap / 100) % 10).unwrap();
+        } else {
+            write!(&mut self.irp, "{gap},").unwrap();
         }
     }
 
