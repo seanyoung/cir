@@ -16,8 +16,10 @@ extern "C" {
     fn send_buffer_data() -> *const u32;
     fn send_buffer_sum() -> i32;
     fn set_fake_data(data: *const u32, len: u32);
+    fn fake_data_done() -> i32;
     fn decode_all(remote: *const ir_remote) -> *const c_char;
     fn rec_buffer_init();
+    fn rec_buffer_clear();
     pub fn lirc_log_set_stdout();
     static mut last_remote: *const ir_remote;
 }
@@ -216,6 +218,10 @@ impl<'a> Remote<'a> {
         unsafe { (*self.0).toggle_bit }
     }
 
+    pub fn min_repeat(&self) -> i32 {
+        unsafe { (*self.0).min_repeat }
+    }
+
     pub fn bit(&self, bit: usize) -> (i32, i32) {
         unsafe {
             match bit {
@@ -236,7 +242,21 @@ impl<'a> Remote<'a> {
             set_fake_data(data.as_ptr(), data.len() as u32);
         }
 
-        unsafe { decode_all(self.0) };
+        if unsafe { (*self.0).toggle_mask } != 0 {
+            unsafe {
+                (*self.0).toggle_mask_state = 0;
+            }
+        }
+
+        loop {
+            unsafe { decode_all(self.0) };
+
+            unsafe { rec_buffer_clear() };
+
+            if unsafe { fake_data_done() } != 0 {
+                break;
+            }
+        }
 
         unsafe { CODES.clone() }
     }

@@ -100,34 +100,23 @@ fn main() {
 
                 let mut message = Message::new();
 
-                if our_code.code.len() == 2 && our_remote.repeat.0 != 0 && our_remote.repeat.1 != 0
-                {
-                    // if remote has a repeat parameter and two scancodes, then just repeat the first scancode
+                for code in &our_code.code {
                     let mut vars = Vartable::new();
-                    vars.set(String::from("CODE"), our_code.code[0] as i64);
+                    vars.set(String::from("CODE"), *code as i64);
 
-                    let m = irp.encode_raw(vars, 1).expect("encode should succeed");
+                    // lircd does not honour toggle bit in RCMM transmit
+                    if our_remote.flags.contains(Flags::RCMM)
+                        && our_remote.toggle_bit_mask.count_ones() == 1
+                    {
+                        vars.set(
+                            String::from("T"),
+                            ((*code & our_remote.toggle_bit_mask) != 0).into(),
+                        );
+                    }
+
+                    let m = irp.encode_raw(vars, 0).expect("encode should succeed");
 
                     message.extend(&m);
-                } else {
-                    for code in &our_code.code {
-                        let mut vars = Vartable::new();
-                        vars.set(String::from("CODE"), *code as i64);
-
-                        // lircd does not honour toggle bit in RCMM transmit
-                        if our_remote.flags.contains(Flags::RCMM)
-                            && our_remote.toggle_bit_mask.count_ones() == 1
-                        {
-                            vars.set(
-                                String::from("T"),
-                                ((*code & our_remote.toggle_bit_mask) != 0).into(),
-                            );
-                        }
-
-                        let m = irp.encode_raw(vars, 0).expect("encode should succeed");
-
-                        message.extend(&m);
-                    }
                 }
 
                 if message.raw.len().is_even() {
@@ -146,12 +135,18 @@ fn main() {
 
                 // let's see if lircd can decode its own creation
 
-                let decoded = lircd_remote.decode(&lircd);
+                let decoded = lircd_remote.decode(&message.raw);
 
-                if decoded != vec![our_code.code[0]] {
+                let mut expect = vec![our_code.code[0]];
+
+                for _ in 0..lircd_remote.min_repeat() {
+                    expect.push(our_code.code[0]);
+                }
+
+                if decoded != expect {
                     panic!(
                         "DECODE MISMATCH got: {decoded:#x?} expected: {:#x?}",
-                        our_code.code
+                        expect
                     );
                 } else {
                     println!("LIRCD DECODE {:#x?} OK", decoded);

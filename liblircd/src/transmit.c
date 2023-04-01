@@ -412,7 +412,7 @@ static int init_send_or_sim(struct ir_remote* remote, struct ir_ncode* code, int
 	}
 
 init_send_loop:
-	if (repeat && has_repeat(remote)) {
+	if (repeat && has_repeat(remote) && code->next == NULL) {
 		if (remote->flags & REPEAT_HEADER && has_header(remote))
 			send_header(remote);
 		send_repeat(remote);

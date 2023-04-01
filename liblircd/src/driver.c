@@ -17,6 +17,10 @@ int set_fake_data(int *d, int l)
     leading = 1;
 }
 
+int fake_data_done() {
+    return offset >= len;
+}
+
 int readdata(int timeout) {
     if (leading) {
         leading = 0;
