@@ -114,22 +114,41 @@ impl Remote {
 
         let irp = Irp::parse(&irp).expect("should parse");
 
-        let mut message = Message::new();
         let name = &code.name;
 
-        for code in &code.code {
+        if code.code.len() == 1 {
+            // We can use irp repeats
             let mut vars = Vartable::new();
 
-            debug!("encoding name={} code={}", name, code);
+            debug!("encoding name={} code={}", name, code.code[0]);
 
-            vars.set(String::from("CODE"), *code as i64);
+            vars.set(String::from("CODE"), code.code[0] as i64);
 
-            let m = irp.encode_raw(vars, repeats)?;
+            irp.encode_raw(vars, repeats)
+        } else {
+            // We need to repeat all the scancodes for each repeat
+            let mut single = Message::new();
 
-            message.extend(&m);
+            for code in &code.code {
+                let mut vars = Vartable::new();
+
+                debug!("encoding name={} code={}", name, code);
+
+                vars.set(String::from("CODE"), *code as i64);
+
+                let m = irp.encode_raw(vars, 0)?;
+
+                single.extend(&m);
+            }
+
+            let mut message = Message::new();
+
+            for _ in 0..=repeats {
+                message.extend(&single);
+            }
+
+            Ok(message)
         }
-
-        Ok(message)
     }
 
     /// Encode raw code for this remote, with the given repeats

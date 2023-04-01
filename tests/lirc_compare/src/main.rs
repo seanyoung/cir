@@ -98,26 +98,9 @@ fn main() {
                     }
                 };
 
-                let mut message = Message::new();
-
-                for code in &our_code.code {
-                    let mut vars = Vartable::new();
-                    vars.set(String::from("CODE"), *code as i64);
-
-                    // lircd does not honour toggle bit in RCMM transmit
-                    if our_remote.flags.contains(Flags::RCMM)
-                        && our_remote.toggle_bit_mask.count_ones() == 1
-                    {
-                        vars.set(
-                            String::from("T"),
-                            ((*code & our_remote.toggle_bit_mask) != 0).into(),
-                        );
-                    }
-
-                    let m = irp.encode_raw(vars, 0).expect("encode should succeed");
-
-                    message.extend(&m);
-                }
+                let mut message = our_remote
+                    .encode(our_code, 0)
+                    .expect("encode should succeed");
 
                 if message.raw.len().is_even() {
                     message.raw.pop();

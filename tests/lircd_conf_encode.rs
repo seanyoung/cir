@@ -1,5 +1,5 @@
-use cir::lircd_conf::{parse, Flags};
-use irp::{Irp, Message, Vartable};
+use cir::lircd_conf::parse;
+use irp::Message;
 use liblircd::LircdConf;
 use num_integer::Integer;
 use std::{
@@ -99,7 +99,6 @@ fn lircd_encode(path: &Path) {
         if !our_remote.codes.is_empty() {
             let irp = our_remote.irp();
             println!("remote {} irp:{}", our_remote.name, irp);
-            let irp = Irp::parse(&irp).expect("should work");
 
             for (our_code, lircd_code) in our_remote.codes.iter().zip(lircd_remote.codes_iter()) {
                 if our_code.dup {
@@ -121,26 +120,9 @@ fn lircd_encode(path: &Path) {
                     }
                 };
 
-                let mut message = Message::new();
-
-                for code in &our_code.code {
-                    let mut vars = Vartable::new();
-                    vars.set(String::from("CODE"), *code as i64);
-
-                    // lircd does not honour toggle bit in RCMM transmit
-                    if our_remote.flags.contains(Flags::RCMM)
-                        && our_remote.toggle_bit_mask.count_ones() == 1
-                    {
-                        vars.set(
-                            String::from("T"),
-                            ((*code & our_remote.toggle_bit_mask) != 0).into(),
-                        );
-                    }
-
-                    let m = irp.encode_raw(vars, 0).expect("encode should succeed");
-
-                    message.extend(&m);
-                }
+                let mut message = our_remote
+                    .encode(our_code, 0)
+                    .expect("encode should succeed");
 
                 if message.raw.len().is_even() {
                     message.raw.pop();
