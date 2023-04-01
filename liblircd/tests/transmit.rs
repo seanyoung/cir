@@ -101,7 +101,10 @@ fn encode() {
                 ]
             );
 
-            assert_eq!(remote.decode(&raw), vec!(0x5006));
+            assert_eq!(
+                remote.decode(&raw),
+                vec!(0x5006, 0x5006, 0x5006, 0x5006, 0x5006, 0x5006, 0x5006, 0x5006)
+            );
         }
     }
 }
