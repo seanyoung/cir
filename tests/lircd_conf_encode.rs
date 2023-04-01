@@ -160,10 +160,18 @@ fn lircd_encode(path: &Path) {
 
                 let decoded = lircd_remote.decode(&lircd);
 
-                let mut expect = vec![our_code.code[0]];
+                let mut expect = Vec::new();
 
-                for _ in 0..lircd_remote.min_repeat() {
-                    expect.push(our_code.code[0]);
+                if lircd_remote.toggle_mask() != 0 {
+                    for _ in 0..(lircd_remote.min_repeat() / 2) {
+                        expect.push(our_code.code[0]);
+                    }
+                } else {
+                    expect = vec![our_code.code[0]];
+
+                    for _ in 0..lircd_remote.min_repeat() {
+                        expect.push(our_code.code[0]);
+                    }
                 }
 
                 if decoded != expect {

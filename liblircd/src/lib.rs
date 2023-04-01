@@ -218,6 +218,10 @@ impl<'a> Remote<'a> {
         unsafe { (*self.0).toggle_bit }
     }
 
+    pub fn toggle_mask(&self) -> u64 {
+        unsafe { (*self.0).toggle_mask }
+    }
+
     pub fn min_repeat(&self) -> i32 {
         unsafe { (*self.0).min_repeat }
     }
