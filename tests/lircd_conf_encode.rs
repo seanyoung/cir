@@ -1,4 +1,4 @@
-use cir::lircd_conf::parse;
+use cir::lircd_conf::{parse, Flags};
 use irp::Message;
 use liblircd::LircdConf;
 use num_integer::Integer;
@@ -56,6 +56,30 @@ fn lircd_encode(path: &Path) {
             // TODO: fix either cir or lircd
             println!(
                 "SKIP: {} because lircd does weird things",
+                lircd_remote.name()
+            );
+            continue;
+        }
+
+        if our_remote.bit[0].0 == our_remote.bit[1].0
+            && our_remote.ptrail == 0
+            && our_remote.flags == Flags::SPACE_ENC | Flags::CONST_LENGTH
+        {
+            // SPACE encoding without ptrail and same pulse => cannot be decoded
+            // e.g. creative/livedrive.lircd.conf
+            println!(
+                "SKIP: {} because lircd.conf is missing trail",
+                lircd_remote.name()
+            );
+            continue;
+        }
+
+        if !our_remote.flags.contains(Flags::RAW_CODES)
+            && (our_remote.bit[0].0 == 0 || our_remote.bit[0].1 == 0)
+            && (our_remote.bit[1].0 == 0 || our_remote.bit[1].1 == 0)
+        {
+            println!(
+                "SKIP: {} because lircd.conf is contains zero-length bit encoding",
                 lircd_remote.name()
             );
             continue;
@@ -161,8 +185,6 @@ fn lircd_encode(path: &Path) {
                         "DECODE MISMATCH got: {decoded:#x?} expected: {:#x?}",
                         expect
                     );
-                } else {
-                    println!("LIRCD DECODE {:#x?} OK", decoded);
                 }
             }
         }

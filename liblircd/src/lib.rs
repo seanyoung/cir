@@ -30,12 +30,12 @@ static mut CODES: Vec<u64> = Vec::new();
 extern "C" fn register_button_press(
     _remote: *mut ir_remote,
     ncode: *const ir_ncode,
-    code: u64,
-    reps: i32,
+    _code: u64,
+    _reps: i32,
 ) {
     let n = unsafe { (*ncode).code };
     unsafe { CODES.push(n) };
-    println!("registered {code:#x} {n:#x} {reps}");
+    //println!("registered {code:#x} {n:#x} {reps}");
 }
 
 #[repr(C)]
