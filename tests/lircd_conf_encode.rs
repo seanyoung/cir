@@ -121,7 +121,7 @@ fn lircd_encode(path: &Path) {
         }
 
         if !our_remote.codes.is_empty() {
-            let irp = our_remote.irp();
+            let irp = our_remote.encode_irp();
             println!("remote {} irp:{}", our_remote.name, irp);
 
             for (our_code, lircd_code) in our_remote.codes.iter().zip(lircd_remote.codes_iter()) {

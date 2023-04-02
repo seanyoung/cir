@@ -108,7 +108,7 @@ pub fn encode(
 impl Remote {
     /// Encode code for this remote, with the given repeats
     pub fn encode(&self, code: &Code, repeats: u64) -> Result<Message, String> {
-        let irp = self.irp();
+        let irp = self.encode_irp();
 
         debug!("irp for remote {}: {}", self.name, irp);
 

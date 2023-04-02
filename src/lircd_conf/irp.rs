@@ -2,10 +2,16 @@ use super::{Flags, Remote};
 use std::fmt::Write;
 
 impl Remote {
-    /// Build an IRP representation for the remote. This can be used both for encoding
-    /// and decoding.
-    pub fn irp(&self) -> String {
-        let builder = Builder::new(self);
+    /// Build an IRP representation for the remote. This can be used for encoding.
+    pub fn encode_irp(&self) -> String {
+        let builder = Builder::new(self, true);
+
+        builder.build()
+    }
+
+    /// Build an IRP representation for the remote. This can be used for decoding.
+    pub fn decode_irp(&self) -> String {
+        let builder = Builder::new(self, false);
 
         builder.build()
     }
@@ -18,6 +24,7 @@ impl Remote {
 
 struct Builder<'a> {
     remote: &'a Remote,
+    min_repeat: u64,
     irp: String,
 }
 
@@ -29,9 +36,16 @@ enum Stream {
 }
 
 impl<'a> Builder<'a> {
-    fn new(remote: &'a Remote) -> Self {
+    fn new(remote: &'a Remote, encoding: bool) -> Self {
+        let min_repeat = if encoding {
+            remote.min_repeat
+        } else {
+            remote.min_code_repeat
+        };
+
         Builder {
             remote,
+            min_repeat,
             irp: String::new(),
         }
     }
@@ -173,10 +187,10 @@ impl<'a> Builder<'a> {
             }
 
             self.irp.pop();
-            match self.remote.min_repeat {
+            match self.min_repeat {
                 0 => self.irp.push_str(")*)"),
                 1 => self.irp.push_str(")+)"),
-                _ => write!(&mut self.irp, "){}+)", self.remote.min_repeat).unwrap(),
+                _ => write!(&mut self.irp, "){}+)", self.min_repeat).unwrap(),
             }
         } else if self
             .remote
@@ -189,15 +203,15 @@ impl<'a> Builder<'a> {
             self.add_irp_body(true);
 
             self.irp.pop();
-            match self.remote.min_repeat {
+            match self.min_repeat {
                 0 => self.irp.push_str(")*)"),
                 1 => self.irp.push_str(")+)"),
-                _ => write!(&mut self.irp, "){}+)", self.remote.min_repeat).unwrap(),
+                _ => write!(&mut self.irp, "){}+)", self.min_repeat).unwrap(),
             }
         } else {
             self.irp.pop();
-            if self.remote.min_repeat > 0 {
-                write!(&mut self.irp, "){}+", self.remote.min_repeat + 1).unwrap();
+            if self.min_repeat > 0 {
+                write!(&mut self.irp, "){}+", self.min_repeat + 1).unwrap();
             } else {
                 self.irp.push_str(")+");
             }

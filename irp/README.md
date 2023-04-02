@@ -185,7 +185,7 @@ needs some matching parameters, and then we can feed it input. The results can b
 with the get() function on the decoder.
 
 ```rust
-use irp::{Irp,InfraredData};
+use irp::{Irp, InfraredData, Decoder};
 
 fn main() {
     let irp = Irp::parse(r#"
@@ -195,15 +195,14 @@ fn main() {
     let nfa = irp.compile().expect("build nfa should succeed");
     // Create a decoder with 100 microsecond tolerance, 30% relative tolerance,
     // and 20000 microseconds maximum gap.
-    let mut decoder = nfa.decoder(100, 30, 20000);
+    let mut decoder = Decoder::new(100, 30, 20000);
     for ir in InfraredData::from_rawir(
         "+940 -860 +1790 -1750 +880 -880 +900 -890 +870 -900 +1750
         -900 +890 -910 +840 -920 +870 -920 +840 -920 +870 -1810 +840 -125000").unwrap() {
-        decoder.input(ir);
+        decoder.input(ir, &nfa, |event, vars| {
+            println!("decoded: {} F={} D={} T={}", event, vars["F"], vars["D"], vars["T"]);
+        });
     }
-    let (event, res) = decoder.get().unwrap();
-
-    println!("decoded: {} F={} D={} T={}", event, res["F"], res["D"], res["T"]);
 }
 ```
 

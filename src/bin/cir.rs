@@ -41,6 +41,7 @@ fn main() {
                         .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
                         .long("device")
                         .short('d')
+                        .global(true)
                         .takes_value(true)
                         .conflicts_with_all(&["RCDEV", "RAWIR", "FILE"]),
                 )
@@ -49,6 +50,7 @@ fn main() {
                         .help("Select device to use by rc core device (e.g. rc0)")
                         .long("rcdev")
                         .short('s')
+                        .global(true)
                         .takes_value(true)
                         .conflicts_with_all(&["LIRCDEV", "RAWIR", "FILE"]),
                 )
@@ -56,6 +58,7 @@ fn main() {
                     Arg::new("LEARNING")
                         .help("Use short-range learning mode")
                         .long("learning-mode")
+                        .global(true)
                         .short('l'),
                 )
                 .group(ArgGroup::new("DEVICE").args(&["RCDEV", "LIRCDEV"]))
@@ -63,6 +66,7 @@ fn main() {
                     Arg::new("FILE")
                         .long("file")
                         .short('f')
+                        .global(true)
                         .help("Read from rawir or mode2 file")
                         .takes_value(true)
                         .allow_invalid_utf8(true)
@@ -73,38 +77,19 @@ fn main() {
                     Arg::new("RAWIR")
                         .long("raw")
                         .short('r')
+                        .global(true)
                         .help("Raw IR text")
                         .takes_value(true)
                         .multiple_occurrences(true)
                         .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV", "FILE"]),
                 )
-                .next_help_heading("PROTOCOL")
-                .arg(
-                    Arg::new("IRP")
-                        .long("irp")
-                        .short('i')
-                        .help("Decode using IRP language")
-                        .takes_value(true)
-                        .required(true)
-                        .conflicts_with("LIRCDCONF")
-                        .display_order(1),
-                )
-                .arg(
-                    Arg::new("LIRCDCONF")
-                        .long("lircd")
-                        .short('c')
-                        .help("Decode using lircd.conf file and print codes")
-                        .allow_invalid_utf8(true)
-                        .takes_value(true)
-                        .required(true)
-                        .conflicts_with("IRP")
-                        .display_order(2),
-                )
+                .next_help_heading("DECODING")
                 .arg(
                     Arg::new("AEPS")
                         .long("absolute-tolerance")
                         .help("Absolute tolerance in microseconds")
                         .takes_value(true)
+                        .global(true)
                         .default_value("100")
                         .display_order(3),
                 )
@@ -112,6 +97,7 @@ fn main() {
                     Arg::new("EPS")
                         .long("relative-tolerance")
                         .help("Relative tolerance in %")
+                        .global(true)
                         .takes_value(true)
                         .default_value("3")
                         .display_order(4),
@@ -120,9 +106,25 @@ fn main() {
                     Arg::new("GRAPHVIZ")
                         .help("Save the state machine as graphviz dot files")
                         .takes_value(true)
+                        .global(true)
                         .value_parser(["nfa", "nfa-step"])
                         .long("graphviz")
                         .display_order(5),
+                )
+                .subcommand(
+                    Command::new("irp")
+                        .about("Decode using IRP Notation")
+                        .arg(Arg::new("IRP").help("IRP Notation").required(true)),
+                )
+                .subcommand(
+                    Command::new("lircd")
+                        .about("Decode using lircd.conf file")
+                        .arg(
+                            Arg::new("LIRCDCONF")
+                                .help("lircd.conf file")
+                                .allow_invalid_utf8(true)
+                                .required(true),
+                        ),
                 ),
         )
         .subcommand(

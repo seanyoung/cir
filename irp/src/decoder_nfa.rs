@@ -4,11 +4,7 @@ use super::{
 };
 use crate::{Event, Message};
 use log::trace;
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt,
-    fmt::Write,
-};
+use std::{collections::HashMap, fmt, fmt::Write};
 
 /// NFA Decoder state
 #[derive(Debug)]
@@ -17,21 +13,17 @@ pub struct Decoder<'a> {
     abs_tolerance: u32,
     rel_tolerance: u32,
     max_gap: u32,
-    nfa: &'a NFA,
-    decoded: VecDeque<(Event, HashMap<String, i64>)>,
 }
 
-impl NFA {
+impl<'a> Decoder<'a> {
     /// Create a decoder with parameters. abs_tolerance is microseconds, rel_tolerance is in percentage,
     /// and trailing gap is the minimum gap in microseconds which must follow.
-    pub fn decoder(&self, abs_tolerance: u32, rel_tolerance: u32, max_gap: u32) -> Decoder {
+    pub fn new(abs_tolerance: u32, rel_tolerance: u32, max_gap: u32) -> Decoder<'a> {
         Decoder {
             pos: Vec::new(),
             abs_tolerance,
             rel_tolerance,
             max_gap,
-            nfa: self,
-            decoded: VecDeque::new(),
         }
     }
 }
@@ -106,7 +98,6 @@ impl<'a> Decoder<'a> {
     /// Reset decoder state
     pub fn reset(&mut self) {
         self.pos.truncate(0);
-        self.decoded.truncate(0);
     }
 
     fn tolerance_eq(&self, expected: u32, received: u32) -> bool {
@@ -121,7 +112,10 @@ impl<'a> Decoder<'a> {
     }
 
     /// Feed infrared data to the decoder
-    pub fn input(&mut self, ir: InfraredData) {
+    pub fn input<F>(&mut self, ir: InfraredData, nfa: &NFA, mut callback: F)
+    where
+        F: FnMut(Event, HashMap<String, i64>),
+    {
         if ir == InfraredData::Reset {
             trace!("decoder reset");
             self.reset();
@@ -129,7 +123,7 @@ impl<'a> Decoder<'a> {
         }
 
         if self.pos.is_empty() {
-            let (success, mut vartab) = self.run_actions(0, &Vartable::new());
+            let (success, mut vartab) = self.run_actions(0, &Vartable::new(), nfa, &mut callback);
 
             vartab.set("$down".into(), 0);
 
@@ -147,7 +141,7 @@ impl<'a> Decoder<'a> {
         let mut new_pos = Vec::new();
 
         while let Some((ir, pos, vartab)) = work.pop() {
-            let edges = &self.nfa.verts[pos].edges;
+            let edges = &nfa.verts[pos].edges;
 
             trace!("pos:{} ir:{:?} vars:{}", pos, ir, vartab);
 
@@ -169,7 +163,8 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
+                                let (success, vartab) =
+                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
@@ -181,7 +176,8 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
+                                let (success, vartab) =
+                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
                                 }
@@ -210,7 +206,8 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
+                                let (success, vartab) =
+                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
@@ -222,7 +219,8 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
+                                let (success, vartab) =
+                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
                                 if success {
                                     work.push((Some(ir.consume(expected as u32)), *dest, vartab));
                                 }
@@ -246,7 +244,8 @@ impl<'a> Decoder<'a> {
                                         dest
                                     );
 
-                                    let (success, vartab) = self.run_actions(*dest, &vartab);
+                                    let (success, vartab) =
+                                        self.run_actions(*dest, &vartab, nfa, &mut callback);
                                     if success {
                                         work.push((None, *dest, vartab));
                                     }
@@ -259,7 +258,8 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
+                                let (success, vartab) =
+                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
@@ -271,7 +271,8 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
+                                let (success, vartab) =
+                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
                                 if success {
                                     work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
                                 }
@@ -301,7 +302,8 @@ impl<'a> Decoder<'a> {
                                         dest
                                     );
 
-                                    let (success, vartab) = self.run_actions(*dest, &vartab);
+                                    let (success, vartab) =
+                                        self.run_actions(*dest, &vartab, nfa, &mut callback);
                                     if success {
                                         work.push((None, *dest, vartab));
                                     }
@@ -314,7 +316,8 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
+                                let (success, vartab) =
+                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
                                 if success {
                                     work.push((None, *dest, vartab));
                                 }
@@ -326,7 +329,8 @@ impl<'a> Decoder<'a> {
                                     dest
                                 );
 
-                                let (success, vartab) = self.run_actions(*dest, &vartab);
+                                let (success, vartab) =
+                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
                                 if success {
                                     work.push((Some(ir.consume(expected as u32)), *dest, vartab));
                                 }
@@ -336,7 +340,8 @@ impl<'a> Decoder<'a> {
                         }
                     }
                     Edge::Branch(dest) => {
-                        let (success, vartab) = self.run_actions(*dest, &vartab);
+                        let (success, vartab) =
+                            self.run_actions(*dest, &vartab, nfa, &mut callback);
 
                         if success {
                             work.push((ir, *dest, vartab));
@@ -347,7 +352,7 @@ impl<'a> Decoder<'a> {
 
                         let dest = if cond != 0 { *yes } else { *no };
 
-                        let (success, vartab) = self.run_actions(dest, &vartab);
+                        let (success, vartab) = self.run_actions(dest, &vartab, nfa, &mut callback);
 
                         if success {
                             trace!(
@@ -364,7 +369,8 @@ impl<'a> Decoder<'a> {
                         let cond = expr.eval(&vartab).unwrap();
 
                         if cond != 0 {
-                            let (success, vartab) = self.run_actions(*dest, &vartab);
+                            let (success, vartab) =
+                                self.run_actions(*dest, &vartab, nfa, &mut callback);
 
                             if success {
                                 let dest = *dest;
@@ -387,10 +393,19 @@ impl<'a> Decoder<'a> {
         self.pos = new_pos;
     }
 
-    fn run_actions<'v>(&mut self, pos: usize, vartab: &Vartable<'v>) -> (bool, Vartable<'v>) {
+    fn run_actions<'v, F>(
+        &mut self,
+        pos: usize,
+        vartab: &Vartable<'v>,
+        nfa: &NFA,
+        callback: &mut F,
+    ) -> (bool, Vartable<'v>)
+    where
+        F: FnMut(Event, HashMap<String, i64>),
+    {
         let mut vartable = vartab.clone();
 
-        for a in &self.nfa.verts[pos].actions {
+        for a in &nfa.verts[pos].actions {
             match a {
                 Action::Set { var, expr } => {
                     let val = expr.eval(&vartable).unwrap();
@@ -434,7 +449,7 @@ impl<'a> Decoder<'a> {
                         }
                     }
 
-                    self.decoded.push_back((*event, res));
+                    (callback)(*event, res);
                 }
             }
         }
@@ -443,52 +458,16 @@ impl<'a> Decoder<'a> {
     }
 
     /// Generate a GraphViz dot file and write to the given path
-    pub fn dotgraphviz(&self, path: &str) {
-        crate::graphviz::graphviz(self.nfa, &self.pos, path);
-    }
-
-    /// Get the decoded result
-    pub fn get(&mut self) -> Option<(Event, HashMap<String, i64>)> {
-        self.decoded.pop_front()
+    pub fn dotgraphviz(&self, path: &str, nfa: &NFA) {
+        crate::graphviz::graphviz(nfa, &self.pos, path);
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::{Decoder, InfraredData};
-    use crate::{Event, Irp, Message};
-    use num::Integer;
+    use crate::{Event, Irp};
     use std::collections::HashMap;
-
-    fn munge(matcher: &mut Decoder, s: &str) -> (Event, HashMap<String, i64>) {
-        let mut res = None;
-
-        for ir in Message::parse(s)
-            .unwrap()
-            .raw
-            .iter()
-            .enumerate()
-            .map(|(no, len)| {
-                if no.is_odd() {
-                    InfraredData::Gap(*len)
-                } else {
-                    InfraredData::Flash(*len)
-                }
-            })
-        {
-            matcher.input(ir);
-
-            if let Some(r) = matcher.get() {
-                if res.is_some() {
-                    panic!("double result: {res:?} and {r:?}");
-                }
-
-                res = Some(r.clone());
-            }
-        }
-
-        res.unwrap()
-    }
 
     #[test]
     fn sony8() {
@@ -497,12 +476,20 @@ mod test {
 
         let nfa = irp.compile().unwrap();
 
-        let mut matcher = nfa.decoder(100, 3, 20000);
+        let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let (event, res) = munge(&mut matcher,
-            "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200");
+        let mut matcher = Decoder::new(100, 3, 20000);
 
-        assert_eq!(event, Event::Down);
+        for ir in InfraredData::from_rawir(
+            "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200").unwrap() {
+            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+        }
+
+        assert_eq!(res.len(), 1);
+
+        let (event, res) = &res[0];
+
+        assert_eq!(*event, Event::Down);
         assert_eq!(res["F"], 196);
     }
 
@@ -512,38 +499,66 @@ mod test {
 
         let nfa = irp.compile().unwrap();
 
-        let mut matcher = nfa.decoder(100, 3, 20000);
+        let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let (event, res) = munge(&mut matcher,
-            "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756");
+        let mut matcher = Decoder::new(100, 3, 20000);
 
-        assert_eq!(event, Event::Down);
-        assert_eq!(res["F"], 196);
-        assert_eq!(res["D"], 64);
-        assert_eq!(res["S"], 191);
+        for ir in InfraredData::from_rawir(
+            "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756").unwrap() {
 
-        let (event, res) = munge(&mut matcher, "+9024 -2256 +564 -96156");
+            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+        }
 
-        assert_eq!(event, Event::Repeat);
-        assert_eq!(res["F"], 196);
-        assert_eq!(res["D"], 64);
-        assert_eq!(res["S"], 191);
+        assert_eq!(res.len(), 1);
 
-        let (event, res) = munge(&mut matcher, "+9024 -2256 +564 -96156");
+        let (event, vars) = &res[0];
 
-        assert_eq!(event, Event::Repeat);
-        assert_eq!(res["F"], 196);
-        assert_eq!(res["D"], 64);
-        assert_eq!(res["S"], 191);
+        assert_eq!(*event, Event::Down);
+        assert_eq!(vars["F"], 196);
+        assert_eq!(vars["D"], 64);
+        assert_eq!(vars["S"], 191);
 
-        let (event, res) = munge(&mut matcher,
-            "+9024 -4512 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -39756");
+        for ir in InfraredData::from_rawir("+9024 -2256 +564 -96156").unwrap() {
+            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+        }
 
-        assert_eq!(event, Event::Down);
+        assert_eq!(res.len(), 2);
+
+        let (event, vars) = &res[1];
+
+        assert_eq!(*event, Event::Repeat);
+        assert_eq!(vars["F"], 196);
+        assert_eq!(vars["D"], 64);
+        assert_eq!(vars["S"], 191);
+
+        for ir in InfraredData::from_rawir("+9024 -2256 +564 -96156").unwrap() {
+            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+        }
+
+        assert_eq!(res.len(), 3);
+
+        let (event, vars) = &res[2];
+
+        assert_eq!(*event, Event::Repeat);
+        assert_eq!(vars["F"], 196);
+        assert_eq!(vars["D"], 64);
+        assert_eq!(vars["S"], 191);
+
+        for ir in InfraredData::from_rawir(
+            "+9024 -4512 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -39756").unwrap() {
+
+                matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+            }
+
+        assert_eq!(res.len(), 4);
+
+        let (event, vars) = &res[3];
+
+        assert_eq!(*event, Event::Down);
         // not quite
-        assert_eq!(res["F"], 191);
-        assert_eq!(res["D"], 59);
-        assert_eq!(res["S"], 196);
+        assert_eq!(vars["F"], 191);
+        assert_eq!(vars["D"], 59);
+        assert_eq!(vars["S"], 196);
     }
 
     #[test]
@@ -553,14 +568,21 @@ mod test {
 
         let nfa = irp.compile().unwrap();
 
-        let mut matcher = nfa.decoder(100, 3, 20000);
+        let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let  (event, res) = munge(&mut matcher,
-            "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997");
+        let mut matcher = Decoder::new(100, 3, 20000);
 
-        assert_eq!(event, Event::Repeat);
-        assert_eq!(res["F"], 1);
-        assert_eq!(res["D"], 30);
-        assert_eq!(res["T"], 0);
+        for ir in InfraredData::from_rawir(
+            "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997").unwrap() {
+
+            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+        }
+
+        let (event, vars) = &res[0];
+
+        assert_eq!(*event, Event::Repeat);
+        assert_eq!(vars["F"], 1);
+        assert_eq!(vars["D"], 30);
+        assert_eq!(vars["T"], 0);
     }
 }

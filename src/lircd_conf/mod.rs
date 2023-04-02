@@ -3,10 +3,12 @@
 use bitflags::bitflags;
 use std::path::Path;
 
+mod decode;
 mod encode;
 mod irp;
 mod parse;
 
+pub use decode::LircDecoder;
 pub use encode::encode;
 
 /// A button on a remote presented by a scancode
