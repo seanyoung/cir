@@ -1,6 +1,6 @@
 use super::{Code, Remote};
 use irp::{Decoder, InfraredData, Irp, NFA};
-use log::info;
+use log::debug;
 
 pub struct LircDecoder<'a> {
     pub remote: &'a Remote,
@@ -13,7 +13,7 @@ impl Remote {
     pub fn decoder(&self, abs_tolerance: u32, rel_tolerance: u32, max_gap: u32) -> LircDecoder {
         let irp = self.decode_irp();
 
-        info!("decoding irp {irp} for remote {}", self.name);
+        debug!("decoding irp {irp} for remote {}", self.name);
 
         let irp = Irp::parse(&irp).unwrap();
 
