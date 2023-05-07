@@ -166,7 +166,7 @@ enum Expression {
 #[derive(Debug)]
 pub struct ParameterSpec {
     pub name: String,
-    /// Retain value, see http://www.harctoolbox.org/IrpTransmogrifier.html#Persistency+of+variables
+    /// Retain value, see <http://www.harctoolbox.org/IrpTransmogrifier.html#Persistency+of+variables>
     pub persistent: bool,
     pub min: i64,
     pub max: i64,
