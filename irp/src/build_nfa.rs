@@ -105,7 +105,7 @@ impl Irp {
 impl NFA {
     /// Generate a GraphViz dot file and write to the given path
     pub fn dotgraphviz(&self, path: &str) {
-        crate::graphviz::graphviz(self, &[], path);
+        crate::graphviz::graphviz(&self.verts, "NFA", &[], path);
     }
 }
 

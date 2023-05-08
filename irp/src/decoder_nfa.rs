@@ -459,7 +459,7 @@ impl<'a> Decoder<'a> {
 
     /// Generate a GraphViz dot file and write to the given path
     pub fn dotgraphviz(&self, path: &str, nfa: &NFA) {
-        crate::graphviz::graphviz(nfa, &self.pos, path);
+        crate::graphviz::graphviz(&nfa.verts, "NFA", &self.pos, path);
     }
 }
 

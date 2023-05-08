@@ -43,6 +43,9 @@ fn decode_irp(matches: &clap::ArgMatches) {
         }
     };
 
+    let dfa = nfa.build_dfa();
+    dfa.dotgraphviz("dfa.dot");
+
     if graphviz {
         let filename = "irp_nfa.dot";
         info!("saving nfa as {}", filename);
@@ -50,7 +53,7 @@ fn decode_irp(matches: &clap::ArgMatches) {
         nfa.dotgraphviz(filename);
     }
 
-    let input_on_cli = matches.get_count("FILE") != 0 || matches.get_count("RAWIR") != 0;
+    let input_on_cli = matches.is_present("FILE") || matches.is_present("RAWIR");
 
     let lircdev = if !input_on_cli {
         // open lirc

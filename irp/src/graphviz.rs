@@ -1,20 +1,20 @@
 use super::{
-    build_nfa::{Action, Edge, NFA},
+    build_nfa::{Action, Edge, Vertex},
     Vartable,
 };
 use itertools::Itertools;
 use std::{char, fs::File, io::Write, path::PathBuf};
 
 /// Generate a GraphViz dot file and write to the given path
-pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
+pub(crate) fn graphviz(verts: &[Vertex], name: &str, states: &[(usize, Vartable)], path: &str) {
     let path = PathBuf::from(path);
     let mut file = File::create(path).expect("create file");
 
-    writeln!(&mut file, "strict digraph NFA {{").unwrap();
+    writeln!(&mut file, "strict digraph {name} {{").unwrap();
 
     let mut vert_names = Vec::new();
 
-    for (no, v) in nfa.verts.iter().enumerate() {
+    for (no, v) in verts.iter().enumerate() {
         let name = if v.actions.iter().any(|a| matches!(a, Action::Done(..))) {
             format!("done ({no})")
         } else {
@@ -78,7 +78,7 @@ pub fn graphviz(nfa: &NFA, states: &[(usize, Vartable)], path: &str) {
         vert_names.push(name);
     }
 
-    for (i, v) in nfa.verts.iter().enumerate() {
+    for (i, v) in verts.iter().enumerate() {
         for edge in &v.edges {
             match edge {
                 Edge::Flash {
