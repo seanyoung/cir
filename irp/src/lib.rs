@@ -75,13 +75,13 @@ pub struct Irp {
 #[derive(Debug)]
 struct GeneralSpec {
     duty_cycle: Option<u8>,
-    carrier: i64,
+    carrier: Rational64,
     lsb: bool,
-    unit: f64,
+    unit: Rational64,
 }
 
 /// Unit suffix for a duration
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Hash, Eq, Clone, Debug)]
 enum Unit {
     Units,
     Microseconds,
@@ -90,7 +90,7 @@ enum Unit {
 }
 
 /// The repeat marker for a stream within an IRP
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
 enum RepeatMarker {
     Any,
     OneOrMore,
@@ -99,7 +99,7 @@ enum RepeatMarker {
 }
 
 /// A stream within an IRP
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
 struct Stream {
     bit_spec: Vec<Rc<Expression>>,
     stream: Vec<Rc<Expression>>,
@@ -107,11 +107,11 @@ struct Stream {
 }
 
 /// An expression within an IRP
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
 enum Expression {
-    FlashConstant(f64, Unit),
-    GapConstant(f64, Unit),
-    ExtentConstant(f64, Unit),
+    FlashConstant(Rational64, Unit),
+    GapConstant(Rational64, Unit),
+    ExtentConstant(Rational64, Unit),
     FlashIdentifier(String, Unit),
     GapIdentifier(String, Unit),
     ExtentIdentifier(String, Unit),
@@ -215,3 +215,4 @@ impl fmt::Display for Event {
 
 pub use build_nfa::NFA;
 pub use decoder_nfa::Decoder;
+use num_rational::Rational64;

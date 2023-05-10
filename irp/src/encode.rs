@@ -1,6 +1,8 @@
 use super::{Expression, GeneralSpec, Irp, Message, Pronto, RepeatMarker, Unit, Vartable};
 use bitvec::prelude::*;
 use log::warn;
+use num::{ToPrimitive, Zero};
+use num_rational::Rational64;
 use std::{collections::HashMap, rc::Rc};
 
 impl Irp {
@@ -40,7 +42,7 @@ impl Irp {
         raw.extend(up);
 
         Ok(Message {
-            carrier: Some(self.general_spec.carrier),
+            carrier: Some(self.general_spec.carrier.to_integer()),
             duty_cycle: self.general_spec.duty_cycle,
             raw,
         })
@@ -59,9 +61,9 @@ impl Irp {
             warn!("ending sequence cannot be represented in pronto, dropped");
         }
 
-        if self.general_spec.carrier != 0 {
+        if !self.general_spec.carrier.is_zero() {
             Ok(Pronto::LearnedModulated {
-                frequency: self.general_spec.carrier as f64,
+                frequency: self.general_spec.carrier.to_f64().unwrap(),
                 intro,
                 repeat,
             })
@@ -372,7 +374,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
         match expr {
             Expression::FlashConstant(p, u) => {
                 self.flush_level(level)?;
-                self.add_flash(u.eval_float(*p, self.general_spec)?)?;
+                self.add_flash(u.eval_rational(p, self.general_spec)?)?;
             }
             Expression::FlashIdentifier(id, u) => {
                 self.flush_level(level)?;
@@ -385,7 +387,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
             }
             Expression::ExtentConstant(p, u) => {
                 self.flush_level(level)?;
-                self.add_extent(u.eval_float(*p, self.general_spec)?)?;
+                self.add_extent(u.eval_rational(p, self.general_spec)?)?;
             }
             Expression::ExtentIdentifier(id, u) => {
                 self.flush_level(level)?;
@@ -393,7 +395,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
             }
             Expression::GapConstant(p, u) => {
                 self.flush_level(level)?;
-                self.add_gap(u.eval_float(*p, self.general_spec)?)?;
+                self.add_gap(u.eval_rational(p, self.general_spec)?)?;
             }
             Expression::GapIdentifier(id, u) => {
                 self.flush_level(level)?;
@@ -485,27 +487,27 @@ impl<'a, 'b> Encoder<'a, 'b> {
 impl Unit {
     pub(crate) fn eval(&self, v: i64, spec: &GeneralSpec) -> Result<i64, String> {
         match self {
-            Unit::Units if spec.unit == 0.0 => Err("cannot use units when unit set to 0".into()),
-            Unit::Units => Ok((v as f64 * spec.unit) as i64),
+            Unit::Units if spec.unit.is_zero() => Err("cannot use units when unit set to 0".into()),
+            Unit::Units => Ok((spec.unit * v).to_integer()),
             Unit::Microseconds => Ok(v),
             Unit::Milliseconds => Ok(v * 1000),
-            Unit::Pulses if spec.carrier == 0 => {
+            Unit::Pulses if spec.carrier.is_zero() => {
                 Err("pulses cannot be used with zero carrier".into())
             }
-            Unit::Pulses => Ok(v * 1_000_000 / spec.carrier),
+            Unit::Pulses => Ok((Rational64::from(v) * 1_000_000 / spec.carrier).to_integer()),
         }
     }
 
-    pub(crate) fn eval_float(&self, v: f64, spec: &GeneralSpec) -> Result<i64, String> {
+    pub(crate) fn eval_rational(&self, v: &Rational64, spec: &GeneralSpec) -> Result<i64, String> {
         match self {
-            Unit::Units if spec.unit == 0.0 => Err("cannot use units when unit set to 0".into()),
-            Unit::Units => Ok((v * spec.unit) as i64),
-            Unit::Microseconds => Ok(v as i64),
-            Unit::Milliseconds => Ok((v * 1000.0) as i64),
-            Unit::Pulses if spec.carrier == 0 => {
+            Unit::Units if spec.unit.is_zero() => Err("cannot use units when unit set to 0".into()),
+            Unit::Units => Ok((spec.unit * v).to_integer()),
+            Unit::Microseconds => Ok(v.to_integer()),
+            Unit::Milliseconds => Ok((v * 1000).to_integer()),
+            Unit::Pulses if spec.carrier.is_zero() => {
                 Err("pulses cannot be used with zero carrier".into())
             }
-            Unit::Pulses => Ok((v * 1_000_000.0) as i64 / spec.carrier),
+            Unit::Pulses => Ok((v * 1_000_000 / spec.carrier).to_integer()),
         }
     }
 }

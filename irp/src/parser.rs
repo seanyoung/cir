@@ -3,6 +3,8 @@ use super::{
     Vartable,
 };
 use itertools::Itertools;
+use num::ToPrimitive;
+use num_rational::Rational64;
 use std::{
     collections::{HashMap, HashSet},
     fmt,
@@ -14,7 +16,7 @@ use std::{
 enum GeneralItem<'a> {
     Msb,
     Lsb,
-    Value(f64, Option<&'a str>),
+    Value(Rational64, Option<&'a str>),
 }
 
 peg::parser! {
@@ -36,11 +38,23 @@ peg::parser! {
          / _ "lsb" _ { GeneralItem::Lsb }
          / _ v:number_decimals() _ u:$("u" / "p" / "k" / "%")? _ { GeneralItem::Value(v, u) }
 
-        rule number_decimals() -> f64
-         = n:$(['0'..='9']* "." ['0'..='9']+)
-         {? match f64::from_str(n) { Ok(n) => Ok(n), Err(_) => Err("f64") } }
+        rule number_decimals() -> Rational64
+         = n:$(['0'..='9']*) "." f:$(['0'..='9']+)
+         {
+            let n = if n.is_empty() {
+                Rational64::from(0)
+            } else {
+                Rational64::from_str(n).unwrap()
+            };
+            let ten: Rational64 = 10.into();
+            let f = Rational64::from_str(f).unwrap() / ten.pow(f.len() as i32);
+
+            f + n
+         }
          / n:$(['0'..='9']+)
-         {? match f64::from_str(n) { Ok(n) => Ok(n), Err(_) => Err("f64") } }
+         {
+            Rational64::from_str(n).unwrap()
+         }
 
         rule definitions() -> Vec<Expression>
          = "{" _ def:(definition() ** ("," _)) "}" _ { def }
@@ -392,7 +406,7 @@ impl Irp {
     /// The carrier frequency in Hertz. None means unknown, Some(0) means
     /// unmodulated.
     pub fn carrier(&self) -> i64 {
-        self.general_spec.carrier
+        self.general_spec.carrier.to_integer()
     }
     /// Duty cycle of the carrier pulse wave. Between 1% and 99%.
     pub fn duty_cycle(&self) -> Option<u8> {
@@ -409,7 +423,7 @@ impl Irp {
     /// Unit of time that may be used in durations and extents. The default unit
     /// is 1.0 microseconds. If a carrier frequency is defined, the unit may
     /// also be defined in terms of a number of carrier frequency pulses.
-    pub fn unit(&self) -> f64 {
+    pub fn unit(&self) -> Rational64 {
         self.general_spec.unit
     }
 
@@ -457,9 +471,9 @@ impl Irp {
 fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
     let mut res = GeneralSpec {
         duty_cycle: None,
-        carrier: 38000,
+        carrier: 38000.into(),
         lsb: true,
-        unit: 1.0,
+        unit: 1.into(),
     };
 
     let mut unit = None;
@@ -480,17 +494,17 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
 
                 let u = match u {
                     Some("%") => {
-                        if v < 1.0 {
+                        if v < 1.into() {
                             return Err("duty cycle less than 1% not valid".into());
                         }
-                        if v > 99.0 {
+                        if v > 99.into() {
                             return Err("duty cycle larger than 99% not valid".into());
                         }
                         if res.duty_cycle.is_some() {
                             return Err("duty cycle specified twice".into());
                         }
 
-                        res.duty_cycle = Some(v as u8);
+                        res.duty_cycle = Some(v.to_integer() as u8);
 
                         continue;
                     }
@@ -499,7 +513,7 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
                             return Err("carrier frequency specified twice".into());
                         }
 
-                        carrier = Some((v * 1000.0) as i64);
+                        carrier = Some(v * 1000);
 
                         continue;
                     }
@@ -520,8 +534,8 @@ fn general_spec(items: &[GeneralItem]) -> Result<GeneralSpec, String> {
 
     if let Some((p, u)) = unit {
         res.unit = match u {
-            Unit::Pulses => p * 1_000_000.0 / res.carrier as f64,
-            Unit::Milliseconds => p * 1000.0,
+            Unit::Pulses => p * 1_000_000 / res.carrier,
+            Unit::Milliseconds => p * 1000,
             Unit::Units | Unit::Microseconds => p,
         }
     }
@@ -807,8 +821,8 @@ impl fmt::Display for GeneralSpec {
 
         let mut needs_comma = false;
 
-        if self.carrier != 38000 {
-            write!(f, "{}k", self.carrier as f64 / 1000.0)?;
+        if self.carrier != 38000.into() {
+            write!(f, "{}k", self.carrier.to_f64().unwrap() / 1000.0)?;
             needs_comma = true;
         }
 

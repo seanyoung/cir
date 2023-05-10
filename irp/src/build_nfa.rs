@@ -990,7 +990,7 @@ impl<'a> Builder<'a> {
             if let Expression::ExtentConstant(v, u) = expr {
                 builder
                     .extents
-                    .insert(0, u.eval_float(*v, &builder.irp.general_spec).unwrap());
+                    .insert(0, u.eval_rational(v, &builder.irp.general_spec).unwrap());
             }
         });
 
@@ -1060,7 +1060,7 @@ impl<'a> Builder<'a> {
             Expression::FlashConstant(v, u) => {
                 self.cur.seen_edges = true;
 
-                let len = u.eval_float(*v, &self.irp.general_spec)?;
+                let len = u.eval_rational(v, &self.irp.general_spec)?;
 
                 let node = self.add_vertex();
 
@@ -1077,7 +1077,7 @@ impl<'a> Builder<'a> {
             Expression::GapConstant(v, u) => {
                 self.cur.seen_edges = true;
 
-                let len = u.eval_float(*v, &self.irp.general_spec)?;
+                let len = u.eval_rational(v, &self.irp.general_spec)?;
 
                 let node = self.add_vertex();
 
