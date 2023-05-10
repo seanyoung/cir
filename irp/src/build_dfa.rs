@@ -102,25 +102,19 @@ impl<'a> Builder<'a> {
 
         #[allow(clippy::map_entry)]
         if !self.nfa_to_dfa.contains_key(&nfa_to) {
-            if let Some(to) = self.edges.get(&DfaEdge {
+            let dfa_edge = DfaEdge {
                 from,
                 flash,
                 length: length.clone(),
-            }) {
+            };
+            if let Some(to) = self.edges.get(&dfa_edge) {
                 self.nfa_to_dfa.insert(nfa_to, *to);
                 // FIXME: check path matches
             } else {
                 let to = self.add_vertex();
                 self.nfa_to_dfa.insert(nfa_to, to);
 
-                self.edges.insert(
-                    DfaEdge {
-                        flash,
-                        length: length.clone(),
-                        from,
-                    },
-                    to,
-                );
+                self.edges.insert(dfa_edge, to);
 
                 self.verts[from].edges.push(if flash {
                     Edge::Flash {
