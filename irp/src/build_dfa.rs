@@ -1,7 +1,11 @@
-use super::build_nfa::{Action, Edge, Vertex, NFA};
+use super::{
+    build_nfa::{Action, Edge, Vertex, NFA},
+    Expression,
+};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
+    rc::Rc,
 };
 
 /// Non-deterministic finite automation for decoding IR. Using this we can
@@ -25,7 +29,7 @@ struct Path {
 struct DfaEdge {
     from: usize,
     flash: bool,
-    length: i64,
+    length: Rc<Expression>,
 }
 
 impl NFA {
@@ -101,7 +105,7 @@ impl<'a> Builder<'a> {
             if let Some(to) = self.edges.get(&DfaEdge {
                 from,
                 flash,
-                length,
+                length: length.clone(),
             }) {
                 self.nfa_to_dfa.insert(nfa_to, *to);
                 // FIXME: check path matches
@@ -112,7 +116,7 @@ impl<'a> Builder<'a> {
                 self.edges.insert(
                     DfaEdge {
                         flash,
-                        length,
+                        length: length.clone(),
                         from,
                     },
                     to,
@@ -139,20 +143,30 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn path_length(&self, path: &[Path]) -> i64 {
-        let mut len = 0;
+    fn path_length(&self, path: &[Path]) -> Rc<Expression> {
+        let mut len: Option<Rc<Expression>> = None;
 
         for elem in path {
-            match self.nfa.verts[elem.from].edges[elem.edge_no] {
+            match &self.nfa.verts[elem.from].edges[elem.edge_no] {
                 Edge::Gap { length, .. } | Edge::Flash { length, .. } => {
-                    len += length;
+                    if let Some(prev) = len {
+                        if let (Expression::Number(left), Expression::Number(right)) =
+                            (length.as_ref(), prev.as_ref())
+                        {
+                            // TODO: proper const folding
+                            len = Some(Rc::new(Expression::Number(left + right)));
+                        } else {
+                            len = Some(Rc::new(Expression::Add(length.clone(), prev)));
+                        }
+                    } else {
+                        len = Some(length.clone());
+                    }
                 }
-                //Edge::FlashVar { .. } | Edge::GapVar { .. } => unimplemented!(),
                 _ => (),
             }
         }
 
-        len
+        len.unwrap()
     }
 
     fn path_actions(&self, path: &[Path]) -> Vec<Action> {
@@ -223,14 +237,14 @@ impl<'a> Builder<'a> {
         let mut res = Vec::new();
         for (i, edge) in self.nfa.verts[pos].edges.iter().enumerate() {
             match edge {
-                Edge::Flash { dest, .. } | Edge::FlashVar { dest, .. } if flash => {
+                Edge::Flash { dest, .. } if flash => {
                     res.push(Path {
                         from: pos,
                         to: *dest,
                         edge_no: i,
                     });
                 }
-                Edge::Gap { dest, .. } | Edge::GapVar { dest, .. } if !flash => {
+                Edge::Gap { dest, .. } if !flash => {
                     res.push(Path {
                         from: pos,
                         to: *dest,

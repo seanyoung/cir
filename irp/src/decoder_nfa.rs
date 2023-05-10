@@ -1,6 +1,6 @@
 use super::{
     build_nfa::{Action, Edge, NFA},
-    Expression, InfraredData, Vartable,
+    InfraredData, Vartable,
 };
 use crate::{Event, Message};
 use log::trace;
@@ -154,48 +154,7 @@ impl<'a> Decoder<'a> {
                         complete,
                         dest,
                     } => {
-                        if let Some(ir @ InfraredData::Flash(received)) = ir {
-                            if self.tolerance_eq(*expected as u32, received) {
-                                trace!(
-                                    "matched flash {} (expected {}) => {}",
-                                    received,
-                                    *expected,
-                                    dest
-                                );
-
-                                let (success, vartab) =
-                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                if success {
-                                    work.push((None, *dest, vartab));
-                                }
-                            } else if !complete && received > *expected as u32 {
-                                trace!(
-                                    "matched flash {} (expected {}) (incomplete consume) => {}",
-                                    received,
-                                    *expected,
-                                    dest
-                                );
-
-                                let (success, vartab) =
-                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                if success {
-                                    work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
-                                }
-                            }
-                        } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
-                            new_pos.push((pos, vartab.clone()));
-                        }
-                    }
-                    Edge::FlashVar {
-                        name: var,
-                        unit,
-                        complete,
-                        dest,
-                    } => {
-                        let res = Expression::Identifier(var.to_owned())
-                            .eval(&vartab)
-                            .unwrap();
-                        let expected = res * unit;
+                        let expected = expected.eval(&vartab).unwrap();
 
                         if let Some(ir @ InfraredData::Flash(received)) = ir {
                             if self.tolerance_eq(expected as u32, received) {
@@ -234,63 +193,7 @@ impl<'a> Decoder<'a> {
                         complete,
                         dest,
                     } => {
-                        if let Some(ir @ InfraredData::Gap(received)) = ir {
-                            if *expected >= self.max_gap as i64 {
-                                if received >= self.max_gap {
-                                    trace!(
-                                        "large gap matched gap {} (expected {}) => {}",
-                                        received,
-                                        *expected,
-                                        dest
-                                    );
-
-                                    let (success, vartab) =
-                                        self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                    if success {
-                                        work.push((None, *dest, vartab));
-                                    }
-                                }
-                            } else if self.tolerance_eq(*expected as u32, received) {
-                                trace!(
-                                    "matched gap {} (expected {}) => {}",
-                                    received,
-                                    *expected,
-                                    dest
-                                );
-
-                                let (success, vartab) =
-                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                if success {
-                                    work.push((None, *dest, vartab));
-                                }
-                            } else if !complete && received > *expected as u32 {
-                                trace!(
-                                    "matched gap {} (expected {}) (incomplete consume) => {}",
-                                    received,
-                                    *expected,
-                                    dest
-                                );
-
-                                let (success, vartab) =
-                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                if success {
-                                    work.push((Some(ir.consume(*expected as u32)), *dest, vartab));
-                                }
-                            }
-                        } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
-                            new_pos.push((pos, vartab.clone()));
-                        }
-                    }
-                    Edge::GapVar {
-                        name: var,
-                        unit,
-                        complete,
-                        dest,
-                    } => {
-                        let res = Expression::Identifier(var.to_owned())
-                            .eval(&vartab)
-                            .unwrap();
-                        let expected = res * unit;
+                        let expected = expected.eval(&vartab).unwrap();
 
                         if let Some(ir @ InfraredData::Gap(received)) = ir {
                             if expected >= self.max_gap as i64 {

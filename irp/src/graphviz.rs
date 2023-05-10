@@ -82,58 +82,28 @@ pub(crate) fn graphviz(verts: &[Vertex], name: &str, states: &[(usize, Vartable)
         for edge in &v.edges {
             match edge {
                 Edge::Flash {
-                    length: len,
+                    length,
                     complete,
                     dest,
                 } => writeln!(
                     &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"flash {}μs {}\"]",
+                    "\t\"{}\" -> \"{}\" [label=\"flash {} {}\"]",
                     vert_names[i],
                     vert_names[*dest],
-                    len,
+                    length,
                     if *complete { " complete" } else { "" }
                 )
                 .unwrap(),
                 Edge::Gap {
-                    length: len,
+                    length,
                     complete,
                     dest,
                 } => writeln!(
                     &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"gap {}μs {}\"]",
+                    "\t\"{}\" -> \"{}\" [label=\"gap {} {}\"]",
                     vert_names[i],
                     vert_names[*dest],
-                    len,
-                    if *complete { " complete" } else { "" }
-                )
-                .unwrap(),
-                Edge::FlashVar {
-                    name: var,
-                    unit,
-                    complete,
-                    dest,
-                } => writeln!(
-                    &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"flash {}*{} {}\"]",
-                    vert_names[i],
-                    vert_names[*dest],
-                    var,
-                    unit,
-                    if *complete { " complete" } else { "" }
-                )
-                .unwrap(),
-                Edge::GapVar {
-                    name: var,
-                    unit,
-                    complete,
-                    dest,
-                } => writeln!(
-                    &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"gap {}*{} {}\"]",
-                    vert_names[i],
-                    vert_names[*dest],
-                    var,
-                    unit,
+                    length,
                     if *complete { " complete" } else { "" }
                 )
                 .unwrap(),

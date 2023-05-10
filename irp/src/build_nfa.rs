@@ -15,24 +15,12 @@ use std::{
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum Edge {
     Flash {
-        length: i64,
+        length: Rc<Expression>,
         complete: bool,
         dest: usize,
     },
     Gap {
-        length: i64,
-        complete: bool,
-        dest: usize,
-    },
-    FlashVar {
-        name: String,
-        unit: i64,
-        complete: bool,
-        dest: usize,
-    },
-    GapVar {
-        name: String,
-        unit: i64,
+        length: Rc<Expression>,
         complete: bool,
         dest: usize,
     },
@@ -1065,7 +1053,7 @@ impl<'a> Builder<'a> {
                 let node = self.add_vertex();
 
                 self.add_edge(Edge::Flash {
-                    length: len,
+                    length: Rc::new(Expression::Number(len)),
                     complete: last,
                     dest: node,
                 });
@@ -1082,7 +1070,7 @@ impl<'a> Builder<'a> {
                 let node = self.add_vertex();
 
                 self.add_edge(Edge::Gap {
-                    length: len,
+                    length: Rc::new(Expression::Number(len)),
                     complete: last,
                     dest: node,
                 });
@@ -1098,11 +1086,19 @@ impl<'a> Builder<'a> {
 
                 let unit = unit.eval(1, &self.irp.general_spec)?;
 
+                let mut expr = Rc::new(Expression::Identifier(var.to_owned()));
+
+                if unit != 1 {
+                    expr = Rc::new(Expression::Multiply(
+                        expr,
+                        Rc::new(Expression::Number(unit)),
+                    ));
+                }
+
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::FlashVar {
-                    name: var.to_owned(),
-                    unit,
+                self.add_edge(Edge::Flash {
+                    length: expr,
                     complete: last,
                     dest: node,
                 });
@@ -1129,9 +1125,17 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::GapVar {
-                    name: var.to_owned(),
-                    unit,
+                let mut expr = Rc::new(Expression::Identifier(var.to_owned()));
+
+                if unit != 1 {
+                    expr = Rc::new(Expression::Multiply(
+                        expr,
+                        Rc::new(Expression::Number(unit)),
+                    ));
+                }
+
+                self.add_edge(Edge::Gap {
+                    length: expr,
                     complete: last,
                     dest: node,
                 });
@@ -1159,9 +1163,8 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::GapVar {
-                    name: "$extent".to_owned(),
-                    unit: 1,
+                self.add_edge(Edge::Gap {
+                    length: Rc::new(Expression::Identifier("$extent".to_owned())),
                     complete: last,
                     dest: node,
                 });
