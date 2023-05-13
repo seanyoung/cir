@@ -56,8 +56,7 @@ pub(crate) struct Vertex {
 }
 
 /// Non-deterministic finite automation for decoding IR. Using this we can
-/// match IR and hopefully, one day, create the dfa (deterministic finite
-/// automation).
+/// match IR and create the DFA (deterministic finite automation).
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Default)]
 pub struct NFA {

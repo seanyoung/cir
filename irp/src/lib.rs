@@ -213,6 +213,7 @@ impl fmt::Display for Event {
     }
 }
 
+pub use build_dfa::DFA;
 pub use build_nfa::NFA;
 pub use decoder_nfa::Decoder;
 use num_rational::Rational64;

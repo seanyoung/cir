@@ -4,9 +4,7 @@ use super::{
 };
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
-/// Non-deterministic finite automation for decoding IR. Using this we can
-/// match IR and hopefully, one day, create the dfa (deterministic finite
-/// automation).
+/// Deterministic finite automation for decoding IR. Using this we can match IR.
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Default)]
 pub struct DFA {
