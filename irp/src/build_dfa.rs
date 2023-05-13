@@ -73,6 +73,8 @@ impl<'a> Builder<'a> {
 
         assert_eq!(self.add_vertex(), 0);
 
+        self.verts[0].actions = self.nfa.verts[0].actions.clone();
+
         self.nfa_to_dfa.insert(0, 0);
 
         while !pos.is_empty() {
@@ -167,7 +169,7 @@ impl<'a> Builder<'a> {
         let mut res: Vec<Action> = Vec::new();
 
         for elem in path {
-            res.extend(self.nfa.verts[elem.from].actions.iter().cloned());
+            res.extend(self.nfa.verts[elem.to].actions.iter().cloned());
         }
 
         res
