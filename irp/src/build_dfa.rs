@@ -2,11 +2,7 @@ use super::{
     build_nfa::{Action, Edge, Vertex, NFA},
     Expression,
 };
-use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-    rc::Rc,
-};
+use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 /// Non-deterministic finite automation for decoding IR. Using this we can
 /// match IR and hopefully, one day, create the dfa (deterministic finite
@@ -40,6 +36,7 @@ impl NFA {
             nfa_to_dfa: HashMap::new(),
             edges: HashMap::new(),
             nfa: self,
+            visited: Vec::new(),
         };
 
         builder.build();
@@ -62,80 +59,87 @@ struct Builder<'a> {
     nfa_to_dfa: HashMap<usize, usize>,
     edges: HashMap<DfaEdge, usize>,
     verts: Vec<Vertex>,
+    visited: Vec<usize>,
 }
 
 impl<'a> Builder<'a> {
     fn build(&mut self) {
-        let mut visited: HashSet<usize> = HashSet::new();
-
-        let mut pos = vec![0];
-        let mut flash = true;
-
         assert_eq!(self.add_vertex(), 0);
 
         self.verts[0].actions = self.nfa.verts[0].actions.clone();
 
         self.nfa_to_dfa.insert(0, 0);
 
-        while !pos.is_empty() {
-            visited.extend(&pos);
-            let next = self.closure_set(pos, flash);
+        self.add_path(true, 0);
+    }
 
-            for path in &next {
-                self.add_path(flash, path);
-            }
+    /// Recursively add a new path
+    fn add_path(&mut self, mut flash: bool, pos: usize) {
+        self.visited.push(pos);
 
-            flash = !flash;
+        let mut paths = Vec::new();
 
-            pos = Vec::new();
-            for path in next {
-                let n = path.last().unwrap();
-                if !visited.contains(&n.to) {
-                    pos.push(n.to);
-                }
+        self.closure(pos, flash, Vec::new(), &mut paths);
+
+        flash = !flash;
+
+        let mut next = Vec::new();
+
+        for path in &paths {
+            self.add_path_to_dfa(flash, path);
+            let last = path.last().unwrap();
+            next.push(last.to);
+        }
+
+        for next in next {
+            if !self.visited.contains(&next) {
+                self.add_path(flash, next);
             }
         }
     }
 
-    fn add_path(&mut self, flash: bool, path: &[Path]) {
+    fn add_path_to_dfa(&mut self, flash: bool, path: &[Path]) {
         let from = self.nfa_to_dfa[&path[0].from];
         let nfa_to = path[path.len() - 1].to;
         let length = self.path_length(path);
 
-        #[allow(clippy::map_entry)]
-        if !self.nfa_to_dfa.contains_key(&nfa_to) {
-            let dfa_edge = DfaEdge {
-                from,
-                flash,
-                length: length.clone(),
-            };
-            if let Some(to) = self.edges.get(&dfa_edge) {
-                self.nfa_to_dfa.insert(nfa_to, *to);
-                // FIXME: check path matches
+        let dfa_edge = DfaEdge {
+            from,
+            flash,
+            length: length.clone(),
+        };
+
+        if let Some(to) = self.edges.get(&dfa_edge) {
+            self.nfa_to_dfa.insert(nfa_to, *to);
+            // FIXME: check path matches
+        } else {
+            let to = if let Some(vert_no) = self.nfa_to_dfa.get(&nfa_to) {
+                *vert_no
             } else {
-                let to = self.add_vertex();
-                self.nfa_to_dfa.insert(nfa_to, to);
+                self.add_vertex()
+            };
 
-                self.edges.insert(dfa_edge, to);
+            self.nfa_to_dfa.insert(nfa_to, to);
 
-                self.verts[from].edges.push(if flash {
-                    Edge::Flash {
-                        length,
-                        complete: true,
-                        dest: to,
-                    }
-                } else {
-                    Edge::Gap {
-                        length,
-                        complete: true,
-                        dest: to,
-                    }
-                });
+            self.edges.insert(dfa_edge, to);
 
-                let actions = self.path_actions(path);
+            self.verts[from].edges.push(if flash {
+                Edge::Flash {
+                    length,
+                    complete: true,
+                    dest: to,
+                }
+            } else {
+                Edge::Gap {
+                    length,
+                    complete: true,
+                    dest: to,
+                }
+            });
 
-                self.verts[to].actions = actions;
-            }
+            let actions = self.path_actions(path);
+
+            self.verts[to].actions = actions;
         }
     }
 
@@ -170,16 +174,6 @@ impl<'a> Builder<'a> {
 
         for elem in path {
             res.extend(self.nfa.verts[elem.to].actions.iter().cloned());
-        }
-
-        res
-    }
-
-    fn closure_set(&self, pos: Vec<usize>, flash: bool) -> Vec<Vec<Path>> {
-        let mut res = Vec::new();
-
-        for pos in pos {
-            self.closure(pos, flash, Vec::new(), &mut res);
         }
 
         res
