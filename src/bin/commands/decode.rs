@@ -1,6 +1,6 @@
 use super::{find_devices, Purpose};
 use cir::{lirc, lircd_conf::parse};
-use irp::{Decoder, InfraredData, Irp, Message};
+use irp::{DFADecoder, InfraredData, Irp, Message};
 use itertools::Itertools;
 use log::{error, info, trace};
 use std::{
@@ -18,8 +18,7 @@ pub fn decode(matches: &clap::ArgMatches) {
 }
 
 fn decode_irp(matches: &clap::ArgMatches) {
-    let graphviz_step = matches.value_of("GRAPHVIZ") == Some("nfa-step");
-    let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa");
+    let graphviz_step = matches.value_of("GRAPHVIZ") == Some("dfa-step");
 
     let mut abs_tolerance = str::parse(matches.value_of("AEPS").unwrap()).expect("number expected");
     let rel_tolerance = str::parse(matches.value_of("EPS").unwrap()).expect("number expected");
@@ -35,7 +34,7 @@ fn decode_irp(matches: &clap::ArgMatches) {
         }
     };
 
-    let nfa = match irp.compile() {
+    let nfa = match irp.build_nfa() {
         Ok(nfa) => nfa,
         Err(s) => {
             eprintln!("unable to compile irp ‘{i}’: {s}");
@@ -44,13 +43,21 @@ fn decode_irp(matches: &clap::ArgMatches) {
     };
 
     let dfa = nfa.build_dfa();
-    dfa.dotgraphviz("dfa.dot");
 
-    if graphviz {
-        let filename = "irp_nfa.dot";
-        info!("saving nfa as {}", filename);
+    match matches.value_of("GRAPHVIZ") {
+        Some("nfa") => {
+            let filename = "irp_nfa.dot";
+            info!("saving nfa as {}", filename);
 
-        nfa.dotgraphviz(filename);
+            nfa.dotgraphviz(filename);
+        }
+        Some("dfa") => {
+            let filename = "irp_dfa.dot";
+            info!("saving dfa as {}", filename);
+
+            dfa.dotgraphviz(filename);
+        }
+        _ => (),
     }
 
     let input_on_cli = matches.is_present("FILE") || matches.is_present("RAWIR");
@@ -134,11 +141,11 @@ fn decode_irp(matches: &clap::ArgMatches) {
         None
     };
 
-    let mut decoder = Decoder::new(abs_tolerance, rel_tolerance, max_gap);
+    let mut decoder = DFADecoder::new(abs_tolerance, rel_tolerance, max_gap);
 
     let mut feed_decoder = |raw: &[InfraredData]| {
         for (index, ir) in raw.iter().enumerate() {
-            decoder.input(*ir, &nfa, |event, var| {
+            decoder.input(*ir, &dfa, |event, var| {
                 let mut var: Vec<(String, i64)> = var.into_iter().collect();
                 var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                 println!(
@@ -155,7 +162,7 @@ fn decode_irp(matches: &clap::ArgMatches) {
 
                 info!("saving nfa at step {} as {}", index, filename);
 
-                decoder.dotgraphviz(&filename, &nfa);
+                decoder.dotgraphviz(&filename, &dfa);
             }
         }
     };

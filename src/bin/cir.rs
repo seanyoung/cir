@@ -107,7 +107,7 @@ fn main() {
                         .help("Save the state machine as graphviz dot files")
                         .takes_value(true)
                         .global(true)
-                        .value_parser(["nfa", "nfa-step"])
+                        .value_parser(["nfa", "dfa", "dfa-step"])
                         .long("graphviz")
                         .display_order(5),
                 )

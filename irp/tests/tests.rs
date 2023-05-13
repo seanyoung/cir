@@ -1,6 +1,6 @@
 use irp::{
     protocols::{parse, Protocol},
-    Decoder, Event, InfraredData, Irp, Message, Vartable,
+    Event, InfraredData, Irp, Message, NFADecoder, Vartable,
 };
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
@@ -441,7 +441,7 @@ fn decode_all() {
 
         let irp = Irp::parse(&protocol.irp).unwrap();
 
-        let nfa = match irp.compile() {
+        let nfa = match irp.build_nfa() {
             Ok(nfa) => nfa,
             Err(s) => {
                 println!("compile {} failed {}", protocol.irp, s);
@@ -456,7 +456,7 @@ fn decode_all() {
             20000
         };
 
-        let mut decoder = Decoder::new(10, 3, max_gap);
+        let mut decoder = NFADecoder::new(10, 3, max_gap);
 
         let first = if irp.has_ending() { 1 } else { 0 };
 

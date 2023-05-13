@@ -55,8 +55,9 @@ pub(crate) struct Vertex {
     pub edges: Vec<Edge>,
 }
 
-/// Non-deterministic finite automation for decoding IR. Using this we can
-/// match IR and create the DFA (deterministic finite automation).
+/// Non-deterministic finite automation for decoding IR. We create the DFA
+/// (deterministic finite automation) from this, but it can also be used for
+/// decoding IR.
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Default)]
 pub struct NFA {
@@ -66,7 +67,7 @@ pub struct NFA {
 impl Irp {
     /// Generate an NFA decoder for this IRP. This may fail if it is impossible
     /// for this IRP.
-    pub fn compile(&self) -> Result<NFA, String> {
+    pub fn build_nfa(&self) -> Result<NFA, String> {
         let mut builder = Builder::new(self);
 
         builder.add_constants();

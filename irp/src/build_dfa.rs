@@ -1,6 +1,6 @@
 use super::{
     build_nfa::{Action, Edge, Vertex, NFA},
-    Expression,
+    Expression, Irp,
 };
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
@@ -49,6 +49,15 @@ impl DFA {
     /// Generate a GraphViz dot file and write to the given path
     pub fn dotgraphviz(&self, path: &str) {
         crate::graphviz::graphviz(&self.verts, "DFA", &[], path);
+    }
+}
+
+impl Irp {
+    /// Generate an DFA decoder state machine for this IRP
+    pub fn compile(&self) -> Result<DFA, String> {
+        let nfa = self.build_nfa()?;
+
+        Ok(nfa.build_dfa())
     }
 }
 
@@ -122,16 +131,22 @@ impl<'a> Builder<'a> {
             for edge in &self.nfa.verts[path.from].edges {
                 match edge {
                     Edge::Branch(dest) if *dest == path.to => {
-                        self.verts[from].edges.push(Edge::Branch(to));
+                        let edge = Edge::Branch(to);
+
+                        if !self.verts[from].edges.contains(&edge) {
+                            self.verts[from].edges.push(edge);
+                        }
                     }
                     Edge::BranchCond { expr, yes, no } => {
                         let yes = self.copy_vert(*yes);
                         let no = self.copy_vert(*no);
                         let expr = expr.clone();
 
-                        self.verts[from]
-                            .edges
-                            .push(Edge::BranchCond { expr, yes, no });
+                        let edge = Edge::BranchCond { expr, yes, no };
+
+                        if !self.verts[from].edges.contains(&edge) {
+                            self.verts[from].edges.push(edge);
+                        }
                     }
                     _ => (),
                 }
