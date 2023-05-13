@@ -25,7 +25,7 @@ struct Path {
 struct DfaEdge {
     from: usize,
     flash: bool,
-    length: Rc<Expression>,
+    length: Option<Rc<Expression>>,
 }
 
 impl NFA {
@@ -79,14 +79,12 @@ impl<'a> Builder<'a> {
 
         let mut paths = Vec::new();
 
-        self.closure(pos, flash, Vec::new(), &mut paths);
-
-        flash = !flash;
+        self.conditional_closure(pos, Vec::new(), &mut paths);
 
         let mut next = Vec::new();
 
         for path in &paths {
-            self.add_path_to_dfa(flash, path);
+            self.add_conditional_path_to_dfa(path);
             let last = path.last().unwrap();
             next.push(last.to);
         }
@@ -96,9 +94,68 @@ impl<'a> Builder<'a> {
                 self.add_path(flash, next);
             }
         }
+
+        let mut paths = Vec::new();
+
+        self.input_closure(pos, flash, Vec::new(), &mut paths);
+
+        let mut next = Vec::new();
+
+        for path in &paths {
+            self.add_input_path_to_dfa(flash, path);
+            let last = path.last().unwrap();
+            next.push(last.to);
+        }
+
+        flash = !flash;
+
+        for next in next {
+            if !self.visited.contains(&next) {
+                self.add_path(flash, next);
+            }
+        }
     }
 
-    fn add_path_to_dfa(&mut self, flash: bool, path: &[Path]) {
+    fn add_conditional_path_to_dfa(&mut self, path: &[Path]) {
+        for path in path {
+            let from = self.nfa_to_dfa[&path.from];
+            let to = self.copy_vert(path.to);
+
+            for edge in &self.nfa.verts[path.from].edges {
+                match edge {
+                    Edge::Branch(dest) if *dest == path.to => {
+                        self.verts[from].edges.push(Edge::Branch(to));
+                    }
+                    Edge::BranchCond { expr, yes, no } => {
+                        let yes = self.copy_vert(*yes);
+                        let no = self.copy_vert(*no);
+                        let expr = expr.clone();
+
+                        self.verts[from]
+                            .edges
+                            .push(Edge::BranchCond { expr, yes, no });
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+
+    fn copy_vert(&mut self, original: usize) -> usize {
+        if let Some(vert_no) = self.nfa_to_dfa.get(&original) {
+            *vert_no
+        } else {
+            let vert_no = self.add_vertex();
+
+            self.nfa_to_dfa.insert(original, vert_no);
+
+            self.verts[vert_no].actions = self.nfa.verts[original].actions.clone();
+
+            vert_no
+        }
+    }
+
+    fn add_input_path_to_dfa(&mut self, flash: bool, path: &[Path]) {
         let from = self.nfa_to_dfa[&path[0].from];
         let nfa_to = path[path.len() - 1].to;
         let length = self.path_length(path);
@@ -123,18 +180,22 @@ impl<'a> Builder<'a> {
 
             self.edges.insert(dfa_edge, to);
 
-            self.verts[from].edges.push(if flash {
-                Edge::Flash {
-                    length,
-                    complete: true,
-                    dest: to,
+            self.verts[from].edges.push(if let Some(length) = length {
+                if flash {
+                    Edge::Flash {
+                        length,
+                        complete: true,
+                        dest: to,
+                    }
+                } else {
+                    Edge::Gap {
+                        length,
+                        complete: true,
+                        dest: to,
+                    }
                 }
             } else {
-                Edge::Gap {
-                    length,
-                    complete: true,
-                    dest: to,
-                }
+                Edge::Branch(to)
             });
 
             let actions = self.path_actions(path);
@@ -143,7 +204,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn path_length(&self, path: &[Path]) -> Rc<Expression> {
+    fn path_length(&self, path: &[Path]) -> Option<Rc<Expression>> {
         let mut len: Option<Rc<Expression>> = None;
 
         for elem in path {
@@ -166,7 +227,7 @@ impl<'a> Builder<'a> {
             }
         }
 
-        len.unwrap()
+        len
     }
 
     fn path_actions(&self, path: &[Path]) -> Vec<Action> {
@@ -179,43 +240,40 @@ impl<'a> Builder<'a> {
         res
     }
 
-    fn closure(&self, pos: usize, flash: bool, current_path: Vec<Path>, res: &mut Vec<Vec<Path>>) {
-        for path in self.get_edges(pos, flash) {
+    fn input_closure(
+        &self,
+        pos: usize,
+        flash: bool,
+        current_path: Vec<Path>,
+        res: &mut Vec<Vec<Path>>,
+    ) {
+        for path in self.get_input_edges(pos, flash) {
             let mut p = current_path.clone();
             p.push(path);
             res.push(p);
         }
 
-        for path in self.get_empty_edges(pos) {
+        for path in self.get_unconditional_edges(pos) {
             let mut p = current_path.clone();
             let pos = path.to;
             p.push(path);
-            self.closure(pos, flash, p, res);
+            self.input_closure(pos, flash, p, res);
         }
     }
 
-    fn get_empty_edges(&self, pos: usize) -> Vec<Path> {
+    fn get_unconditional_edges(&self, pos: usize) -> Vec<Path> {
         let mut res = Vec::new();
         for (i, edge) in self.nfa.verts[pos].edges.iter().enumerate() {
             match edge {
-                Edge::Branch(dest) | Edge::MayBranchCond { dest, .. } => {
+                Edge::Branch(dest) => {
                     res.push(Path {
                         to: *dest,
                         from: pos,
                         edge_no: i,
                     });
                 }
-                Edge::BranchCond { yes, no, .. } => {
-                    res.push(Path {
-                        from: pos,
-                        to: *yes,
-                        edge_no: i,
-                    });
-                    res.push(Path {
-                        from: pos,
-                        to: *no,
-                        edge_no: i,
-                    });
+                Edge::MayBranchCond { .. } | Edge::BranchCond { .. } => {
+                    return Vec::new();
                 }
                 _ => (),
             }
@@ -223,7 +281,7 @@ impl<'a> Builder<'a> {
         res
     }
 
-    fn get_edges(&self, pos: usize, flash: bool) -> Vec<Path> {
+    fn get_input_edges(&self, pos: usize, flash: bool) -> Vec<Path> {
         let mut res = Vec::new();
         for (i, edge) in self.nfa.verts[pos].edges.iter().enumerate() {
             match edge {
@@ -245,6 +303,50 @@ impl<'a> Builder<'a> {
             }
         }
         res
+    }
+
+    fn get_conditional_edges(&self, pos: usize) -> Vec<Path> {
+        let mut res = Vec::new();
+        for (i, edge) in self.nfa.verts[pos].edges.iter().enumerate() {
+            match edge {
+                Edge::MayBranchCond { dest, .. } => {
+                    res.push(Path {
+                        from: pos,
+                        to: *dest,
+                        edge_no: i,
+                    });
+                }
+                Edge::BranchCond { yes, no, .. } => {
+                    res.push(Path {
+                        from: pos,
+                        to: *yes,
+                        edge_no: i,
+                    });
+                    res.push(Path {
+                        from: pos,
+                        to: *no,
+                        edge_no: i,
+                    });
+                }
+                _ => (),
+            }
+        }
+        res
+    }
+
+    fn conditional_closure(&self, pos: usize, current_path: Vec<Path>, res: &mut Vec<Vec<Path>>) {
+        for path in self.get_conditional_edges(pos) {
+            let mut p = current_path.clone();
+            p.push(path);
+            res.push(p);
+        }
+
+        for path in self.get_unconditional_edges(pos) {
+            let mut p = current_path.clone();
+            let pos = path.to;
+            p.push(path);
+            self.conditional_closure(pos, p, res);
+        }
     }
 
     fn add_vertex(&mut self) -> usize {
