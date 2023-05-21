@@ -183,25 +183,30 @@ impl Lirc {
 
     /// transmit some data
     fn write(&mut self, data: &[u32]) -> io::Result<()> {
-        let bs_length = if (data.len() % 2) == 0 {
+        assert!(!data.is_empty());
+
+        let data = if (data.len() % 2) == 0 {
             // remove trailing space
-            (data.len() - 1) * mem::size_of::<u32>()
+            &data[..data.len() - 1]
         } else {
-            data.len() * mem::size_of::<u32>()
+            data
         };
 
-        // there must be a nicer way to write an array of u32s..
-        let data = unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, bs_length) };
+        let data = unsafe {
+            std::slice::from_raw_parts(data.as_ptr() as *const u8, std::mem::size_of_val(data))
+        };
+
         let res = self.file.write(data)?;
 
-        if res != bs_length {
-            Err(Error::new(
-                ErrorKind::Other,
-                String::from("send incomplete"),
-            ))
-        } else {
-            Ok(())
-        }
+        // linux will either send all of it, or return an error. If we're getting a
+        // different result, throw toys out of the pram.
+        assert_eq!(
+            res,
+            std::mem::size_of_val(data),
+            "linux driver incomplete send, please send report bug to linux-media@vger.kernel.org"
+        );
+
+        Ok(())
     }
 
     /// Does this lirc device support sending
