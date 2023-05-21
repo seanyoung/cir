@@ -14,7 +14,6 @@ clap = "3.1"
 toml = "0.7"
 serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
-iocuddle = "0.1.1"
 itertools = "0.10"
 evdev = "0.12.1"
 mio = { version = "0.8", features = [ "os-poll", "os-ext" ] }
