@@ -1,4 +1,4 @@
-use super::{Code, Flags, RawCode, Remote};
+use super::{Code, Flags, ParseError, RawCode, Remote};
 use log::{debug, error, warn};
 use std::num::ParseIntError;
 use std::str::Lines;
@@ -20,15 +20,17 @@ pub struct LircParser<'a> {
 /// garbage is permitted when 'begin remote' is expected, and most lines can have
 /// trailing characters after the first two tokens.
 impl<'a> LircParser<'a> {
-    pub fn parse(path: &Path) -> Result<Vec<Remote>, ()> {
-        let mut file = OpenOptions::new()
-            .read(true)
-            .open(path)
-            .map_err(|e| error!("failed to open ‘{}’: {}", path.display(), e))?;
+    pub fn parse(path: &Path) -> Result<Vec<Remote>, ParseError> {
+        let mut file = OpenOptions::new().read(true).open(path).map_err(|e| {
+            error!("failed to open ‘{}’: {}", path.display(), e);
+            ParseError::FileError(e)
+        })?;
 
         let mut buf = Vec::new();
-        file.read_to_end(&mut buf)
-            .map_err(|e| error!("failed to read ‘{}’: {}", path.display(), e))?;
+        file.read_to_end(&mut buf).map_err(|e| {
+            error!("failed to read ‘{}’: {}", path.display(), e);
+            ParseError::FileError(e)
+        })?;
 
         let contents = String::from_utf8_lossy(&buf);
 
@@ -52,7 +54,7 @@ impl<'a> LircParser<'a> {
         parser.read()
     }
 
-    fn read(&mut self) -> Result<Vec<Remote>, ()> {
+    fn read(&mut self) -> Result<Vec<Remote>, ParseError> {
         let mut remotes = Vec::new();
 
         loop {
@@ -61,7 +63,7 @@ impl<'a> LircParser<'a> {
             if line.is_none() {
                 return if remotes.is_empty() {
                     error!("{}: no remote definitions found", self.path.display());
-                    Err(())
+                    Err(ParseError::SyntaxError(self.line_no))
                 } else {
                     Ok(remotes)
                 };
@@ -93,7 +95,7 @@ impl<'a> LircParser<'a> {
         }
     }
 
-    fn read_remote(&mut self) -> Result<Remote, ()> {
+    fn read_remote(&mut self) -> Result<Remote, ParseError> {
         let mut remote = Remote {
             frequency: 38000,
             ..Default::default()
@@ -108,7 +110,7 @@ impl<'a> LircParser<'a> {
                     self.path.display(),
                     self.line_no
                 );
-                return Err(());
+                return Err(ParseError::SyntaxError(self.line_no));
             }
 
             let line = line.unwrap();
@@ -126,7 +128,7 @@ impl<'a> LircParser<'a> {
                             self.path.display(),
                             self.line_no
                         );
-                        return Err(());
+                        return Err(ParseError::SyntaxError(self.line_no));
                     }
 
                     remote.name = second.unwrap().to_owned();
@@ -138,7 +140,7 @@ impl<'a> LircParser<'a> {
                             self.path.display(),
                             self.line_no
                         );
-                        return Err(());
+                        return Err(ParseError::SyntaxError(self.line_no));
                     }
 
                     remote.driver = second.unwrap().to_owned();
@@ -150,7 +152,7 @@ impl<'a> LircParser<'a> {
                             self.path.display(),
                             self.line_no
                         );
-                        return Err(());
+                        return Err(ParseError::SyntaxError(self.line_no));
                     }
 
                     remote.serial_mode = second.unwrap().to_owned();
@@ -302,7 +304,7 @@ impl<'a> LircParser<'a> {
                                         self.line_no,
                                         flag
                                     );
-                                    return Err(());
+                                    return Err(ParseError::SyntaxError(self.line_no));
                                 }
                             }
                         }
@@ -315,7 +317,7 @@ impl<'a> LircParser<'a> {
                             self.path.display(),
                             self.line_no
                         );
-                        return Err(());
+                        return Err(ParseError::SyntaxError(self.line_no));
                     }
                 },
                 Some("end") => {
@@ -330,7 +332,7 @@ impl<'a> LircParser<'a> {
                         line
                     );
 
-                    return Err(());
+                    return Err(ParseError::SyntaxError(self.line_no));
                 }
                 Some("begin") => match second {
                     Some("codes") => {
@@ -347,7 +349,7 @@ impl<'a> LircParser<'a> {
                             line
                         );
 
-                        return Err(());
+                        return Err(ParseError::SyntaxError(self.line_no));
                     }
                 },
                 Some(key) => {
@@ -363,7 +365,7 @@ impl<'a> LircParser<'a> {
         }
     }
 
-    fn parse_number_arg(&self, arg_name: &str, arg: Option<&str>) -> Result<u64, ()> {
+    fn parse_number_arg(&self, arg_name: &str, arg: Option<&str>) -> Result<u64, ParseError> {
         if let Some(val) = arg {
             if let Ok(val) = parse_number(val) {
                 Ok(val)
@@ -375,7 +377,7 @@ impl<'a> LircParser<'a> {
                     arg_name,
                     val
                 );
-                Err(())
+                Err(ParseError::SyntaxError(self.line_no))
             }
         } else {
             error!(
@@ -384,11 +386,11 @@ impl<'a> LircParser<'a> {
                 self.line_no,
                 arg_name
             );
-            Err(())
+            Err(ParseError::SyntaxError(self.line_no))
         }
     }
 
-    fn read_codes(&mut self) -> Result<Vec<Code>, ()> {
+    fn read_codes(&mut self) -> Result<Vec<Code>, ParseError> {
         let mut codes = Vec::new();
 
         loop {
@@ -400,7 +402,7 @@ impl<'a> LircParser<'a> {
                     self.path.display(),
                     self.line_no
                 );
-                return Err(());
+                return Err(ParseError::SyntaxError(self.line_no));
             }
 
             let line = line.unwrap();
@@ -420,7 +422,7 @@ impl<'a> LircParser<'a> {
                         line
                     );
 
-                    return Err(());
+                    return Err(ParseError::SyntaxError(self.line_no));
                 }
                 Some(name) => {
                     let mut values = Vec::new();
@@ -441,14 +443,14 @@ impl<'a> LircParser<'a> {
                                     self.line_no,
                                     code,
                                 );
-                                return Err(());
+                                return Err(ParseError::SyntaxError(self.line_no));
                             }
                         }
                     }
 
                     if values.is_empty() {
                         error!("{}:{}: missing code", self.path.display(), self.line_no);
-                        return Err(());
+                        return Err(ParseError::SyntaxError(self.line_no));
                     }
 
                     let dup = codes.iter().any(|c| c.name == name);
@@ -464,7 +466,7 @@ impl<'a> LircParser<'a> {
         }
     }
 
-    fn read_raw_codes(&mut self) -> Result<Vec<RawCode>, ()> {
+    fn read_raw_codes(&mut self) -> Result<Vec<RawCode>, ParseError> {
         let mut raw_codes = Vec::new();
         let mut raw_code = None;
 
@@ -477,7 +479,7 @@ impl<'a> LircParser<'a> {
                     self.path.display(),
                     self.line_no
                 );
-                return Err(());
+                return Err(ParseError::SyntaxError(self.line_no));
             }
 
             let line = line.unwrap();
@@ -500,7 +502,7 @@ impl<'a> LircParser<'a> {
                         line,
                     );
 
-                    return Err(());
+                    return Err(ParseError::SyntaxError(self.line_no));
                 }
                 Some("name") => {
                     if let Some(name) = words.next() {
@@ -517,7 +519,7 @@ impl<'a> LircParser<'a> {
                         });
                     } else {
                         error!("{}:{}: missing name", self.path.display(), self.line_no);
-                        return Err(());
+                        return Err(ParseError::SyntaxError(self.line_no));
                     }
                 }
                 Some(v) => {
@@ -532,7 +534,7 @@ impl<'a> LircParser<'a> {
                             self.line_no,
                             v
                         );
-                        return Err(());
+                        return Err(ParseError::SyntaxError(self.line_no));
                     }
                 }
                 None => (),
@@ -540,7 +542,7 @@ impl<'a> LircParser<'a> {
         }
     }
 
-    fn read_lengths(&self, words: SplitWhitespace) -> Result<Vec<u32>, ()> {
+    fn read_lengths(&self, words: SplitWhitespace) -> Result<Vec<u32>, ParseError> {
         let mut rawir = Vec::new();
 
         for no in words {
@@ -557,7 +559,7 @@ impl<'a> LircParser<'a> {
                         self.line_no,
                         no
                     );
-                    return Err(());
+                    return Err(ParseError::SyntaxError(self.line_no));
                 }
             }
         }

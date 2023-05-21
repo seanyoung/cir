@@ -116,9 +116,16 @@ pub struct Remote {
     pub raw_codes: Vec<RawCode>,
 }
 
+#[derive(Debug)]
+pub enum ParseError {
+    /// Unable to read file
+    FileError(std::io::Error),
+    /// Syntax error on line no
+    SyntaxError(u32),
+}
+
 /// Read a lircd.conf file at the path specified. Such a file may contain multiple
 /// remotes. Any parse errors or warnings are send to the log.
-#[allow(clippy::result_unit_err)]
-pub fn parse<P: AsRef<Path>>(path: P) -> Result<Vec<Remote>, ()> {
+pub fn parse<P: AsRef<Path>>(path: P) -> Result<Vec<Remote>, ParseError> {
     parse::LircParser::parse(path.as_ref())
 }
