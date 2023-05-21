@@ -36,7 +36,7 @@ pub struct RawCode {
 
 bitflags! {
     /// Protocol flags
-    #[derive(Default)]
+    #[derive(Debug, PartialEq, Default)]
     pub struct Flags: u32 {
         /// This remote uses raw codes
         const RAW_CODES = 0x0001;

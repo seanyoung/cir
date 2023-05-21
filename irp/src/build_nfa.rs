@@ -58,7 +58,6 @@ pub(crate) struct Vertex {
 /// Non-deterministic finite automation for decoding IR. We create the DFA
 /// (deterministic finite automation) from this, but it can also be used for
 /// decoding IR.
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Default)]
 pub struct NFA {
     pub(crate) verts: Vec<Vertex>,

@@ -5,7 +5,6 @@ use super::{
 use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 /// Deterministic finite automation for decoding IR. Using this we can match IR.
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Default)]
 pub struct DFA {
     pub(crate) verts: Vec<Vertex>,
@@ -213,7 +212,7 @@ impl<'a> Builder<'a> {
 
             let actions = self.path_actions(path);
 
-            self.verts[to].actions = actions;
+            self.verts[to].actions.extend(actions);
         }
     }
 
