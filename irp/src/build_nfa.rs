@@ -628,6 +628,8 @@ impl<'a> Builder<'a> {
                     bits.clone(),
                 ))
             } else {
+                // clippy 1.70.0 incorrectly warns about this
+                #[allow(clippy::redundant_clone)]
                 bits.clone()
             };
 
