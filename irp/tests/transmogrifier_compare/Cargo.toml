@@ -8,6 +8,6 @@ publish = false
 irp = { path = "../.." }
 irptransmogrifier = { path = "../rust-irptransmogrifier" }
 rand = "0.8"
-itertools = "0.10"
+itertools = "0.11"
 
 [workspace]
