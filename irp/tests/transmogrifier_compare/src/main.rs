@@ -1,4 +1,4 @@
-use irp::{InfraredData, Irp, Message, Vartable};
+use irp::{InfraredData, Irp, Message, NFADecoder, Vartable};
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
 use rand::Rng;
@@ -42,42 +42,40 @@ fn main() {
                             assert!(compare_with_rounding(&our[i], &their[i]));
                         }
 
-                        match irp.compile() {
+                        match irp.build_nfa() {
                             Ok(nfa) => {
-                                let mut decoder = nfa.decoder(100, 3, 100000);
+                                let mut decoder = NFADecoder::new(100, 3, 100000);
                                 let mut decoded = false;
 
-                                for (i, part) in our.into_iter().enumerate() {
+                                for part in our {
                                     let ir = InfraredData::from_u32_slice(&part);
-
-                                    for i in ir {
-                                        decoder.input(i);
-                                    }
 
                                     let mut failed = false;
 
-                                    while let Some((ev, fields)) = decoder.get() {
-                                        println!(
-                                            "decode {i} {ev}: {}",
-                                            fields
-                                                .iter()
-                                                .map(|(name, v)| format!("{name}={v}"))
-                                                .join(", ")
-                                        );
+                                    for i in ir {
+                                        decoder.input(i, &nfa, |ev, fields| {
+                                            println!(
+                                                "decode {i} {ev}: {}",
+                                                fields
+                                                    .iter()
+                                                    .map(|(name, v)| format!("{name}={v}"))
+                                                    .join(", ")
+                                            );
 
-                                        if fields == params {
-                                            decoded = true;
-                                        } else {
-                                            for (n, v) in fields {
-                                                if params[&n] != v {
-                                                    failed = true;
-                                                    println!(
-                                                        "{n} decoded as {} should be {}",
-                                                        v, params[&n]
-                                                    );
+                                            if fields == params {
+                                                decoded = true;
+                                            } else {
+                                                for (n, v) in fields {
+                                                    if params[&n] != v {
+                                                        failed = true;
+                                                        println!(
+                                                            "{n} decoded as {} should be {}",
+                                                            v, params[&n]
+                                                        );
+                                                    }
                                                 }
                                             }
-                                        }
+                                        });
                                     }
 
                                     if failed {

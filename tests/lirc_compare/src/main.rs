@@ -1,5 +1,5 @@
-use cir::lircd_conf::{parse, Flags};
-use irp::{Irp, Message, Vartable};
+use cir::lircd_conf::parse;
+use irp::Message;
 use liblircd::{lirc_log_set_stdout, LircdConf};
 use num_integer::Integer;
 use std::fs::read;
@@ -74,10 +74,6 @@ fn main() {
         }
 
         if !our_remote.codes.is_empty() {
-            let irp = our_remote.irp();
-            println!("remote {} irp:{}", our_remote.name, irp);
-            let irp = Irp::parse(&irp).expect("should work");
-
             for (our_code, lircd_code) in our_remote.codes.iter().zip(lircd_remote.codes_iter()) {
                 if our_code.dup {
                     continue;
