@@ -9,6 +9,6 @@ afl = "*"
 irp = { path = "../.." }
 irptransmogrifier = { path = "../rust-irptransmogrifier" }
 rand = "0.8"
-j4rs = "0.16"
+j4rs = "0.17"
 
 [workspace]
