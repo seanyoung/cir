@@ -344,7 +344,7 @@ fn main() {
                             Arg::new("REMOTE")
                                 .long("remote")
                                 .short('m')
-                                .help("Use codes from specific remote")
+                                .help("Remote to use from lircd.conf file")
                                 .takes_value(true),
                         )
                         .arg(
