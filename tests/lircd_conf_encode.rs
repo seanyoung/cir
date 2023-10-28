@@ -32,7 +32,7 @@ fn lircd_encode(path: &Path) {
 
     let lircd_conf = LircdConf::parse(&source).unwrap();
 
-    let our_conf = parse(path).unwrap_or(Vec::new());
+    let our_conf = parse(path).unwrap_or_default();
     let mut our_conf = our_conf.iter();
 
     for lircd_remote in lircd_conf.iter() {
