@@ -10,7 +10,7 @@ use super::{find_devices, open_lirc, Purpose};
 
 // Clippy comparison_chain doesn't make any sense. It make the code _worse_
 #[allow(clippy::comparison_chain)]
-pub fn test_config(matches: &clap::ArgMatches) {
+pub fn test(matches: &clap::ArgMatches) {
     let rcdev = find_devices(matches, Purpose::Receive);
     let raw_token: Token = Token(0);
     let scancodes_token: Token = Token(1);

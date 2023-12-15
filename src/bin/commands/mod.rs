@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 pub mod config;
 pub mod decode;
-pub mod test_config;
+pub mod test;
 pub mod transmit;
 
 pub enum Purpose {
