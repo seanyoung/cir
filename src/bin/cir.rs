@@ -4,7 +4,7 @@ use clap::{Arg, ArgGroup, Command};
 use evdev::Device;
 use itertools::Itertools;
 use log::{Level, LevelFilter, Metadata, Record};
-use std::{convert::TryInto, os::unix::io::AsRawFd, path::PathBuf};
+use std::{convert::TryInto, path::PathBuf};
 
 mod commands;
 
@@ -612,7 +612,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
                             }
                         );
 
-                        match LircMode2::query(lircdev.as_raw_fd()) {
+                        match LircMode2::query(lircdev.as_file()) {
                             Ok(list) => {
                                 print!("\tBPF protocols\t\t: ");
 

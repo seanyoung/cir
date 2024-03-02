@@ -449,6 +449,10 @@ impl Lirc {
 
         Ok(res)
     }
+
+    pub fn as_file(&self) -> &File {
+        &self.file
+    }
 }
 
 impl AsRawFd for Lirc {

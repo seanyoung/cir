@@ -647,7 +647,7 @@ fn arithmetic_in_bitspec() {
 
     let irp = Irp::parse("{.0k}<2,-3||-1>(1m,-100m)");
 
-    assert_eq!(irp.err(), Some("parse error at error at 1:11: expected one of \",\", \".\", \">\", \"m\", \"p\", \"u\", ['0' ..= '9']".into()));
+    assert_eq!(irp.err(), Some("parse error at error at 1:11: expected one of \",\", \".\", \">\", \"m\", \"p\", \"u\", ['0'..='9']".into()));
 
     let irp = Irp::parse("{100}<>(1,-2,2u,-100m)").unwrap();
 
