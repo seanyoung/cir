@@ -6,7 +6,7 @@ use std::collections::HashMap;
 pub fn create_jvm(base: &str) -> Jvm {
     let mut base = base.to_owned();
 
-    base.push_str("/target/IrpTransmogrifier-1.2.13-SNAPSHOT-jar-with-dependencies.jar");
+    base.push_str("/target/IrpTransmogrifier-1.2.14-SNAPSHOT-jar-with-dependencies.jar");
 
     JvmBuilder::new()
         .classpath_entry(ClasspathEntry::new(&base))
