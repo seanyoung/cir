@@ -1,5 +1,5 @@
 use super::{
-    build_nfa::{Action, Edge, Vertex},
+    build_nfa::{Action, Vertex},
     Vartable,
 };
 use itertools::Itertools;
@@ -15,37 +15,13 @@ pub(crate) fn graphviz(verts: &[Vertex], name: &str, states: &[(usize, Vartable)
     let mut vert_names = Vec::new();
 
     for (no, v) in verts.iter().enumerate() {
-        let name = if v.actions.iter().any(|a| matches!(a, Action::Done(..))) {
+        let name = if v.entry.iter().any(|a| matches!(a, Action::Done(..))) {
             format!("done ({no})")
         } else {
             format!("{} ({})", no_to_name(vert_names.len()), no)
         };
 
-        let mut labels: Vec<String> = v
-            .actions
-            .iter()
-            .map(|a| match a {
-                Action::Set { var, expr } => format!("{var} = {expr}"),
-                Action::AssertEq { left, right } => format!("assert {left} = {right}",),
-                Action::Done(event, res) => format!("{} ({})", event, res.iter().join(", ")),
-            })
-            .collect::<Vec<String>>();
-
-        if let Some(Edge::BranchCond { expr, .. }) = v
-            .edges
-            .iter()
-            .find(|e| matches!(e, Edge::BranchCond { .. }))
-        {
-            labels.push(format!("cond: {expr}"));
-        }
-
-        if let Some(Edge::MayBranchCond { expr, .. }) = v
-            .edges
-            .iter()
-            .find(|e| matches!(e, Edge::MayBranchCond { .. }))
-        {
-            labels.push(format!("may cond: {expr}"));
-        }
+        let mut labels = actions(&v.entry);
 
         let color = if let Some((_, vars)) = states.iter().find(|(node, _)| *node == no) {
             let values = vars
@@ -80,63 +56,24 @@ pub(crate) fn graphviz(verts: &[Vertex], name: &str, states: &[(usize, Vartable)
 
     for (i, v) in verts.iter().enumerate() {
         for edge in &v.edges {
-            match edge {
-                Edge::Flash {
-                    length,
-                    complete,
-                    dest,
-                } => writeln!(
-                    &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"flash {} {}\"]",
-                    vert_names[i],
-                    vert_names[*dest],
-                    length,
-                    if *complete { " complete" } else { "" }
-                )
-                .unwrap(),
-                Edge::Gap {
-                    length,
-                    complete,
-                    dest,
-                } => writeln!(
-                    &mut file,
-                    "\t\"{}\" -> \"{}\" [label=\"gap {} {}\"]",
-                    vert_names[i],
-                    vert_names[*dest],
-                    length,
-                    if *complete { " complete" } else { "" }
-                )
-                .unwrap(),
-                Edge::BranchCond { yes, no, .. } => {
-                    writeln!(
-                        &mut file,
-                        "\t\"{}\" -> \"{}\" [label=\"cond: true\"]",
-                        vert_names[i], vert_names[*yes]
-                    )
-                    .unwrap();
-                    //
+            let labels = actions(&edge.actions);
 
-                    writeln!(
-                        &mut file,
-                        "\t\"{}\" -> \"{}\" [label=\"cond: false\"]",
-                        vert_names[i], vert_names[*no]
-                    )
-                    .unwrap();
-                }
-                Edge::MayBranchCond { dest, .. } => {
-                    writeln!(
-                        &mut file,
-                        "\t\"{}\" -> \"{}\" [label=\"may branch\"]",
-                        vert_names[i], vert_names[*dest]
-                    )
-                    .unwrap();
-                }
-                Edge::Branch(dest) => writeln!(
+            if !labels.is_empty() {
+                writeln!(
+                    &mut file,
+                    "\t\"{}\" -> \"{}\" [label=\"{}\"]",
+                    vert_names[i],
+                    vert_names[edge.dest],
+                    labels.join("\\n"),
+                )
+                .unwrap();
+            } else {
+                writeln!(
                     &mut file,
                     "\t\"{}\" -> \"{}\"",
-                    vert_names[i], vert_names[*dest]
+                    vert_names[i], vert_names[edge.dest]
                 )
-                .unwrap(),
+                .unwrap();
             }
         }
     }
@@ -158,4 +95,21 @@ fn no_to_name(no: usize) -> String {
             return res;
         }
     }
+}
+
+fn actions(actions: &[Action]) -> Vec<String> {
+    actions
+        .iter()
+        .map(|a| match a {
+            Action::Flash { length, complete } => {
+                format!("flash {length} {}", if *complete { "complete" } else { "" })
+            }
+            Action::Gap { length, complete } => {
+                format!("gap {length} {}", if *complete { "complete" } else { "" })
+            }
+            Action::Set { var, expr } => format!("{var} = {expr}"),
+            Action::AssertEq { left, right } => format!("assert {left} = {right}",),
+            Action::Done(event, res) => format!("{} ({})", event, res.iter().join(", ")),
+        })
+        .collect::<Vec<String>>()
 }

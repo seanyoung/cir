@@ -1,11 +1,11 @@
 use super::{Code, Remote};
-use irp::{InfraredData, Irp, NFADecoder, NFA};
+use irp::{Decoder, InfraredData, Irp, NFA};
 use log::debug;
 
 pub struct LircDecoder<'a> {
     pub remote: &'a Remote,
     pub nfa: NFA,
-    pub decoder: NFADecoder<'a>,
+    pub decoder: Decoder<'a>,
 }
 
 impl Remote {
@@ -19,7 +19,7 @@ impl Remote {
 
         let nfa = irp.build_nfa().unwrap();
 
-        let decoder = NFADecoder::new(
+        let decoder = Decoder::new(
             abs_tolerance.max(self.aeps as u32),
             rel_tolerance.max(self.eps as u32),
             max_gap,
@@ -38,7 +38,7 @@ impl<'a> LircDecoder<'a> {
     where
         F: FnMut(u64, Option<&'a Code>),
     {
-        self.decoder.input(ir, &self.nfa, |_, vars| {
+        self.decoder.nfa_input(ir, &self.nfa, |_, vars| {
             let decoded = vars["CODE"] as u64;
 
             callback(

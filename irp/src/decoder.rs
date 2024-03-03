@@ -1,26 +1,29 @@
 use super::{
-    build_nfa::{Action, Edge, NFA},
+    build_dfa::DFA,
+    build_nfa::{Action, NFA},
     InfraredData, Vartable,
 };
-use crate::{Event, Message};
+use crate::{build_nfa::Vertex, Event, Message};
 use log::trace;
 use std::{collections::HashMap, fmt, fmt::Write};
 
 /// NFA Decoder state
 #[derive(Debug)]
-pub struct NFADecoder<'a> {
+pub struct Decoder<'a> {
     pos: Vec<(usize, Vartable<'a>)>,
+    dfa: bool,
     abs_tolerance: u32,
     rel_tolerance: u32,
     max_gap: u32,
 }
 
-impl<'a> NFADecoder<'a> {
+impl<'a> Decoder<'a> {
     /// Create a decoder with parameters. abs_tolerance is microseconds, rel_tolerance is in percentage,
     /// and trailing gap is the minimum gap in microseconds which must follow.
-    pub fn new(abs_tolerance: u32, rel_tolerance: u32, max_gap: u32) -> NFADecoder<'a> {
-        NFADecoder {
+    pub fn new(abs_tolerance: u32, rel_tolerance: u32, max_gap: u32) -> Decoder<'a> {
+        Decoder {
             pos: Vec::new(),
+            dfa: false,
             abs_tolerance,
             rel_tolerance,
             max_gap,
@@ -58,15 +61,6 @@ impl InfraredData {
             })
             .collect())
     }
-
-    #[must_use]
-    pub(crate) fn consume(&self, v: u32) -> Self {
-        match self {
-            InfraredData::Flash(dur) => InfraredData::Flash(*dur - v),
-            InfraredData::Gap(dur) => InfraredData::Gap(*dur - v),
-            _ => unreachable!(),
-        }
-    }
 }
 
 impl fmt::Display for InfraredData {
@@ -94,10 +88,25 @@ impl<'a> fmt::Display for Vartable<'a> {
     }
 }
 
-impl<'a> NFADecoder<'a> {
+enum ActionResult<'v> {
+    Fail,
+    Retry(Vartable<'v>),
+    Match(Option<InfraredData>, Vartable<'v>),
+}
+
+impl<'a> Decoder<'a> {
     /// Reset decoder state
     pub fn reset(&mut self) {
         self.pos.truncate(0);
+    }
+
+    pub fn add_pos(&mut self, pos: usize, vartab: Vartable<'a>) {
+        let entry = (pos, vartab);
+        if self.dfa {
+            self.pos = vec![entry];
+        } else if !self.pos.contains(&entry) {
+            self.pos.push(entry);
+        }
     }
 
     fn tolerance_eq(&self, expected: u32, received: u32) -> bool {
@@ -111,8 +120,84 @@ impl<'a> NFADecoder<'a> {
         }
     }
 
+    pub(crate) fn consume_flash(
+        &self,
+        ir: &mut Option<InfraredData>,
+        expected: i64,
+        complete: bool,
+    ) -> bool {
+        match ir {
+            Some(InfraredData::Flash(received)) => {
+                if self.tolerance_eq(expected as u32, *received) {
+                    trace!("matched flash {} (expected {})", received, expected);
+                    *ir = None;
+                    true
+                } else if !complete && *received as i64 > expected {
+                    trace!(
+                        "matched flash {} (expected {}) (incomplete consume)",
+                        received,
+                        expected,
+                    );
+                    *ir = Some(InfraredData::Flash(*received - expected as u32));
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    pub(crate) fn consume_gap(
+        &self,
+        ir: &mut Option<InfraredData>,
+        expected: i64,
+        complete: bool,
+    ) -> bool {
+        match ir {
+            Some(InfraredData::Gap(received)) => {
+                if expected > self.max_gap as i64 && *received >= self.max_gap {
+                    trace!("large gap matched gap {} (expected {})", received, expected,);
+                    *ir = None;
+                    true
+                } else if self.tolerance_eq(expected as u32, *received) {
+                    trace!("matched gap {} (expected {})", received, expected);
+                    *ir = None;
+                    true
+                } else if !complete && *received as i64 > expected {
+                    trace!(
+                        "matched gap {} (expected {}) (incomplete consume)",
+                        received,
+                        expected,
+                    );
+                    *ir = Some(InfraredData::Gap(*received - expected as u32));
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    pub fn nfa_input<F>(&mut self, ir: InfraredData, nfa: &NFA, callback: F)
+    where
+        F: FnMut(Event, HashMap<String, i64>),
+    {
+        self.dfa = false;
+        self.input(ir, &nfa.verts, callback)
+    }
+
+    pub fn dfa_input<F>(&mut self, ir: InfraredData, dfa: &DFA, callback: F)
+    where
+        F: FnMut(Event, HashMap<String, i64>),
+    {
+        self.dfa = true;
+        self.input(ir, &dfa.verts, callback)
+    }
+
     /// Feed infrared data to the decoder
-    pub fn input<F>(&mut self, ir: InfraredData, nfa: &NFA, mut callback: F)
+    fn input<F>(&mut self, ir: InfraredData, verts: &[Vertex], mut callback: F)
     where
         F: FnMut(Event, HashMap<String, i64>),
     {
@@ -122,194 +207,113 @@ impl<'a> NFADecoder<'a> {
             return;
         }
 
-        if self.pos.is_empty() {
-            let (success, mut vartab) = self.run_actions(0, &Vartable::new(), nfa, &mut callback);
+        let ir = if self.pos.is_empty() {
+            let mut vartable = Vartable::new();
+            vartable.set("$down".into(), 0);
 
-            vartab.set("$down".into(), 0);
-
-            assert!(success);
-
-            self.pos.push((0, vartab));
-        }
+            match self.run_actions(&verts[0].entry, &vartable, Some(ir), &mut callback) {
+                ActionResult::Match(ir, vartab) => {
+                    self.add_pos(0, vartab);
+                    ir
+                }
+                ActionResult::Retry(vartab) => {
+                    self.add_pos(0, vartab);
+                    Some(ir)
+                }
+                ActionResult::Fail => {
+                    return;
+                }
+            }
+        } else {
+            Some(ir)
+        };
 
         let mut work = Vec::new();
 
         for (pos, vartab) in &self.pos {
-            work.push((Some(ir), *pos, vartab.clone()));
+            work.push((ir, *pos, vartab.clone()));
         }
 
-        let mut new_pos = Vec::new();
+        self.pos.truncate(0);
 
         while let Some((ir, pos, vartab)) = work.pop() {
-            let edges = &nfa.verts[pos].edges;
+            let edges = &verts[pos].edges;
 
             trace!("pos:{} ir:{:?} vars:{}", pos, ir, vartab);
 
-            for edge in edges {
+            for (edge_no, edge) in edges.iter().enumerate() {
                 //trace!(&format!("edge:{:?}", edge));
 
-                match edge {
-                    Edge::Flash {
-                        length: expected,
-                        complete,
-                        dest,
-                    } => {
-                        let expected = expected.eval(&vartab).unwrap();
-
-                        if let Some(ir @ InfraredData::Flash(received)) = ir {
-                            if self.tolerance_eq(expected as u32, received) {
-                                trace!(
-                                    "matched flash {} (expected {}) => {}",
-                                    received,
-                                    expected,
-                                    dest
-                                );
-
-                                let (success, vartab) =
-                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                if success {
-                                    work.push((None, *dest, vartab));
-                                }
-                            } else if !complete && received > expected as u32 {
-                                trace!(
-                                    "matched flash {} (expected {}) (incomplete consume) => {}",
-                                    received,
-                                    expected,
-                                    dest
-                                );
-
-                                let (success, vartab) =
-                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                if success {
-                                    work.push((Some(ir.consume(expected as u32)), *dest, vartab));
+                match self.run_actions(&edge.actions, &vartab, ir, &mut callback) {
+                    ActionResult::Match(ir, vartab) => {
+                        match self.run_actions(&verts[edge.dest].entry, &vartab, ir, &mut callback)
+                        {
+                            ActionResult::Match(ir, vartab) => {
+                                trace!("pos {pos}: edge: {edge_no} match");
+                                work.push((ir, edge.dest, vartab));
+                                if self.dfa {
+                                    break;
                                 }
                             }
-                        } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
-                            new_pos.push((pos, vartab.clone()));
-                        }
-                    }
-                    Edge::Gap {
-                        length: expected,
-                        complete,
-                        dest,
-                    } => {
-                        let expected = expected.eval(&vartab).unwrap();
-
-                        if let Some(ir @ InfraredData::Gap(received)) = ir {
-                            if expected >= self.max_gap as i64 {
-                                if received >= self.max_gap {
-                                    trace!(
-                                        "large gap matched gap {} (expected {}) => {}",
-                                        received,
-                                        expected,
-                                        dest
-                                    );
-
-                                    let (success, vartab) =
-                                        self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                    if success {
-                                        work.push((None, *dest, vartab));
-                                    }
-                                }
-                            } else if self.tolerance_eq(expected as u32, received) {
-                                trace!(
-                                    "matched gap {} (expected {}) => {}",
-                                    received,
-                                    expected,
-                                    dest
-                                );
-
-                                let (success, vartab) =
-                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                if success {
-                                    work.push((None, *dest, vartab));
-                                }
-                            } else if !complete && received > expected as u32 {
-                                trace!(
-                                    "matched gap {} (expected {}) (incomplete consume) => {}",
-                                    received,
-                                    expected,
-                                    dest
-                                );
-
-                                let (success, vartab) =
-                                    self.run_actions(*dest, &vartab, nfa, &mut callback);
-                                if success {
-                                    work.push((Some(ir.consume(expected as u32)), *dest, vartab));
-                                }
+                            ActionResult::Retry(..) => {
+                                panic!("no flash/gap on entry actions allowed");
                             }
-                        } else if ir.is_none() && new_pos.iter().all(|(n, _)| *n != pos) {
-                            new_pos.push((pos, vartab.clone()));
+                            ActionResult::Fail => (),
                         }
                     }
-                    Edge::Branch(dest) => {
-                        let (success, vartab) =
-                            self.run_actions(*dest, &vartab, nfa, &mut callback);
-
-                        if success {
-                            work.push((ir, *dest, vartab));
-                        }
+                    ActionResult::Retry(vartab) => {
+                        self.add_pos(pos, vartab);
                     }
-                    Edge::BranchCond { expr, yes, no } => {
-                        let cond = expr.eval(&vartab).unwrap();
-
-                        let dest = if cond != 0 { *yes } else { *no };
-
-                        let (success, vartab) = self.run_actions(dest, &vartab, nfa, &mut callback);
-
-                        if success {
-                            trace!(
-                                "conditional branch {}: {}: destination {}",
-                                expr,
-                                cond != 0,
-                                dest
-                            );
-
-                            work.push((ir, dest, vartab));
-                        }
-                    }
-                    Edge::MayBranchCond { expr, dest } => {
-                        let cond = expr.eval(&vartab).unwrap();
-
-                        if cond != 0 {
-                            let (success, vartab) =
-                                self.run_actions(*dest, &vartab, nfa, &mut callback);
-
-                            if success {
-                                let dest = *dest;
-
-                                trace!(
-                                    "conditional branch {}: {}: destination {}",
-                                    expr,
-                                    cond != 0,
-                                    dest
-                                );
-
-                                work.push((ir, dest, vartab));
-                            }
-                        }
+                    ActionResult::Fail => {
+                        trace!("pos {pos}: edge: {edge_no} no match");
                     }
                 }
             }
         }
-
-        self.pos = new_pos;
     }
 
     fn run_actions<'v, F>(
-        &mut self,
-        pos: usize,
+        &self,
+        actions: &[Action],
         vartab: &Vartable<'v>,
-        nfa: &NFA,
+        mut ir: Option<InfraredData>,
         callback: &mut F,
-    ) -> (bool, Vartable<'v>)
+    ) -> ActionResult<'v>
     where
         F: FnMut(Event, HashMap<String, i64>),
     {
         let mut vartable = vartab.clone();
 
-        for a in &nfa.verts[pos].actions {
+        for a in actions {
             match a {
+                Action::Flash {
+                    length: expected,
+                    complete,
+                } => {
+                    let expected = expected.eval(vartab).unwrap();
+
+                    if ir.is_none() {
+                        return ActionResult::Retry(vartable);
+                    } else if self.consume_flash(&mut ir, expected, *complete) {
+                        continue;
+                    }
+
+                    return ActionResult::Fail;
+                }
+                Action::Gap {
+                    length: expected,
+                    complete,
+                } => {
+                    let expected = expected.eval(vartab).unwrap();
+
+                    if ir.is_none() {
+                        return ActionResult::Retry(vartable);
+                    } else if self.consume_gap(&mut ir, expected, *complete) {
+                        continue;
+                    }
+
+                    return ActionResult::Fail;
+                }
                 Action::Set { var, expr } => {
                     let val = expr.eval(&vartable).unwrap();
                     trace!("set {} = {} = {}", var, expr, val);
@@ -327,7 +331,7 @@ impl<'a> NFADecoder<'a> {
                                 left_val,
                                 right_val
                             );
-                            return (false, vartable);
+                            return ActionResult::Fail;
                         } else {
                             trace!(
                                 "assert  {} == {} ({} == {})",
@@ -338,7 +342,7 @@ impl<'a> NFADecoder<'a> {
                             );
                         }
                     } else {
-                        return (false, vartable);
+                        return ActionResult::Fail;
                     }
                 }
                 Action::Done(event, include) => {
@@ -357,18 +361,22 @@ impl<'a> NFADecoder<'a> {
             }
         }
 
-        (true, vartable)
+        ActionResult::Match(ir, vartable)
     }
 
     /// Generate a GraphViz dot file and write to the given path
-    pub fn dotgraphviz(&self, path: &str, nfa: &NFA) {
+    pub fn nfa_dotgraphviz(&self, path: &str, nfa: &NFA) {
         crate::graphviz::graphviz(&nfa.verts, "NFA", &self.pos, path);
+    }
+
+    pub fn dfa_dotgraphviz(&self, path: &str, dfa: &DFA) {
+        crate::graphviz::graphviz(&dfa.verts, "DFA", &self.pos, path);
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{InfraredData, NFADecoder};
+    use super::{Decoder, InfraredData};
     use crate::{Event, Irp};
     use std::collections::HashMap;
 
@@ -381,11 +389,11 @@ mod test {
 
         let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let mut matcher = NFADecoder::new(100, 3, 20000);
+        let mut matcher = Decoder::new(100, 3, 20000);
 
         for ir in InfraredData::from_rawir(
             "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200").unwrap() {
-            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+            matcher.nfa_input(ir, &nfa, |ev, vars| res.push((ev, vars)));
         }
 
         assert_eq!(res.len(), 1);
@@ -404,12 +412,12 @@ mod test {
 
         let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let mut matcher = NFADecoder::new(100, 3, 20000);
+        let mut matcher = Decoder::new(100, 3, 20000);
 
         for ir in InfraredData::from_rawir(
             "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756").unwrap() {
 
-            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+            matcher.nfa_input(ir, &nfa, |ev, vars| res.push((ev, vars)));
         }
 
         assert_eq!(res.len(), 1);
@@ -422,7 +430,7 @@ mod test {
         assert_eq!(vars["S"], 191);
 
         for ir in InfraredData::from_rawir("+9024 -2256 +564 -96156").unwrap() {
-            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+            matcher.nfa_input(ir, &nfa, |ev, vars| res.push((ev, vars)));
         }
 
         assert_eq!(res.len(), 2);
@@ -435,7 +443,7 @@ mod test {
         assert_eq!(vars["S"], 191);
 
         for ir in InfraredData::from_rawir("+9024 -2256 +564 -96156").unwrap() {
-            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+            matcher.nfa_input(ir, &nfa, |ev, vars| res.push((ev, vars)));
         }
 
         assert_eq!(res.len(), 3);
@@ -450,7 +458,7 @@ mod test {
         for ir in InfraredData::from_rawir(
             "+9024 -4512 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -39756").unwrap() {
 
-                matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+                matcher.nfa_input(ir, &nfa, |ev, vars| res.push((ev, vars)));
             }
 
         assert_eq!(res.len(), 4);
@@ -473,12 +481,12 @@ mod test {
 
         let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let mut matcher = NFADecoder::new(100, 3, 20000);
+        let mut matcher = Decoder::new(100, 3, 20000);
 
         for ir in InfraredData::from_rawir(
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997").unwrap() {
 
-            matcher.input(ir, &nfa, |ev, vars| res.push((ev, vars)));
+            matcher.nfa_input(ir, &nfa, |ev, vars| res.push((ev, vars)));
         }
 
         let (event, vars) = &res[0];

@@ -1,6 +1,6 @@
 use super::{find_devices, Purpose};
 use cir::{lirc, lircd_conf::parse};
-use irp::{DFADecoder, InfraredData, Irp, Message};
+use irp::{Decoder, InfraredData, Irp, Message};
 use itertools::Itertools;
 use log::{error, info, trace};
 use std::{
@@ -141,11 +141,11 @@ fn decode_irp(matches: &clap::ArgMatches) {
         None
     };
 
-    let mut decoder = DFADecoder::new(abs_tolerance, rel_tolerance, max_gap);
+    let mut decoder = Decoder::new(abs_tolerance, rel_tolerance, max_gap);
 
     let mut feed_decoder = |raw: &[InfraredData]| {
         for (index, ir) in raw.iter().enumerate() {
-            decoder.input(*ir, &dfa, |event, var| {
+            decoder.dfa_input(*ir, &dfa, |event, var| {
                 let mut var: Vec<(String, i64)> = var.into_iter().collect();
                 var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                 println!(
@@ -162,7 +162,7 @@ fn decode_irp(matches: &clap::ArgMatches) {
 
                 info!("saving nfa at step {} as {}", index, filename);
 
-                decoder.dotgraphviz(&filename, &dfa);
+                decoder.dfa_dotgraphviz(&filename, &dfa);
             }
         }
     };
