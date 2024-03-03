@@ -1,6 +1,6 @@
 use irp::{
     protocols::{parse, Protocol},
-    Event, InfraredData, Irp, Message, NFADecoder, Vartable,
+    Decoder, Event, InfraredData, Irp, Message, Vartable,
 };
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
@@ -456,14 +456,14 @@ fn decode_all() {
             20000
         };
 
-        let mut decoder = NFADecoder::new(10, 3, max_gap);
+        let mut decoder = Decoder::new(10, 3, max_gap);
 
         let first = if irp.has_ending() { 1 } else { 0 };
 
         for n in first..10 {
             let repeats = if n < 3 { n } else { rng.gen_range(n..n + 20) };
 
-            decoder.input(InfraredData::Reset, &nfa, |_, _| {});
+            decoder.nfa_input(InfraredData::Reset, &nfa, |_, _| {});
 
             let mut vars = Vartable::new();
             let mut params = HashMap::new();
@@ -487,7 +487,7 @@ fn decode_all() {
             let mut decodes = Vec::new();
 
             for data in InfraredData::from_u32_slice(&msg.raw) {
-                decoder.input(data, &nfa, |ev, res| decodes.push((ev, res)));
+                decoder.nfa_input(data, &nfa, |ev, res| decodes.push((ev, res)));
             }
 
             let mut ok = false;

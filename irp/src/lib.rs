@@ -3,8 +3,8 @@
 
 mod build_dfa;
 mod build_nfa;
-mod decoder_dfa;
-mod decoder_nfa;
+//mod decoder_dfa;
+mod decoder;
 mod encode;
 mod expression;
 mod graphviz;
@@ -183,7 +183,7 @@ impl ParameterSpec {
 }
 
 /// During IRP evaluation, variables may change their value
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Vartable<'a> {
     vars: HashMap<String, (i64, Option<&'a Expression>)>,
 }
@@ -214,8 +214,6 @@ impl fmt::Display for Event {
     }
 }
 
-pub use build_dfa::DFA;
 pub use build_nfa::NFA;
-pub use decoder_dfa::DFADecoder;
-pub use decoder_nfa::NFADecoder;
+pub use decoder::Decoder;
 use num_rational::Rational64;

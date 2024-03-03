@@ -13,31 +13,21 @@ use std::{
  */
 
 #[derive(PartialEq, Debug, Clone)]
-pub(crate) enum Edge {
-    Flash {
-        length: Rc<Expression>,
-        complete: bool,
-        dest: usize,
-    },
-    Gap {
-        length: Rc<Expression>,
-        complete: bool,
-        dest: usize,
-    },
-    BranchCond {
-        expr: Rc<Expression>,
-        yes: usize,
-        no: usize,
-    },
-    MayBranchCond {
-        expr: Rc<Expression>,
-        dest: usize,
-    },
-    Branch(usize),
+pub(crate) struct Edge {
+    pub dest: usize,
+    pub actions: Vec<Action>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub(crate) enum Action {
+    Flash {
+        length: Rc<Expression>,
+        complete: bool,
+    },
+    Gap {
+        length: Rc<Expression>,
+        complete: bool,
+    },
     Set {
         var: String,
         expr: Rc<Expression>,
@@ -51,7 +41,7 @@ pub(crate) enum Action {
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub(crate) struct Vertex {
-    pub actions: Vec<Action>,
+    pub entry: Vec<Action>,
     pub edges: Vec<Edge>,
 }
 
@@ -183,7 +173,7 @@ impl<'a> Builder<'a> {
                 })
                 .collect();
 
-            self.add_action(Action::Done(event, res));
+            self.add_entry_action(Action::Done(event, res));
             self.mask_results()?;
             self.cur.seen_edges = false;
             Ok(true)
@@ -204,8 +194,8 @@ impl<'a> Builder<'a> {
         self.cur.head = head;
     }
 
-    fn add_action(&mut self, action: Action) {
-        self.verts[self.cur.head].actions.push(action);
+    fn add_entry_action(&mut self, action: Action) {
+        self.verts[self.cur.head].entry.push(action);
     }
 
     fn add_edge(&mut self, edge: Edge) {
@@ -213,7 +203,7 @@ impl<'a> Builder<'a> {
     }
 
     fn add_action_at_node(&mut self, node: usize, action: Action) {
-        self.verts[node].actions.push(action);
+        self.verts[node].entry.push(action);
     }
 
     fn add_edge_at_node(&mut self, node: usize, edge: Edge) {
@@ -295,7 +285,7 @@ impl<'a> Builder<'a> {
 
                     if self.expression_available(expr, false).is_ok() {
                         // just set an initial value
-                        self.add_action(Action::Set {
+                        self.add_entry_action(Action::Set {
                             var: name.to_owned(),
                             expr: self.const_folding(expr),
                         });
@@ -438,7 +428,7 @@ impl<'a> Builder<'a> {
                         };
 
                         if let Expression::Identifier(name) = value.as_ref() {
-                            self.add_action(Action::Set {
+                            self.add_entry_action(Action::Set {
                                 var: name.to_owned(),
                                 expr: self.const_folding(&Rc::new(bits)),
                             });
@@ -548,7 +538,9 @@ impl<'a> Builder<'a> {
                         }
                         Err(name) => match self.inverse(bits, value.clone(), &name) {
                             Some((bits, actions, _)) => {
-                                actions.into_iter().for_each(|act| self.add_action(act));
+                                actions
+                                    .into_iter()
+                                    .for_each(|act| self.add_entry_action(act));
 
                                 self.use_decode_bits(&name, bits, mask, &mut delayed)?;
                             }
@@ -573,9 +565,9 @@ impl<'a> Builder<'a> {
                     Action::Set { expr, .. } => {
                         self.have_definitions(expr)?;
                     }
-                    Action::Done(..) => (),
+                    _ => (),
                 }
-                self.add_action(action);
+                self.add_entry_action(action);
             }
 
             pos += expr_count;
@@ -633,7 +625,7 @@ impl<'a> Builder<'a> {
                 bits.clone()
             };
 
-            self.add_action(Action::Set {
+            self.add_entry_action(Action::Set {
                 var: name.to_owned(),
                 expr: self.const_folding(&expr),
             });
@@ -657,7 +649,7 @@ impl<'a> Builder<'a> {
             };
 
             if self.have_definitions(&def).is_ok() {
-                self.add_action(action);
+                self.add_entry_action(action);
             } else {
                 delayed.push(action);
             }
@@ -667,7 +659,7 @@ impl<'a> Builder<'a> {
                 Rc::new(Expression::Number(mask)),
             )));
 
-            self.add_action(Action::AssertEq {
+            self.add_entry_action(Action::AssertEq {
                 left,
                 right: self.const_folding(&bits),
             });
@@ -683,7 +675,7 @@ impl<'a> Builder<'a> {
 
             self.set(name, mask);
 
-            self.add_action(Action::Set {
+            self.add_entry_action(Action::Set {
                 var: name.to_owned(),
                 expr: self.const_folding(&expr),
             });
@@ -703,7 +695,7 @@ impl<'a> Builder<'a> {
             value,
             Rc::new(Expression::Number(mask)),
         )));
-        self.add_action(Action::AssertEq { left, right });
+        self.add_entry_action(Action::AssertEq { left, right });
 
         Ok(())
     }
@@ -719,7 +711,7 @@ impl<'a> Builder<'a> {
                     Ok(_) => {
                         trace!("found definition {} = {}", name, def);
 
-                        self.add_action(Action::Set {
+                        self.add_entry_action(Action::Set {
                             var: name.to_owned(),
                             expr: self.const_folding(&def),
                         });
@@ -768,14 +760,16 @@ impl<'a> Builder<'a> {
 
                     trace!("found definition {} = {}", name, expr);
 
-                    self.add_action(Action::Set {
+                    self.add_entry_action(Action::Set {
                         var: name.to_owned(),
                         expr,
                     });
 
                     self.set(name, mask.unwrap_or(!0));
 
-                    actions.into_iter().for_each(|act| self.add_action(act));
+                    actions
+                        .into_iter()
+                        .for_each(|act| self.add_entry_action(act));
 
                     found = true;
 
@@ -836,12 +830,15 @@ impl<'a> Builder<'a> {
 
                 self.expression(e, &bit_spec[1..], last)?;
 
-                self.add_action(Action::Set {
+                self.add_entry_action(Action::Set {
                     var: String::from("$bits"),
                     expr: Rc::new(Expression::Number(bit as i64)),
                 });
 
-                self.add_edge(Edge::Branch(next));
+                self.add_edge(Edge {
+                    dest: next,
+                    actions: vec![],
+                });
 
                 self.pop_location();
             }
@@ -859,7 +856,10 @@ impl<'a> Builder<'a> {
 
         let done = self.add_vertex();
 
-        self.add_edge(Edge::Branch(entry));
+        self.add_edge(Edge {
+            dest: entry,
+            actions: vec![],
+        });
 
         self.set_head(entry);
 
@@ -874,12 +874,15 @@ impl<'a> Builder<'a> {
 
             self.expression(e, &bit_spec[1..], last)?;
 
-            self.add_action(Action::Set {
+            self.add_entry_action(Action::Set {
                 var: String::from("$v"),
                 expr: Rc::new(Expression::Number(bit as i64)),
             });
 
-            self.add_edge(Edge::Branch(next));
+            self.add_edge(Edge {
+                dest: next,
+                actions: vec![],
+            });
 
             self.pop_location();
         }
@@ -943,25 +946,44 @@ impl<'a> Builder<'a> {
 
         self.add_edge_at_node(
             next,
-            Edge::BranchCond {
-                expr: Rc::new(Expression::Less(
-                    Rc::new(Expression::Identifier(length.to_owned())),
-                    Rc::new(Expression::Number(max)),
-                )),
-                yes: entry,
-                no: done,
+            Edge {
+                dest: entry,
+                actions: vec![Action::AssertEq {
+                    left: Rc::new(Expression::Less(
+                        Rc::new(Expression::Identifier(length.to_owned())),
+                        Rc::new(Expression::Number(max)),
+                    )),
+                    right: Rc::new(Expression::Number(1)),
+                }],
+            },
+        );
+
+        self.add_edge_at_node(
+            next,
+            Edge {
+                dest: done,
+                actions: vec![Action::AssertEq {
+                    left: Rc::new(Expression::Less(
+                        Rc::new(Expression::Identifier(length.to_owned())),
+                        Rc::new(Expression::Number(max)),
+                    )),
+                    right: Rc::new(Expression::Number(0)),
+                }],
             },
         );
 
         if let Some(min) = min {
             self.add_edge_at_node(
                 next,
-                Edge::MayBranchCond {
-                    expr: Rc::new(Expression::GreaterEqual(
-                        Rc::new(Expression::Identifier(length)),
-                        Rc::new(Expression::Number(min)),
-                    )),
+                Edge {
                     dest: done,
+                    actions: vec![Action::AssertEq {
+                        left: Rc::new(Expression::GreaterEqual(
+                            Rc::new(Expression::Identifier(length)),
+                            Rc::new(Expression::Number(min)),
+                        )),
+                        right: Rc::new(Expression::Number(1)),
+                    }],
                 },
             );
         }
@@ -985,7 +1007,10 @@ impl<'a> Builder<'a> {
 
         let node = self.add_vertex();
 
-        self.add_edge(Edge::Branch(node));
+        self.add_edge(Edge {
+            dest: node,
+            actions: vec![],
+        });
 
         self.set_head(node);
 
@@ -997,7 +1022,10 @@ impl<'a> Builder<'a> {
         if self.cur.seen_edges {
             self.add_done(event)?;
 
-            self.add_edge(Edge::Branch(0));
+            self.add_edge(Edge {
+                dest: 0,
+                actions: vec![],
+            });
 
             self.set_head(0);
             self.cur.seen_edges = false;
@@ -1008,7 +1036,7 @@ impl<'a> Builder<'a> {
 
     fn next_extent(&mut self) {
         if let Some(v) = self.extents.pop() {
-            self.add_action(Action::Set {
+            self.add_entry_action(Action::Set {
                 var: "$extent".to_owned(),
                 expr: Rc::new(Expression::Number(v)),
             });
@@ -1053,10 +1081,12 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::Flash {
-                    length: Rc::new(Expression::Number(len)),
-                    complete: last,
+                self.add_edge(Edge {
                     dest: node,
+                    actions: vec![Action::Flash {
+                        length: Rc::new(Expression::Number(len)),
+                        complete: last,
+                    }],
                 });
 
                 self.set_head(node);
@@ -1070,10 +1100,12 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::Gap {
-                    length: Rc::new(Expression::Number(len)),
-                    complete: last,
+                self.add_edge(Edge {
                     dest: node,
+                    actions: vec![Action::Gap {
+                        length: Rc::new(Expression::Number(len)),
+                        complete: last,
+                    }],
                 });
 
                 self.set_head(node);
@@ -1098,10 +1130,12 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::Flash {
-                    length: expr,
-                    complete: last,
+                self.add_edge(Edge {
                     dest: node,
+                    actions: vec![Action::Flash {
+                        length: expr,
+                        complete: last,
+                    }],
                 });
 
                 self.set_head(node);
@@ -1135,10 +1169,12 @@ impl<'a> Builder<'a> {
                     ));
                 }
 
-                self.add_edge(Edge::Gap {
-                    length: expr,
-                    complete: last,
+                self.add_edge(Edge {
                     dest: node,
+                    actions: vec![Action::Gap {
+                        length: expr,
+                        complete: last,
+                    }],
                 });
 
                 self.set_head(node);
@@ -1164,10 +1200,12 @@ impl<'a> Builder<'a> {
 
                 let node = self.add_vertex();
 
-                self.add_edge(Edge::Gap {
-                    length: Rc::new(Expression::Identifier("$extent".to_owned())),
-                    complete: last,
+                self.add_edge(Edge {
                     dest: node,
+                    actions: vec![Action::Gap {
+                        length: Rc::new(Expression::Identifier("$extent".into())),
+                        complete: last,
+                    }],
                 });
 
                 self.next_extent();
@@ -1181,7 +1219,7 @@ impl<'a> Builder<'a> {
 
                 self.have_definitions(expr)?;
 
-                self.add_action(Action::Set {
+                self.add_entry_action(Action::Set {
                     var: var.to_owned(),
                     expr: self.const_folding(expr),
                 })
@@ -1356,7 +1394,7 @@ impl<'a> Builder<'a> {
 
             if let Some(fields) = self.cur.vars.get(&param.name) {
                 if (fields & !mask) != 0 {
-                    self.add_action(Action::Set {
+                    self.add_entry_action(Action::Set {
                         var: param.name.to_owned(),
                         expr: Rc::new(Expression::BitwiseAnd(
                             Rc::new(Expression::Identifier(param.name.to_owned())),
@@ -1378,7 +1416,7 @@ impl<'a> Builder<'a> {
                 expr,
             ));
 
-            self.add_action(Action::Set {
+            self.add_entry_action(Action::Set {
                 var: "$extent".to_owned(),
                 expr,
             });
