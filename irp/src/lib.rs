@@ -3,7 +3,6 @@
 
 mod build_dfa;
 mod build_nfa;
-//mod decoder_dfa;
 mod decoder;
 mod encode;
 mod expression;
@@ -214,6 +213,7 @@ impl fmt::Display for Event {
     }
 }
 
+pub use build_dfa::DFA;
 pub use build_nfa::NFA;
 pub use decoder::Decoder;
 use num_rational::Rational64;
