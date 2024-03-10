@@ -24,6 +24,7 @@ impl Remote {
 
 struct Builder<'a> {
     remote: &'a Remote,
+    encoding: bool,
     min_repeat: u64,
     irp: String,
 }
@@ -45,6 +46,7 @@ impl<'a> Builder<'a> {
 
         Builder {
             remote,
+            encoding,
             min_repeat,
             irp: String::new(),
         }
@@ -285,7 +287,12 @@ impl<'a> Builder<'a> {
         }
 
         let toggle_bit_mask = if self.remote.toggle_bit_mask.count_ones() == 1 {
-            self.remote.toggle_bit_mask
+            // FIXME: lircd rcmm transmit does not encode toggle bit
+            if self.encoding && self.remote.flags.contains(Flags::RCMM) {
+                0
+            } else {
+                self.remote.toggle_bit_mask
+            }
         } else {
             0
         };
@@ -378,15 +385,6 @@ impl<'a> Builder<'a> {
                 "CODE=CODE^{:#x},",
                 (self.remote.toggle_mask >> self.remote.post_data_bits)
                     & gen_mask(self.remote.bits)
-            )
-            .unwrap();
-        }
-
-        if self.remote.toggle_bit_mask.count_ones() > 1 {
-            write!(
-                &mut self.irp,
-                "CODE=CODE^{:#x},",
-                self.remote.toggle_bit_mask >> self.remote.post_data_bits
             )
             .unwrap();
         }
@@ -489,28 +487,30 @@ impl<'a> Builder<'a> {
             };
 
             let bit_count = highest_bit - bit;
-            let offset = bit;
+            if bit_count > 0 {
+                let offset = bit;
 
-            match stream {
-                Stream::Constant(v) => {
-                    let v = (v >> offset) & gen_mask(bit_count);
+                match stream {
+                    Stream::Constant(v) => {
+                        let v = (v >> offset) & gen_mask(bit_count);
 
-                    if v <= 9 {
-                        write!(&mut self.irp, "{v}:{bit_count},").unwrap();
-                    } else {
-                        write!(&mut self.irp, "0x{v:x}:{bit_count},").unwrap();
+                        if v <= 9 {
+                            write!(&mut self.irp, "{v}:{bit_count},").unwrap();
+                        } else {
+                            write!(&mut self.irp, "0x{v:x}:{bit_count},").unwrap();
+                        }
                     }
-                }
-                Stream::Expression(v) if offset == 0 => {
-                    write!(&mut self.irp, "{v}:{bit_count},").unwrap();
-                }
-                Stream::Expression(v) => {
-                    write!(&mut self.irp, "{v}:{bit_count}:{offset},").unwrap();
-                }
-                Stream::Toggle => {
-                    assert_eq!(bit_count, 1);
+                    Stream::Expression(v) if offset == 0 => {
+                        write!(&mut self.irp, "{v}:{bit_count},").unwrap();
+                    }
+                    Stream::Expression(v) => {
+                        write!(&mut self.irp, "{v}:{bit_count}:{offset},").unwrap();
+                    }
+                    Stream::Toggle => {
+                        assert_eq!(bit_count, 1);
 
-                    self.irp.push_str("T:1,");
+                        self.irp.push_str("T:1,");
+                    }
                 }
             }
 

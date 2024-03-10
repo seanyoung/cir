@@ -73,3 +73,11 @@ define all required vars, and if not, add one iteration of repeat to
 down decoder: very messy.
 
 See also https://github.com/bengtmartensson/IrpTransmogrifier/issues/229
+
+ENCODING ISSUES:
+ - toggle_bit_mask not used when popcount > 1
+
+DECODING ISSUES:
+ - raw not supported
+ - toggle_bit_mask with more than 1 bit not supported
+ - pcmak leading gap not decoded

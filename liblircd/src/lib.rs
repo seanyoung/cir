@@ -311,6 +311,12 @@ impl<'a> Code<'a> {
             }
         }
 
+        if unsafe { (*self.1 .0).toggle_bit_mask } != 0 {
+            unsafe {
+                (*self.1 .0).toggle_bit_mask_state = 0;
+            }
+        }
+
         let res = unsafe { send_buffer_put(self.1 .0, self.0) };
         if res != 1 {
             return None;
