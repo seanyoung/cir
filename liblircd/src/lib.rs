@@ -311,6 +311,16 @@ impl<'a> Code<'a> {
             }
         }
 
+        // toggle_bit_mask_state is set by the parser to a strange value: the
+        // code of the first entry is anded and then xored with toggle_bit_mask.
+
+        // toggle_bit_mask_state is also set by the decoder, which simply ands the
+        // bits from the receive code, it is not xored. None of this behaviour
+        // matches what actually happens in match_ir_code(): either the code
+        // received is correct, or the code ^ toggle_bit_mask is correct.
+
+        // I don't think toggle_bit_mask_state should be used in lircd transmit
+        // at all, so just set it to 0 for now.
         if unsafe { (*self.1 .0).toggle_bit_mask } != 0 {
             unsafe {
                 (*self.1 .0).toggle_bit_mask_state = 0;
