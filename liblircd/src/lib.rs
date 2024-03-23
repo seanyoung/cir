@@ -1,3 +1,6 @@
+// We want to use the same names as the lirc source code
+#![allow(non_camel_case_types)]
+
 use std::{
     ffi::{c_char, CStr},
     marker::PhantomData,
