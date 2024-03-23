@@ -3,6 +3,7 @@ use irp::Message;
 use liblircd::LircdConf;
 use num_integer::Integer;
 use std::{
+    ffi::OsStr,
     fs::{read, read_dir},
     path::{Path, PathBuf},
 };
@@ -131,27 +132,66 @@ fn lircd_encode(path: &Path) {
 
                 // let's see if lircd can decode its own creation
 
-                let decoded = lircd_remote.decode(&lircd);
+                if path == OsStr::new("testdata/lircd_conf/creative/livedrive.lircd.conf") {
+                    // not decodable, missing ptrail
+                    continue;
+                }
+
+                if path == OsStr::new("testdata/lircd_conf/meridian/MSR.lircd.conf") {
+                    // not decodable, missing plead/header
+                    continue;
+                }
+
+                if path == OsStr::new("testdata/lircd_conf/logitech/logitech.lircd.conf")
+                    || path == OsStr::new("testdata/lircd_conf/pcmak/pcmak.lircd.conf")
+                    || path == OsStr::new("testdata/lircd_conf/pixelview/remotemaster.lircd.conf")
+                {
+                    // not decodable, leading space (both lircd and irp crate)
+                    continue;
+                }
+
+                let mut decoded = lircd_remote.decode(&lircd);
+
+                decoded.iter_mut().for_each(|v| {
+                    *v &= !lircd_remote.toggle_bit_mask();
+                });
 
                 let mut expect = Vec::new();
 
+                let mut min_repeat = lircd_remote.min_repeat();
+
                 if lircd_remote.toggle_mask() != 0 {
-                    for _ in 0..(lircd_remote.min_repeat() / 2) {
-                        expect.push(our_code.code[0]);
+                    if min_repeat > 1 {
+                        min_repeat /= 2;
+                    }
+                    for _ in 0..min_repeat {
+                        expect.push(our_code.code[0] & !lircd_remote.toggle_bit_mask());
                     }
                 } else {
-                    expect = vec![our_code.code[0]];
+                    expect = vec![our_code.code[0] & !lircd_remote.toggle_bit_mask()];
 
-                    for _ in 0..lircd_remote.min_repeat() {
-                        expect.push(our_code.code[0]);
+                    for _ in 0..min_repeat {
+                        expect.push(our_code.code[0] & !lircd_remote.toggle_bit_mask());
                     }
                 }
 
                 if decoded != expect {
-                    println!(
-                        "DECODE MISMATCH got: {decoded:#x?} expected: {:#x?}",
-                        expect
-                    );
+                    // is decoded and expected all the same value?
+                    let all_the_same = if !decoded.is_empty() && !expect.is_empty() {
+                        decoded
+                            .iter()
+                            .chain(expect.iter())
+                            .all(|v| *v == decoded[0])
+                    } else {
+                        false
+                    };
+
+                    if !all_the_same {
+                        panic!(
+                            "DECODE MISMATCH got: {decoded:#x?} expected: {:#x?}",
+                            expect
+                        );
+                    }
                 }
             }
         }
