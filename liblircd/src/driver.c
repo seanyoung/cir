@@ -9,7 +9,7 @@ static int *data;
 static int len;
 static int leading;
 
-int set_fake_data(int *d, int l)
+void set_fake_data(int *d, int l)
 {
     data = d;
     len = l;

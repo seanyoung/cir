@@ -21,12 +21,14 @@ libc = "0.2"
 nix = { version = "0.28", features = [ "fs", "ioctl" ] }
 regex = "1"
 humantime = "2.1"
-aya = "0.12"
 bitflags = "2.3"
 num-integer = "0.1"
 terminal_size = "0.3"
 log = "0.4"
 peg = "0.8"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+aya = "0.12"
 
 [dev-dependencies]
 assert_cmd = "2.0"
