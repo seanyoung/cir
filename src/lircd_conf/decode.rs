@@ -10,7 +10,12 @@ pub struct LircDecoder<'a> {
 
 impl Remote {
     /// Create a decoder for this remote
-    pub fn decoder(&self, abs_tolerance: u32, rel_tolerance: u32, max_gap: u32) -> LircDecoder {
+    pub fn decoder(
+        &self,
+        abs_tolerance: Option<u32>,
+        rel_tolerance: Option<u32>,
+        max_gap: u32,
+    ) -> LircDecoder {
         let irp = self.decode_irp();
 
         debug!("decoding irp {irp} for remote {}", self.name);
@@ -20,8 +25,8 @@ impl Remote {
         let nfa = irp.build_nfa().unwrap();
 
         let decoder = Decoder::new(
-            abs_tolerance.max(self.aeps as u32),
-            rel_tolerance.max(self.eps as u32),
+            abs_tolerance.unwrap_or(self.aeps as u32),
+            rel_tolerance.unwrap_or(self.eps as u32),
             max_gap,
         );
 
@@ -36,18 +41,21 @@ impl Remote {
 impl<'a> LircDecoder<'a> {
     pub fn input<F>(&mut self, ir: InfraredData, mut callback: F)
     where
-        F: FnMut(u64, Option<&'a Code>),
+        F: FnMut(&'a Code),
     {
         self.decoder.nfa_input(ir, &self.nfa, |_, vars| {
-            let decoded = vars["CODE"] as u64;
-
-            callback(
-                decoded,
-                self.remote
-                    .codes
-                    .iter()
-                    .find(|code| code.code[0] == decoded),
-            );
+            if let Some(decoded) = vars.get("CODE") {
+                let decoded = *decoded as u64;
+                if let Some(key_code) = self.remote.codes.iter().find(|code| {
+                    code.code[0] == decoded || code.code[0] == (decoded ^ self.remote.repeat_mask)
+                }) {
+                    callback(key_code);
+                }
+            }
         })
+    }
+
+    pub fn reset(&mut self) {
+        self.decoder.reset();
     }
 }

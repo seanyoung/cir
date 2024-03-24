@@ -145,7 +145,7 @@ fn decode_irp(matches: &clap::ArgMatches) {
 
     let mut feed_decoder = |raw: &[InfraredData]| {
         for (index, ir) in raw.iter().enumerate() {
-            decoder.dfa_input(*ir, &dfa, |event, var| {
+            decoder.nfa_input(*ir, &nfa, |event, var| {
                 let mut var: Vec<(String, i64)> = var.into_iter().collect();
                 var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                 println!(
@@ -353,7 +353,7 @@ fn decode_lircd(matches: &clap::ArgMatches) {
     let mut decoders = remotes
         .iter()
         .map(|remote| {
-            let decoder = remote.decoder(abs_tolerance, rel_tolerance, max_gap);
+            let decoder = remote.decoder(Some(abs_tolerance), Some(rel_tolerance), max_gap);
 
             if graphviz {
                 let filename = format!("{}_nfa.dot", remote.name);
@@ -369,15 +369,8 @@ fn decode_lircd(matches: &clap::ArgMatches) {
     let mut feed_decoder = |raw: &[InfraredData]| {
         for (index, ir) in raw.iter().enumerate() {
             for decoder in &mut decoders {
-                decoder.input(*ir, |bits, code| {
-                    if let Some(code) = code {
-                        println!(
-                            "decoded: remote:{} value:{:#x} code:{}",
-                            decoder.remote.name, bits, code.name
-                        );
-                    } else {
-                        println!("decoded: remote:{} value:{:#x}", decoder.remote.name, bits,);
-                    }
+                decoder.input(*ir, |code| {
+                    println!("decoded: remote:{} code:{}", decoder.remote.name, code.name);
                 });
 
                 if graphviz_step {

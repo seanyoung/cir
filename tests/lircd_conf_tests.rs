@@ -1,5 +1,5 @@
 use cir::lircd_conf::parse;
-use irp::Message;
+use irp::{InfraredData, Message};
 use liblircd::LircdConf;
 use num_integer::Integer;
 use std::{
@@ -20,12 +20,12 @@ fn recurse(path: &Path) {
         if e.metadata().unwrap().file_type().is_dir() {
             recurse(&path);
         } else if path.to_string_lossy().ends_with(".lircd.conf") {
-            lircd_encode(&path);
+            lircd_encode_decode(&path);
         }
     }
 }
 
-fn lircd_encode(path: &Path) {
+fn lircd_encode_decode(path: &Path) {
     println!("Testing {}", path.display());
 
     let data = read(path).unwrap();
@@ -91,6 +91,7 @@ fn lircd_encode(path: &Path) {
         if !our_remote.codes.is_empty() {
             let irp = our_remote.encode_irp();
             println!("remote {} irp:{}", our_remote.name, irp);
+            let mut decoder = our_remote.decoder(Some(10), Some(1), 200000);
 
             for (our_code, lircd_code) in our_remote.codes.iter().zip(lircd_remote.codes_iter()) {
                 if our_code.dup {
@@ -188,6 +189,42 @@ fn lircd_encode(path: &Path) {
 
                     if !all_the_same {
                         panic!(
+                            "DECODE MISMATCH got: {decoded:#x?} expected: {:#x?}",
+                            expect
+                        );
+                    }
+                }
+
+                let mut decoded = Vec::new();
+
+                decoder.reset();
+
+                // needs trailing space
+                let message = our_remote
+                    .encode(our_code, 0)
+                    .expect("encode should succeed");
+
+                for ir in InfraredData::from_u32_slice(&message.raw) {
+                    decoder.input(ir, |code| {
+                        decoded.push(code.code[0]);
+                    });
+                }
+
+                if decoded != expect {
+                    // is decoded and expected all the same value?
+                    let all_the_same = if !decoded.is_empty() && !expect.is_empty() {
+                        decoded
+                            .iter()
+                            .chain(expect.iter())
+                            .all(|v| *v == decoded[0])
+                    } else {
+                        false
+                    };
+
+                    if !all_the_same {
+                        println!("{}", message.print_rawir());
+                        println!("irp: {}", our_remote.decode_irp());
+                        println!(
                             "DECODE MISMATCH got: {decoded:#x?} expected: {:#x?}",
                             expect
                         );
