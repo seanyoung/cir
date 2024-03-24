@@ -1,6 +1,7 @@
 //! Get a list of remote controller devices from sysfs on linux. A remote
 //! controller is either an infrared receiver/transmitter or a cec interface.
 
+use crate::rc_maps::KeymapTable;
 use std::path::Path;
 use std::{fs, io};
 
@@ -126,4 +127,11 @@ fn read_uevent(path: &Path) -> io::Result<UEvent> {
         drv_name,
         dev_name,
     })
+}
+
+impl KeymapTable {
+    pub fn matches(&self, rcdev: &Rcdev) -> bool {
+        (self.driver == "*" || self.driver == rcdev.driver)
+            && (self.table == "*" || self.table == rcdev.default_keymap)
+    }
 }

@@ -1,7 +1,6 @@
 //! Parse /etc/rc_maps.cfg for Linux. This file configures the default keymap
 //! to load on Linux.
 
-use crate::rcdev::Rcdev;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error, ErrorKind};
 use std::path::Path;
@@ -57,13 +56,6 @@ pub fn parse_rc_maps_file(path: &Path) -> Result<Vec<KeymapTable>, Error> {
     }
 
     Ok(res)
-}
-
-impl KeymapTable {
-    pub fn matches(&self, rcdev: &Rcdev) -> bool {
-        (self.driver == "*" || self.driver == rcdev.driver)
-            && (self.table == "*" || self.table == rcdev.default_keymap)
-    }
 }
 
 #[test]
