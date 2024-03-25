@@ -21,7 +21,7 @@ libc = "0.2"
 nix = { version = "0.28", features = [ "fs", "ioctl" ] }
 regex = "1"
 humantime = "2.1"
-bitflags = "2.3"
+bitflags = "2.5"
 num-integer = "0.1"
 terminal_size = "0.3"
 log = "0.4"
