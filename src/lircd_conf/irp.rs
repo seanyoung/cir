@@ -267,8 +267,8 @@ impl<'a> Builder<'a> {
     }
 
     fn add_irp_body(&mut self, repeat: bool) {
-        let supress_header = repeat && self.remote.flags.contains(Flags::NO_HEAD_REP);
-        let supress_footer = repeat && self.remote.flags.contains(Flags::NO_FOOT_REP);
+        let suppress_header = repeat && self.remote.flags.contains(Flags::NO_HEAD_REP);
+        let suppress_footer = repeat && self.remote.flags.contains(Flags::NO_FOOT_REP);
 
         if self.remote.flags.contains(Flags::BO) {
             write!(
@@ -282,7 +282,7 @@ impl<'a> Builder<'a> {
             .unwrap();
         }
 
-        if !supress_header && self.remote.header.0 != 0 && self.remote.header.1 != 0 {
+        if !suppress_header && self.remote.header.0 != 0 && self.remote.header.1 != 0 {
             write!(
                 &mut self.irp,
                 "{},-{},",
@@ -379,7 +379,7 @@ impl<'a> Builder<'a> {
             );
         }
 
-        if !supress_footer && self.remote.foot.0 != 0 && self.remote.foot.1 != 0 {
+        if !suppress_footer && self.remote.foot.0 != 0 && self.remote.foot.1 != 0 {
             write!(
                 &mut self.irp,
                 "{},-{},",
@@ -446,7 +446,7 @@ impl<'a> Builder<'a> {
     }
 
     fn gap(&mut self, extent: bool, gap: u64) {
-        self.irp.push_str(if extent { "^" } else { "-" });
+        self.irp.push(if extent { '^' } else { '-' });
 
         if gap % 1000 == 0 {
             write!(&mut self.irp, "{}m,", gap / 1000).unwrap();
