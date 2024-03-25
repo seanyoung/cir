@@ -38,11 +38,7 @@ enum Stream {
 
 impl<'a> Builder<'a> {
     fn new(remote: &'a Remote, encoding: bool) -> Self {
-        let min_repeat = if encoding {
-            remote.min_repeat
-        } else {
-            remote.min_code_repeat
-        };
+        let min_repeat = if encoding { remote.min_repeat } else { 0 };
 
         Builder {
             remote,
@@ -212,10 +208,14 @@ impl<'a> Builder<'a> {
             }
         } else {
             self.irp.pop();
-            if self.min_repeat > 0 {
-                write!(&mut self.irp, "){}+", self.min_repeat + 1).unwrap();
+            if self.encoding {
+                if self.min_repeat > 0 {
+                    write!(&mut self.irp, "){}+", self.min_repeat + 1).unwrap();
+                } else {
+                    self.irp.push_str(")+");
+                }
             } else {
-                self.irp.push_str(")+");
+                self.irp.push_str(")*");
             }
         }
 
@@ -246,7 +246,16 @@ impl<'a> Builder<'a> {
             self.irp.push('}');
         }
 
-        write!(&mut self.irp, " [CODE:0..{}", gen_mask(self.remote.bits)).unwrap();
+        write!(
+            &mut self.irp,
+            " [CODE:0..{}",
+            if self.remote.bits == 0 {
+                1
+            } else {
+                gen_mask(self.remote.bits)
+            }
+        )
+        .unwrap();
 
         if self.remote.toggle_bit_mask.count_ones() == 1 {
             self.irp.push_str(",T@:0..1=0");
@@ -330,12 +339,18 @@ impl<'a> Builder<'a> {
             "CODE".into()
         };
 
-        self.add_bit_stream(
-            Stream::Expression(code),
-            self.remote.bits,
-            toggle_bit_mask >> self.remote.post_data_bits,
-            self.remote.rc6_mask >> self.remote.post_data_bits,
-        );
+        if self.remote.bits == 0 {
+            if !self.encoding {
+                self.irp.push_str("CODE=0,");
+            }
+        } else {
+            self.add_bit_stream(
+                Stream::Expression(code),
+                self.remote.bits,
+                toggle_bit_mask >> self.remote.post_data_bits,
+                self.remote.rc6_mask >> self.remote.post_data_bits,
+            );
+        }
 
         if self.remote.post_data_bits != 0 {
             let stream = if self.toggle_post_data() {
@@ -379,7 +394,7 @@ impl<'a> Builder<'a> {
 
         self.add_gap(repeat);
 
-        if self.remote.toggle_mask != 0 {
+        if self.encoding && self.remote.toggle_mask != 0 {
             write!(
                 &mut self.irp,
                 "CODE=CODE^{:#x},",
@@ -389,7 +404,7 @@ impl<'a> Builder<'a> {
             .unwrap();
         }
 
-        if self.toggle_pre_data() {
+        if self.encoding && self.toggle_pre_data() {
             write!(
                 &mut self.irp,
                 "PRE=PRE^{:#x},",
@@ -399,7 +414,7 @@ impl<'a> Builder<'a> {
             .unwrap();
         }
 
-        if self.toggle_post_data() {
+        if self.encoding && self.toggle_post_data() {
             write!(
                 &mut self.irp,
                 "POST=POST^{:#x},",

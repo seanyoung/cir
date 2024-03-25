@@ -1222,7 +1222,9 @@ impl<'a> Builder<'a> {
                 self.add_entry_action(Action::Set {
                     var: var.to_owned(),
                     expr: self.const_folding(expr),
-                })
+                });
+
+                self.set(var, !0);
             }
             _ => return Err(format!("expression {expr} not supported")),
         }

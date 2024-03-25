@@ -210,7 +210,7 @@ fn lircd_encode_decode(path: &Path) {
                     });
                 }
 
-                if decoded != expect {
+                if decoded != expect && !expect.is_empty() {
                     // is decoded and expected all the same value?
                     let all_the_same = if !decoded.is_empty() && !expect.is_empty() {
                         decoded
@@ -224,7 +224,7 @@ fn lircd_encode_decode(path: &Path) {
                     if !all_the_same {
                         println!("{}", message.print_rawir());
                         println!("irp: {}", our_remote.decode_irp());
-                        println!(
+                        panic!(
                             "DECODE MISMATCH got: {decoded:#x?} expected: {:#x?}",
                             expect
                         );
