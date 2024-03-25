@@ -206,7 +206,7 @@ fn lircd_encode_decode(path: &Path) {
 
                 for ir in InfraredData::from_u32_slice(&message.raw) {
                     decoder.input(ir, |code| {
-                        decoded.push(code.code[0]);
+                        decoded.push(code.code[0] & !lircd_remote.toggle_bit_mask());
                     });
                 }
 
