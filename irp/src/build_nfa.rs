@@ -84,6 +84,66 @@ impl NFA {
     pub fn dotgraphviz(&self, path: &str) {
         crate::graphviz::graphviz(&self.verts, "NFA", &[], path);
     }
+
+    /// Add nfa states for parsing raw IR
+    pub fn add_raw(&mut self, raw: &[u32], event: Event, code: i64) {
+        assert_ne!(raw.len(), 0);
+        assert_eq!(raw.len() % 2, 1);
+
+        if self.verts.is_empty() {
+            self.verts.push(Vertex::default());
+        }
+
+        let mut pos = 0;
+        let mut flash = true;
+
+        for raw in raw {
+            let length = Rc::new(Expression::Number((*raw).into()));
+            let actions = vec![if flash {
+                Action::Flash {
+                    length,
+                    complete: true,
+                }
+            } else {
+                Action::Gap {
+                    length,
+                    complete: true,
+                }
+            }];
+
+            if let Some(next) = self.verts[pos].edges.iter().find_map(|edge| {
+                if edge.actions == actions && self.verts[edge.dest].entry.is_empty() {
+                    Some(edge.dest)
+                } else {
+                    None
+                }
+            }) {
+                pos = next;
+            } else {
+                let next = self.verts.len();
+
+                self.verts.push(Vertex::default());
+
+                self.verts[pos].edges.push(Edge {
+                    actions,
+                    dest: next,
+                });
+
+                pos = next;
+            }
+
+            flash = !flash;
+        }
+
+        self.verts[pos].entry.push(Action::Set {
+            var: "CODE".into(),
+            expr: Rc::new(Expression::Number(code)),
+        });
+
+        self.verts[pos]
+            .entry
+            .push(Action::Done(event, vec!["CODE".into()]));
+    }
 }
 
 pub(crate) fn gen_mask(v: i64) -> i64 {

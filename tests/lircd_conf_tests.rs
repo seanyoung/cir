@@ -53,6 +53,8 @@ fn lircd_encode_decode(path: &Path) {
 
         let our_remote = our_conf.next().unwrap();
 
+        let mut decoder = our_remote.decoder(Some(10), Some(1), 200000);
+
         if lircd_remote.is_raw() {
             for (our_code, lircd_code) in our_remote.raw_codes.iter().zip(lircd_remote.codes_iter())
             {
@@ -85,13 +87,24 @@ fn lircd_encode_decode(path: &Path) {
                     println!("cir {}", message.print_rawir());
                     panic!("RAW CODE: {}", our_code.name);
                 }
+
+                let mut decoded = Vec::new();
+
+                decoder.reset();
+
+                for ir in InfraredData::from_u32_slice(&message.raw) {
+                    decoder.input(ir, |name, _| {
+                        decoded.push(name);
+                    });
+                }
+
+                assert!(decoded.contains(&our_code.name.as_str()));
             }
         }
 
         if !our_remote.codes.is_empty() {
             let irp = our_remote.encode_irp();
             println!("remote {} irp:{}", our_remote.name, irp);
-            let mut decoder = our_remote.decoder(Some(10), Some(1), 200000);
 
             for (our_code, lircd_code) in our_remote.codes.iter().zip(lircd_remote.codes_iter()) {
                 if our_code.dup {
@@ -205,8 +218,8 @@ fn lircd_encode_decode(path: &Path) {
                     .expect("encode should succeed");
 
                 for ir in InfraredData::from_u32_slice(&message.raw) {
-                    decoder.input(ir, |code| {
-                        decoded.push(code.code[0] & !lircd_remote.toggle_bit_mask());
+                    decoder.input(ir, |_, code| {
+                        decoded.push(code & !lircd_remote.toggle_bit_mask());
                     });
                 }
 

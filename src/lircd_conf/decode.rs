@@ -1,4 +1,4 @@
-use super::{Code, Remote};
+use super::Remote;
 use irp::{Decoder, InfraredData, Irp, NFA};
 use log::debug;
 
@@ -16,13 +16,23 @@ impl Remote {
         rel_tolerance: Option<u32>,
         max_gap: u32,
     ) -> LircDecoder {
-        let irp = self.decode_irp();
+        let nfa = if self.raw_codes.is_empty() {
+            let irp = self.decode_irp();
 
-        debug!("decoding irp {irp} for remote {}", self.name);
+            debug!("decoding irp {irp} for remote {}", self.name);
 
-        let irp = Irp::parse(&irp).unwrap();
+            let irp = Irp::parse(&irp).unwrap();
 
-        let nfa = irp.build_nfa().unwrap();
+            irp.build_nfa().unwrap()
+        } else {
+            let mut nfa = NFA::default();
+
+            for (i, raw) in self.raw_codes.iter().enumerate() {
+                nfa.add_raw(&raw.rawir, irp::Event::Down, u32::MAX as i64 + i as i64);
+            }
+
+            nfa
+        };
 
         let decoder = Decoder::new(
             abs_tolerance.unwrap_or(self.aeps as u32),
@@ -41,25 +51,31 @@ impl Remote {
 impl<'a> LircDecoder<'a> {
     pub fn input<F>(&mut self, ir: InfraredData, mut callback: F)
     where
-        F: FnMut(&'a Code),
+        F: FnMut(&'a str, u64),
     {
         self.decoder.nfa_input(ir, &self.nfa, |_, vars| {
             if let Some(decoded) = vars.get("CODE") {
-                // TODO: ignore mask, toggle_bit_mask with many bits set
-                let mask = if self.remote.toggle_bit_mask.count_ones() == 1 {
-                    !self.remote.toggle_bit_mask
+                if self.remote.raw_codes.is_empty() {
+                    // TODO: ignore mask, toggle_bit_mask with many bits set
+                    let mask = if self.remote.toggle_bit_mask.count_ones() == 1 {
+                        !self.remote.toggle_bit_mask
+                    } else {
+                        !0
+                    };
+
+                    let decoded = *decoded as u64;
+                    if let Some(key_code) = self.remote.codes.iter().find(|code| {
+                        let code = code.code[0] & mask;
+                        let decoded_masked = decoded & mask;
+
+                        code == decoded_masked || code == (decoded_masked ^ self.remote.repeat_mask)
+                    }) {
+                        callback(&key_code.name, decoded);
+                    }
                 } else {
-                    !0
-                };
+                    let decoded: usize = *decoded as usize - u32::MAX as usize;
 
-                let decoded = *decoded as u64;
-                if let Some(key_code) = self.remote.codes.iter().find(|code| {
-                    let code = code.code[0] & mask;
-                    let decoded = decoded & mask;
-
-                    code == decoded || code == (decoded ^ self.remote.repeat_mask)
-                }) {
-                    callback(key_code);
+                    callback(&self.remote.raw_codes[decoded].name, decoded as u64);
                 }
             }
         })

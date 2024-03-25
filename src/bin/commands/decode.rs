@@ -369,8 +369,8 @@ fn decode_lircd(matches: &clap::ArgMatches) {
     let mut feed_decoder = |raw: &[InfraredData]| {
         for (index, ir) in raw.iter().enumerate() {
             for decoder in &mut decoders {
-                decoder.input(*ir, |code| {
-                    println!("decoded: remote:{} code:{}", decoder.remote.name, code.name);
+                decoder.input(*ir, |name, _| {
+                    println!("decoded: remote:{} code:{}", decoder.remote.name, name);
                 });
 
                 if graphviz_step {
