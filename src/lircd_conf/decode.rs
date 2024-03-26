@@ -56,11 +56,10 @@ impl<'a> LircDecoder<'a> {
         self.decoder.nfa_input(ir, &self.nfa, |_, vars| {
             if let Some(decoded) = vars.get("CODE") {
                 if self.remote.raw_codes.is_empty() {
-                    // TODO: ignore mask
                     let (mask, toggle_bit_mask) = if self.remote.toggle_bit_mask.count_ones() == 1 {
-                        (!self.remote.toggle_bit_mask, 0)
+                        (!(self.remote.toggle_bit_mask | self.remote.ignore_mask), 0)
                     } else {
-                        (!0, self.remote.toggle_bit_mask)
+                        (!self.remote.ignore_mask, self.remote.toggle_bit_mask)
                     };
 
                     let decoded = *decoded as u64;

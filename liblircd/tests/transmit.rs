@@ -160,4 +160,58 @@ fn encode() {
     let result = remote.decode(&data);
 
     assert_eq!(result, vec![0x42BD]);
+
+    // now test decoder of a remote with an ignore_mask
+
+    let conf = read_to_string("../testdata/lircd_conf/apple/A1156.lircd.conf").unwrap();
+
+    //unsafe { lirc_log_set_stdout() };
+
+    let conf = LircdConf::parse(&conf).unwrap();
+
+    let lircd_conf: Vec<_> = conf.iter().collect();
+
+    assert_eq!(lircd_conf.len(), 1);
+
+    let remote = &lircd_conf[0];
+
+    assert_eq!(remote.name(), "Apple_A1156");
+
+    // encode
+    let code = remote
+        .codes_iter()
+        .find(|code| code.name() == "KEY_FASTFORWARD")
+        .unwrap();
+
+    let data = code.encode().unwrap();
+
+    let result = remote.decode(&data);
+
+    assert_eq!(result, vec![0xe0]);
+
+    // cargo run transmit irp '{msb}<574,-547|574,-1668>(9065,-4484,0x77e1:16,(CODE^0x80):8,0xc5:8,567,-37.6m,(9031,-2242,567,-37.6m)*) [CODE:0..255]' -fCODE=0xe0
+    let data = [
+        9065, 4484, 574, 547, 574, 1668, 574, 1668, 574, 1668, 574, 547, 574, 1668, 574, 1668, 574,
+        1668, 574, 1668, 574, 1668, 574, 1668, 574, 547, 574, 547, 574, 547, 574, 547, 574, 1668,
+        574, 547, 574, 1668, 574, 1668, 574, 547, 574, 547, 574, 547, 574, 547, 574, 547, 574,
+        1668, 574, 1668, 574, 547, 574, 547, 574, 547, 574, 1668, 574, 547, 574, 1668, 567, 37600,
+        9031, 2242, 567, 37600,
+    ];
+
+    let result = remote.decode(&data);
+
+    assert_eq!(result, vec![0xe0, 0xe0]);
+
+    // cargo run transmit irp '{msb}<574,-547|574,-1668>(9065,-4484,0x77e1:16,(CODE^0x80):8,(0xc5^0xff):8,567,-37.6m,(9031,-2242,567,-37.6m)*) [CODE:0..255]' -fCODE=0xe0
+    let data = [
+        9065, 4484, 574, 547, 574, 1668, 574, 1668, 574, 1668, 574, 547, 574, 1668, 574, 1668, 574,
+        1668, 574, 1668, 574, 1668, 574, 1668, 574, 547, 574, 547, 574, 547, 574, 547, 574, 1668,
+        574, 547, 574, 1668, 574, 1668, 574, 547, 574, 547, 574, 547, 574, 547, 574, 547, 574, 547,
+        574, 547, 574, 1668, 574, 1668, 574, 1668, 574, 547, 574, 1668, 574, 547, 567, 37600, 9031,
+        2242, 567, 37600,
+    ];
+
+    let result = remote.decode(&data);
+
+    assert_eq!(result, vec![0xe0, 0xe0]);
 }
