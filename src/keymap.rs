@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 #[derive(Deserialize, PartialEq, Eq, Debug, Default)]
 pub struct Protocol {
-    #[serde(default = "String::new")]
     pub name: String,
     pub protocol: String,
     pub variant: Option<String>,
