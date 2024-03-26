@@ -107,4 +107,57 @@ fn encode() {
             );
         }
     }
+
+    // now test decode of a remote with toggle_bit_mask set (more than one bit)
+
+    let conf = read_to_string("../testdata/lircd_conf/d-link/DSM-10.lircd.conf").unwrap();
+
+    //unsafe { lirc_log_set_stdout() };
+
+    let conf = LircdConf::parse(&conf).unwrap();
+
+    let lircd_conf: Vec<_> = conf.iter().collect();
+
+    assert_eq!(lircd_conf.len(), 1);
+
+    let remote = &lircd_conf[0];
+
+    assert_eq!(remote.name(), "DLink_DSM-10");
+
+    // encode
+    let code = remote
+        .codes_iter()
+        .find(|code| code.name() == "KEY_1")
+        .unwrap();
+
+    let data = code.encode().unwrap();
+
+    let result = remote.decode(&data);
+
+    assert_eq!(result, vec![0x42BD]);
+
+    // cargo run transmit irp '{msb}<664,-460|664,-1592>(9132,-4396,0x1067:16,(CODE^0x6a6a):16,671,^108247,(9128,-2143,671,^108247)*) [CODE:0..65535]' -fCODE=0x42BD
+    let data = [
+        9132, 4396, 664, 460, 664, 460, 664, 460, 664, 1592, 664, 460, 664, 460, 664, 460, 664,
+        460, 664, 460, 664, 1592, 664, 1592, 664, 460, 664, 460, 664, 1592, 664, 1592, 664, 1592,
+        664, 460, 664, 460, 664, 1592, 664, 460, 664, 1592, 664, 460, 664, 460, 664, 460, 664,
+        1592, 664, 1592, 664, 460, 664, 1592, 664, 460, 664, 1592, 664, 1592, 664, 1592, 671,
+        42232, 9128, 2143, 671, 96305,
+    ];
+
+    let result = remote.decode(&data);
+
+    assert_eq!(result, vec![0x42BD, 0x42BD]);
+
+    // cargo run transmit lircd testdata/lircd_conf/d-link/DSM-10.lircd.conf KEY_1
+    let data = [
+        9132, 4396, 664, 460, 664, 460, 664, 460, 664, 1592, 664, 460, 664, 460, 664, 460, 664,
+        460, 664, 460, 664, 1592, 664, 1592, 664, 460, 664, 460, 664, 1592, 664, 1592, 664, 1592,
+        664, 460, 664, 1592, 664, 460, 664, 460, 664, 460, 664, 460, 664, 1592, 664, 460, 664,
+        1592, 664, 460, 664, 1592, 664, 1592, 664, 1592, 664, 1592, 664, 460, 664, 1592, 671,
+        42232,
+    ];
+    let result = remote.decode(&data);
+
+    assert_eq!(result, vec![0x42BD]);
 }
