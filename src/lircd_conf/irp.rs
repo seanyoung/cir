@@ -31,7 +31,7 @@ struct Builder<'a> {
 
 #[derive(Clone)]
 enum Stream {
-    Constant(u64),
+    Constant { v: u64, ignore: u64 },
     Expression(String),
     Toggle,
 }
@@ -310,7 +310,10 @@ impl<'a> Builder<'a> {
             let stream = if self.toggle_pre_data() {
                 Stream::Expression("PRE".into())
             } else {
-                Stream::Constant(self.remote.pre_data)
+                Stream::Constant {
+                    v: self.remote.pre_data,
+                    ignore: 0,
+                }
             };
 
             self.add_bit_stream(
@@ -356,7 +359,14 @@ impl<'a> Builder<'a> {
             let stream = if self.toggle_post_data() {
                 Stream::Expression("POST".into())
             } else {
-                Stream::Constant(self.remote.post_data)
+                Stream::Constant {
+                    v: self.remote.post_data,
+                    ignore: if self.encoding {
+                        0
+                    } else {
+                        self.remote.ignore_mask
+                    },
+                }
             };
 
             // post should only be sent if there are post_data_bits, see
@@ -506,13 +516,30 @@ impl<'a> Builder<'a> {
                 let offset = bit;
 
                 match stream {
-                    Stream::Constant(v) => {
+                    Stream::Constant { v, ignore } => {
                         let v = (v >> offset) & gen_mask(bit_count);
+                        let ignore = (ignore >> offset) & gen_mask(bit_count);
 
-                        if v <= 9 {
-                            write!(&mut self.irp, "{v}:{bit_count},").unwrap();
-                        } else {
-                            write!(&mut self.irp, "0x{v:x}:{bit_count},").unwrap();
+                        let mut edges = mask_edges(ignore, bit_count);
+                        edges.sort_by(|a, b| b.partial_cmp(a).unwrap());
+                        edges.push(0);
+
+                        let mut highest_bit = bit_count;
+
+                        for bit in edges {
+                            let bit_count = highest_bit - bit;
+
+                            let is_ignore = (ignore & (1 << bit)) != 0;
+
+                            if is_ignore {
+                                write!(&mut self.irp, "_:{bit_count},").unwrap();
+                            } else if v <= 9 {
+                                write!(&mut self.irp, "{v}:{bit_count},").unwrap();
+                            } else {
+                                write!(&mut self.irp, "{v:#x}:{bit_count},").unwrap();
+                            }
+
+                            highest_bit = bit;
                         }
                     }
                     Stream::Expression(v) if offset == 0 => {
