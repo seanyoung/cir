@@ -485,7 +485,6 @@ impl<'a> Builder<'a> {
         edges.extend_from_slice(&mask_edges(toggle_mask, bits));
         edges.sort_by(|a, b| b.partial_cmp(a).unwrap());
         edges.dedup();
-        edges.push(0);
 
         let mut highest_bit = bits;
 
@@ -520,9 +519,7 @@ impl<'a> Builder<'a> {
                         let v = (v >> offset) & gen_mask(bit_count);
                         let ignore = (ignore >> offset) & gen_mask(bit_count);
 
-                        let mut edges = mask_edges(ignore, bit_count);
-                        edges.sort_by(|a, b| b.partial_cmp(a).unwrap());
-                        edges.push(0);
+                        let edges = mask_edges(ignore, bit_count);
 
                         let mut highest_bit = bit_count;
 
@@ -577,7 +574,7 @@ fn highest_bit(v: u64) -> u64 {
 /// For given bitmask, produce an array of edges of bit numbers where the mask changes
 fn mask_edges(mask: u64, bits: u64) -> Vec<u64> {
     let mut v = mask & gen_mask(bits);
-    let mut edges = Vec::new();
+    let mut edges = vec![0];
 
     while v != 0 {
         let bit = highest_bit(v) + 1;
@@ -587,14 +584,16 @@ fn mask_edges(mask: u64, bits: u64) -> Vec<u64> {
         v = !v & gen_mask(bit);
     }
 
+    edges.sort_by(|a, b| b.partial_cmp(a).unwrap());
+
     edges
 }
 
 #[test]
 fn test_edges() {
-    assert_eq!(mask_edges(0, 32), vec![]);
-    assert_eq!(mask_edges(1, 32), vec![1]);
-    assert_eq!(mask_edges(2, 32), vec![2, 1]);
-    assert_eq!(mask_edges(8, 32), vec![4, 3]);
-    assert_eq!(mask_edges(0xf0, 32), vec![8, 4]);
+    assert_eq!(mask_edges(0, 32), vec![0]);
+    assert_eq!(mask_edges(1, 32), vec![1, 0]);
+    assert_eq!(mask_edges(2, 32), vec![2, 1, 0]);
+    assert_eq!(mask_edges(8, 32), vec![4, 3, 0]);
+    assert_eq!(mask_edges(0xf0, 32), vec![8, 4, 0]);
 }

@@ -266,7 +266,7 @@ impl<'a, 'b> Encoder<'a, 'b> {
         } else {
             // IrpTransmogrifier will error here with: Argument of extent smaller than actual duration
             // We do this to remain compatible with lircd transmit
-            return Err("extend shorter than duration".into());
+            return Err("extent shorter than duration".into());
         }
 
         // Reset extent marker
