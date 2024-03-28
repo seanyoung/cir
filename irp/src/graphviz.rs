@@ -3,12 +3,26 @@ use super::{
     Vartable,
 };
 use itertools::Itertools;
-use std::{char, fs::File, io::Write, path::PathBuf};
+use log::error;
+use std::{
+    char,
+    fs::File,
+    io::{BufWriter, Write},
+    path::PathBuf,
+};
 
 /// Generate a GraphViz dot file and write to the given path
 pub(crate) fn graphviz(verts: &[Vertex], name: &str, states: &[(usize, Vartable)], path: &str) {
     let path = PathBuf::from(path);
-    let mut file = File::create(path).expect("create file");
+    let file = match File::create(&path) {
+        Ok(file) => file,
+        Err(e) => {
+            error!("unable to write file '{}': {e}", path.display());
+            return;
+        }
+    };
+
+    let mut file = BufWriter::new(file);
 
     writeln!(&mut file, "strict digraph {name} {{").unwrap();
 
