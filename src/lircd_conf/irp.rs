@@ -312,7 +312,11 @@ impl<'a> Builder<'a> {
             } else {
                 Stream::Constant {
                     v: self.remote.pre_data,
-                    ignore: 0,
+                    ignore: if self.encoding {
+                        0
+                    } else {
+                        self.remote.ignore_mask >> (self.remote.bits + self.remote.post_data_bits)
+                    },
                 }
             };
 
