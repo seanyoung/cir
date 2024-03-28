@@ -14,6 +14,11 @@ mod pronto;
 pub mod protocols;
 mod variants;
 
+pub use build_dfa::DFA;
+pub use build_nfa::NFA;
+pub use decoder::Decoder;
+
+use num_rational::Rational64;
 use std::{collections::HashMap, fmt, rc::Rc};
 
 #[derive(Debug, PartialEq, Default, Eq)]
@@ -212,8 +217,3 @@ impl fmt::Display for Event {
         }
     }
 }
-
-pub use build_dfa::DFA;
-pub use build_nfa::NFA;
-pub use decoder::Decoder;
-use num_rational::Rational64;
