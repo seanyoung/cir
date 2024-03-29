@@ -116,24 +116,30 @@ impl<'a> Builder<'a> {
             length: length.clone(),
         };
 
+        let actions = self.path_actions(path, flash, length);
+
         if let Some(to) = self.edges.get(&dfa_edge) {
-            self.nfa_to_dfa.insert(nfa_to, *to);
-            // FIXME: check path matches
-        } else {
-            let to = if let Some(vert_no) = self.nfa_to_dfa.get(&nfa_to) {
-                *vert_no
-            } else {
-                self.add_vertex()
-            };
-
-            self.nfa_to_dfa.insert(nfa_to, to);
-
-            self.edges.insert(dfa_edge, to);
-
-            let actions = self.path_actions(path, flash, length);
-
-            self.verts[from].edges.push(Edge { dest: to, actions });
+            if self.verts[from]
+                .edges
+                .iter()
+                .any(|edge| edge.dest == *to && edge.actions == actions)
+            {
+                self.nfa_to_dfa.insert(nfa_to, *to);
+                return;
+            }
         }
+
+        let to = if let Some(vert_no) = self.nfa_to_dfa.get(&nfa_to) {
+            *vert_no
+        } else {
+            self.add_vertex()
+        };
+
+        self.nfa_to_dfa.insert(nfa_to, to);
+
+        self.edges.insert(dfa_edge, to);
+
+        self.verts[from].edges.push(Edge { dest: to, actions });
     }
 
     fn path_length(&self, path: &[Path]) -> Option<Rc<Expression>> {
