@@ -593,15 +593,21 @@ impl<'a> LircParser<'a> {
         }
 
         if remote.gap == 0 {
-            warn!("{}:{}: missing gap", self.path.display(), self.line_no);
+            warn!(
+                "{}:{}: missing gap for remote {}",
+                self.path.display(),
+                self.line_no,
+                remote.name
+            );
         }
 
         if remote.duty_cycle > 99 {
             warn!(
-                "{}:{}: duty_cycle {} is not valid",
+                "{}:{}: duty_cycle {} is not valid for remote {}",
                 self.path.display(),
                 self.line_no,
-                remote.duty_cycle
+                remote.duty_cycle,
+                remote.name
             );
             remote.duty_cycle = 0;
         }
@@ -611,9 +617,10 @@ impl<'a> LircParser<'a> {
 
             if !remote.codes.is_empty() {
                 error!(
-                    "{}:{}: non-raw codes specified for raw remote",
+                    "{}:{}: non-raw codes specified for raw remote {}",
                     self.path.display(),
                     self.line_no,
+                    remote.name
                 );
                 return false;
             }
@@ -623,15 +630,21 @@ impl<'a> LircParser<'a> {
 
         if remote.flags.contains(Flags::RAW_CODES) {
             error!(
-                "{}:{}: missing raw codes",
+                "{}:{}: missing raw codes for remote {}",
                 self.path.display(),
                 self.line_no,
+                remote.name
             );
             return false;
         }
 
         if remote.codes.is_empty() {
-            error!("{}:{}: missing codes", self.path.display(), self.line_no);
+            error!(
+                "{}:{}: missing codes for remote {}",
+                self.path.display(),
+                self.line_no,
+                remote.name
+            );
             return false;
         }
 
