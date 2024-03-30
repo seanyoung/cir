@@ -1,5 +1,6 @@
 use super::{
     build_nfa::{Action, Edge, Vertex, NFA},
+    expression::clone_filter,
     Expression, Irp,
 };
 use std::{collections::HashMap, hash::Hash, rc::Rc};
@@ -145,10 +146,22 @@ impl<'a> Builder<'a> {
     fn path_length(&self, path: &[Path]) -> Option<Rc<Expression>> {
         let mut len: Option<Rc<Expression>> = None;
 
+        let mut vars: HashMap<String, Rc<Expression>> = HashMap::new();
+
         for elem in path {
-            for action in &self.nfa.verts[elem.from].edges[elem.edge_no].actions {
+            for action in self.nfa.verts[elem.from].edges[elem.edge_no]
+                .actions
+                .iter()
+                .chain(&self.nfa.verts[elem.to].entry)
+            {
                 match action {
                     Action::Gap { length, .. } | Action::Flash { length, .. } => {
+                        let length = if let Expression::Identifier(id) = length.as_ref() {
+                            vars.get(id).unwrap_or(length).clone()
+                        } else {
+                            length.clone()
+                        };
+
                         if let Some(prev) = len {
                             if let (Expression::Number(left), Expression::Number(right)) =
                                 (length.as_ref(), prev.as_ref())
@@ -161,6 +174,19 @@ impl<'a> Builder<'a> {
                         } else {
                             len = Some(length.clone());
                         }
+                    }
+                    Action::Set { var, expr } => {
+                        let expr = clone_filter(expr, &|e| {
+                            if let Expression::Identifier(id) = e.as_ref() {
+                                if let Some(expr) = vars.get(id) {
+                                    return Some(expr.clone());
+                                }
+                            }
+                            None
+                        })
+                        .unwrap_or(expr.clone());
+
+                        vars.insert(var.to_owned(), expr);
                     }
                     _ => (),
                 }
