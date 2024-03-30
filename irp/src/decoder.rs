@@ -116,7 +116,7 @@ impl<'a> Decoder<'a> {
             true
         } else {
             // upcast to u64 since diff * 100 may overflow
-            ((diff as u64 * 100) / expected as u64) <= self.rel_tolerance as u64
+            (diff as u64 * 100) <= self.rel_tolerance as u64 * expected as u64
         }
     }
 
