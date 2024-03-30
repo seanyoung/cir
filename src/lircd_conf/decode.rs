@@ -28,7 +28,8 @@ impl Remote {
             let mut nfa = NFA::default();
 
             for (i, raw) in self.raw_codes.iter().enumerate() {
-                nfa.add_raw(&raw.rawir, irp::Event::Down, u32::MAX as i64 + i as i64);
+                let message = self.encode_once(raw);
+                nfa.add_raw(&message.raw, irp::Event::Down, u32::MAX as i64 + i as i64);
             }
 
             nfa

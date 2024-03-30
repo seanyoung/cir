@@ -88,7 +88,7 @@ impl NFA {
     /// Add nfa states for parsing raw IR
     pub fn add_raw(&mut self, raw: &[u32], event: Event, code: i64) {
         assert_ne!(raw.len(), 0);
-        assert_eq!(raw.len() % 2, 1);
+        assert_eq!(raw.len() % 2, 0);
 
         if self.verts.is_empty() {
             self.verts.push(Vertex::default());

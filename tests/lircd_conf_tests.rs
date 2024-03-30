@@ -76,11 +76,11 @@ fn lircd_encode_decode(path: &Path) {
                     }
                 };
 
-                let mut message = our_remote.encode_raw(our_code, 0).unwrap();
+                let message = our_remote.encode_raw(our_code, 0).unwrap();
 
-                message.raw.pop();
+                let raw = &message.raw[0..message.raw.len() - 1];
 
-                if lircd != message.raw {
+                if lircd != raw {
                     let testdata = Message::from_raw_slice(&lircd);
 
                     println!("lircd {}", testdata.print_rawir());

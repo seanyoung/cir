@@ -151,6 +151,59 @@ impl Remote {
         }
     }
 
+    pub fn encode_once(&self, raw_code: &RawCode) -> Message {
+        // remove trailing space
+        let length = if raw_code.rawir.len().is_even() {
+            raw_code.rawir.len() - 1
+        } else {
+            raw_code.rawir.len()
+        };
+
+        let mut raw = raw_code.rawir[..length].to_vec();
+
+        let gap = if self.gap2 != 0 && self.gap2 < self.gap {
+            self.gap2
+        } else {
+            self.gap
+        };
+
+        let mut gap = if self.flags.contains(Flags::CONST_LENGTH) {
+            let total_length: u32 = raw.iter().sum();
+
+            if (total_length as u64) < gap {
+                gap as u32 - total_length
+            } else {
+                gap as u32
+            }
+        } else {
+            gap as u32
+        };
+
+        if gap == 0 {
+            gap = 20000;
+        }
+
+        raw.push(gap);
+
+        let carrier = if self.frequency != 0 {
+            Some(self.frequency as i64)
+        } else {
+            None
+        };
+
+        let duty_cycle = if self.duty_cycle != 0 {
+            Some(self.duty_cycle as u8)
+        } else {
+            None
+        };
+
+        Message {
+            carrier,
+            duty_cycle,
+            raw,
+        }
+    }
+
     /// Encode raw code for this remote, with the given repeats
     pub fn encode_raw(&self, raw_code: &RawCode, repeats: u64) -> Result<Message, String> {
         debug!("encoding name={}", raw_code.name);
