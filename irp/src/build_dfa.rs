@@ -146,7 +146,7 @@ impl<'a> Builder<'a> {
     fn path_length(&self, path: &[Path]) -> Option<Rc<Expression>> {
         let mut len: Option<Rc<Expression>> = None;
 
-        let mut vars: HashMap<String, Rc<Expression>> = HashMap::new();
+        let mut vars: HashMap<&str, Rc<Expression>> = HashMap::new();
 
         for elem in path {
             for action in self.nfa.verts[elem.from].edges[elem.edge_no]
@@ -156,11 +156,7 @@ impl<'a> Builder<'a> {
             {
                 match action {
                     Action::Gap { length, .. } | Action::Flash { length, .. } => {
-                        let length = if let Expression::Identifier(id) = length.as_ref() {
-                            vars.get(id).unwrap_or(length).clone()
-                        } else {
-                            length.clone()
-                        };
+                        let length = replace_vars(length, &vars);
 
                         if let Some(prev) = len {
                             if let (Expression::Number(left), Expression::Number(right)) =
@@ -176,17 +172,9 @@ impl<'a> Builder<'a> {
                         }
                     }
                     Action::Set { var, expr } => {
-                        let expr = clone_filter(expr, &|e| {
-                            if let Expression::Identifier(id) = e.as_ref() {
-                                if let Some(expr) = vars.get(id) {
-                                    return Some(expr.clone());
-                                }
-                            }
-                            None
-                        })
-                        .unwrap_or(expr.clone());
+                        let expr = replace_vars(expr, &vars);
 
-                        vars.insert(var.to_owned(), expr);
+                        vars.insert(var, expr);
                     }
                     _ => (),
                 }
@@ -313,4 +301,16 @@ impl<'a> Builder<'a> {
 
         node
     }
+}
+
+fn replace_vars(expr: &Rc<Expression>, vars: &HashMap<&str, Rc<Expression>>) -> Rc<Expression> {
+    clone_filter(expr, &|e| {
+        if let Expression::Identifier(id) = e.as_ref() {
+            if let Some(expr) = vars.get(&id.as_str()) {
+                return Some(expr.clone());
+            }
+        }
+        None
+    })
+    .unwrap_or(expr.clone())
 }
