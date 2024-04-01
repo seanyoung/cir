@@ -21,7 +21,6 @@ fn toggle_bit_mask() {
     assert_eq!(
         stdout,
         r#"decoded: remote:DLink_DSM-10 code:KEY_1
-decoded: remote:DLink_DSM-10 code:KEY_1
 "#
     );
 
@@ -49,7 +48,6 @@ fn ignore_mask() {
     assert_eq!(
         stdout,
         r#"decoded: remote:Apple_A1156 code:KEY_PLAY
-decoded: remote:Apple_A1156 code:KEY_PLAY
 "#
     );
 
@@ -72,7 +70,6 @@ decoded: remote:Apple_A1156 code:KEY_PLAY
     assert_eq!(
         stdout,
         r#"decoded: remote:Apple_A1156 code:KEY_PLAY
-decoded: remote:Apple_A1156 code:KEY_PLAY
 "#
     );
 }

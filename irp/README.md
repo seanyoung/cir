@@ -194,7 +194,7 @@ fn main() {
         {36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)
         [D:0..31,F:0..127,T@:0..1=0]"#)
         .expect("parse should succeed");
-    let dfa = irp.compile().expect("build dfa should succeed");
+    let dfa = irp.compile(100, 3).expect("build dfa should succeed");
     // Create a decoder with 100 microsecond tolerance, 30% relative tolerance,
     // and 20000 microseconds maximum gap.
     let mut decoder = Decoder::new(100, 30, 20000);

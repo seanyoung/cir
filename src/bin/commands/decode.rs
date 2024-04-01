@@ -42,7 +42,7 @@ fn decode_irp(matches: &clap::ArgMatches) {
         }
     };
 
-    let dfa = nfa.build_dfa();
+    let dfa = nfa.build_dfa(abs_tolerance, rel_tolerance);
 
     match matches.value_of("GRAPHVIZ") {
         Some("nfa") => {
@@ -255,8 +255,8 @@ fn decode_irp(matches: &clap::ArgMatches) {
 }
 
 fn decode_lircd(matches: &clap::ArgMatches) {
-    let graphviz_step = matches.value_of("GRAPHVIZ") == Some("nfa-step");
-    let graphviz = matches.value_of("GRAPHVIZ") == Some("nfa");
+    let graphviz_step = matches.value_of("GRAPHVIZ") == Some("dfa-step");
+    let graphviz = matches.value_of("GRAPHVIZ") == Some("dfa");
 
     let mut abs_tolerance = str::parse(matches.value_of("AEPS").unwrap()).expect("number expected");
     let rel_tolerance = str::parse(matches.value_of("EPS").unwrap()).expect("number expected");
@@ -356,10 +356,13 @@ fn decode_lircd(matches: &clap::ArgMatches) {
             let decoder = remote.decoder(Some(abs_tolerance), Some(rel_tolerance), max_gap);
 
             if graphviz {
-                let filename = format!("{}_nfa.dot", remote.name);
-                info!("saving nfa as {}", filename);
+                let mut filename = format!("{}_dfa.dot", remote.name);
+                // characters not allowed on Windows/Mac/Linux: https://stackoverflow.com/a/35352640
+                filename
+                    .retain(|c| !matches!(c, ':' | '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|'));
+                info!("saving dfa as {}", filename);
 
-                decoder.nfa.dotgraphviz(&filename);
+                decoder.dfa.dotgraphviz(&filename);
             }
 
             decoder
@@ -374,11 +377,14 @@ fn decode_lircd(matches: &clap::ArgMatches) {
                 });
 
                 if graphviz_step {
-                    let filename = format!("{}_nfa_step_{:04}.dot", decoder.remote.name, index);
+                    let mut filename = format!("{}_dfa_step_{:04}.dot", decoder.remote.name, index);
+                    filename.retain(|c| {
+                        !matches!(c, ':' | '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|')
+                    });
 
-                    info!("saving nfa at step {} as {}", index, filename);
+                    info!("saving dfa at step {} as {}", index, filename);
 
-                    decoder.nfa.dotgraphviz(&filename);
+                    decoder.dfa.dotgraphviz(&filename);
                 }
             }
         }

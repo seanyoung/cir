@@ -201,7 +201,7 @@ pub enum InfraredData {
 }
 
 /// Decoded key event
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Hash, Clone, Copy)]
 pub enum Event {
     Down,
     Repeat,

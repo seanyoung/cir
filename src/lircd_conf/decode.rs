@@ -1,10 +1,10 @@
 use super::Remote;
-use irp::{Decoder, InfraredData, Irp, NFA};
+use irp::{Decoder, InfraredData, Irp, DFA, NFA};
 use log::debug;
 
 pub struct LircDecoder<'a> {
     pub remote: &'a Remote,
-    pub nfa: NFA,
+    pub dfa: DFA,
     pub decoder: Decoder<'a>,
 }
 
@@ -35,15 +35,16 @@ impl Remote {
             nfa
         };
 
-        let decoder = Decoder::new(
-            abs_tolerance.unwrap_or(self.aeps as u32),
-            rel_tolerance.unwrap_or(self.eps as u32),
-            max_gap,
-        );
+        let aeps = abs_tolerance.unwrap_or(self.aeps as u32);
+        let eps = rel_tolerance.unwrap_or(self.eps as u32);
+
+        let dfa = nfa.build_dfa(aeps, eps);
+
+        let decoder = Decoder::new(aeps, eps, max_gap);
 
         LircDecoder {
             remote: self,
-            nfa,
+            dfa,
             decoder,
         }
     }
@@ -54,7 +55,7 @@ impl<'a> LircDecoder<'a> {
     where
         F: FnMut(&'a str, u64),
     {
-        self.decoder.nfa_input(ir, &self.nfa, |_, vars| {
+        self.decoder.dfa_input(ir, &self.dfa, |_, vars| {
             if let Some(decoded) = vars.get("CODE") {
                 if self.remote.raw_codes.is_empty() {
                     let (mask, toggle_bit_mask) = if self.remote.toggle_bit_mask.count_ones() == 1 {

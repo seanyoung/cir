@@ -1,5 +1,5 @@
 use super::{
-    build_nfa::{Action, Edge, Vertex, NFA},
+    build_nfa::{Action, Edge, Length, Vertex, NFA},
     expression::clone_filter,
     Expression, Irp,
 };
@@ -24,18 +24,20 @@ struct Path {
 struct DfaEdge {
     from: usize,
     flash: bool,
-    length: Rc<Expression>,
+    length: Length,
 }
 
 impl NFA {
     /// Build the DFA from the NFA
-    pub fn build_dfa(&self) -> DFA {
+    pub fn build_dfa(&self, aeps: u32, eps: u32) -> DFA {
         let mut builder = Builder {
             verts: Vec::new(),
             nfa_to_dfa: HashMap::new(),
             edges: HashMap::new(),
             nfa: self,
             visited: Vec::new(),
+            aeps,
+            eps,
         };
 
         builder.build();
@@ -55,10 +57,10 @@ impl DFA {
 
 impl Irp {
     /// Generate an DFA decoder state machine for this IRP
-    pub fn compile(&self) -> Result<DFA, String> {
+    pub fn compile(&self, aeps: u32, eps: u32) -> Result<DFA, String> {
         let nfa = self.build_nfa()?;
 
-        Ok(nfa.build_dfa())
+        Ok(nfa.build_dfa(aeps, eps))
     }
 }
 
@@ -68,6 +70,8 @@ struct Builder<'a> {
     edges: HashMap<DfaEdge, usize>,
     verts: Vec<Vertex>,
     visited: Vec<usize>,
+    aeps: u32,
+    eps: u32,
 }
 
 impl<'a> Builder<'a> {
@@ -109,7 +113,7 @@ impl<'a> Builder<'a> {
     fn add_input_path_to_dfa(&mut self, flash: bool, path: &[Path]) {
         let from = self.nfa_to_dfa[&path[0].from];
         let nfa_to = path[path.len() - 1].to;
-        let length = self.path_length(path);
+        let length = self.length_to_range(self.path_length(path));
 
         let dfa_edge = DfaEdge {
             from,
@@ -117,7 +121,22 @@ impl<'a> Builder<'a> {
             length: length.clone(),
         };
 
-        let actions = self.path_actions(path, flash, length);
+        let mut actions = self.path_actions(path);
+
+        actions.insert(
+            0,
+            if flash {
+                Action::Flash {
+                    length,
+                    complete: true,
+                }
+            } else {
+                Action::Gap {
+                    length,
+                    complete: true,
+                }
+            },
+        );
 
         if let Some(to) = self.edges.get(&dfa_edge) {
             if self.verts[from]
@@ -156,6 +175,11 @@ impl<'a> Builder<'a> {
             {
                 match action {
                     Action::Gap { length, .. } | Action::Flash { length, .. } => {
+                        let length = match length {
+                            Length::Expression(expr) => expr,
+                            Length::Range(..) => unreachable!(),
+                        };
+
                         let length = replace_vars(length, &vars);
 
                         if let Some(prev) = len {
@@ -184,20 +208,8 @@ impl<'a> Builder<'a> {
         len.unwrap()
     }
 
-    fn path_actions(&self, path: &[Path], flash: bool, length: Rc<Expression>) -> Vec<Action> {
+    fn path_actions(&self, path: &[Path]) -> Vec<Action> {
         let mut res: Vec<Action> = Vec::new();
-
-        res.push(if flash {
-            Action::Flash {
-                length,
-                complete: true,
-            }
-        } else {
-            Action::Gap {
-                length,
-                complete: true,
-            }
-        });
 
         for elem in path {
             res.extend(self.nfa.verts[elem.to].entry.iter().cloned());
@@ -293,6 +305,22 @@ impl<'a> Builder<'a> {
         self.verts.push(Vertex::default());
 
         node
+    }
+
+    fn length_to_range(&self, length: Rc<Expression>) -> Length {
+        if let Expression::Number(length) = length.as_ref() {
+            let length = *length as u32;
+            let min = std::cmp::min(
+                length.saturating_sub(self.aeps),
+                (length * (100 - self.eps)) / 100,
+            );
+
+            let max = std::cmp::min(length + self.aeps, (length * (100 + self.eps)) / 100);
+
+            Length::Range(min, max)
+        } else {
+            Length::Expression(length)
+        }
     }
 }
 

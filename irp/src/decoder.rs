@@ -1,6 +1,6 @@
 use super::{
     build_dfa::DFA,
-    build_nfa::{Action, NFA},
+    build_nfa::{Action, Length, NFA},
     InfraredData, Vartable,
 };
 use crate::{build_nfa::Vertex, Event, Message};
@@ -148,6 +148,37 @@ impl<'a> Decoder<'a> {
         }
     }
 
+    pub(crate) fn consume_flash_range(
+        &self,
+        ir: &mut Option<InfraredData>,
+        min: i64,
+        max: i64,
+        complete: bool,
+    ) -> bool {
+        match ir {
+            Some(InfraredData::Flash(received)) => {
+                let received = *received as i64;
+                if received >= min && received <= max {
+                    trace!("matched flash {} (range {}..{})", received, min, max);
+                    *ir = None;
+                    true
+                } else if !complete && received > min {
+                    trace!(
+                        "matched flash {} (range {}..{}) (incomplete consume)",
+                        received,
+                        min,
+                        max
+                    );
+                    *ir = Some(InfraredData::Flash((received - min) as u32));
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
     pub(crate) fn consume_gap(
         &self,
         ir: &mut Option<InfraredData>,
@@ -171,6 +202,47 @@ impl<'a> Decoder<'a> {
                         expected,
                     );
                     *ir = Some(InfraredData::Gap(*received - expected as u32));
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    pub(crate) fn consume_gap_range(
+        &self,
+        ir: &mut Option<InfraredData>,
+        min: i64,
+        max: i64,
+        complete: bool,
+    ) -> bool {
+        match ir {
+            Some(InfraredData::Gap(received)) => {
+                let received = *received as i64;
+
+                if max > self.max_gap as i64 && received >= self.max_gap as i64 {
+                    trace!(
+                        "large gap matched gap {} (range {}..{})",
+                        received,
+                        min,
+                        max
+                    );
+                    *ir = None;
+                    true
+                } else if received >= min && received <= max {
+                    trace!("matched gap {} (range {}..{})", received, min, max);
+                    *ir = None;
+                    true
+                } else if !complete && received > min {
+                    trace!(
+                        "matched gap {} (range {}..{}) (incomplete consume)",
+                        received,
+                        min,
+                        max,
+                    );
+                    *ir = Some(InfraredData::Gap((received - min) as u32));
                     true
                 } else {
                     false
@@ -287,7 +359,7 @@ impl<'a> Decoder<'a> {
         for a in actions {
             match a {
                 Action::Flash {
-                    length: expected,
+                    length: Length::Expression(expected),
                     complete,
                 } => {
                     let expected = expected.eval(vartab).unwrap();
@@ -300,8 +372,25 @@ impl<'a> Decoder<'a> {
 
                     return ActionResult::Fail;
                 }
+                Action::Flash {
+                    length: Length::Range(min, max),
+                    complete,
+                } => {
+                    if ir.is_none() {
+                        return ActionResult::Retry(vartable);
+                    } else if self.consume_flash_range(
+                        &mut ir,
+                        (*min).into(),
+                        (*max).into(),
+                        *complete,
+                    ) {
+                        continue;
+                    }
+
+                    return ActionResult::Fail;
+                }
                 Action::Gap {
-                    length: expected,
+                    length: Length::Expression(expected),
                     complete,
                 } => {
                     let expected = expected.eval(vartab).unwrap();
@@ -309,6 +398,23 @@ impl<'a> Decoder<'a> {
                     if ir.is_none() {
                         return ActionResult::Retry(vartable);
                     } else if self.consume_gap(&mut ir, expected, *complete) {
+                        continue;
+                    }
+
+                    return ActionResult::Fail;
+                }
+                Action::Gap {
+                    length: Length::Range(min, max),
+                    complete,
+                } => {
+                    if ir.is_none() {
+                        return ActionResult::Retry(vartable);
+                    } else if self.consume_gap_range(
+                        &mut ir,
+                        (*min).into(),
+                        (*max).into(),
+                        *complete,
+                    ) {
                         continue;
                     }
 

@@ -4,6 +4,7 @@ use super::{
 use log::trace;
 use std::{
     collections::HashMap,
+    fmt,
     ops::{Add, BitAnd, BitOr, BitXor, Neg, Not, Rem, Shl, Shr, Sub},
     rc::Rc,
 };
@@ -18,14 +19,20 @@ pub(crate) struct Edge {
     pub actions: Vec<Action>,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Hash, Eq, Clone)]
+pub enum Length {
+    Expression(Rc<Expression>),
+    Range(u32, u32),
+}
+
+#[derive(PartialEq, Debug, Hash, Eq, Clone)]
 pub(crate) enum Action {
     Flash {
-        length: Rc<Expression>,
+        length: Length,
         complete: bool,
     },
     Gap {
-        length: Rc<Expression>,
+        length: Length,
         complete: bool,
     },
     Set {
@@ -101,12 +108,12 @@ impl NFA {
             let length = Rc::new(Expression::Number((*raw).into()));
             let actions = vec![if flash {
                 Action::Flash {
-                    length,
+                    length: Length::Expression(length),
                     complete: true,
                 }
             } else {
                 Action::Gap {
-                    length,
+                    length: Length::Expression(length),
                     complete: true,
                 }
             }];
@@ -1144,7 +1151,7 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge {
                     dest: node,
                     actions: vec![Action::Flash {
-                        length: Rc::new(Expression::Number(len)),
+                        length: Length::Expression(Rc::new(Expression::Number(len))),
                         complete: last,
                     }],
                 });
@@ -1163,7 +1170,7 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge {
                     dest: node,
                     actions: vec![Action::Gap {
-                        length: Rc::new(Expression::Number(len)),
+                        length: Length::Expression(Rc::new(Expression::Number(len))),
                         complete: last,
                     }],
                 });
@@ -1193,7 +1200,7 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge {
                     dest: node,
                     actions: vec![Action::Flash {
-                        length: expr,
+                        length: Length::Expression(expr),
                         complete: last,
                     }],
                 });
@@ -1232,7 +1239,7 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge {
                     dest: node,
                     actions: vec![Action::Gap {
-                        length: expr,
+                        length: Length::Expression(expr),
                         complete: last,
                     }],
                 });
@@ -1263,7 +1270,9 @@ impl<'a> Builder<'a> {
                 self.add_edge(Edge {
                     dest: node,
                     actions: vec![Action::Gap {
-                        length: Rc::new(Expression::Identifier("$extent".into())),
+                        length: Length::Expression(Rc::new(Expression::Identifier(
+                            "$extent".into(),
+                        ))),
                         complete: last,
                     }],
                 });
@@ -1568,5 +1577,14 @@ impl<'a> Builder<'a> {
         });
 
         new.unwrap_or_else(|| expr.clone())
+    }
+}
+
+impl fmt::Display for Length {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Length::Expression(e) => write!(f, "{e}"),
+            Length::Range(min, max) => write!(f, "{min}..{max}"),
+        }
     }
 }

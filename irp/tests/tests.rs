@@ -450,6 +450,8 @@ fn decode_all() {
             }
         };
 
+        let dfa = nfa.build_dfa(10, 3);
+
         let max_gap = if protocol.name == "Epson" {
             100000
         } else {
@@ -463,7 +465,7 @@ fn decode_all() {
         for n in first..10 {
             let repeats = if n < 3 { n } else { rng.gen_range(n..n + 20) };
 
-            decoder.nfa_input(InfraredData::Reset, &nfa, |_, _| {});
+            decoder.dfa_input(InfraredData::Reset, &dfa, |_, _| {});
 
             let mut vars = Vartable::new();
             let mut params = HashMap::new();

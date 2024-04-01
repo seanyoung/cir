@@ -53,7 +53,7 @@ fn lircd_encode_decode(path: &Path) {
 
         let our_remote = our_conf.next().unwrap();
 
-        let mut decoder = our_remote.decoder(Some(10), Some(1), 200000);
+        let mut decoder = our_remote.decoder(Some(0), Some(0), 200000);
 
         if lircd_remote.is_raw() {
             for (our_code, lircd_code) in our_remote.raw_codes.iter().zip(lircd_remote.codes_iter())
@@ -98,7 +98,23 @@ fn lircd_encode_decode(path: &Path) {
                     });
                 }
 
-                assert!(decoded.contains(&our_code.name.as_str()));
+                if !decoded.contains(&our_code.name.as_str()) {
+                    if decoded.len() == 1 {
+                        if let Some(x) = our_remote.raw_codes.iter().find(|e| e.name == decoded[0])
+                        {
+                            let mut raw = message.raw.clone();
+                            raw.pop();
+                            assert_eq!(x.rawir, raw);
+                            continue;
+                        }
+                    }
+
+                    println!("{}", message.print_rawir());
+                    panic!(
+                        "DECODE MISMATCH got: {decoded:?} expected: {}",
+                        our_code.name
+                    );
+                }
             }
         }
 
