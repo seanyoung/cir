@@ -24,7 +24,7 @@ struct Path {
 struct DfaEdge {
     from: usize,
     flash: bool,
-    length: Option<Rc<Expression>>,
+    length: Rc<Expression>,
 }
 
 impl NFA {
@@ -143,7 +143,7 @@ impl<'a> Builder<'a> {
         self.verts[from].edges.push(Edge { dest: to, actions });
     }
 
-    fn path_length(&self, path: &[Path]) -> Option<Rc<Expression>> {
+    fn path_length(&self, path: &[Path]) -> Rc<Expression> {
         let mut len: Option<Rc<Expression>> = None;
 
         let mut vars: HashMap<&str, Rc<Expression>> = HashMap::new();
@@ -181,30 +181,23 @@ impl<'a> Builder<'a> {
             }
         }
 
-        len
+        len.unwrap()
     }
 
-    fn path_actions(
-        &self,
-        path: &[Path],
-        flash: bool,
-        length: Option<Rc<Expression>>,
-    ) -> Vec<Action> {
+    fn path_actions(&self, path: &[Path], flash: bool, length: Rc<Expression>) -> Vec<Action> {
         let mut res: Vec<Action> = Vec::new();
 
-        if let Some(length) = length {
-            res.push(if flash {
-                Action::Flash {
-                    length,
-                    complete: true,
-                }
-            } else {
-                Action::Gap {
-                    length,
-                    complete: true,
-                }
-            });
-        }
+        res.push(if flash {
+            Action::Flash {
+                length,
+                complete: true,
+            }
+        } else {
+            Action::Gap {
+                length,
+                complete: true,
+            }
+        });
 
         for elem in path {
             res.extend(self.nfa.verts[elem.to].entry.iter().cloned());
