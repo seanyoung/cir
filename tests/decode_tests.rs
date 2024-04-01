@@ -48,6 +48,7 @@ fn ignore_mask() {
     assert_eq!(
         stdout,
         r#"decoded: remote:Apple_A1156 code:KEY_PLAY
+decoded: remote:Apple_A1156 code:KEY_PLAY
 "#
     );
 
@@ -70,6 +71,7 @@ fn ignore_mask() {
     assert_eq!(
         stdout,
         r#"decoded: remote:Apple_A1156 code:KEY_PLAY
+decoded: remote:Apple_A1156 code:KEY_PLAY
 "#
     );
 }

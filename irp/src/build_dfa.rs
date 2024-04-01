@@ -3,7 +3,11 @@ use super::{
     expression::clone_filter,
     Expression, Irp,
 };
-use std::{collections::HashMap, hash::Hash, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+    rc::Rc,
+};
 
 /// Deterministic finite automation for decoding IR. Using this we can match IR.
 #[derive(Debug, Default)]
@@ -25,6 +29,7 @@ struct DfaEdge {
     from: usize,
     flash: bool,
     length: Length,
+    actions: Vec<Action>,
 }
 
 impl NFA {
@@ -35,7 +40,7 @@ impl NFA {
             nfa_to_dfa: HashMap::new(),
             edges: HashMap::new(),
             nfa: self,
-            visited: Vec::new(),
+            visited: HashSet::new(),
             aeps,
             eps,
         };
@@ -69,7 +74,7 @@ struct Builder<'a> {
     nfa_to_dfa: HashMap<usize, usize>,
     edges: HashMap<DfaEdge, usize>,
     verts: Vec<Vertex>,
-    visited: Vec<usize>,
+    visited: HashSet<usize>,
     aeps: u32,
     eps: u32,
 }
@@ -82,61 +87,93 @@ impl<'a> Builder<'a> {
 
         self.nfa_to_dfa.insert(0, 0);
 
-        self.add_path(true, 0);
+        self.recurse_nfa_path(true, vec![0]);
     }
 
     // Recursively add a new path
-    fn add_path(&mut self, mut flash: bool, pos: usize) {
-        self.visited.push(pos);
+    fn recurse_nfa_path(&mut self, flash: bool, pos: Vec<usize>) {
+        struct UniqueEdge {
+            length: Length,
+            actions: Vec<Action>,
+            nfa_edges: Vec<(usize, usize)>,
+        }
 
         let mut paths = Vec::new();
 
-        self.input_closure(pos, flash, Vec::new(), &mut paths);
-
-        let mut next = Vec::new();
-
-        for path in &paths {
-            self.add_input_path_to_dfa(flash, path);
-            let last = path.last().unwrap();
-            next.push(last.to);
+        for pos in pos {
+            if !self.visited.contains(&pos) {
+                self.input_closure(pos, flash, Vec::new(), &mut paths);
+                self.visited.insert(pos);
+            }
         }
 
-        flash = !flash;
+        let mut edges: Vec<UniqueEdge> = Vec::new();
 
-        for next in next {
-            if !self.visited.contains(&next) {
-                self.add_path(flash, next);
+        for path in &paths {
+            let length = self.path_length(path);
+            let actions = self.path_actions(path);
+            let from = path[0].from;
+            let to = path.last().unwrap().to;
+
+            // If an edge overlaps with an existing edge, merge it
+            if let Some(e) = edges
+                .iter_mut()
+                .find(|e| e.length.overlaps(&length) && e.actions == actions)
+            {
+                e.length = e.length.merge(&length);
+                e.nfa_edges.push((from, to));
+            } else {
+                edges.push(UniqueEdge {
+                    length,
+                    actions,
+                    nfa_edges: vec![(from, to)],
+                });
             }
+        }
+
+        for UniqueEdge {
+            length,
+            actions,
+            nfa_edges,
+        } in edges
+        {
+            let pos = nfa_edges.iter().map(|(_, nfa_to)| *nfa_to).collect();
+            self.add_path_to_dfa(flash, actions, length, nfa_edges);
+
+            self.recurse_nfa_path(!flash, pos);
         }
     }
 
-    fn add_input_path_to_dfa(&mut self, flash: bool, path: &[Path]) {
-        let from = self.nfa_to_dfa[&path[0].from];
-        let nfa_to = path[path.len() - 1].to;
-        let length = self.length_to_range(self.path_length(path));
-
-        let dfa_edge = DfaEdge {
-            from,
-            flash,
-            length: length.clone(),
-        };
-
-        let mut actions = self.path_actions(path);
+    fn add_path_to_dfa(
+        &mut self,
+        flash: bool,
+        mut actions: Vec<Action>,
+        length: Length,
+        nfa_edges: Vec<(usize, usize)>,
+    ) {
+        let from = self.nfa_to_dfa[&nfa_edges[0].0];
 
         actions.insert(
             0,
             if flash {
                 Action::Flash {
-                    length,
+                    length: length.clone(),
                     complete: true,
                 }
             } else {
                 Action::Gap {
-                    length,
+                    length: length.clone(),
                     complete: true,
                 }
             },
         );
+
+        let dfa_edge = DfaEdge {
+            from,
+            flash,
+            length,
+            actions: actions.clone(),
+        };
 
         if let Some(to) = self.edges.get(&dfa_edge) {
             if self.verts[from]
@@ -144,25 +181,31 @@ impl<'a> Builder<'a> {
                 .iter()
                 .any(|edge| edge.dest == *to && edge.actions == actions)
             {
-                self.nfa_to_dfa.insert(nfa_to, *to);
+                for (nfa_from, nfa_to) in nfa_edges {
+                    self.nfa_to_dfa.insert(nfa_from, from);
+                    self.nfa_to_dfa.insert(nfa_to, *to);
+                }
                 return;
             }
         }
 
-        let to = if let Some(vert_no) = self.nfa_to_dfa.get(&nfa_to) {
+        let to = if let Some(vert_no) = self.nfa_to_dfa.get(&nfa_edges[0].1) {
             *vert_no
         } else {
             self.add_vertex()
         };
 
-        self.nfa_to_dfa.insert(nfa_to, to);
+        for (nfa_from, nfa_to) in nfa_edges {
+            self.nfa_to_dfa.insert(nfa_from, from);
+            self.nfa_to_dfa.insert(nfa_to, to);
+        }
 
         self.edges.insert(dfa_edge, to);
 
         self.verts[from].edges.push(Edge { dest: to, actions });
     }
 
-    fn path_length(&self, path: &[Path]) -> Rc<Expression> {
+    fn path_length(&self, path: &[Path]) -> Length {
         let mut len: Option<Rc<Expression>> = None;
 
         let mut vars: HashMap<&str, Rc<Expression>> = HashMap::new();
@@ -205,7 +248,21 @@ impl<'a> Builder<'a> {
             }
         }
 
-        len.unwrap()
+        let length = len.unwrap();
+
+        if let Expression::Number(length) = length.as_ref() {
+            let length = *length as u32;
+            let min = std::cmp::min(
+                length.saturating_sub(self.aeps),
+                (length * (100 - self.eps)) / 100,
+            );
+
+            let max = std::cmp::min(length + self.aeps, (length * (100 + self.eps)) / 100);
+
+            Length::Range(min, max)
+        } else {
+            Length::Expression(length)
+        }
     }
 
     fn path_actions(&self, path: &[Path]) -> Vec<Action> {
@@ -306,22 +363,6 @@ impl<'a> Builder<'a> {
 
         node
     }
-
-    fn length_to_range(&self, length: Rc<Expression>) -> Length {
-        if let Expression::Number(length) = length.as_ref() {
-            let length = *length as u32;
-            let min = std::cmp::min(
-                length.saturating_sub(self.aeps),
-                (length * (100 - self.eps)) / 100,
-            );
-
-            let max = std::cmp::min(length + self.aeps, (length * (100 + self.eps)) / 100);
-
-            Length::Range(min, max)
-        } else {
-            Length::Expression(length)
-        }
-    }
 }
 
 fn replace_vars(expr: &Rc<Expression>, vars: &HashMap<&str, Rc<Expression>>) -> Rc<Expression> {
@@ -334,4 +375,37 @@ fn replace_vars(expr: &Rc<Expression>, vars: &HashMap<&str, Rc<Expression>>) -> 
         None
     })
     .unwrap_or(expr.clone())
+}
+
+impl Length {
+    fn overlaps(&self, other: &Self) -> bool {
+        if let (Length::Range(min1, max1), Length::Range(min2, max2)) = (self, other) {
+            !(max1 < min2 || max2 < min1)
+        } else {
+            false
+        }
+    }
+
+    fn merge(&self, other: &Self) -> Length {
+        debug_assert!(self.overlaps(other));
+
+        if let (Length::Range(min1, max1), Length::Range(min2, max2)) = (self, other) {
+            Length::Range(std::cmp::min(*min1, *min2), std::cmp::max(*max1, *max2))
+        } else {
+            unreachable!();
+        }
+    }
+}
+
+#[test]
+fn overlaps() {
+    assert!(!Length::Range(1, 10).overlaps(&Length::Range(11, 20)));
+    assert!(!Length::Range(11, 20).overlaps(&Length::Range(1, 10)));
+
+    assert!(Length::Range(1, 11).overlaps(&Length::Range(11, 20)));
+    assert!(Length::Range(11, 20).overlaps(&Length::Range(1, 11)));
+
+    assert!(Length::Range(11, 20).overlaps(&Length::Range(11, 20)));
+    assert!(Length::Range(5, 25).overlaps(&Length::Range(11, 20)));
+    assert!(Length::Range(11, 20).overlaps(&Length::Range(5, 25)));
 }
