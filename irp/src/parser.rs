@@ -403,8 +403,7 @@ impl Irp {
         }
     }
 
-    /// The carrier frequency in Hertz. None means unknown, Some(0) means
-    /// unmodulated.
+    /// The carrier frequency in Hertz. 0 means unmodulated (no carrier)
     pub fn carrier(&self) -> i64 {
         self.general_spec.carrier.to_integer()
     }
