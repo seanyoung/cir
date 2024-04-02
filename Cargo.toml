@@ -13,12 +13,11 @@ exclude = [ "/.git*", "/testdata", "/tests" ]
 irp = { version = "0.3.2", path = "irp" }
 clap = "3.1"
 toml = "0.8"
-serde_derive = { version = "1.0" }
 serde = { version = "1.0", features = [ "derive" ] }
+serde_derive = { version = "1.0" }
 itertools = "0.12"
 evdev = "0.12.1"
 mio = { version = "0.8", features = [ "os-poll", "os-ext" ] }
-libc = "0.2"
 nix = { version = "0.28", features = [ "fs", "ioctl" ] }
 regex = "1"
 humantime = "2.1"
