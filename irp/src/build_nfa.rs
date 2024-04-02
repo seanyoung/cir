@@ -20,7 +20,7 @@ pub(crate) struct Edge {
 }
 
 #[derive(PartialEq, Debug, Hash, Eq, Clone)]
-pub enum Length {
+pub(crate) enum Length {
     Expression(Rc<Expression>),
     Range(u32, u32),
 }
