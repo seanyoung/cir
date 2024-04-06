@@ -1,6 +1,8 @@
 #![doc = include_str!("../README.md")]
 #![allow(clippy::comparison_chain)]
 
+#[cfg(feature = "bpf")]
+mod build_bpf;
 mod build_dfa;
 mod build_nfa;
 mod decoder;
@@ -14,6 +16,8 @@ mod pronto;
 pub mod protocols;
 mod variants;
 
+#[cfg(feature = "bpf")]
+pub use build_bpf::BpfOptions;
 pub use build_dfa::DFA;
 pub use build_nfa::NFA;
 pub use decoder::Decoder;
