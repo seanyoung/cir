@@ -1,7 +1,7 @@
 use super::{
     build_nfa::{Action, Edge, Length, Vertex, NFA},
     expression::clone_filter,
-    Expression, Irp,
+    Expression, Irp, Options,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -34,15 +34,14 @@ struct DfaEdge {
 
 impl NFA {
     /// Build the DFA from the NFA
-    pub fn build_dfa(&self, aeps: u32, eps: u32) -> DFA {
+    pub fn build_dfa(&self, options: &Options) -> DFA {
         let mut builder = Builder {
+            options,
             verts: Vec::new(),
             nfa_to_dfa: HashMap::new(),
             edges: HashMap::new(),
             nfa: self,
             visited: HashSet::new(),
-            aeps,
-            eps,
         };
 
         builder.build();
@@ -62,21 +61,20 @@ impl DFA {
 
 impl Irp {
     /// Generate an DFA decoder state machine for this IRP
-    pub fn compile(&self, aeps: u32, eps: u32) -> Result<DFA, String> {
+    pub fn compile(&self, options: &Options) -> Result<DFA, String> {
         let nfa = self.build_nfa()?;
 
-        Ok(nfa.build_dfa(aeps, eps))
+        Ok(nfa.build_dfa(options))
     }
 }
 
 struct Builder<'a> {
+    options: &'a Options<'a>,
     nfa: &'a NFA,
     nfa_to_dfa: HashMap<usize, usize>,
     edges: HashMap<DfaEdge, usize>,
     verts: Vec<Vertex>,
     visited: HashSet<usize>,
-    aeps: u32,
-    eps: u32,
 }
 
 impl<'a> Builder<'a> {
@@ -253,11 +251,14 @@ impl<'a> Builder<'a> {
         if let Expression::Number(length) = length.as_ref() {
             let length = *length as u32;
             let min = std::cmp::min(
-                length.saturating_sub(self.aeps),
-                (length * (100 - self.eps)) / 100,
+                length.saturating_sub(self.options.aeps),
+                (length * (100 - self.options.eps)) / 100,
             );
 
-            let max = std::cmp::min(length + self.aeps, (length * (100 + self.eps)) / 100);
+            let max = std::cmp::min(
+                length + self.options.aeps,
+                (length * (100 + self.options.eps)) / 100,
+            );
 
             Length::Range(min, max)
         } else {

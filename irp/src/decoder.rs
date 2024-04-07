@@ -1,7 +1,7 @@
 use super::{
     build_dfa::DFA,
     build_nfa::{Action, Length, NFA},
-    InfraredData, Vartable,
+    InfraredData, Options, Vartable,
 };
 use crate::{build_nfa::Vertex, Event, Message};
 use log::trace;
@@ -11,22 +11,17 @@ use std::{collections::HashMap, fmt, fmt::Write};
 #[derive(Debug)]
 pub struct Decoder<'a> {
     pos: Vec<(usize, Vartable<'a>)>,
+    options: Options<'a>,
     dfa: bool,
-    abs_tolerance: u32,
-    rel_tolerance: u32,
-    max_gap: u32,
 }
 
 impl<'a> Decoder<'a> {
-    /// Create a decoder with parameters. abs_tolerance is microseconds, rel_tolerance is in percentage,
-    /// and trailing gap is the minimum gap in microseconds which must follow.
-    pub fn new(abs_tolerance: u32, rel_tolerance: u32, max_gap: u32) -> Decoder<'a> {
+    /// Create a decoder with parameters.
+    pub fn new(options: Options<'a>) -> Decoder<'a> {
         Decoder {
+            options,
             pos: Vec::new(),
             dfa: false,
-            abs_tolerance,
-            rel_tolerance,
-            max_gap,
         }
     }
 }
@@ -112,11 +107,11 @@ impl<'a> Decoder<'a> {
     fn tolerance_eq(&self, expected: u32, received: u32) -> bool {
         let diff = expected.abs_diff(received);
 
-        if diff <= self.abs_tolerance {
+        if diff <= self.options.aeps {
             true
         } else {
             // upcast to u64 since diff * 100 may overflow
-            (diff as u64 * 100) <= self.rel_tolerance as u64 * expected as u64
+            (diff as u64 * 100) <= self.options.eps as u64 * expected as u64
         }
     }
 
@@ -187,7 +182,7 @@ impl<'a> Decoder<'a> {
     ) -> bool {
         match ir {
             Some(InfraredData::Gap(received)) => {
-                if expected > self.max_gap as i64 && *received >= self.max_gap {
+                if expected > self.options.max_gap as i64 && *received >= self.options.max_gap {
                     trace!("large gap matched gap {} (expected {})", received, expected,);
                     *ir = None;
                     true
@@ -222,7 +217,7 @@ impl<'a> Decoder<'a> {
             Some(InfraredData::Gap(received)) => {
                 let received = *received as i64;
 
-                if max > self.max_gap as i64 && received >= self.max_gap as i64 {
+                if max > self.options.max_gap as i64 && received >= self.options.max_gap as i64 {
                     trace!(
                         "large gap matched gap {} (range {}..{})",
                         received,
@@ -483,7 +478,7 @@ impl<'a> Decoder<'a> {
 #[cfg(test)]
 mod test {
     use super::{Decoder, InfraredData};
-    use crate::{Event, Irp};
+    use crate::{Event, Irp, Options};
     use std::collections::HashMap;
 
     #[test]
@@ -495,7 +490,12 @@ mod test {
 
         let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let mut matcher = Decoder::new(100, 3, 20000);
+        let mut matcher = Decoder::new(Options {
+            aeps: 100,
+            eps: 3,
+            max_gap: 20000,
+            ..Default::default()
+        });
 
         for ir in InfraredData::from_rawir(
             "+2400 -600 +600 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -31200").unwrap() {
@@ -518,7 +518,12 @@ mod test {
 
         let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let mut matcher = Decoder::new(100, 3, 20000);
+        let mut matcher = Decoder::new(Options {
+            aeps: 100,
+            eps: 3,
+            max_gap: 20000,
+            ..Default::default()
+        });
 
         for ir in InfraredData::from_rawir(
             "+9024 -4512 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -1692 +564 -564 +564 -564 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -1692 +564 -1692 +564 -1692 +564 -564 +564 -564 +564 -39756").unwrap() {
@@ -587,7 +592,12 @@ mod test {
 
         let mut res: Vec<(Event, HashMap<String, i64>)> = Vec::new();
 
-        let mut matcher = Decoder::new(100, 3, 20000);
+        let mut matcher = Decoder::new(Options {
+            aeps: 100,
+            eps: 3,
+            max_gap: 20000,
+            ..Default::default()
+        });
 
         for ir in InfraredData::from_rawir(
             "+889 -889 +1778 -1778 +889 -889 +889 -889 +889 -889 +1778 -889 +889 -889 +889 -889 +889 -889 +889 -889 +889 -1778 +889 -89997").unwrap() {

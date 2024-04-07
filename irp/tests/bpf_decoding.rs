@@ -4,7 +4,7 @@ use aya_obj::{
     generated::{bpf_insn, bpf_map_type::BPF_MAP_TYPE_ARRAY},
     Map, Object,
 };
-use irp::{BpfOptions, Irp, Vartable};
+use irp::{Irp, Options, Vartable};
 use itertools::Itertools;
 use num::Integer;
 use std::collections::{HashMap, HashSet};
@@ -18,18 +18,19 @@ fn rc5() {
     let mut vars = Vartable::new();
     vars.set("CODE".into(), 102);
     let message = irp.encode_raw(vars, 0).unwrap();
+    let options = Options {
+        name: "rc5",
+        source: file!(),
+        aeps: 100,
+        eps: 3,
+        ..Default::default()
+    };
 
-    let dfa = irp.compile(100, 3).unwrap();
+    let dfa = irp.compile(&options).unwrap();
 
     dfa.dotgraphviz("lircd.dot");
 
-    let (object, vars) = dfa
-        .compile_bpf(&BpfOptions {
-            name: "rc5",
-            source: file!(),
-            ..Default::default()
-        })
-        .unwrap();
+    let (object, vars) = dfa.compile_bpf(&options).unwrap();
 
     let mut obj = Object::parse(&object).unwrap();
     let text_sections = HashSet::new();

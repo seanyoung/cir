@@ -1,7 +1,7 @@
 use super::{
     build_dfa::DFA,
     build_nfa::{Action, Length},
-    Event, Expression,
+    Event, Expression, Options,
 };
 use inkwell::{
     builder,
@@ -13,31 +13,14 @@ use inkwell::{
     AddressSpace, IntPredicate, OptimizationLevel,
 };
 use once_cell::sync::OnceCell;
-use std::{collections::HashMap, fs::File, io::Write, path::Path, rc::Rc};
+use std::{collections::HashMap, fs::File, io::Write, rc::Rc};
 
 static LLVM_INIT: OnceCell<()> = OnceCell::new();
 static LLVM_TARGET_TRIPLE: &str = "bpf-unknown-unknown";
 
-/// Options for code bpf decoder codegen
-#[derive(Default)]
-pub struct BpfOptions<'a> {
-    /// Name of the decoder
-    pub name: &'a str,
-    // Name of the source file
-    pub source: &'a str,
-    /// Protocol no which will be passed to bpf_rc_keydown()
-    pub protocol: u32,
-    /// If Some(path) the llvm IR intermediate file will be saved
-    pub llvm_ir: Option<&'a Path>,
-    /// If Some(path) the assembly intermediate file will be saved
-    pub assembly: Option<&'a Path>,
-    /// If Some(path) the object intermediate file will be saved
-    pub object: Option<&'a Path>,
-}
-
 impl DFA {
     /// Compile the DFA to a BPF program for Linux kernel IR decoding
-    pub fn compile_bpf(&self, options: &BpfOptions) -> Result<(Vec<u8>, Vec<String>), String> {
+    pub fn compile_bpf(&self, options: &Options) -> Result<(Vec<u8>, Vec<String>), String> {
         LLVM_INIT.get_or_init(|| {
             Target::initialize_bpf(&Default::default());
         });
@@ -134,7 +117,7 @@ impl DFA {
 }
 
 struct Builder<'a> {
-    options: &'a BpfOptions<'a>,
+    options: &'a Options<'a>,
     dfa: &'a DFA,
     module: Module<'a>,
     builder: builder::Builder<'a>,

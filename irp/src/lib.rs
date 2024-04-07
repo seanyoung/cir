@@ -16,14 +16,12 @@ mod pronto;
 pub mod protocols;
 mod variants;
 
-#[cfg(feature = "bpf")]
-pub use build_bpf::BpfOptions;
 pub use build_dfa::DFA;
 pub use build_nfa::NFA;
 pub use decoder::Decoder;
 
 use num_rational::Rational64;
-use std::{collections::HashMap, fmt, rc::Rc};
+use std::{collections::HashMap, fmt, path::Path, rc::Rc};
 
 #[derive(Debug, PartialEq, Default, Eq)]
 /// An encoded raw infrared message
@@ -220,4 +218,27 @@ impl fmt::Display for Event {
             Event::Up => write!(f, "up"),
         }
     }
+}
+
+/// Options for the decoder
+#[derive(Default, Debug)]
+pub struct Options<'a> {
+    /// Name of the decoder
+    pub name: &'a str,
+    // Name of the source file
+    pub source: &'a str,
+    /// Absolute tolerance in microsecondes
+    pub aeps: u32,
+    /// Relative tolerance in percentage
+    pub eps: u32,
+    /// Maximum gap the input will contains
+    pub max_gap: u32,
+    /// Protocol no which will be passed to bpf_rc_keydown()
+    pub protocol: u32,
+    /// If Some(path) the llvm IR intermediate file will be saved
+    pub llvm_ir: Option<&'a Path>,
+    /// If Some(path) the assembly intermediate file will be saved
+    pub assembly: Option<&'a Path>,
+    /// If Some(path) the object intermediate file will be saved
+    pub object: Option<&'a Path>,
 }

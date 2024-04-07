@@ -187,17 +187,23 @@ we compile the DFA state machine, for decoding. Then we create a decoder, which
 needs some matching parameters, and then we can feed it input.
 
 ```rust
-use irp::{Irp, InfraredData, Decoder};
+use irp::{Irp, InfraredData, Options, Decoder};
 
 fn main() {
     let irp = Irp::parse(r#"
         {36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)
         [D:0..31,F:0..127,T@:0..1=0]"#)
         .expect("parse should succeed");
-    let dfa = irp.compile(100, 3).expect("build dfa should succeed");
+    let options = Options {
+        aeps: 100,
+        eps: 30,
+        max_gap: 20000,
+        ..Default::default()
+    };
+    let dfa = irp.compile(&options).expect("build dfa should succeed");
     // Create a decoder with 100 microsecond tolerance, 30% relative tolerance,
     // and 20000 microseconds maximum gap.
-    let mut decoder = Decoder::new(100, 30, 20000);
+    let mut decoder = Decoder::new(options);
     for ir in InfraredData::from_rawir(
         "+940 -860 +1790 -1750 +880 -880 +900 -890 +870 -900 +1750
         -900 +890 -910 +840 -920 +870 -920 +840 -920 +870 -1810 +840 -125000").unwrap() {

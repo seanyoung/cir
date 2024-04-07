@@ -1,6 +1,6 @@
 use irp::{
     protocols::{parse, Protocol},
-    Decoder, Event, InfraredData, Irp, Message, Vartable,
+    Decoder, Event, InfraredData, Irp, Message, Options, Vartable,
 };
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
@@ -450,15 +450,22 @@ fn decode_all() {
             }
         };
 
-        let dfa = nfa.build_dfa(10, 3);
-
         let max_gap = if protocol.name == "Epson" {
             100000
         } else {
             20000
         };
 
-        let mut decoder = Decoder::new(10, 3, max_gap);
+        let options = Options {
+            aeps: 10,
+            eps: 3,
+            max_gap,
+            ..Default::default()
+        };
+
+        let dfa = nfa.build_dfa(&options);
+
+        let mut decoder = Decoder::new(options);
 
         let first = if irp.has_ending() { 1 } else { 0 };
 

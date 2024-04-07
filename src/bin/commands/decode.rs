@@ -1,6 +1,6 @@
 use super::{find_devices, Purpose};
 use cir::{lirc, lircd_conf::parse};
-use irp::{Decoder, InfraredData, Irp, Message};
+use irp::{Decoder, InfraredData, Irp, Message, Options};
 use itertools::Itertools;
 use log::{error, info, trace};
 use std::{
@@ -41,24 +41,6 @@ fn decode_irp(matches: &clap::ArgMatches) {
             std::process::exit(2);
         }
     };
-
-    let dfa = nfa.build_dfa(abs_tolerance, rel_tolerance);
-
-    match matches.value_of("GRAPHVIZ") {
-        Some("nfa") => {
-            let filename = "irp_nfa.dot";
-            info!("saving nfa as {}", filename);
-
-            nfa.dotgraphviz(filename);
-        }
-        Some("dfa") => {
-            let filename = "irp_dfa.dot";
-            info!("saving dfa as {}", filename);
-
-            dfa.dotgraphviz(filename);
-        }
-        _ => (),
-    }
 
     let input_on_cli = matches.is_present("FILE") || matches.is_present("RAWIR");
 
@@ -141,7 +123,32 @@ fn decode_irp(matches: &clap::ArgMatches) {
         None
     };
 
-    let mut decoder = Decoder::new(abs_tolerance, rel_tolerance, max_gap);
+    let options = Options {
+        aeps: abs_tolerance,
+        eps: rel_tolerance,
+        max_gap,
+        ..Default::default()
+    };
+
+    let dfa = nfa.build_dfa(&options);
+
+    match matches.value_of("GRAPHVIZ") {
+        Some("nfa") => {
+            let filename = "irp_nfa.dot";
+            info!("saving nfa as {}", filename);
+
+            nfa.dotgraphviz(filename);
+        }
+        Some("dfa") => {
+            let filename = "irp_dfa.dot";
+            info!("saving dfa as {}", filename);
+
+            dfa.dotgraphviz(filename);
+        }
+        _ => (),
+    }
+
+    let mut decoder = Decoder::new(options);
 
     let mut feed_decoder = |raw: &[InfraredData]| {
         for (index, ir) in raw.iter().enumerate() {
