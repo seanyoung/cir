@@ -182,7 +182,10 @@ impl<'a> Decoder<'a> {
     ) -> bool {
         match ir {
             Some(InfraredData::Gap(received)) => {
-                if expected > self.options.max_gap as i64 && *received >= self.options.max_gap {
+                if self.options.max_gap > 0
+                    && expected > self.options.max_gap as i64
+                    && *received >= self.options.max_gap
+                {
                     trace!("large gap matched gap {} (expected {})", received, expected,);
                     *ir = None;
                     true
@@ -376,7 +379,7 @@ impl<'a> Decoder<'a> {
                     } else if self.consume_flash_range(
                         &mut ir,
                         (*min).into(),
-                        (*max).into(),
+                        max.unwrap_or(u32::MAX).into(),
                         *complete,
                     ) {
                         continue;
@@ -407,7 +410,7 @@ impl<'a> Decoder<'a> {
                     } else if self.consume_gap_range(
                         &mut ir,
                         (*min).into(),
-                        (*max).into(),
+                        max.unwrap_or(u32::MAX).into(),
                         *complete,
                     ) {
                         continue;

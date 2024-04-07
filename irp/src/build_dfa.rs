@@ -255,12 +255,16 @@ impl<'a> Builder<'a> {
                 (length * (100 - self.options.eps)) / 100,
             );
 
-            let max = std::cmp::min(
+            let max = std::cmp::max(
                 length + self.options.aeps,
                 (length * (100 + self.options.eps)) / 100,
             );
 
-            Length::Range(min, max)
+            if self.options.max_gap > 0 && max < self.options.max_gap {
+                Length::Range(min, Some(max))
+            } else {
+                Length::Range(min, None)
+            }
         } else {
             Length::Expression(length)
         }
@@ -381,7 +385,10 @@ fn replace_vars(expr: &Rc<Expression>, vars: &HashMap<&str, Rc<Expression>>) -> 
 impl Length {
     fn overlaps(&self, other: &Self) -> bool {
         if let (Length::Range(min1, max1), Length::Range(min2, max2)) = (self, other) {
-            !(max1 < min2 || max2 < min1)
+            let max1 = max1.unwrap_or(u32::MAX);
+            let max2 = max2.unwrap_or(u32::MAX);
+
+            !(max1 < *min2 || max2 < *min1)
         } else {
             false
         }
@@ -400,13 +407,21 @@ impl Length {
 
 #[test]
 fn overlaps() {
-    assert!(!Length::Range(1, 10).overlaps(&Length::Range(11, 20)));
-    assert!(!Length::Range(11, 20).overlaps(&Length::Range(1, 10)));
+    assert!(!Length::Range(1, Some(10)).overlaps(&Length::Range(11, Some(20))));
+    assert!(!Length::Range(11, Some(20)).overlaps(&Length::Range(1, Some(10))));
 
-    assert!(Length::Range(1, 11).overlaps(&Length::Range(11, 20)));
-    assert!(Length::Range(11, 20).overlaps(&Length::Range(1, 11)));
+    assert!(Length::Range(1, Some(11)).overlaps(&Length::Range(11, Some(20))));
+    assert!(Length::Range(11, Some(20)).overlaps(&Length::Range(1, Some(11))));
 
-    assert!(Length::Range(11, 20).overlaps(&Length::Range(11, 20)));
-    assert!(Length::Range(5, 25).overlaps(&Length::Range(11, 20)));
-    assert!(Length::Range(11, 20).overlaps(&Length::Range(5, 25)));
+    assert!(Length::Range(11, Some(20)).overlaps(&Length::Range(11, Some(20))));
+    assert!(Length::Range(5, Some(25)).overlaps(&Length::Range(11, Some(20))));
+    assert!(Length::Range(11, Some(20)).overlaps(&Length::Range(5, Some(25))));
+
+    assert!(Length::Range(5, None).overlaps(&Length::Range(11, Some(20))));
+    assert!(!Length::Range(21, None).overlaps(&Length::Range(11, Some(20))));
+
+    assert!(Length::Range(5, Some(25)).overlaps(&Length::Range(11, None)));
+    assert!(!Length::Range(11, Some(20)).overlaps(&Length::Range(21, None)));
+
+    assert!(Length::Range(5, None).overlaps(&Length::Range(11, None)));
 }

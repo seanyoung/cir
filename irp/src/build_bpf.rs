@@ -312,23 +312,25 @@ impl<'a> Builder<'a> {
 
                             self.builder.position_at_end(ok);
 
-                            let ok = context.append_basic_block(function, "ok");
+                            if let Some(max) = max {
+                                let ok = context.append_basic_block(function, "ok");
 
-                            let res = self
-                                .builder
-                                .build_int_compare(
-                                    IntPredicate::ULE,
-                                    length,
-                                    i32.const_int(*max as u64, false),
-                                    "max",
-                                )
-                                .unwrap();
+                                let res = self
+                                    .builder
+                                    .build_int_compare(
+                                        IntPredicate::ULE,
+                                        length,
+                                        i32.const_int(*max as u64, false),
+                                        "max",
+                                    )
+                                    .unwrap();
 
-                            self.builder
-                                .build_conditional_branch(res, ok, next)
-                                .unwrap();
+                                self.builder
+                                    .build_conditional_branch(res, ok, next)
+                                    .unwrap();
 
-                            self.builder.position_at_end(ok);
+                                self.builder.position_at_end(ok);
+                            }
                         }
                         Action::Gap {
                             length: Length::Range(min, max),
@@ -360,23 +362,25 @@ impl<'a> Builder<'a> {
 
                             self.builder.position_at_end(ok);
 
-                            let ok = context.append_basic_block(function, "ok");
+                            if let Some(max) = max {
+                                let ok = context.append_basic_block(function, "ok");
 
-                            let res = self
-                                .builder
-                                .build_int_compare(
-                                    IntPredicate::ULE,
-                                    length,
-                                    i32.const_int(*max as u64, false),
-                                    "max",
-                                )
-                                .unwrap();
+                                let res = self
+                                    .builder
+                                    .build_int_compare(
+                                        IntPredicate::ULE,
+                                        length,
+                                        i32.const_int(*max as u64, false),
+                                        "max",
+                                    )
+                                    .unwrap();
 
-                            self.builder
-                                .build_conditional_branch(res, ok, next)
-                                .unwrap();
+                                self.builder
+                                    .build_conditional_branch(res, ok, next)
+                                    .unwrap();
 
-                            self.builder.position_at_end(ok);
+                                self.builder.position_at_end(ok);
+                            }
                         }
                         Action::Set { var, expr } => {
                             let value = self.emit(expr, context);

@@ -22,7 +22,7 @@ pub(crate) struct Edge {
 #[derive(PartialEq, Debug, Hash, Eq, Clone)]
 pub(crate) enum Length {
     Expression(Rc<Expression>),
-    Range(u32, u32),
+    Range(u32, Option<u32>),
 }
 
 #[derive(PartialEq, Debug, Hash, Eq, Clone)]
@@ -1584,7 +1584,8 @@ impl fmt::Display for Length {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Length::Expression(e) => write!(f, "{e}"),
-            Length::Range(min, max) => write!(f, "{min}..{max}"),
+            Length::Range(min, None) => write!(f, "{min}.."),
+            Length::Range(min, Some(max)) => write!(f, "{min}..{max}"),
         }
     }
 }

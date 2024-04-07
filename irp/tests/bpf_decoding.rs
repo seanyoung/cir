@@ -23,12 +23,11 @@ fn rc5() {
         source: file!(),
         aeps: 100,
         eps: 3,
+        max_gap: 20000,
         ..Default::default()
     };
 
     let dfa = irp.compile(&options).unwrap();
-
-    dfa.dotgraphviz("lircd.dot");
 
     let (object, vars) = dfa.compile_bpf(&options).unwrap();
 
@@ -57,8 +56,6 @@ fn rc5() {
 
         rel_maps.push((name.as_str(), 7, map));
     }
-
-    println!("value_size: {value_size:?}");
 
     obj.relocate_maps(rel_maps.into_iter(), &text_sections)
         .unwrap();
