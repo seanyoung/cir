@@ -57,6 +57,8 @@ impl DFA {
             builder.module.print_to_file(path).unwrap();
         }
 
+        builder.module.verify().unwrap();
+
         let target = Target::from_name("bpf").unwrap();
 
         let target_machine = target
@@ -726,20 +728,19 @@ fn define_map_def<'ctx>(
     vars: &HashMap<&str, VarValue>,
     context: &'ctx Context,
 ) -> (GlobalValue<'ctx>, StructType<'ctx>) {
-    let i32 = context.i32_type().as_basic_type_enum();
-    let i64 = context.i64_type().as_basic_type_enum();
+    let i32 = context.i32_type();
 
-    let field_types = vec![i32; 7];
+    let field_types = vec![i32.as_basic_type_enum(); 7];
 
-    let bpf_map_def = context.struct_type(&field_types, false);
+    let bpf_map_def = context.opaque_struct_type("bpf_map_def");
+
+    bpf_map_def.set_body(&field_types, false);
 
     let gv = module.add_global(
         bpf_map_def,
         Some(AddressSpace::default()),
         "decoder_state_map",
     );
-
-    let i32 = context.i32_type();
 
     let def = bpf_map_def.const_named_struct(&[
         // BPF_MAP_TYPE_ARRAY
@@ -761,9 +762,11 @@ fn define_map_def<'ctx>(
     gv.set_section(Some("maps"));
     gv.set_alignment(4);
 
-    let field_types = vec![i64; vars.len()];
+    let field_types = vec![context.i64_type().as_basic_type_enum(); vars.len()];
 
-    let decoder_state_ty = context.struct_type(&field_types, false);
+    let decoder_state_ty = context.opaque_struct_type("decoder_state_ty");
+
+    decoder_state_ty.set_body(&field_types, false);
 
     (gv, decoder_state_ty)
 }

@@ -4,21 +4,17 @@
 - Need ir-ctl and ir-keytable command line parsing
 - localization of cli messages
 - clap 4.5/4.4 and merge cir devices/config
-- struct definitions should be on the module rather than repeated
-- honour max_gap in Action::Gap { .. }
 - implement Action::Gap/Flash { Expression::Length {} }
 - test all the protocols
-- Generic decoder Options {} struct
+- Generic decoder Options {} struct saves NFA/DFA files
 - calculate maximum length for timeout
 - calculate minimum $extent for avoiding runtime calcs
-- lead in gap (or whatever irptransmogrifier calls it
+- lead in gap (or whatever irptransmogrifier calls it)
 - Formatting of ir receive is poor/broken
 - Test all keymaps
-- Need ir-ctl and ir-keytable command line parsing
-- localization of cli messages
 - scancode <=> irp mapping
 - lircd.conf generate -> send to lircd -> correct result?
-- bpf feature should not be the default
+- bpf feature should not be the default in irp crate
 
 ir-keytable -c
 
