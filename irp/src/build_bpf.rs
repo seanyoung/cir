@@ -201,19 +201,19 @@ impl<'a> Builder<'a> {
         self.decoder_state = decoder_state;
 
         // load the lirc mode2 value and check its type
-        let lirc = self
+        let lirc_mode2 = self
             .builder
             .build_load(
                 i32,
                 function.get_first_param().unwrap().into_pointer_value(),
-                "lirc",
+                "lirc_mode2",
             )
             .unwrap()
             .into_int_value();
 
-        let lirc_ty = self
+        let lirc_mode2_ty = self
             .builder
-            .build_right_shift(lirc, i32.const_int(24, false), false, "lirc_ty")
+            .build_right_shift(lirc_mode2, i32.const_int(24, false), false, "lirc_mode2_ty")
             .unwrap();
 
         let lirc_ok = context.append_basic_block(function, "lirc_ok");
@@ -221,12 +221,16 @@ impl<'a> Builder<'a> {
 
         self.builder
             .build_switch(
-                lirc_ty,
-                zero_key,
+                lirc_mode2_ty,
+                zero_key, // ignore LIRC_MODE2_FREQUENCY and anything unknown
                 &[
+                    // LIRC_MODE2_SPACE
                     (i32.const_zero(), lirc_ok),
+                    // LIRC_MODE2_PULSE
                     (i32.const_int(1, false), lirc_ok),
+                    // LIRC_MODE2_TIMEOUT
                     (i32.const_int(3, false), lirc_ok),
+                    // LIRC_MODE2_OVERFLOW
                     (i32.const_int(4, false), error),
                 ],
             )
@@ -234,18 +238,18 @@ impl<'a> Builder<'a> {
 
         self.builder.position_at_end(lirc_ok);
 
-        // we known the lirc mode2 value is ok,
-
+        // we know the lirc mode2 value is ok
         let length = self
             .builder
-            .build_and(lirc, i32.const_int(0x00ff_ffff, false), "length")
+            .build_and(lirc_mode2, i32.const_int(0x00ff_ffff, false), "length")
             .unwrap();
 
+        // false for LIRC_MODE2_SPACE and LIRC_MODE2_TIMEOUT, true for LIRC_MODE2_PULSE
         let is_pulse = self
             .builder
             .build_int_compare(
                 IntPredicate::EQ,
-                lirc_ty,
+                lirc_mode2_ty,
                 i32.const_int(1, false),
                 "is_pulse",
             )
@@ -272,9 +276,9 @@ impl<'a> Builder<'a> {
 
         let mut cases = Vec::new();
 
-        // we will add a switch statement at the end of lirc ok once we have built all the cases
+        // we will add a switch statement at the end of lirc_ok block once we have built all the cases
         for (state_no, vert) in self.dfa.verts.iter().enumerate() {
-            let block = context.append_basic_block(function, &format!("state_{state_no}_entry"));
+            let block = context.append_basic_block(function, &format!("state_{state_no}"));
             self.builder.position_at_end(block);
 
             cases.push((i64.const_int(state_no as u64, false), block));
@@ -385,12 +389,12 @@ impl<'a> Builder<'a> {
                             }
                         }
                         Action::Set { var, expr } => {
-                            let value = self.emit(expr, context);
+                            let value = self.expression(expr, context);
                             self.update_var(var, value);
                         }
                         Action::AssertEq { left, right } => {
-                            let left = self.emit(left, context);
-                            let right = self.emit(right, context);
+                            let left = self.expression(left, context);
+                            let right = self.expression(right, context);
 
                             let ok = context.append_basic_block(function, "ok");
 
@@ -416,7 +420,7 @@ impl<'a> Builder<'a> {
                         }
                         Action::Done(ev, _) => {
                             let flags = if self.vars.contains_key("T") {
-                                // T should be 0 or 1; this corresponds with LIRC_SCANCODE_FA
+                                // T should be 0 or 1; this corresponds with LIRC_SCANCODE_FLAGS_TOGGLE
                                 self.load_var("T", context)
                             } else {
                                 context.i64_type().const_zero()
@@ -507,10 +511,10 @@ impl<'a> Builder<'a> {
             .unwrap();
     }
 
-    fn emit(&mut self, expr: &'a Rc<Expression>, context: &'a Context) -> IntValue<'a> {
+    fn expression(&mut self, expr: &'a Rc<Expression>, context: &'a Context) -> IntValue<'a> {
         macro_rules! unary {
             ($expr:expr,  $op:ident) => {{
-                let expr = self.emit($expr, context);
+                let expr = self.expression($expr, context);
 
                 self.builder.$op(expr, "").unwrap()
             }};
@@ -518,8 +522,8 @@ impl<'a> Builder<'a> {
 
         macro_rules! binary {
             ($left:expr, $right:expr, $op:ident) => {{
-                let left = self.emit($left, context);
-                let right = self.emit($right, context);
+                let left = self.expression($left, context);
+                let right = self.expression($right, context);
 
                 self.builder.$op(left, right, "").unwrap()
             }};
@@ -527,8 +531,8 @@ impl<'a> Builder<'a> {
 
         macro_rules! compare {
             ($left:expr, $right:expr, $pred:path) => {{
-                let left = self.emit($left, context);
-                let right = self.emit($right, context);
+                let left = self.expression($left, context);
+                let right = self.expression($right, context);
 
                 self.builder
                     .build_int_z_extend(
@@ -548,7 +552,7 @@ impl<'a> Builder<'a> {
             Expression::Complement(expr) => unary!(expr, build_not),
             Expression::Negative(expr) => unary!(expr, build_int_neg),
             Expression::Not(expr) => {
-                let expr = self.emit(expr, context);
+                let expr = self.expression(expr, context);
 
                 self.builder
                     .build_int_z_extend(
@@ -566,7 +570,7 @@ impl<'a> Builder<'a> {
                     .unwrap()
             }
             Expression::BitCount(expr) => {
-                let expr = self.emit(expr, context);
+                let expr = self.expression(expr, context);
 
                 let i64 = context.i64_type();
 
@@ -596,8 +600,8 @@ impl<'a> Builder<'a> {
 
             Expression::ShiftLeft(left, right) => binary!(left, right, build_left_shift),
             Expression::ShiftRight(left, right) => {
-                let left = self.emit(left, context);
-                let right = self.emit(right, context);
+                let left = self.expression(left, context);
+                let right = self.expression(right, context);
 
                 self.builder
                     .build_right_shift(left, right, false, "")
@@ -617,51 +621,45 @@ impl<'a> Builder<'a> {
     }
 
     fn load_var(&mut self, name: &'a str, context: &'a Context) -> IntValue<'a> {
-        match self.vars.get_mut(name) {
-            Some(e) => {
-                if let Some(value) = e.value {
-                    return value;
-                }
+        let e = self.vars.get_mut(name).unwrap();
 
-                let load = self
-                    .builder
-                    .build_load(
-                        context.i64_type(),
-                        self.builder
-                            .build_struct_gep(
-                                self.decoder_state_ty,
-                                self.decoder_state,
-                                e.offset as u32,
-                                name,
-                            )
-                            .unwrap(),
+        if let Some(value) = e.value {
+            return value;
+        }
+
+        let load = self
+            .builder
+            .build_load(
+                context.i64_type(),
+                self.builder
+                    .build_struct_gep(
+                        self.decoder_state_ty,
+                        self.decoder_state,
+                        e.offset as u32,
                         name,
                     )
-                    .unwrap();
+                    .unwrap(),
+                name,
+            )
+            .unwrap();
 
-                load.as_instruction_value()
-                    .unwrap()
-                    .set_alignment(8)
-                    .unwrap();
+        load.as_instruction_value()
+            .unwrap()
+            .set_alignment(8)
+            .unwrap();
 
-                let value = load.into_int_value();
+        let value = load.into_int_value();
 
-                e.value = Some(value);
+        e.value = Some(value);
 
-                value
-            }
-            None => unreachable!(),
-        }
+        value
     }
 
     fn update_var(&mut self, name: &'a str, value: IntValue<'a>) {
-        match self.vars.get_mut(name) {
-            Some(e) => {
-                e.value = Some(value);
-                e.dirty = true;
-            }
-            None => unreachable!(),
-        }
+        let e = self.vars.get_mut(name).unwrap();
+
+        e.value = Some(value);
+        e.dirty = true;
     }
 
     fn write_dirty(&self) {

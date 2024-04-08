@@ -15,6 +15,7 @@
 - scancode <=> irp mapping
 - lircd.conf generate -> send to lircd -> correct result?
 - bpf feature should not be the default in irp crate
+- DFA edges can be overlapping - removing overlapping parts
 
 ir-keytable -c
 
