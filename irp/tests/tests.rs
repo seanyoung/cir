@@ -1,7 +1,4 @@
-use irp::{
-    protocols::{parse, Protocol},
-    Decoder, Event, InfraredData, Irp, Message, Options, Vartable,
-};
+use irp::{Decoder, Event, InfraredData, Irp, Message, Options, Protocol, Vartable};
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
 use rand::Rng;
@@ -266,9 +263,10 @@ fn vars() {
 
 #[test]
 fn parse_all_of_them() {
-    let protocols = parse(&PathBuf::from(
+    let protocols = Protocol::parse(&PathBuf::from(
         "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
-    ));
+    ))
+    .unwrap();
 
     let mut broken = 0;
     let mut total = 0;
@@ -327,9 +325,10 @@ fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
 
 #[test]
 fn compare_encode_to_transmogrifier() {
-    let mut protocols = parse(&PathBuf::from(
+    let mut protocols = Protocol::parse(&PathBuf::from(
         "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
-    ));
+    ))
+    .unwrap();
 
     let mut total_tests = 0;
     let mut fails = 0;
@@ -424,9 +423,10 @@ fn compare_encode_to_transmogrifier() {
 
 #[test]
 fn decode_all() {
-    let protocols = parse(&PathBuf::from(
+    let protocols = Protocol::parse(&PathBuf::from(
         "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
-    ));
+    ))
+    .unwrap();
 
     let mut total_tests = 0;
     let mut fails = 0;

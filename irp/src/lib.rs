@@ -13,12 +13,13 @@ mod inverse;
 mod message;
 mod parser;
 mod pronto;
-pub mod protocols;
+mod protocols;
 mod variants;
 
 pub use build_dfa::DFA;
 pub use build_nfa::NFA;
 pub use decoder::Decoder;
+pub use protocols::Protocol;
 
 use num_rational::Rational64;
 use std::{collections::HashMap, fmt, rc::Rc};
