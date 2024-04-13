@@ -74,6 +74,20 @@ impl DFA {
     }
 }
 
+impl<'a> Options<'a> {
+    /// Create file name for saving of intermediates. The extension should include the dot,
+    /// so we can have `_nfa.dot` as extension.
+    pub(crate) fn filename(&self, ext: &str) -> String {
+        // characters not allowed on Windows/Mac/Linux: https://stackoverflow.com/a/35352640
+
+        self.name
+            .chars()
+            .filter(|c| !matches!(c, ':' | '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|'))
+            .chain(ext.chars())
+            .collect::<String>()
+    }
+}
+
 impl Irp {
     /// Generate an DFA decoder state machine for this IRP
     pub fn compile(&self, options: &Options) -> Result<DFA, String> {

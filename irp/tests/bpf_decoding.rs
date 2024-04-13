@@ -1,5 +1,4 @@
 #![cfg(feature = "bpf")]
-#![cfg(target_os = "linux")]
 
 use aya_obj::{
     generated::{bpf_insn, bpf_map_type::BPF_MAP_TYPE_ARRAY},

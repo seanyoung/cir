@@ -95,7 +95,7 @@ impl<'a> Decoder<'a> {
         self.pos.truncate(0);
     }
 
-    pub fn add_pos(&mut self, pos: usize, vartab: Vartable<'a>) {
+    fn add_pos(&mut self, pos: usize, vartab: Vartable<'a>) {
         let entry = (pos, vartab);
         if self.dfa {
             self.pos = vec![entry];

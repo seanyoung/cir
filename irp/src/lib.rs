@@ -235,6 +235,7 @@ pub struct Options<'a> {
     /// Maximum gap the input will contains
     pub max_gap: u32,
     /// If non-zero, repeated presses can be xored with this value
+    #[cfg(feature = "bpf")]
     pub repeat_mask: u64,
     /// Protocol no which will be passed to bpf_rc_keydown()
     pub protocol: u32,
@@ -243,23 +244,12 @@ pub struct Options<'a> {
     /// If Some(path) the dfa intermediate file will be saved
     pub dfa: bool,
     /// If Some(path) the llvm IR intermediate file will be saved
+    #[cfg(feature = "bpf")]
     pub llvm_ir: bool,
     /// If Some(path) the assembly intermediate file will be saved
+    #[cfg(feature = "bpf")]
     pub assembly: bool,
     /// If Some(path) the object intermediate file will be saved
+    #[cfg(feature = "bpf")]
     pub object: bool,
-}
-
-impl<'a> Options<'a> {
-    /// Create file name for saving of intermediates. The extension should include the dot,
-    /// so we can have `_nfa.dot` as extension.
-    fn filename(&self, ext: &str) -> String {
-        // characters not allowed on Windows/Mac/Linux: https://stackoverflow.com/a/35352640
-
-        self.name
-            .chars()
-            .filter(|c| !matches!(c, ':' | '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|'))
-            .chain(ext.chars())
-            .collect::<String>()
-    }
 }
