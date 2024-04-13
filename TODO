@@ -3,9 +3,7 @@
 - send from keymap
 - Need ir-ctl and ir-keytable command line parsing
 - localization of cli messages
-- implement Action::Gap/Flash { Expression::Length {} }
 - test all the protocols
-- Generic decoder Options {} struct saves NFA/DFA files
 - calculate maximum length for timeout
 - calculate minimum $extent for avoiding runtime calcs
 - lead in gap (or whatever irptransmogrifier calls it)

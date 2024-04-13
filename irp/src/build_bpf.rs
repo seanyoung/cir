@@ -4,6 +4,7 @@ use super::{
     Event, Expression, Options,
 };
 use inkwell::{
+    basic_block::BasicBlock,
     builder,
     context::Context,
     module::Module,
@@ -301,7 +302,7 @@ impl<'a> Builder<'a> {
             cases.push((i64.const_int(state_no as u64, false), block));
 
             for edge in &vert.edges {
-                let next = context.append_basic_block(self.function, "next");
+                let next_edge = context.append_basic_block(self.function, "next");
 
                 for action in &edge.actions {
                     match action {
@@ -312,12 +313,12 @@ impl<'a> Builder<'a> {
                             let ok = context.append_basic_block(self.function, "ok");
 
                             self.builder
-                                .build_conditional_branch(is_pulse, ok, next)
+                                .build_conditional_branch(is_pulse, ok, next_edge)
                                 .unwrap();
 
                             self.builder.position_at_end(ok);
 
-                            self.const_edge(context, length, min, max, next);
+                            self.min_max_edge(context, length, min, max, next_edge);
                         }
                         Action::Gap {
                             length: Length::Range(min, max),
@@ -326,12 +327,89 @@ impl<'a> Builder<'a> {
                             let ok = context.append_basic_block(self.function, "ok");
 
                             self.builder
-                                .build_conditional_branch(is_pulse, next, ok)
+                                .build_conditional_branch(is_pulse, next_edge, ok)
                                 .unwrap();
 
                             self.builder.position_at_end(ok);
 
-                            self.const_edge(context, length, min, max, next);
+                            self.min_max_edge(context, length, min, max, next_edge);
+                        }
+                        Action::Gap {
+                            length: Length::Expression(expected),
+                            ..
+                        } => {
+                            let ok = context.append_basic_block(self.function, "ok");
+
+                            self.builder
+                                .build_conditional_branch(is_pulse, next_edge, ok)
+                                .unwrap();
+
+                            self.builder.position_at_end(ok);
+
+                            let expected = self.expression(expected, context);
+
+                            let ok = context.append_basic_block(self.function, "ok");
+                            let edge_ok = context.append_basic_block(self.function, "edge_ok");
+
+                            // ok if both expected && length >= max_gap
+                            let res = self
+                                .builder
+                                .build_int_compare(
+                                    IntPredicate::UGE,
+                                    expected,
+                                    i64.const_int(self.options.max_gap.into(), false),
+                                    "",
+                                )
+                                .unwrap();
+
+                            let expected_ge_max_gap =
+                                context.append_basic_block(self.function, "expected_ge_max_gap");
+
+                            self.builder
+                                .build_conditional_branch(res, edge_ok, ok)
+                                .unwrap();
+
+                            self.builder.position_at_end(expected_ge_max_gap);
+
+                            let res = self
+                                .builder
+                                .build_int_compare(
+                                    IntPredicate::UGE,
+                                    length,
+                                    i64.const_int(self.options.max_gap.into(), false),
+                                    "",
+                                )
+                                .unwrap();
+
+                            self.builder
+                                .build_conditional_branch(res, edge_ok, ok)
+                                .unwrap();
+
+                            self.builder.position_at_end(ok);
+
+                            self.tolerance_eq(context, length, expected, edge_ok, next_edge);
+
+                            self.builder.position_at_end(edge_ok);
+                        }
+                        Action::Flash {
+                            length: Length::Expression(expected),
+                            ..
+                        } => {
+                            let ok = context.append_basic_block(self.function, "ok");
+
+                            self.builder
+                                .build_conditional_branch(is_pulse, ok, next_edge)
+                                .unwrap();
+
+                            self.builder.position_at_end(ok);
+
+                            let expected = self.expression(expected, context);
+
+                            let edge_ok = context.append_basic_block(self.function, "edge_ok");
+
+                            self.tolerance_eq(context, length, expected, edge_ok, next_edge);
+
+                            self.builder.position_at_end(edge_ok);
                         }
                         Action::Set { var, expr } => {
                             let value = self.expression(expr, context);
@@ -349,7 +427,7 @@ impl<'a> Builder<'a> {
                                 .unwrap();
 
                             self.builder
-                                .build_conditional_branch(res, ok, next)
+                                .build_conditional_branch(res, ok, next_edge)
                                 .unwrap();
 
                             self.builder.position_at_end(ok);
@@ -446,7 +524,6 @@ impl<'a> Builder<'a> {
                                     .unwrap();
                             }
                         }
-                        _ => unimplemented!(),
                     }
                 }
 
@@ -470,7 +547,7 @@ impl<'a> Builder<'a> {
                     .build_return(Some(&i32.const_zero().as_basic_value_enum()))
                     .unwrap();
 
-                self.builder.position_at_end(next);
+                self.builder.position_at_end(next_edge);
             }
 
             self.builder.build_unconditional_branch(error).unwrap();
@@ -499,13 +576,13 @@ impl<'a> Builder<'a> {
             .unwrap();
     }
 
-    fn const_edge(
+    fn min_max_edge(
         &self,
         context: &Context,
         length: IntValue<'a>,
         min: &u32,
         max: &Option<u32>,
-        next: inkwell::basic_block::BasicBlock<'a>,
+        next_edge: BasicBlock<'a>,
     ) {
         let i64 = context.i64_type();
 
@@ -522,7 +599,7 @@ impl<'a> Builder<'a> {
             .unwrap();
 
         self.builder
-            .build_conditional_branch(res, ok, next)
+            .build_conditional_branch(res, ok, next_edge)
             .unwrap();
 
         self.builder.position_at_end(ok);
@@ -541,11 +618,76 @@ impl<'a> Builder<'a> {
                 .unwrap();
 
             self.builder
-                .build_conditional_branch(res, ok, next)
+                .build_conditional_branch(res, ok, next_edge)
                 .unwrap();
 
             self.builder.position_at_end(ok);
         }
+    }
+
+    fn tolerance_eq(
+        &self,
+        context: &'a Context,
+        received: IntValue<'a>,
+        expected: IntValue<'a>,
+        edge_ok: BasicBlock<'a>,
+        next_edge: BasicBlock<'a>,
+    ) {
+        let diff = self.builder.build_int_sub(expected, received, "").unwrap();
+
+        let i64 = context.i64_type();
+        let i1 = context.bool_type();
+
+        let fn_type = i64.fn_type(&[i64.into(), i1.into()], false);
+
+        let function = self.module.add_function("llvm.abs.i64", fn_type, None);
+
+        let abs_diff = self
+            .builder
+            .build_call(function, &[diff.into(), i1.const_zero().into()], "")
+            .unwrap()
+            .try_as_basic_value()
+            .left()
+            .unwrap()
+            .into_int_value();
+
+        let ok = context.append_basic_block(self.function, "ok");
+
+        let less_than_aeps = self
+            .builder
+            .build_int_compare(
+                IntPredicate::ULE,
+                abs_diff,
+                i64.const_int(self.options.aeps.into(), false),
+                "",
+            )
+            .unwrap();
+
+        self.builder
+            .build_conditional_branch(less_than_aeps, edge_ok, ok)
+            .unwrap();
+
+        self.builder.position_at_end(ok);
+
+        // abs_diff * 100 <= eps * expected
+        let left = self
+            .builder
+            .build_int_mul(abs_diff, i64.const_int(100, false), "")
+            .unwrap();
+
+        let right = self
+            .builder
+            .build_int_mul(i64.const_int(self.options.aeps.into(), false), expected, "")
+            .unwrap();
+
+        let less_than_eps = self
+            .builder
+            .build_int_compare(IntPredicate::ULE, left, right, "")
+            .unwrap();
+
+        self.builder
+            .build_conditional_branch(less_than_eps, edge_ok, next_edge)
+            .unwrap();
     }
 
     fn expression(&mut self, expr: &'a Rc<Expression>, context: &'a Context) -> IntValue<'a> {
