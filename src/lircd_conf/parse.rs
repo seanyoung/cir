@@ -131,7 +131,7 @@ impl<'a> LircParser<'a> {
                         return Err(ParseError::SyntaxError(self.line_no));
                     }
 
-                    remote.name = second.unwrap().to_owned();
+                    second.unwrap().clone_into(&mut remote.name);
                 }
                 Some("driver") => {
                     if second.is_none() {
@@ -143,7 +143,7 @@ impl<'a> LircParser<'a> {
                         return Err(ParseError::SyntaxError(self.line_no));
                     }
 
-                    remote.driver = second.unwrap().to_owned();
+                    second.unwrap().clone_into(&mut remote.driver);
                 }
                 Some("serial_mode") => {
                     if second.is_none() {
@@ -155,7 +155,7 @@ impl<'a> LircParser<'a> {
                         return Err(ParseError::SyntaxError(self.line_no));
                     }
 
-                    remote.serial_mode = second.unwrap().to_owned();
+                    second.unwrap().clone_into(&mut remote.serial_mode);
                 }
                 Some(name @ "eps")
                 | Some(name @ "aeps")

@@ -110,13 +110,13 @@ fn read_uevent(path: &Path) -> io::Result<UEvent> {
     for line in fs::read_to_string(path.join("uevent"))?.lines() {
         match line.split_once('=') {
             Some(("NAME", value)) => {
-                name = value.to_owned();
+                value.clone_into(&mut name);
             }
             Some(("DRV_NAME", value)) => {
-                drv_name = value.to_owned();
+                value.clone_into(&mut drv_name);
             }
             Some(("DEVNAME", value)) | Some(("DEV_NAME", value)) => {
-                dev_name = value.to_owned();
+                value.clone_into(&mut dev_name);
             }
             _ => (),
         }

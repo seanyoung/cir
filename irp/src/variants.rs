@@ -174,8 +174,8 @@ pub(crate) fn variants(stream: &Rc<Expression>) -> Result<[Option<Rc<Expression>
                         if repeat_marker.is_some() {
                             return Err("multiple repeat markers in IRP".into());
                         } else {
-                            repeats = stream.stream.clone();
-                            repeat_marker = stream.repeat.clone();
+                            repeats.clone_from(&stream.stream);
+                            repeat_marker.clone_from(&stream.repeat);
                             min_repeat = stream.min_repeat();
                             continue;
                         }

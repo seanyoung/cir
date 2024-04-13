@@ -81,7 +81,7 @@ impl<'a> Builder<'a> {
     fn build(&mut self) {
         assert_eq!(self.add_vertex(), 0);
 
-        self.verts[0].entry = self.nfa.verts[0].entry.clone();
+        self.verts[0].entry.clone_from(&self.nfa.verts[0].entry);
 
         self.nfa_to_dfa.insert(0, 0);
 
