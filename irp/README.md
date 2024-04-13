@@ -9,6 +9,9 @@ using many different protocols. Using this library you can decode the IR
 received from a remote control, or encode IR into the same format as a remote
 control.
 
+When the `bpf` feature is enabled, a decoder can be compiled to BPF. This decoder is
+usable on Linux for BPF based kernel decoding.
+
 This library only deals with the encoding and decoding, and does not know anything
 about talking to infrared devices for receiving or transmitting; you can use
 the [cir crate](https://crates.io/crates/cir)
