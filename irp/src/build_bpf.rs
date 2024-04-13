@@ -12,6 +12,7 @@ use inkwell::{
     values::{BasicValue, FunctionValue, GlobalValue, IntValue, PointerValue},
     AddressSpace, IntPredicate, OptimizationLevel,
 };
+use log::info;
 use once_cell::sync::OnceCell;
 use std::{collections::HashMap, fs::File, io::Write, rc::Rc};
 
@@ -55,8 +56,12 @@ impl DFA {
 
         builder.define_function_body(map, &context);
 
-        if let Some(path) = options.llvm_ir {
-            builder.module.print_to_file(path).unwrap();
+        if options.llvm_ir {
+            let filename = options.filename(".ll");
+
+            info!("saving llvm ir as {filename}");
+
+            builder.module.print_to_file(&filename).unwrap();
         }
 
         builder.module.verify().unwrap();
@@ -74,14 +79,17 @@ impl DFA {
             )
             .unwrap();
 
-        if let Some(path) = options.assembly {
+        if options.assembly {
             let code = target_machine.write_to_memory_buffer(&builder.module, FileType::Assembly);
 
             match code {
                 Ok(mem_buf) => {
                     let slice = mem_buf.as_slice();
+                    let filename = options.filename(".s");
 
-                    let mut file = match File::create(path) {
+                    info!("saving assembly as {filename}");
+
+                    let mut file = match File::create(&filename) {
                         Ok(file) => file,
                         Err(e) => return Err(e.to_string()),
                     };
@@ -98,8 +106,11 @@ impl DFA {
             Ok(mem_buf) => {
                 let slice = mem_buf.as_slice();
 
-                if let Some(path) = options.object {
-                    let mut file = match File::create(path) {
+                if options.object {
+                    let filename = options.filename(".o");
+
+                    info!("saving object file as {filename}");
+                    let mut file = match File::create(&filename) {
                         Ok(file) => file,
                         Err(e) => return Err(e.to_string()),
                     };
@@ -410,12 +421,17 @@ impl<'a> Builder<'a> {
                             self.builder.position_at_end(ok);
                         }
                         Action::Done(Event::Repeat, vars) if vars.is_empty() => {
-                            let fn_type = i32.fn_type(&[], false);
+                            let fn_type = i32.fn_type(&[i32_ptr.into()], false);
 
                             let bpf_rc_repeat = i64.const_int(77, false).const_to_pointer(i32_ptr);
 
                             self.builder
-                                .build_indirect_call(fn_type, bpf_rc_repeat, &[], "")
+                                .build_indirect_call(
+                                    fn_type,
+                                    bpf_rc_repeat,
+                                    &[self.function.get_first_param().unwrap().into()],
+                                    "",
+                                )
                                 .unwrap();
                         }
                         Action::Done(ev, _) => {
@@ -445,7 +461,10 @@ impl<'a> Builder<'a> {
                                 .i32_type()
                                 .const_int(self.options.protocol as u64, false);
 
-                            let fn_type = i32.fn_type(&[i32.into(), i64.into(), i64.into()], false);
+                            let fn_type = i32.fn_type(
+                                &[i32_ptr.into(), i32.into(), i64.into(), i64.into()],
+                                false,
+                            );
 
                             let bpf_rc_keydown = i64.const_int(78, false).const_to_pointer(i32_ptr);
 
@@ -453,7 +472,12 @@ impl<'a> Builder<'a> {
                                 .build_indirect_call(
                                     fn_type,
                                     bpf_rc_keydown,
-                                    &[protocol.into(), code.into(), flags.into()],
+                                    &[
+                                        self.function.get_first_param().unwrap().into(),
+                                        protocol.into(),
+                                        code.into(),
+                                        flags.into(),
+                                    ],
                                     "",
                                 )
                                 .unwrap();
@@ -789,7 +813,7 @@ fn define_function<'ctx>(
 
     let fn_type = i32.fn_type(&[i32_ptr.into()], false);
 
-    let function = module.add_function("bpf_decoder", fn_type, None);
+    let function = module.add_function(name, fn_type, None);
 
     function.set_section(Some(&format!("lirc_mode2/{}", name)));
 

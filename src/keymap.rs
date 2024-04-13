@@ -1,7 +1,7 @@
 //! Parse linux rc keymaps
 
 use serde_derive::Deserialize;
-use std::collections::HashMap;
+use std::{collections::HashMap, ffi::OsStr, path::Path};
 
 #[derive(Deserialize, PartialEq, Eq, Debug, Default)]
 pub struct Protocol {
@@ -82,8 +82,8 @@ peg::parser! {
 }
 
 /// Parse a rc keymap file, either toml or old text format. No validation is done of key codes or protocol names
-pub fn parse(contents: &str, filename: &str) -> Result<Keymap, String> {
-    if filename.ends_with(".toml") {
+pub fn parse(contents: &str, filename: &Path) -> Result<Keymap, String> {
+    if filename.extension() == Some(OsStr::new("toml")) {
         let keymap: Keymap = toml::from_str(contents).map_err(|e| e.to_string())?;
 
         for p in &keymap.protocols {
@@ -140,7 +140,7 @@ fn parse_toml_test() {
     0x1e1c = "KEY_TV"
     "#;
 
-    let k = parse(s, "x.toml").unwrap();
+    let k = parse(s, Path::new("x.toml")).unwrap();
 
     assert_eq!(k.protocols[0].name, "hauppauge");
     assert_eq!(k.protocols[0].protocol, "rc5");
@@ -165,7 +165,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        parse(s, "x.toml"),
+        parse(s, Path::new("x.toml")),
         Err("raw protocol is misssing raw entries".to_string())
     );
 
@@ -178,7 +178,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        parse(s, "x.toml"),
+        parse(s, Path::new("x.toml")),
         Err("raw entry has neither pronto hex code nor raw".to_string())
     );
 
@@ -192,7 +192,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        parse(s, "x.toml"),
+        parse(s, Path::new("x.toml")),
         Err("raw entry has neither pronto hex code nor raw".to_string())
     );
 }
@@ -206,7 +206,7 @@ fn parse_text_test() {
     0x1e1c KEY_TV
     "#;
 
-    let k = parse(s, "hauppauge").unwrap();
+    let k = parse(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k.protocols[0].name, "hauppauge");
     assert_eq!(k.protocols[0].protocol, "RC5");
@@ -230,7 +230,7 @@ fn parse_text_test() {
     0x800f0403 KEY_NUMERIC_3
     "#;
 
-    let k = parse(s, "hauppauge").unwrap();
+    let k = parse(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k.protocols[0].name, "rc6_mce");
     assert_eq!(k.protocols[0].protocol, "RC6");
@@ -255,7 +255,7 @@ fn parse_text_test() {
     0x28c2 KEY_NUMERIC_2
     "#;
 
-    let k = parse(s, "hauppauge").unwrap();
+    let k = parse(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k.protocols[0].name, "streamzap");
     assert_eq!(k.protocols[0].protocol, "RC-5-SZ");

@@ -27,11 +27,7 @@ inkwell = { version = "0.4", features = [ "target-bpf", "no-libffi-linking", "ll
 once_cell = { version = "1.19", optional = true }
 
 [features]
-default = [ "bpf" ]
 bpf = [ "inkwell", "once_cell" ]
-
-[package.metadata.docs.rs]
-no-default-features = true
 
 [dev-dependencies]
 cir = { path = ".." }

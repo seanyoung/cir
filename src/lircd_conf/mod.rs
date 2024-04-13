@@ -21,6 +21,8 @@ pub struct Code {
     /// List of codes. Usually there is only one, sometimes a single button
     /// transmits multiple codes.
     pub code: Vec<u64>,
+    /// line no in lircd.conf
+    pub line_no: u32,
 }
 
 /// A button on a remote presented by raw IR
@@ -32,6 +34,8 @@ pub struct RawCode {
     pub dup: bool,
     /// Raw IR lengths. The first entry is a pulse, followed by gap, pulse, etc.
     pub rawir: Vec<u32>,
+    /// line no in lircd.conf
+    pub line_no: u32,
 }
 
 bitflags! {

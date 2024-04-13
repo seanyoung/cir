@@ -9,13 +9,24 @@ pub struct LircDecoder<'a> {
 }
 
 impl Remote {
-    /// Create a decoder for this remote
-    pub fn decoder(
+    /// Create a default decoder Options for this remote
+    pub fn default_options(
         &self,
         abs_tolerance: Option<u32>,
         rel_tolerance: Option<u32>,
         max_gap: u32,
-    ) -> LircDecoder {
+    ) -> Options {
+        Options {
+            name: &self.name,
+            aeps: abs_tolerance.unwrap_or(self.aeps as u32),
+            eps: rel_tolerance.unwrap_or(self.eps as u32),
+            max_gap,
+            ..Default::default()
+        }
+    }
+
+    /// Create DFA for this remote
+    pub fn build_dfa<'b>(&'b self, options: &Options<'b>) -> DFA {
         let nfa = if self.raw_codes.is_empty() {
             let irp = self.decode_irp();
 
@@ -35,15 +46,12 @@ impl Remote {
             nfa
         };
 
-        let options = Options {
-            name: &self.name,
-            aeps: abs_tolerance.unwrap_or(self.aeps as u32),
-            eps: rel_tolerance.unwrap_or(self.eps as u32),
-            max_gap,
-            ..Default::default()
-        };
+        nfa.build_dfa(options)
+    }
 
-        let dfa = nfa.build_dfa(&options);
+    /// Create a decoder for this remote
+    pub fn decoder<'b>(&'b self, options: Options<'b>) -> LircDecoder<'b> {
+        let dfa = self.build_dfa(&options);
 
         let decoder = Decoder::new(options);
 

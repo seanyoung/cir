@@ -53,7 +53,9 @@ fn lircd_encode_decode(path: &Path) {
 
         let our_remote = our_conf.next().unwrap();
 
-        let mut decoder = our_remote.decoder(Some(0), Some(0), 200000);
+        let options = our_remote.default_options(Some(0), Some(0), 200000);
+
+        let mut decoder = our_remote.decoder(options);
 
         if lircd_remote.is_raw() {
             for (our_code, lircd_code) in our_remote.raw_codes.iter().zip(lircd_remote.codes_iter())

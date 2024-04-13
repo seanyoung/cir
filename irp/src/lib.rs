@@ -21,7 +21,7 @@ pub use build_nfa::NFA;
 pub use decoder::Decoder;
 
 use num_rational::Rational64;
-use std::{collections::HashMap, fmt, path::Path, rc::Rc};
+use std::{collections::HashMap, fmt, rc::Rc};
 
 #[derive(Debug, PartialEq, Default, Eq)]
 /// An encoded raw infrared message
@@ -235,10 +235,28 @@ pub struct Options<'a> {
     pub max_gap: u32,
     /// Protocol no which will be passed to bpf_rc_keydown()
     pub protocol: u32,
+    /// If Some(path) the nfa intermediate file will be saved
+    pub nfa: bool,
+    /// If Some(path) the dfa intermediate file will be saved
+    pub dfa: bool,
     /// If Some(path) the llvm IR intermediate file will be saved
-    pub llvm_ir: Option<&'a Path>,
+    pub llvm_ir: bool,
     /// If Some(path) the assembly intermediate file will be saved
-    pub assembly: Option<&'a Path>,
+    pub assembly: bool,
     /// If Some(path) the object intermediate file will be saved
-    pub object: Option<&'a Path>,
+    pub object: bool,
+}
+
+impl<'a> Options<'a> {
+    /// Create file name for saving of intermediates. The extension should include the dot,
+    /// so we can have `_nfa.dot` as extension.
+    fn filename(&self, ext: &str) -> String {
+        // characters not allowed on Windows/Mac/Linux: https://stackoverflow.com/a/35352640
+
+        self.name
+            .chars()
+            .filter(|c| !matches!(c, ':' | '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|'))
+            .chain(ext.chars())
+            .collect::<String>()
+    }
 }

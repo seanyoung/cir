@@ -3,7 +3,6 @@
 - send from keymap
 - Need ir-ctl and ir-keytable command line parsing
 - localization of cli messages
-- clap 4.5/4.4 and merge cir devices/config
 - implement Action::Gap/Flash { Expression::Length {} }
 - test all the protocols
 - Generic decoder Options {} struct saves NFA/DFA files
@@ -14,40 +13,11 @@
 - Test all keymaps
 - scancode <=> irp mapping
 - lircd.conf generate -> send to lircd -> correct result?
-- bpf feature should not be the default in irp crate
 - DFA edges can be overlapping - removing overlapping parts
-
-ir-keytable -c
-
-cir config clear
-
-ir-keytable --a [/etc/maps]
-
-cir config auto ?
-
-ir-keytable -w keypmap
-
-cir config keymap keypmap
-
-cir config lircd foo.lircd
-
-cir config show/cir devices?
-
-.. what about -p rc5 -
-
-cir config set -p rc5 -s 1:KEY_F1
-
-IRPs for kernel protocols include pulse_distance and so on
-
-cir decode irp should read IrpProtocols.xml
-
-cir transmit keymap
-
-
-cir devices
-cir config show
-cir config clear
-
+- rc_mapping() kfunc
+- IRPs for kernel protocols include pulse_distance and so on
+- cir decode irp should read IrpProtocols.xml
+- bpf decoder does not know about repeat_mask
 
 irp language oddities
 

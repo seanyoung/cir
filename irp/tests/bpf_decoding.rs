@@ -1,4 +1,5 @@
 #![cfg(feature = "bpf")]
+#![cfg(target_os = "linux")]
 
 use aya_obj::{
     generated::{bpf_insn, bpf_map_type::BPF_MAP_TYPE_ARRAY},
@@ -62,7 +63,7 @@ fn rc5() {
 
     let function = obj
         .functions
-        .get(&obj.programs["bpf_decoder"].function_key())
+        .get(&obj.programs["rc5"].function_key())
         .unwrap();
 
     let data = unsafe {
@@ -122,7 +123,7 @@ fn bpf_map_lookup_elem(def: u64, key: u64, _arg3: u64, _arg4: u64, _arg5: u64) -
     p as u64
 }
 
-fn bpf_rc_keydown(protocol: u64, code: u64, flags: u64, _arg4: u64, _arg5: u64) -> u64 {
+fn bpf_rc_keydown(_ctx: u64, protocol: u64, code: u64, flags: u64, _arg4: u64) -> u64 {
     println!("rc_keydown protocol:{protocol} code:{code} flags:{flags}");
 
     unsafe {
@@ -132,7 +133,7 @@ fn bpf_rc_keydown(protocol: u64, code: u64, flags: u64, _arg4: u64, _arg5: u64) 
     0
 }
 
-fn bpf_rc_repeat(_arg1: u64, _arg2: u64, _arg3: u64, _arg4: u64, _arg5: u64) -> u64 {
+fn bpf_rc_repeat(_ctx: u64, _arg2: u64, _arg3: u64, _arg4: u64, _arg5: u64) -> u64 {
     println!("rc_repeat");
 
     0

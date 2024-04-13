@@ -1,112 +1,78 @@
-use super::{open_lirc, Purpose};
+#[cfg(target_os = "linux")]
+use super::config::{open_lirc, Purpose};
 use cir::lircd_conf;
 use irp::{Irp, Message, Pronto, Vartable};
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use std::{ffi::OsStr, fs, path::Path, str::FromStr};
 use terminal_size::{terminal_size, Width};
 
-pub fn transmit(global_matches: &clap::ArgMatches) {
-    let (message, matches) = encode_args(global_matches);
-    let dry_run = matches.is_present("DRYRUN");
+pub fn transmit(transmit: &crate::Transmit) {
+    let message = encode_args(transmit);
 
-    let duty_cycle = if let Some(value) = matches.value_of("DUTY_CYCLE") {
-        match value.parse() {
-            Ok(d @ 1..=99) => Some(d),
-            _ => {
-                eprintln!("error: ‘{value}’ duty cycle is not valid");
-
-                std::process::exit(1);
-            }
-        }
-    } else {
-        message.duty_cycle
-    };
-
-    let carrier = if let Some(value) = matches.value_of("CARRIER") {
-        match value.parse() {
-            Ok(c @ 0..=1_000_000) => Some(c),
-            _ => {
-                eprintln!("error: ‘{value}’ carrier is not valid");
-
-                std::process::exit(1);
-            }
-        }
-    } else {
-        message.carrier
-    };
-
-    if let Some(carrier) = &carrier {
+    if let Some(carrier) = &message.carrier {
         if *carrier == 0 {
             info!("carrier: unmodulated (no carrier)");
         } else {
             info!("carrier: {}Hz", carrier);
         }
     }
-    if let Some(duty_cycle) = &duty_cycle {
+    if let Some(duty_cycle) = &message.duty_cycle {
         info!("duty cycle: {}%", duty_cycle);
     }
     info!("rawir: {}", message.print_rawir());
 
-    if !dry_run {
-        let mut lircdev = open_lirc(matches, Purpose::Transmit);
+    #[cfg(target_os = "linux")]
+    if !transmit.dry_run {
+        let mut lircdev = open_lirc(&transmit.device, Purpose::Transmit);
 
-        if let Some(values) = global_matches
-            .values_of("TRANSMITTERS")
-            .or_else(|| matches.values_of("TRANSMITTERS"))
-        {
-            let mut transmitters: Vec<u32> = Vec::new();
-            for t in values {
-                match t.parse() {
-                    Ok(0) | Err(_) => {
-                        eprintln!("error: ‘{t}’ is not a valid transmitter number");
-                        std::process::exit(1);
-                    }
-                    Ok(v) => transmitters.push(v),
-                }
+        if !transmit.transmitters.is_empty() {
+            if !lircdev.can_set_send_transmitter_mask() {
+                eprintln!("error: {lircdev}: device does not support setting transmitters");
+
+                std::process::exit(1);
             }
 
-            if !transmitters.is_empty() {
-                if !lircdev.can_set_send_transmitter_mask() {
-                    eprintln!("error: {lircdev}: device does not support setting transmitters");
+            let transmitter_count = match lircdev.num_transmitters() {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("error: {lircdev}: failed to get transmitter count: {e}");
 
                     std::process::exit(1);
                 }
+            };
 
-                let transmitter_count = match lircdev.num_transmitters() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        eprintln!("error: {lircdev}: failed to get transmitter count: {e}");
+            if let Some(t) = transmit
+                .transmitters
+                .iter()
+                .find(|t| **t == 0 || **t > transmitter_count)
+            {
+                eprintln!(
+                    "error: transmitter {t} not valid, device has {transmitter_count} transmitters"
+                );
 
-                        std::process::exit(1);
-                    }
-                };
+                std::process::exit(1);
+            }
 
-                if let Some(t) = transmitters.iter().find(|t| **t > transmitter_count) {
-                    eprintln!(
-                        "error: transmitter {t} not valid, device has {transmitter_count} transmitters"
-                    );
+            let mask: u32 = transmit
+                .transmitters
+                .iter()
+                .fold(0, |acc, t| acc | (1 << (t - 1)));
+
+            info!("debug: setting transmitter mask {:08x}", mask);
+
+            match lircdev.set_transmitter_mask(mask) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("error: {lircdev}: failed to set transmitter mask: {e}");
 
                     std::process::exit(1);
-                }
-
-                let mask: u32 = transmitters.iter().fold(0, |acc, t| acc | (1 << (t - 1)));
-
-                info!("debug: setting transmitter mask {:08x}", mask);
-
-                match lircdev.set_transmitter_mask(mask) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        eprintln!("error: {lircdev}: failed to set transmitter mask: {e}");
-
-                        std::process::exit(1);
-                    }
                 }
             }
         }
 
-        if let Some(duty_cycle) = duty_cycle {
+        if let Some(duty_cycle) = message.duty_cycle {
             if lircdev.can_set_send_duty_cycle() {
-                debug!("setting {} duty cycle {}", lircdev, duty_cycle);
+                log::debug!("setting {} duty cycle {}", lircdev, duty_cycle);
 
                 if let Err(s) = lircdev.set_send_duty_cycle(duty_cycle as u32) {
                     eprintln!("error: {lircdev}: {s}");
@@ -121,9 +87,9 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
             }
         }
 
-        if let Some(carrier) = carrier {
+        if let Some(carrier) = message.carrier {
             if lircdev.can_set_send_carrier() {
-                debug!("setting {} send carrier {}", lircdev, carrier);
+                log::debug!("setting {} send carrier {}", lircdev, carrier);
 
                 if let Err(s) = lircdev.set_send_carrier(carrier as u32) {
                     eprintln!("error: {lircdev}: {s}");
@@ -138,7 +104,7 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
             }
         }
 
-        debug!("transmitting {} data {}", lircdev, message.print_rawir());
+        log::debug!("transmitting {} data {}", lircdev, message.print_rawir());
 
         if let Err(s) = lircdev.send(&message.raw) {
             eprintln!("error: {lircdev}: {s}");
@@ -147,64 +113,47 @@ pub fn transmit(global_matches: &clap::ArgMatches) {
     }
 }
 
-fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
-    match matches.subcommand() {
-        Some(("irp", matches)) => {
+fn encode_args(transmit: &crate::Transmit) -> Message {
+    match &transmit.commands {
+        crate::TransmitCommands::Irp(tx_irp) => {
             let mut vars = irp::Vartable::new();
 
-            let i = matches.value_of("IRP").unwrap();
+            for field in &tx_irp.fields {
+                let list: Vec<&str> = field.trim().split('=').collect();
 
-            if let Some(values) = matches.values_of("FIELD") {
-                for fields in values {
-                    for f in fields.split(',') {
-                        let list: Vec<&str> = f.trim().split('=').collect();
-
-                        if list.len() != 2 {
-                            eprintln!("argument to --field must be X=1");
-                            std::process::exit(2);
-                        }
-
-                        let value = match if list[1].starts_with("0x") {
-                            i64::from_str_radix(&list[1][2..], 16)
-                        } else if list[1].starts_with("0o") {
-                            i64::from_str_radix(&list[1][2..], 8)
-                        } else if list[1].starts_with("0b") {
-                            i64::from_str_radix(&list[1][2..], 2)
-                        } else {
-                            list[1].parse()
-                        } {
-                            Ok(v) => v,
-                            Err(_) => {
-                                eprintln!("‘{}’ is not a valid number", list[1]);
-                                std::process::exit(2);
-                            }
-                        };
-
-                        vars.set(list[0].to_string(), value);
-                    }
+                if list.len() != 2 {
+                    eprintln!("argument to --field must be X=1");
+                    std::process::exit(2);
                 }
-            }
 
-            let repeats = match matches.value_of("REPEATS") {
-                None => 1,
-                Some(s) => match s.parse() {
-                    Ok(num) => num,
+                let value = match if list[1].starts_with("0x") {
+                    i64::from_str_radix(&list[1][2..], 16)
+                } else if list[1].starts_with("0o") {
+                    i64::from_str_radix(&list[1][2..], 8)
+                } else if list[1].starts_with("0b") {
+                    i64::from_str_radix(&list[1][2..], 2)
+                } else {
+                    list[1].parse()
+                } {
+                    Ok(v) => v,
                     Err(_) => {
-                        eprintln!("error: {s} is not numeric");
+                        eprintln!("‘{}’ is not a valid number", list[1]);
                         std::process::exit(2);
                     }
-                },
-            };
+                };
 
-            let irp = match Irp::parse(i) {
+                vars.set(list[0].to_string(), value);
+            }
+
+            let irp = match Irp::parse(&tx_irp.irp) {
                 Ok(m) => m,
                 Err(s) => {
-                    eprintln!("unable to parse irp ‘{i}’: {s}");
+                    eprintln!("unable to parse irp ‘{}’: {s}", tx_irp.irp);
                     std::process::exit(2);
                 }
             };
 
-            if matches.is_present("PRONTO") {
+            let mut m = if tx_irp.pronto {
                 match irp.encode_pronto(vars) {
                     Ok(p) => {
                         println!("{p}");
@@ -216,30 +165,27 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                     }
                 }
             } else {
-                match irp.encode_raw(vars, repeats) {
-                    Ok(m) => (m, matches),
+                match irp.encode_raw(vars, tx_irp.repeats) {
+                    Ok(m) => m,
                     Err(s) => {
                         eprintln!("error: {s}");
                         std::process::exit(2);
                     }
                 }
-            }
-        }
-        Some(("pronto", matches)) => {
-            let pronto = matches.value_of("PRONTO").unwrap();
-
-            let repeats = match matches.value_of("REPEATS") {
-                None => 0,
-                Some(s) => match str::parse(s) {
-                    Ok(num) => num,
-                    Err(_) => {
-                        eprintln!("error: {s} is not numeric");
-                        std::process::exit(2);
-                    }
-                },
             };
 
-            let pronto = match Pronto::parse(pronto) {
+            if tx_irp.carrier.is_some() {
+                m.carrier = tx_irp.carrier;
+            }
+
+            if tx_irp.duty_cycle.is_some() {
+                m.duty_cycle = tx_irp.duty_cycle;
+            }
+
+            m
+        }
+        crate::TransmitCommands::Pronto(pronto) => {
+            let p = match Pronto::parse(&pronto.pronto) {
                 Ok(pronto) => pronto,
                 Err(err) => {
                     eprintln!("error: {err}");
@@ -247,57 +193,50 @@ fn encode_args(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
                 }
             };
 
-            (pronto.encode(repeats), matches)
+            p.encode(pronto.repeats as usize)
         }
-        Some(("rawir", matches)) => encode_rawir(matches),
-        Some(("lircd", matches)) => {
-            let filename = matches.value_of_os("CONF").unwrap();
-
-            let remotes = match lircd_conf::parse(filename) {
+        crate::TransmitCommands::RawIR(rawir) => encode_rawir(rawir),
+        crate::TransmitCommands::Lircd(lircd) => {
+            let remotes = match lircd_conf::parse(&lircd.conf) {
                 Ok(r) => r,
                 Err(_) => std::process::exit(2),
             };
 
-            let remote = matches.value_of("REMOTE");
-            let repeats = match matches.value_of("REPEATS") {
-                None => 0,
-                Some(s) => match s.parse() {
-                    Ok(num) => num,
-                    Err(_) => {
-                        eprintln!("error: {s} is not numeric");
-                        std::process::exit(2);
-                    }
-                },
-            };
-
-            if let Some(codes) = matches.values_of("CODES") {
-                let codes: Vec<&str> = codes.collect();
-                let m = lircd_conf::encode(&remotes, remote, &codes, repeats);
+            if !lircd.codes.is_empty() {
+                let codes: Vec<&str> = lircd.codes.iter().map(|v| v.as_str()).collect();
+                let m =
+                    lircd_conf::encode(&remotes, lircd.remote.as_deref(), &codes, lircd.repeats);
 
                 match m {
-                    Ok(m) => (m, matches),
+                    Ok(mut m) => {
+                        if lircd.carrier.is_some() {
+                            m.carrier = lircd.carrier;
+                        }
+
+                        if lircd.duty_cycle.is_some() {
+                            m.duty_cycle = lircd.duty_cycle;
+                        }
+
+                        m
+                    }
                     Err(e) => {
                         error!("{}", e);
 
-                        list_remotes(filename, &remotes, None);
+                        list_remotes(&lircd.conf, &remotes, None);
 
                         std::process::exit(2);
                     }
                 }
             } else {
-                list_remotes(filename, &remotes, remote);
+                list_remotes(&lircd.conf, &remotes, lircd.remote.as_deref());
 
                 std::process::exit(2);
             }
         }
-        _ => {
-            eprintln!("encode requires a subcommand");
-            std::process::exit(2);
-        }
     }
 }
 
-fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
+fn encode_rawir(transmit: &crate::TransmitRawIR) -> Message {
     enum Part {
         Raw(Message),
         Gap(u32),
@@ -305,103 +244,76 @@ fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
 
     let mut part = Vec::new();
 
-    if let Some(files) = matches.values_of_os("FILE") {
-        let mut indices = matches.indices_of("FILE").unwrap();
-
-        for filename in files {
-            let input = match fs::read_to_string(filename) {
-                Ok(s) => s,
-                Err(s) => {
-                    error!("{}: {}", Path::new(filename).display(), s);
-                    std::process::exit(2);
-                }
-            };
-
-            match Message::parse(&input) {
-                Ok(m) => {
-                    part.push((Part::Raw(m), indices.next().unwrap()));
-                }
-                Err(msg) => match Message::parse_mode2(&input) {
-                    Ok(m) => {
-                        part.push((Part::Raw(m), indices.next().unwrap()));
-                    }
-                    Err((line_no, error)) => {
-                        error!("{}: parse as rawir: {}", Path::new(filename).display(), msg);
-                        error!(
-                            "{}:{}: parse as mode2: {}",
-                            Path::new(filename).display(),
-                            line_no,
-                            error
-                        );
+    for tx in &transmit.transmitables {
+        match tx {
+            crate::Transmitables::File(filename) => {
+                let input = match fs::read_to_string(filename) {
+                    Ok(s) => s,
+                    Err(s) => {
+                        error!("{}: {}", Path::new(filename).display(), s);
                         std::process::exit(2);
                     }
-                },
+                };
+
+                match Message::parse(&input) {
+                    Ok(m) => {
+                        part.push(Part::Raw(m));
+                    }
+                    Err(msg) => match Message::parse_mode2(&input) {
+                        Ok(m) => {
+                            part.push(Part::Raw(m));
+                        }
+                        Err((line_no, error)) => {
+                            error!("{}: parse as rawir: {}", Path::new(filename).display(), msg);
+                            error!(
+                                "{}:{}: parse as mode2: {}",
+                                Path::new(filename).display(),
+                                line_no,
+                                error
+                            );
+                            std::process::exit(2);
+                        }
+                    },
+                }
             }
-        }
-    }
-
-    if let Some(rawirs) = matches.values_of("RAWIR") {
-        let mut indices = matches.indices_of("RAWIR").unwrap();
-
-        for rawir in rawirs {
-            match Message::parse(rawir) {
+            crate::Transmitables::RawIR(rawir) => match Message::parse(rawir) {
                 Ok(m) => {
-                    part.push((Part::Raw(m), indices.next().unwrap()));
+                    part.push(Part::Raw(m));
                 }
                 Err(msg) => {
                     error!("{}", msg);
                     std::process::exit(2);
                 }
-            }
-        }
-    }
-
-    if let Some(scancodes) = matches.values_of("SCANCODE") {
-        let mut indices = matches.indices_of("SCANCODE").unwrap();
-
-        for scancode in scancodes {
-            if let Some((protocol, code)) = scancode.split_once(':') {
-                match encode_scancode(protocol, code) {
-                    Ok(m) => {
-                        part.push((Part::Raw(m), indices.next().unwrap()));
+            },
+            crate::Transmitables::Scancode(scancode) => {
+                if let Some((protocol, code)) = scancode.split_once(':') {
+                    match encode_scancode(protocol, code) {
+                        Ok(m) => {
+                            part.push(Part::Raw(m));
+                        }
+                        Err(msg) => {
+                            error!("{}", msg);
+                            std::process::exit(2);
+                        }
                     }
-                    Err(msg) => {
-                        error!("{}", msg);
-                        std::process::exit(2);
-                    }
-                }
-            } else {
-                error!(
-                    "{} is not a valid protocol, should be protocol:scancode",
-                    scancode
-                );
-                std::process::exit(2);
-            }
-        }
-    }
-
-    if let Some(gaps) = matches.values_of("GAP") {
-        let mut indices = matches.indices_of("GAP").unwrap();
-
-        for gap in gaps {
-            match gap.parse() {
-                Ok(0) | Err(_) => {
-                    error!("{} is not a valid gap", gap);
+                } else {
+                    error!(
+                        "{} is not a valid protocol, should be protocol:scancode",
+                        scancode
+                    );
                     std::process::exit(2);
                 }
-                Ok(num) => {
-                    part.push((Part::Gap(num), indices.next().unwrap()));
-                }
+            }
+            crate::Transmitables::Gap(gap) => {
+                part.push(Part::Gap(*gap));
             }
         }
     }
-
-    part.sort_by(|a, b| a.1.cmp(&b.1));
 
     let mut message = Message::new();
     let mut gap = 125000;
 
-    for (part, _) in part {
+    for part in part {
         match part {
             Part::Gap(v) => {
                 gap = v;
@@ -425,7 +337,7 @@ fn encode_rawir(matches: &clap::ArgMatches) -> (Message, &clap::ArgMatches) {
         message.raw.push(gap);
     }
 
-    (message, matches)
+    message
 }
 
 fn list_remotes(filename: &OsStr, remotes: &[lircd_conf::Remote], needle: Option<&str>) {

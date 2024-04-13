@@ -1,436 +1,535 @@
-use aya::programs::LircMode2;
-use cir::{lirc, rcdev};
-use clap::{Arg, ArgGroup, Command};
-use evdev::Device;
-use itertools::Itertools;
+use clap::{
+    error::{Error, ErrorKind},
+    value_parser, ArgAction, ArgMatches, Args, Command, FromArgMatches, Parser, Subcommand,
+};
 use log::{Level, LevelFilter, Metadata, Record};
-use std::{convert::TryInto, path::PathBuf};
+use std::ffi::OsString;
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 
 mod commands;
 
+#[derive(Parser)]
+#[command(
+    name = "cir",
+    version = env!("CARGO_PKG_VERSION"),
+    author = env!("CARGO_PKG_AUTHORS"),
+    about = "Consumer Infrared",
+    subcommand_required = true
+)]
+struct App {
+    /// Increase message verbosity
+    #[arg(long, short, action = ArgAction::Count, global = true, conflicts_with = "quiet")]
+    verbose: u8,
+
+    /// Silence all warnings
+    #[arg(long, short, global = true, conflicts_with = "verbose")]
+    quiet: bool,
+
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    #[command(about = "Decode IR", arg_required_else_help = true)]
+    Decode(Decode),
+    #[command(about = "Transmit IR", arg_required_else_help = true)]
+    Transmit(Transmit),
+    #[cfg(target_os = "linux")]
+    #[command(about = "List IR and CEC devices")]
+    Config(Config),
+    #[cfg(target_os = "linux")]
+    #[command(about = "Receive IR and print to stdout")]
+    Test(Test),
+    #[cfg(target_os = "linux")]
+    #[command(about = "Auto-load keymaps based on configuration")]
+    Auto(Auto),
+}
+
+#[derive(Args)]
+struct Decode {
+    #[cfg(target_os = "linux")]
+    #[clap(flatten)]
+    device: RcDevice,
+
+    /// Use short-range learning mode
+    #[cfg(target_os = "linux")]
+    #[arg(
+        long = "learning-mode",
+        short = 'l',
+        global = true,
+        help_heading = "DEVICE"
+    )]
+    learning: bool,
+
+    /// Read from rawir or mode2 file
+    #[arg(
+        long = "file",
+        short = 'f',
+        global = true,
+        name = "FILE",
+        help_heading = "INPUT"
+    )]
+    file: Vec<OsString>,
+
+    /// Raw IR text
+    #[arg(
+        long = "raw",
+        short = 'r',
+        global = true,
+        name = "RAWIR",
+        help_heading = "INPUT"
+    )]
+    rawir: Vec<String>,
+
+    #[clap(flatten)]
+    options: DecodeOptions,
+
+    #[command(subcommand)]
+    commands: DecodeCommands,
+}
+
+#[derive(Args)]
+struct DecodeOptions {
+    /// Absolute tolerance in microseconds
+    #[arg(
+            long = "absolute-tolerance",
+            value_parser = value_parser!(u32).range(0..100000),
+            global = true,
+            default_value_t = 100,
+            name = "AEPS",
+            help_heading = "DECODING"
+        )]
+    aeps: u32,
+
+    /// Relative tolerance in %
+    #[arg(
+            long = "relative-tolerance",
+            value_parser = value_parser!(u32).range(0..1000),
+            global = true,
+            default_value_t = 3,
+            name = "EPS",
+            help_heading = "DECODING"
+        )]
+    eps: u32,
+
+    /// Save the NFA
+    #[arg(long = "save-nfa", global = true, help_heading = "DECODING")]
+    save_nfa: bool,
+
+    /// Save the DFA
+    #[arg(long = "save-dfa", global = true, help_heading = "DECODING")]
+    save_dfa: bool,
+}
+#[derive(Subcommand)]
+enum DecodeCommands {
+    #[command(about = "Decode using IRP Notation")]
+    Irp(DecodeIrp),
+
+    #[command(about = "Decode using lircd.conf file")]
+    Lircd(DecodeLircd),
+}
+
+#[derive(Args)]
+struct DecodeIrp {
+    /// IRP Notation
+    irp: String,
+}
+
+#[derive(Args)]
+struct DecodeLircd {
+    /// lircd.conf file
+    lircdconf: OsString,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Args)]
+struct RcDevice {
+    /// Select device to use by lirc chardev (e.g. /dev/lirc1)
+    #[arg(
+        long = "device",
+        short = 'd',
+        conflicts_with = "RCDEV",
+        name = "LIRCDEV",
+        global = true,
+        help_heading = "DEVICE"
+    )]
+    lirc_dev: Option<String>,
+
+    /// Select device to use by rc core device (e.g. rc0)
+    #[arg(
+        long = "rcdev",
+        short = 's',
+        conflicts_with = "LIRCDEV",
+        name = "RCDEV",
+        global = true,
+        help_heading = "DEVICE"
+    )]
+    rc_dev: Option<String>,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Args)]
+struct Config {
+    #[cfg(target_os = "linux")]
+    #[clap(flatten)]
+    device: RcDevice,
+
+    /// Display the scancode to keycode mapping
+    #[arg(long = "read-mapping", short = 'm')]
+    mapping: bool,
+
+    /// Clear existing configuration
+    #[arg(long = "clear", short = 'c')]
+    clear: bool,
+
+    /// Set receiving timeout
+    #[arg(long = "timeout", short = 't')]
+    timeout: Option<u32>,
+
+    /// Sets the delay before repeating a keystroke
+    #[arg(long = "delay", short = 'D', name = "DELAY")]
+    delay: Option<u32>,
+
+    /// Sets the period before repeating a keystroke
+    #[arg(long = "period", short = 'P', name = "PERIOD")]
+    period: Option<u32>,
+
+    /// Load toml or lircd.conf keymap
+    #[arg(long = "keymap", short = 'w', name = "KEYMAP")]
+    keymaps: Vec<PathBuf>,
+
+    // TODO:
+    // --irp '{}<>()[]'
+    // set scancode (like ir-keytable --set-key/-k)
+    // set protocol (like ir-keytabke -P)
+    #[clap(flatten)]
+    options: DecodeOptions,
+
+    /// Save the LLVM IR
+    #[arg(long = "save-llvm-ir", help_heading = "DECODING")]
+    save_llvm_ir: bool,
+
+    /// Save the Assembly
+    #[arg(long = "save-asm", help_heading = "DECODING")]
+    save_assembly: bool,
+
+    /// Save the Object
+    #[arg(long = "save-object", help_heading = "DECODING")]
+    save_object: bool,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Args)]
+struct Test {
+    #[cfg(target_os = "linux")]
+    #[clap(flatten)]
+    device: RcDevice,
+
+    /// Use short-range learning mode
+    #[arg(long = "learning", short = 'l')]
+    learning: bool,
+
+    /// Set receiving timeout
+    #[arg(long = "timeout", short = 't')]
+    timeout: Option<u32>,
+
+    /// Stop receiving after first timeout message
+    #[arg(long = "one-shot", short = '1')]
+    one_shot: bool,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Args)]
+struct Auto {
+    #[clap(flatten)]
+    device: RcDevice,
+
+    /// Configuration file
+    #[arg(name = "CFGFILE", default_value = "/etc/rc_maps.cfg")]
+    cfgfile: PathBuf,
+}
+
+#[derive(Args)]
+struct Transmit {
+    #[cfg(target_os = "linux")]
+    #[clap(flatten)]
+    device: RcDevice,
+
+    /// Comma separated list of transmitters to use, starting from 1
+    #[cfg(target_os = "linux")]
+    #[arg(
+        long = "transmitters",
+        short = 'e',
+        global = true,
+        value_delimiter = ',',
+        help_heading = "DEVICE"
+    )]
+    transmitters: Vec<u32>,
+
+    /// Encode IR but do not actually send
+    #[arg(long = "dry-run", short = 'n', global = true)]
+    dry_run: bool,
+
+    #[command(subcommand)]
+    commands: TransmitCommands,
+}
+
+#[derive(Debug)]
+enum TransmitCommands {
+    Irp(TransmitIrp),
+    Pronto(TransmitPronto),
+    RawIR(TransmitRawIR),
+    Lircd(TransmitLircd),
+}
+
+#[derive(Args, Debug)]
+struct TransmitIrp {
+    #[arg(long, hide = true)]
+    pronto: bool,
+
+    /// Set carrier in Hz, 0 for unmodulated
+    #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(1..1_000_000), hide = true, help_heading = "DEVICE")]
+    carrier: Option<i64>,
+
+    /// Override duty cycle % (1 to 99)
+    #[arg(long = "duty-cycle", short = 'u', value_parser = value_parser!(u8).range(1..99), help_heading = "DEVICE")]
+    duty_cycle: Option<u8>,
+
+    /// Number of IRP repeats to encode
+    #[arg(long = "repeats", short = 'r', value_parser = value_parser!(u64).range(0..99), default_value_t = 1)]
+    repeats: u64,
+
+    /// Set input variable like KEY=VALUE
+    #[arg(long = "field", short = 'f', value_delimiter = ',')]
+    fields: Vec<String>,
+
+    /// IRP protocol
+    #[arg(name = "IRP")]
+    irp: String,
+}
+
+#[derive(Args, Debug)]
+struct TransmitPronto {
+    /// Number of times to repeat signal
+    #[arg(long = "repeats", short = 'r', value_parser = value_parser!(u64).range(0..99), default_value_t = 1)]
+    repeats: u64,
+
+    /// Pronto Hex code
+    #[arg(name = "PRONTO")]
+    pronto: String,
+}
+
+#[derive(Args, Debug)]
+struct TransmitRawIR {
+    /// Read from rawir or mode2 file
+    #[arg(long = "file", short = 'f', name = "FILE", help_heading = "INPUT")]
+    files: Vec<OsString>,
+
+    /// Send scancode using old linux kernel protocols
+    #[arg(
+        long = "scancode",
+        short = 'S',
+        name = "SCANCODE",
+        help_heading = "INPUT"
+    )]
+    scancodes: Vec<String>,
+
+    /// Set gap after each file
+    #[arg(long = "gap", short = 'g', name = "GAP", help_heading = "INPUT")]
+    gaps: Vec<u32>,
+
+    /// Raw IR text
+    #[arg(name = "RAWIR", help_heading = "INPUT")]
+    rawir: Vec<String>,
+
+    /// Set carrier in Hz, 0 for unmodulated
+    #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(1..1_000_000), hide = true, help_heading = "DEVICE")]
+    carrier: Option<i64>,
+
+    /// Set send duty cycle % (1 to 99)
+    #[arg(long = "duty-cycle", short = 'u', value_parser = value_parser!(u8).range(1..99), help_heading = "DEVICE")]
+    duty_cycle: Option<u8>,
+
+    #[arg(skip)]
+    transmitables: Vec<Transmitables>,
+}
+
+impl TransmitRawIR {
+    fn transmitables(&mut self, matches: &ArgMatches) {
+        let mut part = Vec::new();
+
+        if let Some(files) = matches.get_many::<OsString>("FILE") {
+            let mut indices = matches.indices_of("FILE").unwrap();
+
+            for file in files {
+                part.push((Transmitables::File(file.clone()), indices.next().unwrap()));
+            }
+        }
+
+        if let Some(rawirs) = matches.get_many::<String>("RAWIR") {
+            let mut indices = matches.indices_of("RAWIR").unwrap();
+
+            for rawir in rawirs {
+                part.push((Transmitables::RawIR(rawir.clone()), indices.next().unwrap()));
+            }
+        }
+
+        if let Some(scancodes) = matches.get_many::<String>("SCANCODE") {
+            let mut indices = matches.indices_of("SCANCODE").unwrap();
+
+            for scancode in scancodes {
+                part.push((
+                    Transmitables::Scancode(scancode.clone()),
+                    indices.next().unwrap(),
+                ));
+            }
+        }
+
+        if let Some(gaps) = matches.get_many::<u32>("GAP") {
+            let mut indices = matches.indices_of("GAP").unwrap();
+
+            for gap in gaps {
+                part.push((Transmitables::Gap(*gap), indices.next().unwrap()));
+            }
+        }
+
+        part.sort_by(|a, b| a.1.cmp(&b.1));
+
+        self.transmitables = part.into_iter().map(|(t, _)| t).collect();
+    }
+}
+
+#[derive(Debug)]
+enum Transmitables {
+    File(OsString),
+    RawIR(String),
+    Gap(u32),
+    Scancode(String),
+}
+
+#[derive(Args, Debug)]
+struct TransmitLircd {
+    /// Override carrier in Hz, 0 for unmodulated
+    #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(0..1_000_000), help_heading = "DEVICE")]
+    carrier: Option<i64>,
+
+    /// Override duty cycle % (1 to 99)
+    #[arg(long = "duty-cycle", short = 'u', value_parser = value_parser!(u8).range(1..99), help_heading = "DEVICE")]
+    duty_cycle: Option<u8>,
+
+    /// lircd.conf file
+    #[arg(name = "CONF")]
+    conf: OsString,
+
+    /// Remote to use from lircd.conf file
+    #[arg(name = "REMOTE", long = "remote", short = 'm')]
+    remote: Option<String>,
+
+    /// Number of times to repeat signal
+    #[arg(long = "repeats", short = 'r', value_parser = value_parser!(u64).range(0..99), default_value_t = 0)]
+    repeats: u64,
+
+    /// Code to send, leave empty to list codes
+    #[arg(name = "CODES")]
+    codes: Vec<String>,
+}
+
+impl FromArgMatches for TransmitCommands {
+    fn from_arg_matches(matches: &ArgMatches) -> Result<Self, Error> {
+        match matches.subcommand() {
+            Some(("irp", args)) => Ok(Self::Irp(TransmitIrp::from_arg_matches(args)?)),
+            Some(("rawir", args)) => {
+                let mut rawir = TransmitRawIR::from_arg_matches(args)?;
+
+                rawir.transmitables(args);
+
+                Ok(Self::RawIR(rawir))
+            }
+            Some(("pronto", args)) => Ok(Self::Pronto(TransmitPronto::from_arg_matches(args)?)),
+            Some(("lircd", args)) => Ok(Self::Lircd(TransmitLircd::from_arg_matches(args)?)),
+            Some((_, _)) => Err(Error::raw(
+                ErrorKind::InvalidSubcommand,
+                "Valid subcommands are `irp`, `lircd`, `pronto`,  and `rawir`",
+            )),
+            None => Err(Error::raw(
+                ErrorKind::MissingSubcommand,
+                "Valid subcommands are `irp`, `lircd`, `pronto`,  and `rawir`",
+            )),
+        }
+    }
+
+    fn update_from_arg_matches(&mut self, matches: &ArgMatches) -> Result<(), Error> {
+        match matches.subcommand() {
+            Some(("irp", args)) => *self = Self::Irp(TransmitIrp::from_arg_matches(args)?),
+            Some(("rawir", args)) => {
+                let mut rawir = TransmitRawIR::from_arg_matches(args)?;
+
+                rawir.transmitables(args);
+
+                *self = Self::RawIR(rawir);
+            }
+            Some(("pronto", args)) => *self = Self::Pronto(TransmitPronto::from_arg_matches(args)?),
+            Some(("lircd", args)) => *self = Self::Lircd(TransmitLircd::from_arg_matches(args)?),
+            Some((_, _)) => {
+                return Err(Error::raw(
+                    ErrorKind::InvalidSubcommand,
+                    "Valid subcommands are `irp`, `lircd`, `pronto`,  and `rawir`",
+                ))
+            }
+            None => (),
+        }
+
+        Ok(())
+    }
+}
+
+impl Subcommand for TransmitCommands {
+    fn augment_subcommands(cmd: Command) -> Command {
+        cmd.subcommand(TransmitIrp::augment_args(
+            Command::new("irp").about("Encode using IRP language and transmit"),
+        ))
+        .subcommand(TransmitLircd::augment_args(
+            Command::new("lircd").about("Transmit codes from lircd.conf file"),
+        ))
+        .subcommand(TransmitPronto::augment_args(
+            Command::new("pronto").about("Parse pronto hex code and transmit"),
+        ))
+        .subcommand(TransmitRawIR::augment_args(
+            Command::new("rawir").about("Parse raw IR and transmit"),
+        ))
+        .subcommand_required(true)
+    }
+    fn augment_subcommands_for_update(cmd: Command) -> Command {
+        cmd.subcommand(TransmitIrp::augment_args(
+            Command::new("irp").about("Encode using IRP language and transmit"),
+        ))
+        .subcommand(TransmitLircd::augment_args(
+            Command::new("lircd").about("Transmit codes from lircd.conf file"),
+        ))
+        .subcommand(TransmitPronto::augment_args(
+            Command::new("pronto").about("Parse pronto hex code and transmit"),
+        ))
+        .subcommand(TransmitRawIR::augment_args(
+            Command::new("rawir").about("Parse raw IR and transmit"),
+        ))
+        .subcommand_required(true)
+    }
+    fn has_subcommand(name: &str) -> bool {
+        matches!(name, "irp" | "lircd" | "pronto" | "rawir")
+    }
+}
+
 fn main() {
-    let matches = Command::new("cir")
-        .version(env!("CARGO_PKG_VERSION"))
-        .author("Sean Young <sean@mess.org>")
-        .about("Consumer Infrared")
-        .arg_required_else_help(true)
-        .arg(
-            Arg::new("verbosity")
-                .short('v')
-                .long("verbose")
-                .global(true)
-                .multiple_occurrences(true)
-                .help("Increase message verbosity")
-                .conflicts_with("quiet"),
-        )
-        .arg(
-            Arg::new("quiet")
-                .short('q')
-                .long("quiet")
-                .global(true)
-                .help("Silence all warnings")
-                .conflicts_with("verbosity"),
-        )
-        .subcommand(
-            Command::new("decode")
-                .about("Decode IR")
-                .arg_required_else_help(true)
-                .next_help_heading("INPUT")
-                .arg(
-                    Arg::new("LIRCDEV")
-                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
-                        .long("device")
-                        .short('d')
-                        .global(true)
-                        .takes_value(true)
-                        .conflicts_with_all(&["RCDEV", "RAWIR", "FILE"]),
-                )
-                .arg(
-                    Arg::new("RCDEV")
-                        .help("Select device to use by rc core device (e.g. rc0)")
-                        .long("rcdev")
-                        .short('s')
-                        .global(true)
-                        .takes_value(true)
-                        .conflicts_with_all(&["LIRCDEV", "RAWIR", "FILE"]),
-                )
-                .arg(
-                    Arg::new("LEARNING")
-                        .help("Use short-range learning mode")
-                        .long("learning-mode")
-                        .global(true)
-                        .short('l'),
-                )
-                .group(ArgGroup::new("DEVICE").args(&["RCDEV", "LIRCDEV"]))
-                .arg(
-                    Arg::new("FILE")
-                        .long("file")
-                        .short('f')
-                        .global(true)
-                        .help("Read from rawir or mode2 file")
-                        .takes_value(true)
-                        .allow_invalid_utf8(true)
-                        .multiple_occurrences(true)
-                        .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV", "RAWIR"]),
-                )
-                .arg(
-                    Arg::new("RAWIR")
-                        .long("raw")
-                        .short('r')
-                        .global(true)
-                        .help("Raw IR text")
-                        .takes_value(true)
-                        .multiple_occurrences(true)
-                        .conflicts_with_all(&["LEARNING", "LIRCDEV", "RCDEV", "FILE"]),
-                )
-                .next_help_heading("DECODING")
-                .arg(
-                    Arg::new("AEPS")
-                        .long("absolute-tolerance")
-                        .help("Absolute tolerance in microseconds")
-                        .takes_value(true)
-                        .global(true)
-                        .default_value("100")
-                        .display_order(3),
-                )
-                .arg(
-                    Arg::new("EPS")
-                        .long("relative-tolerance")
-                        .help("Relative tolerance in %")
-                        .global(true)
-                        .takes_value(true)
-                        .default_value("3")
-                        .display_order(4),
-                )
-                .arg(
-                    Arg::new("GRAPHVIZ")
-                        .help("Save the state machine as graphviz dot files")
-                        .takes_value(true)
-                        .global(true)
-                        .value_parser(["nfa", "dfa", "dfa-step"])
-                        .long("graphviz")
-                        .display_order(5),
-                )
-                .subcommand(
-                    Command::new("irp")
-                        .about("Decode using IRP Notation")
-                        .arg(Arg::new("IRP").help("IRP Notation").required(true)),
-                )
-                .subcommand(
-                    Command::new("lircd")
-                        .about("Decode using lircd.conf file")
-                        .arg(
-                            Arg::new("LIRCDCONF")
-                                .help("lircd.conf file")
-                                .allow_invalid_utf8(true)
-                                .required(true),
-                        ),
-                ),
-        )
-        .subcommand(
-            Command::new("config")
-                .about("Configure IR decoder")
-                .arg(
-                    Arg::new("LIRCDEV")
-                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
-                        .long("device")
-                        .short('d')
-                        .takes_value(true),
-                )
-                .arg(
-                    Arg::new("RCDEV")
-                        .help("Select device to use by rc core device (e.g. rc0)")
-                        .long("rcdev")
-                        .short('s')
-                        .takes_value(true),
-                )
-                .group(ArgGroup::new("DEVICE").args(&["RCDEV", "LIRCDEV"]))
-                .arg(Arg::new("DELAY").long("delay").short('D').takes_value(true))
-                .arg(
-                    Arg::new("PERIOD")
-                        .long("period")
-                        .short('P')
-                        .takes_value(true),
-                )
-                .arg(
-                    Arg::new("KEYMAP")
-                        .long("write")
-                        .short('w')
-                        .takes_value(true)
-                        .multiple_occurrences(true),
-                )
-                .arg(
-                    Arg::new("TIMEOUT")
-                        .help("Set IR timeout")
-                        .long("timeout")
-                        .short('t')
-                        .takes_value(true),
-                )
-                .arg(Arg::new("CLEAR").long("clear").short('c'))
-                .arg(
-                    Arg::new("CFGFILE")
-                        .long("auto-load")
-                        .short('a')
-                        .help("Auto-load keymaps, based on configuration file")
-                        .default_value("/etc/rc_maps.cfg")
-                        .conflicts_with_all(&["DELAY", "PERIOD", "KEYMAP", "CLEAR", "TIMEOUT"])
-                        .requires("DEVICE")
-                        .takes_value(true),
-                ),
-        )
-        .subcommand(
-            Command::new("transmit")
-                .about("Transmit IR")
-                .arg_required_else_help(true)
-                .arg(
-                    Arg::new("LIRCDEV")
-                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
-                        .long("device")
-                        .short('d')
-                        .global(true)
-                        .takes_value(true)
-                        .conflicts_with("RCDEV"),
-                )
-                .arg(
-                    Arg::new("RCDEV")
-                        .help("Select device to use by rc core device (e.g. rc0)")
-                        .long("rcdev")
-                        .short('s')
-                        .global(true)
-                        .takes_value(true)
-                        .conflicts_with("LIRCDEV"),
-                )
-                .arg(
-                    Arg::new("TRANSMITTERS")
-                        .help("Comma separated list of transmitters to use, starting from 1")
-                        .long("transmitters")
-                        .short('e')
-                        .global(true)
-                        .takes_value(true)
-                        .multiple_occurrences(true)
-                        .require_value_delimiter(true)
-                        .use_value_delimiter(true),
-                )
-                .arg(
-                    Arg::new("DRYRUN")
-                        .help("Encode IR but do not actually send")
-                        .long("dry-run")
-                        .short('n')
-                        .global(true),
-                )
-                .subcommand(
-                    Command::new("irp")
-                        .about("Encode using IRP language and transmit")
-                        .arg(Arg::new("PRONTO").long("pronto").hide(true))
-                        .arg(
-                            Arg::new("CARRIER")
-                                .long("carrier")
-                                .short('c')
-                                .help("Set carrier in Hz, 0 for unmodulated")
-                                .takes_value(true)
-                                .hide(true),
-                        )
-                        .arg(
-                            Arg::new("DUTY_CYCLE")
-                                .long("duty-cycle")
-                                .short('u')
-                                .help("Set send duty cycle % (1 to 99)")
-                                .takes_value(true)
-                                .hide(true),
-                        )
-                        .arg(
-                            Arg::new("REPEATS")
-                                .help("Number of IRP repeats to encode")
-                                .long("repeats")
-                                .short('r')
-                                .takes_value(true)
-                                .default_value("1"),
-                        )
-                        .arg(
-                            Arg::new("FIELD")
-                                .help("Set input variable like KEY=VALUE")
-                                .long("field")
-                                .short('f')
-                                .takes_value(true)
-                                .multiple_occurrences(true),
-                        )
-                        .arg(Arg::new("IRP").help("IRP protocol").required(true)),
-                )
-                .subcommand(
-                    Command::new("pronto")
-                        .about("Parse pronto hex code and transmit")
-                        .arg(
-                            Arg::new("REPEATS")
-                                .long("repeats")
-                                .short('r')
-                                .help("Number of times to repeat signal")
-                                .takes_value(true)
-                                .default_value("1"),
-                        )
-                        .arg(Arg::new("PRONTO").help("Pronto Hex code").required(true)),
-                )
-                .subcommand(
-                    Command::new("rawir")
-                        .about("Parse raw IR and transmit")
-                        .arg(
-                            Arg::new("FILE")
-                                .long("file")
-                                .short('f')
-                                .help("Read from rawir or mode2 file")
-                                .takes_value(true)
-                                .allow_invalid_utf8(true)
-                                .multiple_occurrences(true),
-                        )
-                        .arg(
-                            Arg::new("SCANCODE")
-                                .long("scancode")
-                                .short('S')
-                                .help("Send scancode using old linux kernel protocols")
-                                .takes_value(true)
-                                .multiple_occurrences(true),
-                        )
-                        .arg(
-                            Arg::new("GAP")
-                                .long("gap")
-                                .short('g')
-                                .help("Set gap after each file")
-                                .takes_value(true)
-                                .multiple_occurrences(true),
-                        )
-                        .arg(
-                            Arg::new("RAWIR")
-                                .help("Raw IR text")
-                                .multiple_occurrences(true),
-                        )
-                        .arg(
-                            Arg::new("CARRIER")
-                                .long("carrier")
-                                .short('c')
-                                .help("Set carrier in Hz, 0 for unmodulated")
-                                .takes_value(true),
-                        )
-                        .arg(
-                            Arg::new("DUTY_CYCLE")
-                                .long("duty-cycle")
-                                .short('u')
-                                .help("Set send duty cycle % (1 to 99)")
-                                .takes_value(true),
-                        ),
-                )
-                .subcommand(
-                    Command::new("lircd")
-                        .about("Transmit codes from lircd.conf file")
-                        .arg(
-                            Arg::new("CARRIER")
-                                .long("carrier")
-                                .short('c')
-                                .help("Override carrier in Hz, 0 for unmodulated")
-                                .takes_value(true),
-                        )
-                        .arg(
-                            Arg::new("DUTY_CYCLE")
-                                .long("duty-cycle")
-                                .short('u')
-                                .help("Override duty cycle % (1 to 99)")
-                                .takes_value(true),
-                        )
-                        .arg(
-                            Arg::new("CONF")
-                                .help("lircd.conf file")
-                                .allow_invalid_utf8(true)
-                                .required(true),
-                        )
-                        .arg(
-                            Arg::new("REMOTE")
-                                .long("remote")
-                                .short('m')
-                                .help("Remote to use from lircd.conf file")
-                                .takes_value(true),
-                        )
-                        .arg(
-                            Arg::new("REPEATS")
-                                .long("repeats")
-                                .short('r')
-                                .help("Number of times to repeat signal")
-                                .takes_value(true)
-                                .default_value("0"),
-                        )
-                        .arg(
-                            Arg::new("CODES")
-                                .help("Code to send, leave empty to list codes")
-                                .multiple_occurrences(true)
-                                .takes_value(true),
-                        ),
-                ),
-        )
-        .subcommand(
-            Command::new("devices")
-                .about("List IR and CEC devices")
-                .arg(
-                    Arg::new("LIRCDEV")
-                        .long("device")
-                        .short('d')
-                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
-                        .takes_value(true)
-                        .conflicts_with("RCDEV"),
-                )
-                .arg(
-                    Arg::new("RCDEV")
-                        .help("Select device to use by rc core device (e.g. rc0)")
-                        .long("rcdev")
-                        .short('s')
-                        .takes_value(true)
-                        .conflicts_with("LIRCDEV"),
-                )
-                .arg(Arg::new("READ").long("read-scancodes").short('l')),
-        )
-        .subcommand(
-            Command::new("test")
-                .about("Receive IR and print to stdout")
-                .arg(
-                    Arg::new("LIRCDEV")
-                        .long("device")
-                        .short('d')
-                        .help("Select device to use by lirc chardev (e.g. /dev/lirc1)")
-                        .takes_value(true)
-                        .conflicts_with("RCDEV"),
-                )
-                .arg(
-                    Arg::new("RCDEV")
-                        .help("Select device to use by rc core device (e.g. rc0)")
-                        .long("rcdev")
-                        .short('s')
-                        .takes_value(true)
-                        .conflicts_with("LIRCDEV"),
-                )
-                .arg(
-                    Arg::new("LEARNING")
-                        .help("Use short-range learning mode")
-                        .long("learning-mode")
-                        .short('l'),
-                )
-                .arg(
-                    Arg::new("TIMEOUT")
-                        .help("Set IR timeout")
-                        .long("timeout")
-                        .short('t')
-                        .takes_value(true),
-                )
-                .arg(
-                    Arg::new("ONESHOT")
-                        .help("Stop receiving after first timeout message")
-                        .long("one-shot")
-                        .short('1'),
-                ),
-        )
-        .get_matches();
+    let args = App::parse();
 
     log::set_logger(&CLI_LOGGER).unwrap();
 
-    let level = if matches.is_present("quiet") {
+    let level = if args.quiet {
         LevelFilter::Error
     } else {
-        match matches.occurrences_of("verbosity") {
+        match args.verbose {
             0 => LevelFilter::Info,
             1 => LevelFilter::Debug,
             _ => LevelFilter::Trace,
@@ -439,285 +538,22 @@ fn main() {
 
     log::set_max_level(level);
 
-    match matches.subcommand() {
-        Some(("decode", matches)) => commands::decode::decode(matches),
-        Some(("transmit", matches)) => commands::transmit::transmit(matches),
-        Some(("devices", matches)) => match rcdev::enumerate_rc_dev() {
-            Ok(list) => print_rc_dev(&list, matches),
-            Err(err) => {
-                eprintln!("error: {err}");
-                std::process::exit(1);
+    match &args.command {
+        Commands::Decode(decode) => match &decode.commands {
+            DecodeCommands::Irp(irp) => {
+                commands::decode::decode_irp(decode, &irp.irp);
+            }
+            DecodeCommands::Lircd(lircd) => {
+                commands::decode::decode_lircd(decode, &lircd.lircdconf);
             }
         },
-        Some(("test", matches)) => commands::test::test(matches),
-        Some(("config", matches)) => commands::config::config(matches),
-        _ => unreachable!(),
-    }
-}
-
-fn print_rc_dev(list: &[rcdev::Rcdev], matches: &clap::ArgMatches) {
-    let mut printed = 0;
-
-    for rcdev in list {
-        if let Some(needlelircdev) = matches.value_of("LIRCDEV") {
-            if let Some(lircdev) = &rcdev.lircdev {
-                if lircdev == needlelircdev {
-                    // ok
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-        } else if let Some(needlercdev) = matches.value_of("RCDEV") {
-            if needlercdev != rcdev.name {
-                continue;
-            }
-        }
-
-        println!("{}:", rcdev.name);
-
-        println!("\tDevice Name\t\t: {}", rcdev.device_name);
-        println!("\tDriver\t\t\t: {}", rcdev.driver);
-        if !rcdev.default_keymap.is_empty() {
-            println!("\tDefault Keymap\t\t: {}", rcdev.default_keymap);
-        }
-        if let Some(inputdev) = &rcdev.inputdev {
-            println!("\tInput Device\t\t: {inputdev}");
-
-            match Device::open(inputdev) {
-                Ok(inputdev) => {
-                    let id = inputdev.input_id();
-
-                    println!("\tBus\t\t\t: {}", id.bus_type());
-
-                    println!(
-                        "\tVendor/product\t\t: {:04x}:{:04x} version 0x{:04x}",
-                        id.product(),
-                        id.vendor(),
-                        id.version()
-                    );
-
-                    if let Some(repeat) = inputdev.get_auto_repeat() {
-                        println!(
-                            "\tRepeat\t\t\t: delay {} ms, period {} ms",
-                            repeat.delay, repeat.period
-                        );
-                    }
-
-                    if matches.is_present("READ") {
-                        let mut index = 0;
-
-                        loop {
-                            match inputdev.get_scancode_by_index(index) {
-                                Ok((keycode, scancode)) => {
-                                    match scancode.len() {
-                                        8 => {
-                                            // kernel v5.7 and later give 64 bit scancodes
-                                            let scancode =
-                                                u64::from_ne_bytes(scancode.try_into().unwrap());
-                                            let keycode = evdev::Key::new(keycode as u16);
-
-                                            println!(
-                                                "\tScancode\t\t: 0x{scancode:08x} => {keycode:?}"
-                                            );
-                                        }
-                                        4 => {
-                                            // kernel v5.6 and earlier give 32 bit scancodes
-                                            let scancode =
-                                                u32::from_ne_bytes(scancode.try_into().unwrap());
-                                            let keycode = evdev::Key::new(keycode as u16);
-
-                                            println!(
-                                                "\tScancode\t\t: 0x{scancode:08x} => {keycode:?}"
-                                            )
-                                        }
-                                        len => panic!(
-                                            "scancode should be 4 or 8 bytes long, not {len}"
-                                        ),
-                                    }
-
-                                    index += 1;
-                                }
-                                Err(err) if err.kind() == std::io::ErrorKind::InvalidInput => break,
-                                Err(err) => {
-                                    eprintln!("error: {err}");
-                                    std::process::exit(1);
-                                }
-                            }
-                        }
-                    }
-                }
-                Err(err) => {
-                    println!("\tInput properties\t: {err}");
-                }
-            };
-        }
-        if let Some(lircdev) = &rcdev.lircdev {
-            println!("\tLIRC Device\t\t: {lircdev}");
-
-            match lirc::open(PathBuf::from(lircdev)) {
-                Ok(mut lircdev) => {
-                    if lircdev.can_receive_raw() {
-                        println!("\tLIRC Receiver\t\t: raw receiver");
-
-                        if lircdev.can_get_rec_resolution() {
-                            println!(
-                                "\tLIRC Resolution\t\t: {}",
-                                match lircdev.receiver_resolution() {
-                                    Ok(res) => format!("{res} microseconds"),
-                                    Err(err) => err.to_string(),
-                                }
-                            );
-                        } else {
-                            println!("\tLIRC Resolution\t\t: unknown");
-                        }
-
-                        println!(
-                            "\tLIRC Timeout\t\t: {}",
-                            match lircdev.get_timeout() {
-                                Ok(timeout) => format!("{timeout} microseconds"),
-                                Err(err) => err.to_string(),
-                            }
-                        );
-
-                        if lircdev.can_set_timeout() {
-                            println!(
-                                "\tLIRC Timeout Range\t: {}",
-                                match lircdev.get_min_max_timeout() {
-                                    Ok(range) =>
-                                        format!("{} to {} microseconds", range.start, range.end),
-                                    Err(err) => err.to_string(),
-                                }
-                            );
-                        } else {
-                            println!("\tLIRC Receiver Timeout Range\t: none");
-                        }
-
-                        println!(
-                            "\tLIRC Wideband Receiver\t: {}",
-                            if lircdev.can_use_wideband_receiver() {
-                                "yes"
-                            } else {
-                                "no"
-                            }
-                        );
-
-                        println!(
-                            "\tLIRC Measure Carrier\t: {}",
-                            if lircdev.can_measure_carrier() {
-                                "yes"
-                            } else {
-                                "no"
-                            }
-                        );
-
-                        match LircMode2::query(lircdev.as_file()) {
-                            Ok(list) => {
-                                print!("\tBPF protocols\t\t: ");
-
-                                let mut first = true;
-
-                                for e in list {
-                                    if first {
-                                        first = false;
-                                    } else {
-                                        print!(", ")
-                                    }
-
-                                    match e.info() {
-                                        Ok(info) => match info.name_as_str() {
-                                            Some(name) => print!("{name}"),
-                                            None => print!("{}", info.id()),
-                                        },
-                                        Err(err) => {
-                                            print!("{err}")
-                                        }
-                                    }
-                                }
-
-                                println!();
-                            }
-                            Err(err) => {
-                                println!("\tBPF protocols\t\t: {err}")
-                            }
-                        }
-                    } else if lircdev.can_receive_scancodes() {
-                        println!("\tLIRC Receiver\t\t: scancode");
-                    } else {
-                        println!("\tLIRC Receiver\t\t: none");
-                    }
-
-                    if lircdev.can_send() {
-                        println!("\tLIRC Transmitter\t: yes");
-
-                        println!(
-                            "\tLIRC Set Tx Carrier\t: {}",
-                            if lircdev.can_set_send_carrier() {
-                                "yes"
-                            } else {
-                                "no"
-                            }
-                        );
-
-                        println!(
-                            "\tLIRC Set Tx Duty Cycle\t: {}",
-                            if lircdev.can_set_send_duty_cycle() {
-                                "yes"
-                            } else {
-                                "no"
-                            }
-                        );
-
-                        if lircdev.can_set_send_transmitter_mask() {
-                            println!(
-                                "\tLIRC Transmitters\t: {}",
-                                match lircdev.num_transmitters() {
-                                    Ok(count) => format!("{count}"),
-                                    Err(err) => err.to_string(),
-                                }
-                            );
-                        } else {
-                            println!("\tLIRC Transmitters\t: unknown");
-                        }
-                    } else {
-                        println!("\tLIRC Transmitter\t: no");
-                    }
-                }
-                Err(err) => {
-                    println!("\tLIRC Features\t\t: {err}");
-                }
-            }
-        }
-
-        if !rcdev.supported_protocols.is_empty() {
-            println!(
-                "\tSupported Protocols\t: {}",
-                rcdev.supported_protocols.join(" ")
-            );
-
-            println!(
-                "\tEnabled Protocols\t: {}",
-                rcdev
-                    .enabled_protocols
-                    .iter()
-                    .map(|p| &rcdev.supported_protocols[*p])
-                    .join(" ")
-            );
-        }
-
-        printed += 1;
-    }
-
-    if printed == 0 {
-        if let Some(lircdev) = matches.value_of("LIRCDEV") {
-            eprintln!("error: no lirc device named {lircdev}");
-        } else if let Some(rcdev) = matches.value_of("RCDEV") {
-            eprintln!("error: no rc device named {rcdev}");
-        } else {
-            eprintln!("error: no devices found");
-        }
-        std::process::exit(1);
+        Commands::Transmit(transmit) => commands::transmit::transmit(transmit),
+        #[cfg(target_os = "linux")]
+        Commands::Config(config) => commands::config::config(config),
+        #[cfg(target_os = "linux")]
+        Commands::Test(test) => commands::test::test(test),
+        #[cfg(target_os = "linux")]
+        Commands::Auto(auto) => commands::config::auto(auto),
     }
 }
 

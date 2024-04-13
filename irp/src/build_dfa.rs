@@ -3,6 +3,7 @@ use super::{
     expression::clone_filter,
     Expression, Irp, Options,
 };
+use log::info;
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -46,9 +47,23 @@ impl NFA {
 
         builder.build();
 
-        DFA {
+        let dfa = DFA {
             verts: builder.verts,
+        };
+
+        if options.nfa {
+            let filename = options.filename("_nfa.dot");
+            info!("saving NFA as {filename}");
+            self.dotgraphviz(&filename);
         }
+
+        if options.dfa {
+            let filename = options.filename("_dfa.dot");
+            info!("saving DFA as {filename}");
+            dfa.dotgraphviz(&filename);
+        }
+
+        dfa
     }
 }
 

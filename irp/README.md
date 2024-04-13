@@ -273,8 +273,8 @@ fn main() {
 This example opens the first lirc device `/dev/lirc0` and transmits the `1`
 button from a Hauppauge remote.
 
-```rust,no_run
-extern crate cir;
+```rust,ignore
+# extern crate cir;
 use cir::lirc;
 use irp::{Irp, Vartable};
 

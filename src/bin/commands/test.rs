@@ -6,16 +6,15 @@ use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use super::{find_devices, open_lirc, Purpose};
+use super::config::{find_devices, open_lirc, Purpose};
 
 // Clippy comparison_chain doesn't make any sense. It make the code _worse_
 #[allow(clippy::comparison_chain)]
-pub fn test(matches: &clap::ArgMatches) {
-    let rcdev = find_devices(matches, Purpose::Receive);
+pub fn test(test: &crate::Test) {
+    let rcdev = find_devices(&test.device, Purpose::Receive);
     let raw_token: Token = Token(0);
     let scancodes_token: Token = Token(1);
     let input_token: Token = Token(2);
-    let oneshot = matches.is_present("ONESHOT");
 
     let mut poll = Poll::new().expect("failed to create poll");
     let mut scandev = None;
@@ -33,7 +32,7 @@ pub fn test(matches: &clap::ArgMatches) {
             }
         };
 
-        if matches.is_present("LEARNING") {
+        if test.learning {
             let mut learning_mode = false;
 
             if lircdev.can_measure_carrier() {
@@ -72,34 +71,29 @@ pub fn test(matches: &clap::ArgMatches) {
             }
         }
 
-        if let Some(timeout) = matches.value_of("TIMEOUT") {
-            if let Ok(timeout) = timeout.parse() {
-                if lircdev.can_set_timeout() {
-                    match lircdev.get_min_max_timeout() {
-                        Ok(range) if range.contains(&timeout) => {
-                            if let Err(err) = lircdev.set_timeout(timeout) {
-                                eprintln!("error: {lircdev}: {err}");
-                                std::process::exit(1);
-                            }
-                        }
-                        Ok(range) => {
-                            eprintln!(
-                                "error: {} not in the supported range {}-{}",
-                                timeout, range.start, range.end
-                            );
-                            std::process::exit(1);
-                        }
-                        Err(err) => {
+        if let Some(timeout) = test.timeout {
+            if lircdev.can_set_timeout() {
+                match lircdev.get_min_max_timeout() {
+                    Ok(range) if range.contains(&timeout) => {
+                        if let Err(err) = lircdev.set_timeout(timeout) {
                             eprintln!("error: {lircdev}: {err}");
                             std::process::exit(1);
                         }
                     }
-                } else {
-                    eprintln!("error: {lircdev}: changing timeout not supported");
-                    std::process::exit(1);
+                    Ok(range) => {
+                        eprintln!(
+                            "error: {} not in the supported range {}-{}",
+                            timeout, range.start, range.end
+                        );
+                        std::process::exit(1);
+                    }
+                    Err(err) => {
+                        eprintln!("error: {lircdev}: {err}");
+                        std::process::exit(1);
+                    }
                 }
             } else {
-                eprintln!("error: timeout {timeout} not valid");
+                eprintln!("error: {lircdev}: changing timeout not supported");
                 std::process::exit(1);
             }
         }
@@ -114,7 +108,7 @@ pub fn test(matches: &clap::ArgMatches) {
                 .expect("failed to add raw poll");
 
             if lircdev.can_receive_scancodes() {
-                let mut lircdev = open_lirc(matches, Purpose::Receive);
+                let mut lircdev = open_lirc(&test.device, Purpose::Receive);
 
                 lircdev
                     .scancode_mode()
@@ -205,7 +199,7 @@ pub fn test(matches: &clap::ArgMatches) {
                     } else {
                         println!(" # receiver overflow");
                     }
-                    if oneshot {
+                    if test.one_shot {
                         break 'outer;
                     }
                     leading_space = true;
@@ -216,7 +210,7 @@ pub fn test(matches: &clap::ArgMatches) {
                     } else {
                         println!(" # timeout {}", entry.value());
                     }
-                    if oneshot {
+                    if test.one_shot {
                         break 'outer;
                     }
                     leading_space = true;

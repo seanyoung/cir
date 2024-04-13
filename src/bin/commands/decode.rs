@@ -1,35 +1,26 @@
-use super::{find_devices, Purpose};
-use cir::{lirc, lircd_conf::parse};
+#[cfg(target_os = "linux")]
+use super::config::{find_devices, Purpose};
+#[cfg(target_os = "linux")]
+use cir::lirc;
+use cir::lircd_conf::parse;
 use irp::{Decoder, InfraredData, Irp, Message, Options};
 use itertools::Itertools;
-use log::{error, info, trace};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    str,
-};
+use log::{error, info};
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
+use std::{ffi::OsString, fs, path::Path};
 
-pub fn decode(matches: &clap::ArgMatches) {
-    match matches.subcommand() {
-        Some(("irp", matches)) => decode_irp(matches),
-        Some(("lircd", matches)) => decode_lircd(matches),
-        _ => unreachable!(),
-    }
-}
-
-fn decode_irp(matches: &clap::ArgMatches) {
-    let graphviz_step = matches.value_of("GRAPHVIZ") == Some("dfa-step");
-
-    let mut abs_tolerance = str::parse(matches.value_of("AEPS").unwrap()).expect("number expected");
-    let rel_tolerance = str::parse(matches.value_of("EPS").unwrap()).expect("number expected");
+pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
+    #[allow(unused_mut)]
+    let mut abs_tolerance = decode.options.aeps;
+    let rel_tolerance = decode.options.eps;
+    #[allow(unused_mut)]
     let mut max_gap = 100000;
 
-    let i = matches.value_of("IRP").unwrap();
-
-    let irp = match Irp::parse(i) {
+    let irp = match Irp::parse(irp_str) {
         Ok(m) => m,
         Err(s) => {
-            eprintln!("unable to parse irp ‘{i}’: {s}");
+            eprintln!("unable to parse irp ‘{irp_str}’: {s}");
             std::process::exit(2);
         }
     };
@@ -37,21 +28,27 @@ fn decode_irp(matches: &clap::ArgMatches) {
     let nfa = match irp.build_nfa() {
         Ok(nfa) => nfa,
         Err(s) => {
-            eprintln!("unable to compile irp ‘{i}’: {s}");
+            eprintln!("unable to compile irp ‘{irp_str}’: {s}");
             std::process::exit(2);
         }
     };
 
-    let input_on_cli = matches.is_present("FILE") || matches.is_present("RAWIR");
+    let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
+    #[cfg(not(target_os = "linux"))]
+    if !input_on_cli {
+        eprintln!("no infrared input provided");
+        std::process::exit(2);
+    }
 
+    #[cfg(target_os = "linux")]
     let lircdev = if !input_on_cli {
         // open lirc
-        let rcdev = find_devices(matches, Purpose::Receive);
+        let rcdev = find_devices(&decode.device, Purpose::Receive);
 
         if let Some(lircdev) = rcdev.lircdev {
-            let lircpath = PathBuf::from(lircdev);
+            let lircpath = std::path::PathBuf::from(lircdev);
 
-            trace!("opening lirc device: {}", lircpath.display());
+            log::trace!("opening lirc device: {}", lircpath.display());
 
             let mut lircdev = match lirc::open(&lircpath) {
                 Ok(l) => l,
@@ -61,7 +58,7 @@ fn decode_irp(matches: &clap::ArgMatches) {
                 }
             };
 
-            if matches.is_present("LEARNING") {
+            if decode.learning {
                 let mut learning_mode = false;
 
                 if lircdev.can_measure_carrier() {
@@ -101,7 +98,7 @@ fn decode_irp(matches: &clap::ArgMatches) {
                 if let Ok(timeout) = lircdev.get_timeout() {
                     let dev_max_gap = (timeout * 9) / 10;
 
-                    trace!(
+                    log::trace!(
                         "device reports timeout of {}, using 90% of that as {} max_gap",
                         timeout,
                         dev_max_gap
@@ -123,35 +120,20 @@ fn decode_irp(matches: &clap::ArgMatches) {
         None
     };
 
-    let options = Options {
+    let mut options = Options {
         aeps: abs_tolerance,
         eps: rel_tolerance,
         max_gap,
         ..Default::default()
     };
 
-    let dfa = nfa.build_dfa(&options);
-
-    match matches.value_of("GRAPHVIZ") {
-        Some("nfa") => {
-            let filename = "irp_nfa.dot";
-            info!("saving nfa as {}", filename);
-
-            nfa.dotgraphviz(filename);
-        }
-        Some("dfa") => {
-            let filename = "irp_dfa.dot";
-            info!("saving dfa as {}", filename);
-
-            dfa.dotgraphviz(filename);
-        }
-        _ => (),
-    }
+    options.nfa = decode.options.save_nfa;
+    options.dfa = decode.options.save_dfa;
 
     let mut decoder = Decoder::new(options);
 
     let mut feed_decoder = |raw: &[InfraredData]| {
-        for (index, ir) in raw.iter().enumerate() {
+        for ir in raw {
             decoder.nfa_input(*ir, &nfa, |event, var| {
                 let mut var: Vec<(String, i64)> = var.into_iter().collect();
                 var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -163,73 +145,62 @@ fn decode_irp(matches: &clap::ArgMatches) {
                         .join(", ")
                 );
             });
-
-            if graphviz_step {
-                let filename = format!("irp_nfa_step_{:04}.dot", index);
-
-                info!("saving nfa at step {} as {}", index, filename);
-
-                decoder.dfa_dotgraphviz(&filename, &dfa);
-            }
         }
     };
 
-    if let Some(files) = matches.values_of_os("FILE") {
-        for filename in files {
-            let input = match fs::read_to_string(filename) {
-                Ok(s) => s,
-                Err(s) => {
-                    error!("{}: {}", Path::new(filename).display(), s);
-                    std::process::exit(2);
-                }
-            };
+    for filename in &decode.file {
+        let input = match fs::read_to_string(filename) {
+            Ok(s) => s,
+            Err(s) => {
+                error!("{}: {}", Path::new(filename).display(), s);
+                std::process::exit(2);
+            }
+        };
 
-            info!("parsing ‘{}’ as rawir", filename.to_string_lossy());
+        info!("parsing ‘{}’ as rawir", filename.to_string_lossy());
 
-            match Message::parse(&input) {
-                Ok(raw) => {
-                    info!("decoding: {}", raw.print_rawir());
-                    feed_decoder(&InfraredData::from_u32_slice(&raw.raw));
-                }
-                Err(msg) => {
-                    info!("parsing ‘{}’ as mode2", filename.to_string_lossy());
+        match Message::parse(&input) {
+            Ok(raw) => {
+                info!("decoding: {}", raw.print_rawir());
+                feed_decoder(&InfraredData::from_u32_slice(&raw.raw));
+            }
+            Err(msg) => {
+                info!("parsing ‘{}’ as mode2", filename.to_string_lossy());
 
-                    match Message::parse_mode2(&input) {
-                        Ok(m) => {
-                            info!("decoding: {}", m.print_rawir());
-                            feed_decoder(&InfraredData::from_u32_slice(&m.raw));
-                        }
-                        Err((line_no, error)) => {
-                            error!("{}: parse as rawir: {}", Path::new(filename).display(), msg);
-                            error!(
-                                "{}:{}: parse as mode2: {}",
-                                Path::new(filename).display(),
-                                line_no,
-                                error
-                            );
-                            std::process::exit(2);
-                        }
+                match Message::parse_mode2(&input) {
+                    Ok(m) => {
+                        info!("decoding: {}", m.print_rawir());
+                        feed_decoder(&InfraredData::from_u32_slice(&m.raw));
+                    }
+                    Err((line_no, error)) => {
+                        error!("{}: parse as rawir: {}", Path::new(filename).display(), msg);
+                        error!(
+                            "{}:{}: parse as mode2: {}",
+                            Path::new(filename).display(),
+                            line_no,
+                            error
+                        );
+                        std::process::exit(2);
                     }
                 }
             }
         }
     }
 
-    if let Some(rawirs) = matches.values_of("RAWIR") {
-        for rawir in rawirs {
-            match Message::parse(rawir) {
-                Ok(raw) => {
-                    info!("decoding: {}", raw.print_rawir());
-                    feed_decoder(&InfraredData::from_u32_slice(&raw.raw));
-                }
-                Err(msg) => {
-                    error!("parsing ‘{}’: {}", rawir, msg);
-                    std::process::exit(2);
-                }
+    for rawir in &decode.rawir {
+        match Message::parse(rawir) {
+            Ok(raw) => {
+                info!("decoding: {}", raw.print_rawir());
+                feed_decoder(&InfraredData::from_u32_slice(&raw.raw));
+            }
+            Err(msg) => {
+                error!("parsing ‘{}’: {}", rawir, msg);
+                std::process::exit(2);
             }
         }
     }
 
+    #[cfg(target_os = "linux")]
     if let Some(mut lircdev) = lircdev {
         let mut rawbuf = Vec::with_capacity(1024);
 
@@ -254,38 +225,41 @@ fn decode_irp(matches: &clap::ArgMatches) {
                 })
                 .collect();
 
-            trace!("decoding: {}", raw.iter().join(" "));
+            log::trace!("decoding: {}", raw.iter().join(" "));
 
             feed_decoder(&raw);
         }
     }
 }
 
-fn decode_lircd(matches: &clap::ArgMatches) {
-    let graphviz_step = matches.value_of("GRAPHVIZ") == Some("dfa-step");
-    let graphviz = matches.value_of("GRAPHVIZ") == Some("dfa");
-
-    let mut abs_tolerance = str::parse(matches.value_of("AEPS").unwrap()).expect("number expected");
-    let rel_tolerance = str::parse(matches.value_of("EPS").unwrap()).expect("number expected");
+pub fn decode_lircd(decode: &crate::Decode, conf: &OsString) {
+    #[allow(unused_mut)]
+    let mut abs_tolerance = decode.options.aeps;
+    let rel_tolerance = decode.options.eps;
+    #[allow(unused_mut)]
     let mut max_gap = 100000;
-
-    let conf = matches.value_of_os("LIRCDCONF").unwrap();
 
     let remotes = match parse(conf) {
         Ok(r) => r,
         Err(_) => std::process::exit(2),
     };
 
-    let input_on_cli = matches.is_present("FILE") || matches.is_present("RAWIR");
+    let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
+    #[cfg(not(target_os = "linux"))]
+    if !input_on_cli {
+        eprintln!("no infrared input provided");
+        std::process::exit(2);
+    }
 
+    #[cfg(target_os = "linux")]
     let lircdev = if !input_on_cli {
         // open lirc
-        let rcdev = find_devices(matches, Purpose::Receive);
+        let rcdev = find_devices(&decode.device, Purpose::Receive);
 
         if let Some(lircdev) = rcdev.lircdev {
             let lircpath = PathBuf::from(lircdev);
 
-            trace!("opening lirc device: {}", lircpath.display());
+            log::trace!("opening lirc device: {}", lircpath.display());
 
             let mut lircdev = match lirc::open(&lircpath) {
                 Ok(l) => l,
@@ -295,7 +269,7 @@ fn decode_lircd(matches: &clap::ArgMatches) {
                 }
             };
 
-            if matches.is_present("LEARNING") {
+            if decode.learning {
                 let mut learning_mode = false;
 
                 if lircdev.can_measure_carrier() {
@@ -335,7 +309,7 @@ fn decode_lircd(matches: &clap::ArgMatches) {
                 if let Ok(timeout) = lircdev.get_timeout() {
                     let dev_max_gap = (timeout * 9) / 10;
 
-                    trace!(
+                    log::trace!(
                         "device reports timeout of {}, using 90% of that as {} max_gap",
                         timeout,
                         dev_max_gap
@@ -360,99 +334,79 @@ fn decode_lircd(matches: &clap::ArgMatches) {
     let mut decoders = remotes
         .iter()
         .map(|remote| {
-            let decoder = remote.decoder(Some(abs_tolerance), Some(rel_tolerance), max_gap);
+            let mut options =
+                remote.default_options(Some(abs_tolerance), Some(rel_tolerance), max_gap);
 
-            if graphviz {
-                let mut filename = format!("{}_dfa.dot", remote.name);
-                // characters not allowed on Windows/Mac/Linux: https://stackoverflow.com/a/35352640
-                filename
-                    .retain(|c| !matches!(c, ':' | '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|'));
-                info!("saving dfa as {}", filename);
+            options.nfa = decode.options.save_nfa;
+            options.dfa = decode.options.save_dfa;
 
-                decoder.dfa.dotgraphviz(&filename);
-            }
-
-            decoder
+            remote.decoder(options)
         })
         .collect::<Vec<_>>();
 
     let mut feed_decoder = |raw: &[InfraredData]| {
-        for (index, ir) in raw.iter().enumerate() {
+        for ir in raw {
             for decoder in &mut decoders {
                 decoder.input(*ir, |name, _| {
                     println!("decoded: remote:{} code:{}", decoder.remote.name, name);
                 });
-
-                if graphviz_step {
-                    let mut filename = format!("{}_dfa_step_{:04}.dot", decoder.remote.name, index);
-                    filename.retain(|c| {
-                        !matches!(c, ':' | '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|')
-                    });
-
-                    info!("saving dfa at step {} as {}", index, filename);
-
-                    decoder.dfa.dotgraphviz(&filename);
-                }
             }
         }
     };
 
-    if let Some(files) = matches.values_of_os("FILE") {
-        for filename in files {
-            let input = match fs::read_to_string(filename) {
-                Ok(s) => s,
-                Err(s) => {
-                    error!("{}: {}", Path::new(filename).display(), s);
-                    std::process::exit(2);
-                }
-            };
+    for filename in &decode.file {
+        let input = match fs::read_to_string(filename) {
+            Ok(s) => s,
+            Err(s) => {
+                error!("{}: {}", Path::new(filename).display(), s);
+                std::process::exit(2);
+            }
+        };
 
-            info!("parsing ‘{}’ as rawir", filename.to_string_lossy());
+        info!("parsing ‘{}’ as rawir", filename.to_string_lossy());
 
-            match Message::parse(&input) {
-                Ok(raw) => {
-                    info!("decoding: {}", raw.print_rawir());
-                    feed_decoder(&InfraredData::from_u32_slice(&raw.raw));
-                }
-                Err(msg) => {
-                    info!("parsing ‘{}’ as mode2", filename.to_string_lossy());
+        match Message::parse(&input) {
+            Ok(raw) => {
+                info!("decoding: {}", raw.print_rawir());
+                feed_decoder(&InfraredData::from_u32_slice(&raw.raw));
+            }
+            Err(msg) => {
+                info!("parsing ‘{}’ as mode2", filename.to_string_lossy());
 
-                    match Message::parse_mode2(&input) {
-                        Ok(m) => {
-                            info!("decoding: {}", m.print_rawir());
-                            feed_decoder(&InfraredData::from_u32_slice(&m.raw));
-                        }
-                        Err((line_no, error)) => {
-                            error!("{}: parse as rawir: {}", Path::new(filename).display(), msg);
-                            error!(
-                                "{}:{}: parse as mode2: {}",
-                                Path::new(filename).display(),
-                                line_no,
-                                error
-                            );
-                            std::process::exit(2);
-                        }
+                match Message::parse_mode2(&input) {
+                    Ok(m) => {
+                        info!("decoding: {}", m.print_rawir());
+                        feed_decoder(&InfraredData::from_u32_slice(&m.raw));
+                    }
+                    Err((line_no, error)) => {
+                        error!("{}: parse as rawir: {}", Path::new(filename).display(), msg);
+                        error!(
+                            "{}:{}: parse as mode2: {}",
+                            Path::new(filename).display(),
+                            line_no,
+                            error
+                        );
+                        std::process::exit(2);
                     }
                 }
             }
         }
     }
 
-    if let Some(rawirs) = matches.values_of("RAWIR") {
-        for rawir in rawirs {
-            match Message::parse(rawir) {
-                Ok(raw) => {
-                    info!("decoding: {}", raw.print_rawir());
-                    feed_decoder(&InfraredData::from_u32_slice(&raw.raw));
-                }
-                Err(msg) => {
-                    error!("parsing ‘{}’: {}", rawir, msg);
-                    std::process::exit(2);
-                }
+    for rawir in &decode.rawir {
+        match Message::parse(rawir) {
+            Ok(raw) => {
+                info!("decoding: {}", raw.print_rawir());
+                feed_decoder(&InfraredData::from_u32_slice(&raw.raw));
+            }
+            Err(msg) => {
+                error!("parsing ‘{}’: {}", rawir, msg);
+                std::process::exit(2);
             }
         }
     }
 
+    #[cfg(target_os = "linux")]
     if let Some(mut lircdev) = lircdev {
         let mut rawbuf = Vec::with_capacity(1024);
 
@@ -477,7 +431,7 @@ fn decode_lircd(matches: &clap::ArgMatches) {
                 })
                 .collect();
 
-            trace!("decoding: {}", raw.iter().join(" "));
+            log::trace!("decoding: {}", raw.iter().join(" "));
 
             feed_decoder(&raw);
         }

@@ -3,15 +3,18 @@
 use nix::{ioctl_read, ioctl_write_ptr};
 use num_integer::Integer;
 use std::{
+    fmt,
     fs::{File, OpenOptions},
-    io,
-    io::{Error, ErrorKind, Read, Write},
+    io::{self, Error, ErrorKind, Read, Write},
+    mem,
     ops::Range,
-    os::unix::io::{AsRawFd, RawFd},
+    os::{
+        fd::BorrowedFd,
+        unix::io::{AsFd, AsRawFd, RawFd},
+    },
     path::{Path, PathBuf},
     thread::sleep,
     time::{Duration, Instant},
-    {fmt, mem},
 };
 
 const LIRC_MAGIC: u8 = b'i';
@@ -458,6 +461,12 @@ impl Lirc {
 impl AsRawFd for Lirc {
     fn as_raw_fd(&self) -> RawFd {
         self.file.as_raw_fd()
+    }
+}
+
+impl AsFd for Lirc {
+    fn as_fd(&self) -> BorrowedFd {
+        self.file.as_fd()
     }
 }
 

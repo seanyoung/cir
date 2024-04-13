@@ -459,6 +459,7 @@ impl<'a> LircParser<'a> {
                         name: name.to_owned(),
                         dup,
                         code: values,
+                        line_no: self.line_no,
                     });
                 }
                 None => (),
@@ -516,6 +517,7 @@ impl<'a> LircParser<'a> {
                             name: name.to_owned(),
                             dup,
                             rawir: self.read_lengths(words)?,
+                            line_no: self.line_no,
                         });
                     } else {
                         error!("{}:{}: missing name", self.path.display(), self.line_no);
