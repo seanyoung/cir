@@ -72,7 +72,7 @@ impl DFA {
             .create_target_machine(
                 &target_triple,
                 "v3",
-                "+alu32",
+                "",
                 OptimizationLevel::Default,
                 RelocMode::Default,
                 CodeModel::Default,
@@ -211,20 +211,26 @@ impl<'a> Builder<'a> {
         // load the lirc mode2 value and check its type
         let lirc_mode2 = self
             .builder
-            .build_load(
-                i32,
-                self.function
-                    .get_first_param()
+            .build_int_z_extend(
+                self.builder
+                    .build_load(
+                        i32,
+                        self.function
+                            .get_first_param()
+                            .unwrap()
+                            .into_pointer_value(),
+                        "lirc_mode2",
+                    )
                     .unwrap()
-                    .into_pointer_value(),
-                "lirc_mode2",
+                    .into_int_value(),
+                i64,
+                "",
             )
-            .unwrap()
-            .into_int_value();
+            .unwrap();
 
         let lirc_mode2_ty = self
             .builder
-            .build_right_shift(lirc_mode2, i32.const_int(24, false), false, "lirc_mode2_ty")
+            .build_right_shift(lirc_mode2, i64.const_int(24, false), false, "lirc_mode2_ty")
             .unwrap();
 
         let lirc_ok = context.append_basic_block(self.function, "lirc_ok");
@@ -236,13 +242,13 @@ impl<'a> Builder<'a> {
                 zero_key, // ignore LIRC_MODE2_FREQUENCY and anything unknown
                 &[
                     // LIRC_MODE2_SPACE
-                    (i32.const_zero(), lirc_ok),
+                    (i64.const_zero(), lirc_ok),
                     // LIRC_MODE2_PULSE
-                    (i32.const_int(1, false), lirc_ok),
+                    (i64.const_int(1, false), lirc_ok),
                     // LIRC_MODE2_TIMEOUT
-                    (i32.const_int(3, false), lirc_ok),
+                    (i64.const_int(3, false), lirc_ok),
                     // LIRC_MODE2_OVERFLOW
-                    (i32.const_int(4, false), error),
+                    (i64.const_int(4, false), error),
                 ],
             )
             .unwrap();
@@ -252,7 +258,7 @@ impl<'a> Builder<'a> {
         // we know the lirc mode2 value is ok
         let length = self
             .builder
-            .build_and(lirc_mode2, i32.const_int(0x00ff_ffff, false), "length")
+            .build_and(lirc_mode2, i64.const_int(0x00ff_ffff, false), "length")
             .unwrap();
 
         // false for LIRC_MODE2_SPACE and LIRC_MODE2_TIMEOUT, true for LIRC_MODE2_PULSE
@@ -261,7 +267,7 @@ impl<'a> Builder<'a> {
             .build_int_compare(
                 IntPredicate::EQ,
                 lirc_mode2_ty,
-                i32.const_int(1, false),
+                i64.const_int(1, false),
                 "is_pulse",
             )
             .unwrap();
@@ -318,7 +324,7 @@ impl<'a> Builder<'a> {
                                 .build_int_compare(
                                     IntPredicate::UGE,
                                     length,
-                                    i32.const_int(*min as u64, false),
+                                    i64.const_int(*min as u64, false),
                                     "min",
                                 )
                                 .unwrap();
@@ -337,7 +343,7 @@ impl<'a> Builder<'a> {
                                     .build_int_compare(
                                         IntPredicate::ULE,
                                         length,
-                                        i32.const_int(*max as u64, false),
+                                        i64.const_int(*max as u64, false),
                                         "max",
                                     )
                                     .unwrap();
@@ -368,7 +374,7 @@ impl<'a> Builder<'a> {
                                 .build_int_compare(
                                     IntPredicate::UGE,
                                     length,
-                                    i32.const_int(*min as u64, false),
+                                    i64.const_int(*min as u64, false),
                                     "min",
                                 )
                                 .unwrap();
@@ -387,7 +393,7 @@ impl<'a> Builder<'a> {
                                     .build_int_compare(
                                         IntPredicate::ULE,
                                         length,
-                                        i32.const_int(*max as u64, false),
+                                        i64.const_int(*max as u64, false),
                                         "max",
                                     )
                                     .unwrap();
