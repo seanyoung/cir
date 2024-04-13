@@ -317,43 +317,7 @@ impl<'a> Builder<'a> {
 
                             self.builder.position_at_end(ok);
 
-                            let ok = context.append_basic_block(self.function, "ok");
-
-                            let res = self
-                                .builder
-                                .build_int_compare(
-                                    IntPredicate::UGE,
-                                    length,
-                                    i64.const_int(*min as u64, false),
-                                    "min",
-                                )
-                                .unwrap();
-
-                            self.builder
-                                .build_conditional_branch(res, ok, next)
-                                .unwrap();
-
-                            self.builder.position_at_end(ok);
-
-                            if let Some(max) = max {
-                                let ok = context.append_basic_block(self.function, "ok");
-
-                                let res = self
-                                    .builder
-                                    .build_int_compare(
-                                        IntPredicate::ULE,
-                                        length,
-                                        i64.const_int(*max as u64, false),
-                                        "max",
-                                    )
-                                    .unwrap();
-
-                                self.builder
-                                    .build_conditional_branch(res, ok, next)
-                                    .unwrap();
-
-                                self.builder.position_at_end(ok);
-                            }
+                            self.const_edge(context, length, min, max, next);
                         }
                         Action::Gap {
                             length: Length::Range(min, max),
@@ -367,43 +331,7 @@ impl<'a> Builder<'a> {
 
                             self.builder.position_at_end(ok);
 
-                            let ok = context.append_basic_block(self.function, "ok");
-
-                            let res = self
-                                .builder
-                                .build_int_compare(
-                                    IntPredicate::UGE,
-                                    length,
-                                    i64.const_int(*min as u64, false),
-                                    "min",
-                                )
-                                .unwrap();
-
-                            self.builder
-                                .build_conditional_branch(res, ok, next)
-                                .unwrap();
-
-                            self.builder.position_at_end(ok);
-
-                            if let Some(max) = max {
-                                let ok = context.append_basic_block(self.function, "ok");
-
-                                let res = self
-                                    .builder
-                                    .build_int_compare(
-                                        IntPredicate::ULE,
-                                        length,
-                                        i64.const_int(*max as u64, false),
-                                        "max",
-                                    )
-                                    .unwrap();
-
-                                self.builder
-                                    .build_conditional_branch(res, ok, next)
-                                    .unwrap();
-
-                                self.builder.position_at_end(ok);
-                            }
+                            self.const_edge(context, length, min, max, next);
                         }
                         Action::Set { var, expr } => {
                             let value = self.expression(expr, context);
@@ -569,6 +497,55 @@ impl<'a> Builder<'a> {
         self.builder
             .build_return(Some(&i32.const_zero().as_basic_value_enum()))
             .unwrap();
+    }
+
+    fn const_edge(
+        &self,
+        context: &Context,
+        length: IntValue<'a>,
+        min: &u32,
+        max: &Option<u32>,
+        next: inkwell::basic_block::BasicBlock<'a>,
+    ) {
+        let i64 = context.i64_type();
+
+        let ok = context.append_basic_block(self.function, "ok");
+
+        let res = self
+            .builder
+            .build_int_compare(
+                IntPredicate::UGE,
+                length,
+                i64.const_int(*min as u64, false),
+                "min",
+            )
+            .unwrap();
+
+        self.builder
+            .build_conditional_branch(res, ok, next)
+            .unwrap();
+
+        self.builder.position_at_end(ok);
+
+        if let Some(max) = max {
+            let ok = context.append_basic_block(self.function, "ok");
+
+            let res = self
+                .builder
+                .build_int_compare(
+                    IntPredicate::ULE,
+                    length,
+                    i64.const_int(*max as u64, false),
+                    "max",
+                )
+                .unwrap();
+
+            self.builder
+                .build_conditional_branch(res, ok, next)
+                .unwrap();
+
+            self.builder.position_at_end(ok);
+        }
     }
 
     fn expression(&mut self, expr: &'a Rc<Expression>, context: &'a Context) -> IntValue<'a> {
