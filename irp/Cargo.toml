@@ -9,7 +9,7 @@ documentation = "https://docs.rs/irp/"
 keywords = [ "BPF", "IR", "infrared", "pronto" ]
 readme = "README.md"
 license = "MIT"
-rust-version = "1.68.0"
+rust-version = "1.74.0"
 exclude = [ "/doc", "/tests" ]
 
 [dependencies]
