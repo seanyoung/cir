@@ -226,6 +226,7 @@ fn load_lircd(
         log::info!("Configuring remote {}", remote.name);
         let mut options = remote.default_options(None, None, 20000);
 
+        options.repeat_mask = remote.repeat_mask;
         options.nfa = decode.options.save_nfa;
         options.dfa = decode.options.save_dfa;
         options.llvm_ir = decode.save_llvm_ir;

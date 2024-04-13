@@ -233,6 +233,8 @@ pub struct Options<'a> {
     pub eps: u32,
     /// Maximum gap the input will contains
     pub max_gap: u32,
+    /// If non-zero, repeated presses can be xored with this value
+    pub repeat_mask: u64,
     /// Protocol no which will be passed to bpf_rc_keydown()
     pub protocol: u32,
     /// If Some(path) the nfa intermediate file will be saved

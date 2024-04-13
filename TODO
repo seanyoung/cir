@@ -17,7 +17,7 @@
 - rc_mapping() kfunc
 - IRPs for kernel protocols include pulse_distance and so on
 - cir decode irp should read IrpProtocols.xml
-- bpf decoder does not know about repeat_mask
+- access to io_error in aya
 
 irp language oddities
 

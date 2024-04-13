@@ -481,6 +481,36 @@ impl<'a> Builder<'a> {
                                     "",
                                 )
                                 .unwrap();
+
+                            // We don't know if the previous call worked, since the bpf gets no feedback whether the
+                            // scancode could be mapped to a keycode. So, just re-send the code xor'ed with the repeat_mask
+
+                            // Ideally we'll add a kfunc() which will tell if a mapping exists, like a wrapper for
+                            // rc_g_keycode_from_table() in drivers/media/rc/rc-main.c
+                            if self.options.repeat_mask != 0 {
+                                let code = self
+                                    .builder
+                                    .build_xor(
+                                        code,
+                                        i64.const_int(self.options.repeat_mask, false),
+                                        "",
+                                    )
+                                    .unwrap();
+
+                                self.builder
+                                    .build_indirect_call(
+                                        fn_type,
+                                        bpf_rc_keydown,
+                                        &[
+                                            self.function.get_first_param().unwrap().into(),
+                                            protocol.into(),
+                                            code.into(),
+                                            flags.into(),
+                                        ],
+                                        "",
+                                    )
+                                    .unwrap();
+                            }
                         }
                         _ => unimplemented!(),
                     }
