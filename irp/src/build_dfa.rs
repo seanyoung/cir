@@ -137,7 +137,7 @@ impl<'a> Builder<'a> {
         let mut edges: Vec<UniqueEdge> = Vec::new();
 
         for path in &paths {
-            let length = self.path_length(path);
+            let length = self.path_length(flash, path);
             let actions = self.path_actions(path);
             let from = path[0].from;
             let to = path.last().unwrap().to;
@@ -232,7 +232,7 @@ impl<'a> Builder<'a> {
         self.verts[from].edges.push(Edge { dest: to, actions });
     }
 
-    fn path_length(&self, path: &[Path]) -> Length {
+    fn path_length(&self, flash: bool, path: &[Path]) -> Length {
         let mut len: Option<Rc<Expression>> = None;
 
         let mut vars: HashMap<&str, Rc<Expression>> = HashMap::new();
@@ -289,10 +289,16 @@ impl<'a> Builder<'a> {
                 (length * (100 + self.options.eps)) / 100,
             );
 
-            if self.options.max_gap > 0 && max < self.options.max_gap {
-                Length::Range(min, Some(max))
+            if !flash && self.options.max_gap > 0 {
+                if min > self.options.max_gap {
+                    Length::Range(self.options.max_gap, None)
+                } else if max > self.options.max_gap {
+                    Length::Range(min, None)
+                } else {
+                    Length::Range(min, Some(max))
+                }
             } else {
-                Length::Range(min, None)
+                Length::Range(min, Some(max))
             }
         } else {
             Length::Expression(length)

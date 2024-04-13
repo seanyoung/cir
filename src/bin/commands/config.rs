@@ -224,7 +224,39 @@ fn load_lircd(
 
     for remote in remotes {
         log::info!("Configuring remote {}", remote.name);
-        let mut options = remote.default_options(None, None, 20000);
+
+        let Some(lircdev) = lircdev else {
+            eprintln!("error: no lirc device found");
+            std::process::exit(1);
+        };
+
+        debug!("opening {}", lircdev);
+
+        let lircpath = PathBuf::from(lircdev);
+
+        let chdev = match lirc::open(&lircpath) {
+            Ok(l) => l,
+            Err(s) => {
+                eprintln!("error: {}: {}", lircpath.display(), s);
+                std::process::exit(1);
+            }
+        };
+
+        let mut max_gap = 100000;
+
+        if let Ok(timeout) = chdev.get_timeout() {
+            let dev_max_gap = (timeout * 9) / 10;
+
+            log::trace!(
+                "device reports timeout of {}, using 90% of that as {} max_gap",
+                timeout,
+                dev_max_gap
+            );
+
+            max_gap = dev_max_gap;
+        }
+
+        let mut options = remote.default_options(None, None, max_gap);
 
         options.repeat_mask = remote.repeat_mask;
         options.nfa = decode.options.save_nfa;
@@ -258,23 +290,6 @@ fn load_lircd(
             .unwrap();
 
         program.load().unwrap();
-
-        let Some(lircdev) = lircdev else {
-            eprintln!("error: no lirc device found");
-            std::process::exit(1);
-        };
-
-        debug!("opening {}", lircdev);
-
-        let lircpath = PathBuf::from(lircdev);
-
-        let chdev = match lirc::open(&lircpath) {
-            Ok(l) => l,
-            Err(s) => {
-                eprintln!("error: {}: {}", lircpath.display(), s);
-                std::process::exit(1);
-            }
-        };
 
         let link = program.attach(chdev.as_fd()).expect("attach");
 
