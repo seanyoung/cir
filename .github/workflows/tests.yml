@@ -28,8 +28,7 @@ jobs:
           rustup default stable
     - name: Build IrpTransmogrifier
       run: |
-          mvn compile
-          mvn package
+          mvn -B -V package
       working-directory: irp/tests/IrpTransmogrifier
     - name: Build
       run: cargo build --verbose
