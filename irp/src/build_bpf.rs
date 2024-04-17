@@ -14,10 +14,9 @@ use inkwell::{
     AddressSpace, IntPredicate, OptimizationLevel,
 };
 use log::info;
-use once_cell::sync::OnceCell;
-use std::{collections::HashMap, fs::File, io::Write, rc::Rc};
+use std::{collections::HashMap, fs::File, io::Write, rc::Rc, sync::OnceLock};
 
-static LLVM_INIT: OnceCell<()> = OnceCell::new();
+static LLVM_INIT: OnceLock<()> = OnceLock::new();
 static LLVM_TARGET_TRIPLE: &str = "bpf-unknown-unknown";
 
 impl DFA {
