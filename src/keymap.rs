@@ -1,6 +1,6 @@
 //! Parse linux rc keymaps
 
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use std::{collections::HashMap, ffi::OsStr, path::Path};
 
 #[derive(Deserialize, PartialEq, Eq, Debug, Default)]
