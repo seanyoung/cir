@@ -13,9 +13,9 @@ jobs:
       with:
         submodules: recursive
     - name: Setup LLVM
-      uses: KyleMayes/install-llvm-action@v2.0.1
+      uses: ZhongRuoyu/setup-llvm@v0
       with:
-        version: "17"
+        llvm-version: 17
       if: matrix.os == 'ubuntu-latest'
     - name: Set up JDK 17
       uses: actions/setup-java@v4
