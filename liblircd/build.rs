@@ -6,6 +6,7 @@ fn main() {
         .file("src/lirc_log.c")
         .file("src/receive.c")
         .file("src/transmit.c")
+        .file("src/ir-encode.c") // This is from ir-ctl, not lircd
         .warnings(false)
         .compile("liblirc.a");
 }
