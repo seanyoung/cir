@@ -1,6 +1,6 @@
 #[cfg(target_os = "linux")]
 use super::config::{open_lirc, Purpose};
-use cir::lircd_conf;
+use cir::{linux_protocol::LinuxProtocol, lircd_conf};
 use irp::{Irp, Message, Pronto, Vartable};
 use log::{error, info, warn};
 use std::{ffi::OsStr, fs, path::Path, str::FromStr};
@@ -412,45 +412,22 @@ fn encode_scancode(protocol: &str, code: &str) -> Result<Message, String> {
         return Err(format!("invalid scancode {code}"));
     };
 
-    let (irp, mask) = match protocol.to_ascii_lowercase().as_str() {
-        // TODO needs decoder name and protocol number
-        "rc5" => ("{36k,msb,889}<1,-1|-1,1>(1,~CODE:1:6,T:1,CODE:5:8,CODE:6,^114m) [CODE:0..0x1FFF,T:0..1=0]", 0x1f7f),
-        "rc5x_20" => ("{36k,msb,889}<1,-1|-1,1>(1,~CODE:1:14,T:1,CODE:5:16,-4,CODE:8:6,CODE:6,^114m) [CODE:0..0x1fffff,T:0..1=0]", 0x1f7f3f),
-        "rc5_sz" => ("{36k,msb,889}<1,-1|-1,1>(1,~CODE:1:13,T:1,T:1,CODE:12,^114m) [CODE:0..0x2fff,T:0..1=0]", 0x2fff),
-        "sony12" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:16,^45m)* [CODE:0..0x1fffff]",0x1f007f),
-        "sony15" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:8:16,^45m)* [CODE:0..0xffffff]",0xff007f),
-        "sony20" => ("{40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:16,CODE:8:8,^45m)* [CODE:0..0x1fffff]", 0x1fff7f),
-        "jvc" => ("{37.9k,527,33%}<1,-1|1,-3>(16,-8,CODE:16,1,^59.08m,(CODE:16,1,^46.42m)*) [CODE=0..0xffff]", 0xffff),
-        // TODO: necx and nec32 must not match nec
-        "nec" => ("{38.4k,564}<1,-1|1,-3>(16,-8,CODE:8:8,CODE:8,~CODE:8:8,~CODE:8,1,^108m,(16,-4,1,^108m)*) [CODE:0..0xffff]", 0xffff),
-        "sanyo" => ("{38k,562.5}<1,-1|1,-3>(16,-8,CODE:13:8,~CODE:13:8,CODE:8,~CODE:8,1,-42,(16,-8,1,-150)*) [CODE:0..0x1fffff]", 0x1fffff),
-        "rc6_0" => ("{36k,444,msb}<-1,1|1,-1>((6,-2,1:1,0:3,<-2,2|2,-2>(T:1),CODE:16,^107m)*,T=1-T) [CODE:0..0xffff,T@:0..1=0]", 0xffff),
-        "rc6_6a_20" => ("{36k,444,msb}<-1,1|1,-1>((6,-2,1:1,6:3,<-2,2|2,-2>(T:1),CODE:20,-100m)*,T=1-T)[CODE:0..0xfffff,T@:0..1=0]", 0xf_ffff),
-        "rc6_6a_24" => ("{36k,444,msb}<-1,1|1,-1>((6,-2,1:1,6:3,<-2,2|2,-2>(T:1),CODE:24,^105m)*,T=1-T)[CODE:0..0xffffff,T@:0..1=0]", 0xff_ff_ff),
-        "rc6_6a_32" => ("{36k,444,msb}<-1,1|1,-1>((6,-2,1:1,6:3,<-2,2|2,-2>(T:1),CODE:32,MCE=(CODE>>16)==0x800f||(CODE>>16)==0x8034||(CODE>>16)==0x8046,^105m)*,T=1-T){MCE=0}[CODE:0..0xffffffff,T@:0..1=0]", 0xffff_ffff),
-        "rc6_mce" => ("{36k,444,msb}<-1,1|1,-1>((6,-2,1:1,6:3,-2,2,CODE:16:16,T:1,CODE:15,MCE=(CODE>>16)==0x800f||(CODE>>16)==0x8034||(CODE>>16)==0x8046,^105m)*,T=1-T){MCE=1}[CODE:0..0xffffffff,T@:0..1=0]", 0xffff_ffff),
-        "sharp" => ("{38k,264}<1,-3|1,-7>(CODE:5:8,CODE:8,1:2,1,-165,CODE:5:8,~CODE:8,2:2,1,-165)*[CODE:0..0x1fff]", 0x1fff),
-        "rc-mm-12" => ("{36k,msb}<166.7,-277.8|166.7,-444.4|166.7,-611.1|166.7,-777.8>(416.7,-277.8,CODE:12,166.7,^27.778ms) [CODE:0..0xfff]", 0xfff),
-        "rc-mm-24" => ("{36k,msb}<166.7,-277.8|166.7,-444.4|166.7,-611.1|166.7,-777.8>(416.7,-277.8,CODE:24,166.7,^27.778ms) [CODE:0..0xffffff]", 0xfff_fff),
-        // TODO: toggle bit
-        "rc-mm-32" => ("{36k,msb}<166.7,-277.8|166.7,-444.4|166.7,-611.1|166.7,-777.8>(416.7,-277.8,CODE:32,166.7,^27.778ms) [CODE:0..0xffffffff]", 0xffff_ffff),
-        // TODO: xbox-dvd trailing space?
-        "xbox-dvd" => ("{38k,msb}<550,-900|550,-1900>(4000,-3900,~CODE:12,CODE:12,550,Xm) [CODE:0..0xfff]", 0xfff),
-        // xmp, mcir2
-        "imon" => ("{416,38k,msb}<-1|1>(1,<P:1,1:1,(CHK=CHK>>1,P=CHK&1)|0:2,(CHK=CHK>>1,P=1)>(CODE:31),^106m){P=1,CHK=0x7efec2} [CODE:0..0x7fffffff]", 0x7fffffff),
-        _ => {
-            return Err(format!("protocol {protocol} is not known"));
-        }
+    let Some(linux) = LinuxProtocol::find_like(protocol) else {
+        return Err(format!("protocol {protocol} is not known"));
     };
 
-    let masked = scancode & mask;
+    if linux.irp.is_none() {
+        return Err(format!("protocol {protocol} is cannot be encoded"));
+    }
+
+    let masked = scancode & linux.scancode_mask as u64;
 
     if masked != scancode {
         warn!("error: scancode {scancode:#x} masked to {masked:#x}");
         scancode = masked;
     }
 
-    let irp = Irp::parse(irp).unwrap();
+    let irp = Irp::parse(linux.irp.unwrap()).unwrap();
 
     let mut vars = Vartable::new();
 

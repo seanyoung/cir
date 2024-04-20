@@ -356,6 +356,7 @@ impl<'a> Code<'a> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u32)]
 pub enum rc_proto {
     RC_PROTO_UNKNOWN = 0,
@@ -391,12 +392,12 @@ pub enum rc_proto {
 // These functions are defined in ir-encode.[ch], which comes from v4l-utils' ir-ctl
 #[allow(unused)]
 extern "C" {
-    fn protocol_match(name: *const c_char, proto: rc_proto);
-    fn protocol_carrier(proto: rc_proto) -> u32;
-    fn protocol_max_size(proto: rc_proto) -> u32;
-    fn protocol_scancode_valid(proto: rc_proto, scancode: *mut u32) -> bool;
-    fn protocol_scancode_mask(proto: rc_proto) -> u32;
-    fn protocol_encoder_available(proto: rc_proto) -> bool;
-    fn protocol_encode(proto: rc_proto, scancode: u32, buf: *mut u8) -> u32;
-    fn protocol_name(proto: rc_proto) -> *const c_char;
+    pub fn protocol_match(name: *const c_char, proto: rc_proto);
+    pub fn protocol_carrier(proto: rc_proto) -> u32;
+    pub fn protocol_max_size(proto: rc_proto) -> u32;
+    pub fn protocol_scancode_valid(proto: rc_proto, scancode: *mut u32) -> bool;
+    pub fn protocol_scancode_mask(proto: rc_proto) -> u32;
+    pub fn protocol_encoder_available(proto: rc_proto) -> bool;
+    pub fn protocol_encode(proto: rc_proto, scancode: u32, buf: *mut u32) -> u32;
+    pub fn protocol_name(proto: rc_proto) -> *const c_char;
 }

@@ -1,4 +1,5 @@
 pub mod keymap;
+pub mod linux_protocol;
 #[cfg(target_os = "linux")]
 pub mod lirc;
 pub mod lircd_conf;
