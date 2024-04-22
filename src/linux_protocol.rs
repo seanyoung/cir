@@ -289,12 +289,15 @@ mod test {
                 for _ in 0..1000 {
                     let scancode = rng.next_u32() & linux.scancode_mask;
 
-                    println!("proto: {proto:?} scancode:{scancode:#x}");
-
                     irctl.resize(max_size as usize, 0);
 
                     let len =
                         unsafe { liblircd::protocol_encode(proto, scancode, irctl.as_mut_ptr()) };
+
+                    assert!(
+                        len as usize <= max_size,
+                        "{len} {max_size} proto:{proto:?} scancode:{scancode:#x}"
+                    );
 
                     irctl.resize(len as usize, 0);
 
