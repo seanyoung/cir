@@ -1,18 +1,19 @@
 //! Parse linux rc keymaps
 
-use serde::Deserialize;
 use std::{collections::HashMap, ffi::OsStr, path::Path};
+use toml::{Table, Value};
 
-#[derive(Deserialize, PartialEq, Eq, Debug, Default)]
+#[derive(PartialEq, Eq, Debug, Default)]
 pub struct Protocol {
     pub name: String,
     pub protocol: String,
     pub variant: Option<String>,
+    pub irp: Option<String>,
     pub raw: Option<Vec<Raw>>,
     pub scancodes: Option<HashMap<String, String>>,
 }
 
-#[derive(Deserialize, PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Raw {
     pub keycode: String,
     pub raw: Option<String>,
@@ -20,7 +21,7 @@ pub struct Raw {
     pub pronto: Option<String>,
 }
 
-#[derive(Deserialize, PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Keymap {
     pub protocols: Vec<Protocol>,
 }
@@ -84,47 +85,133 @@ peg::parser! {
 /// Parse a rc keymap file, either toml or old text format. No validation is done of key codes or protocol names
 pub fn parse(contents: &str, filename: &Path) -> Result<Keymap, String> {
     if filename.extension() == Some(OsStr::new("toml")) {
-        let keymap: Keymap = toml::from_str(contents).map_err(|e| e.to_string())?;
-
-        for p in &keymap.protocols {
-            if p.protocol == "raw" {
-                match &p.raw {
-                    None => {
-                        return Err("raw protocol is misssing raw entries".to_string());
-                    }
-                    Some(raw) => {
-                        for r in raw {
-                            if r.pronto.is_some() {
-                                if r.raw.is_some() {
-                                    return Err(
-                                        "raw entry has both pronto hex code and raw".to_string()
-                                    );
-                                }
-                                if r.repeat.is_some() {
-                                    return Err(
-                                        "raw entry has both pronto hex code and repeat".to_string()
-                                    );
-                                }
-                            } else if r.raw.is_none() {
-                                return Err(
-                                    "raw entry has neither pronto hex code nor raw".to_string()
-                                );
-                            }
-                        }
-                    }
-                }
-            } else if p.raw.is_some() {
-                return Err("raw entries for non-raw protocol".to_string());
-            }
-        }
-
-        Ok(keymap)
+        parse_toml(contents, filename)
     } else {
         match text_keymap::keymap(contents) {
             Ok(protocols) => Ok(Keymap { protocols }),
             Err(pos) => Err(format!("parse error at {pos}")),
         }
     }
+}
+
+fn parse_toml(contents: &str, filename: &Path) -> Result<Keymap, String> {
+    let top = contents.parse::<Table>().map_err(|e| e.to_string())?;
+
+    let Some(Value::Array(protocols)) = top.get("protocols") else {
+        return Err(format!(
+            "{}: missing top level protocols array",
+            filename.display()
+        ));
+    };
+
+    let mut res = Vec::new();
+
+    for entry in protocols {
+        let Some(Value::String(name)) = entry.get("name") else {
+            return Err(format!("{}: missing name", filename.display()));
+        };
+
+        let Some(Value::String(protocol)) = entry.get("protocol") else {
+            return Err(format!("{}: missing protocol", filename.display()));
+        };
+
+        let mut variant = None;
+        if let Some(Value::String(entry)) = entry.get("variant") {
+            variant = Some(entry.to_owned());
+        }
+
+        let mut irp = None;
+        let mut raw = None;
+        let mut scancodes = None;
+
+        if protocol == "raw" {
+            // find raw entries
+            let Some(Value::Array(e)) = entry.get("raw") else {
+                return Err("raw protocol is misssing raw entries".into());
+            };
+
+            let mut res = Vec::new();
+
+            for e in e {
+                let Some(Value::String(keycode)) = e.get("keycode") else {
+                    return Err("missing keycode".into());
+                };
+
+                let raw = if let Some(Value::String(raw)) = e.get("raw") {
+                    Some(raw.to_owned())
+                } else {
+                    None
+                };
+
+                let repeat = if let Some(Value::String(repeat)) = e.get("repeat") {
+                    Some(repeat.to_owned())
+                } else {
+                    None
+                };
+
+                let pronto = if let Some(Value::String(pronto)) = e.get("pronto") {
+                    Some(pronto.to_owned())
+                } else {
+                    None
+                };
+
+                if pronto.is_some() {
+                    if raw.is_some() {
+                        return Err("raw entry has both pronto hex code and raw".to_string());
+                    }
+                    if repeat.is_some() {
+                        return Err("raw entry has both pronto hex code and repeat".to_string());
+                    }
+                } else if raw.is_none() {
+                    return Err("raw entry has neither pronto hex code nor raw".to_string());
+                }
+
+                res.push(Raw {
+                    keycode: keycode.to_owned(),
+                    raw,
+                    repeat,
+                    pronto,
+                });
+            }
+
+            raw = Some(res);
+        } else {
+            if entry.get("raw").is_some() {
+                return Err("raw entries for non-raw protocol".to_string());
+            }
+
+            if protocol == "irp" {
+                if let Some(Value::String(entry)) = entry.get("irp") {
+                    irp = Some(entry.to_owned());
+                }
+            }
+
+            if let Some(Value::Table(codes)) = entry.get("scancodes") {
+                let mut res = HashMap::new();
+
+                for (key, value) in codes {
+                    let Value::String(value) = value else {
+                        return Err(format!("{}: scancode should be string", filename.display()));
+                    };
+
+                    res.insert(key.to_owned(), value.to_owned());
+                }
+
+                scancodes = Some(res);
+            }
+        }
+
+        res.push(Protocol {
+            name: name.to_owned(),
+            protocol: protocol.to_owned(),
+            variant,
+            raw,
+            scancodes,
+            irp,
+        });
+    }
+
+    Ok(Keymap { protocols: res })
 }
 
 #[test]
