@@ -1,6 +1,4 @@
-- Sending multiple keys/files
 - ir encode/send needs to read xml file
-- send from keymap
 - Need ir-ctl and ir-keytable command line parsing
 - localization of cli messages
 - test all the protocols
@@ -9,12 +7,11 @@
 - lead in gap (or whatever irptransmogrifier calls it)
 - Formatting of ir receive is poor/broken
 - Test all keymaps
-- scancode <=> irp mapping
 - lircd.conf generate -> send to lircd -> correct result?
 - DFA edges can be overlapping - removing overlapping parts
 - rc_mapping() kfunc
-- IRPs for kernel protocols include pulse_distance and so on
 - cir decode irp should read IrpProtocols.xml
+- cir decode keymap should support keymap.toml
 - access to io_error in aya
 
 irp language oddities
