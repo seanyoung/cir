@@ -4,7 +4,7 @@ use std::{collections::HashMap, ffi::OsStr, fmt::Write, path::Path};
 use toml::{Table, Value};
 
 #[derive(PartialEq, Eq, Debug, Default)]
-pub struct Protocol {
+pub struct Keymap {
     pub name: String,
     pub protocol: String,
     pub variant: Option<String>,
@@ -22,14 +22,9 @@ pub struct Raw {
     pub pronto: Option<String>,
 }
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct Keymap {
-    pub protocols: Vec<Protocol>,
-}
-
 peg::parser! {
     grammar text_keymap() for str {
-        pub rule keymap() -> Vec<Protocol>
+        pub rule keymap() -> Vec<Keymap>
         = (_ newline())* first:first_line() lines:lines() _
         {
             let mut scancodes = HashMap::new();
@@ -38,7 +33,7 @@ peg::parser! {
                 scancodes.insert(code.to_owned(), name.to_owned());
             }
 
-            let mut protocol = vec![Protocol {
+            let mut protocol = vec![Keymap {
                     name: first.0.to_owned(),
                     protocol: first.1[0].to_owned(),
                     scancodes: Some(scancodes),
@@ -46,7 +41,7 @@ peg::parser! {
             }];
 
             for other in &first.1[1..] {
-                protocol.push(Protocol { protocol: other.to_string(), ..Default::default() });
+                protocol.push(Keymap { protocol: other.to_string(), ..Default::default() });
             }
 
             protocol
@@ -84,18 +79,15 @@ peg::parser! {
 }
 
 /// Parse a rc keymap file, either toml or old text format. No validation is done of key codes or protocol names
-pub fn parse(contents: &str, filename: &Path) -> Result<Keymap, String> {
+pub fn parse(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
     if filename.extension() == Some(OsStr::new("toml")) {
         parse_toml(contents, filename)
     } else {
-        match text_keymap::keymap(contents) {
-            Ok(protocols) => Ok(Keymap { protocols }),
-            Err(pos) => Err(format!("parse error at {pos}")),
-        }
+        text_keymap::keymap(contents).map_err(|pos| format!("parse error at {pos}"))
     }
 }
 
-fn parse_toml(contents: &str, filename: &Path) -> Result<Keymap, String> {
+fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
     let top = contents.parse::<Table>().map_err(|e| e.to_string())?;
 
     let Some(Value::Array(protocols)) = top.get("protocols") else {
@@ -218,7 +210,7 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Keymap, String> {
             }
         }
 
-        res.push(Protocol {
+        res.push(Keymap {
             name: name.to_owned(),
             protocol: protocol.to_owned(),
             variant,
@@ -229,7 +221,7 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Keymap, String> {
         });
     }
 
-    Ok(Keymap { protocols: res })
+    Ok(res)
 }
 
 fn bpf_protocol_irp(protocol: &str, entry: &Table) -> Option<String> {
@@ -426,10 +418,10 @@ fn parse_toml_test() {
 
     let k = parse(s, Path::new("x.toml")).unwrap();
 
-    assert_eq!(k.protocols[0].name, "hauppauge");
-    assert_eq!(k.protocols[0].protocol, "rc5");
-    assert_eq!(k.protocols[0].variant, Some(String::from("rc5")));
-    if let Some(scancodes) = &k.protocols[0].scancodes {
+    assert_eq!(k[0].name, "hauppauge");
+    assert_eq!(k[0].protocol, "rc5");
+    assert_eq!(k[0].variant, Some(String::from("rc5")));
+    if let Some(scancodes) = &k[0].scancodes {
         for s in scancodes {
             match (s.0.as_str(), s.1.as_str()) {
                 ("0x1e3b", "KEY_SELECT") | ("0x1e3d", "KEY_POWER2") | ("0x1e1c", "KEY_TV") => {}
@@ -492,10 +484,10 @@ fn parse_text_test() {
 
     let k = parse(s, Path::new("hauppauge")).unwrap();
 
-    assert_eq!(k.protocols[0].name, "hauppauge");
-    assert_eq!(k.protocols[0].protocol, "RC5");
-    assert_eq!(k.protocols[0].variant, None);
-    if let Some(scancodes) = &k.protocols[0].scancodes {
+    assert_eq!(k[0].name, "hauppauge");
+    assert_eq!(k[0].protocol, "RC5");
+    assert_eq!(k[0].variant, None);
+    if let Some(scancodes) = &k[0].scancodes {
         for s in scancodes {
             match (s.0.as_str(), s.1.as_str()) {
                 ("0x1e3b", "KEY_SELECT") | ("0x1e3d", "KEY_POWER2") | ("0x1e1c", "KEY_TV") => {}
@@ -516,11 +508,11 @@ fn parse_text_test() {
 
     let k = parse(s, Path::new("hauppauge")).unwrap();
 
-    assert_eq!(k.protocols[0].name, "rc6_mce");
-    assert_eq!(k.protocols[0].protocol, "RC6");
-    assert_eq!(k.protocols[1].protocol, "foo");
-    assert_eq!(k.protocols[0].variant, None);
-    if let Some(scancodes) = &k.protocols[0].scancodes {
+    assert_eq!(k[0].name, "rc6_mce");
+    assert_eq!(k[0].protocol, "RC6");
+    assert_eq!(k[1].protocol, "foo");
+    assert_eq!(k[0].variant, None);
+    if let Some(scancodes) = &k[0].scancodes {
         for s in scancodes {
             match (s.0.as_str(), s.1.as_str()) {
                 ("0x800f0400", "KEY_NUMERIC_0")
@@ -541,10 +533,10 @@ fn parse_text_test() {
 
     let k = parse(s, Path::new("hauppauge")).unwrap();
 
-    assert_eq!(k.protocols[0].name, "streamzap");
-    assert_eq!(k.protocols[0].protocol, "RC-5-SZ");
-    assert_eq!(k.protocols[0].variant, None);
-    if let Some(scancodes) = &k.protocols[0].scancodes {
+    assert_eq!(k[0].name, "streamzap");
+    assert_eq!(k[0].protocol, "RC-5-SZ");
+    assert_eq!(k[0].variant, None);
+    if let Some(scancodes) = &k[0].scancodes {
         for s in scancodes {
             match (s.0.as_str(), s.1.as_str()) {
                 ("0x28c0", "KEY_NUMERIC_0")
@@ -571,10 +563,10 @@ fn parse_bpf_toml_test() {
 
     let k = parse(s, Path::new("x.toml")).unwrap();
 
-    assert_eq!(k.protocols[0].name, "meh");
-    assert_eq!(k.protocols[0].protocol, "manchester");
+    assert_eq!(k[0].name, "meh");
+    assert_eq!(k[0].protocol, "manchester");
     assert_eq!(
-        k.protocols[0].irp,
+        k[0].irp,
         Some("{msb}<-888,888|888,-888>(CODE:1:13,T:1,CODE:12,-40m) [CODE:0..16383]".into())
     );
 
@@ -594,10 +586,10 @@ fn parse_bpf_toml_test() {
 
     let k = parse(s, Path::new("x.toml")).unwrap();
 
-    assert_eq!(k.protocols[0].name, "meh");
-    assert_eq!(k.protocols[0].protocol, "manchester");
+    assert_eq!(k[0].name, "meh");
+    assert_eq!(k[0].protocol, "manchester");
     assert_eq!(
-        k.protocols[0].irp,
+        k[0].irp,
         Some(
             "{msb,38000Hz}<-888,888|888,-888>(300,-350,CODE:12:2,T:1,CODE:1,-40m) [CODE:0..16383]"
                 .into()

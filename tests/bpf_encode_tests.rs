@@ -31,7 +31,7 @@ fn irctl_compare_encode(path: &str, scancode: u32) {
 
     let keymap = cir::keymap::parse(&contents, &path).unwrap();
 
-    let irp = keymap.protocols[0].irp.as_ref().unwrap();
+    let irp = keymap[0].irp.as_ref().unwrap();
     let irp = Irp::parse(irp).unwrap();
 
     let mut vars = Vartable::new();

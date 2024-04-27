@@ -171,7 +171,7 @@ fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
         }
     };
 
-    for p in map.protocols {
+    for p in map {
         if let Some(scancodes) = p.scancodes {
             for (scancode, keycode) in scancodes {
                 let key = match Key::from_str(&keycode) {
