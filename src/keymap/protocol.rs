@@ -50,7 +50,7 @@ impl LinuxProtocol {
 const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
     LinuxProtocol {
         name: "rc5",
-        decoder: "rc5",
+        decoder: "rc-5",
         irp: Some(
             "{36k,msb,889}<1,-1|-1,1>(1,~CODE:1:6,T:1,CODE:5:8,CODE:6,^114m) [CODE:0..0x1FFF,T:0..1=0]",
         ),
@@ -59,14 +59,14 @@ const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
     },
     LinuxProtocol {
         name: "rc5x_20",
-        decoder: "rc5",
+        decoder: "rc-5",
         irp: Some("{36k,msb,889}<1,-1|-1,1>(1,~CODE:1:14,T:1,CODE:5:16,-4,CODE:6:8,CODE:6,^114m) [CODE:0..0x1fffff,T:0..1=0]"),
         scancode_mask: 0x1f7f3f,
         protocol_no: 3,
     },
     LinuxProtocol {
         name: "rc5_sz",
-        decoder: "rc5",
+        decoder: "rc-5-sz",
         irp: Some("{36k,msb,889}<1,-1|-1,1>(1,CODE:1:13,T:1,CODE:12,^114m) [CODE:0..0x2fff,T:0..1=0]"),
         scancode_mask: 0x2fff,
         protocol_no: 4,
@@ -143,35 +143,35 @@ const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
     },
     LinuxProtocol {
         name: "rc6_0",
-        decoder: "rc6",
+        decoder: "rc-6",
         irp: Some("{36k,444,msb}<-1,1|1,-1>(6,-2,1:1,0:3,<-2,2|2,-2>(T:1),CODE:16,^107m) [CODE:0..0xffff,T@:0..1=0]"),
         scancode_mask: 0xffff,
         protocol_no: 15,
     },
     LinuxProtocol {
         name: "rc6_6a_20",
-        decoder: "rc6",
+        decoder: "rc-6",
         irp: Some("{36k,444,msb}<-1,1|1,-1>(6,-2,1:1,6:3,<-2,2|2,-2>(T:1),CODE:20,-100m) [CODE:0..0xfffff,T@:0..1=0]"),
         scancode_mask: 0xf_ffff,
         protocol_no: 16,
     },
     LinuxProtocol {
         name: "rc6_6a_24",
-        decoder: "rc6",
+        decoder: "rc-6",
         irp: Some("{36k,444,msb}<-1,1|1,-1>(6,-2,1:1,6:3,<-2,2|2,-2>(T:1),CODE:24,^105m) [CODE:0..0xffffff,T@:0..1=0]"),
         scancode_mask: 0xff_ff_ff,
         protocol_no: 17,
     },
     LinuxProtocol {
         name: "rc6_6a_32",
-        decoder: "rc6",
+        decoder: "rc-6",
         irp: Some("{36k,444,msb}<-1,1|1,-1>(6,-2,1:1,6:3,<-2,2|2,-2>(T:1),CODE:32,MCE=(CODE>>16)==0x800f||(CODE>>16)==0x8034||(CODE>>16)==0x8046,^105m){MCE=0}[CODE:0..0xffffffff,T@:0..1=0]"),
         scancode_mask: 0xffff_ffff,
         protocol_no: 18,
     },
     LinuxProtocol {
         name: "rc6_mce",
-        decoder: "rc6",
+        decoder: "rc-6",
         irp: Some("{36k,444,msb}<-1,1|1,-1>(6,-2,1:1,6:3,-2,2,CODE:16:16,T:1,CODE:15,MCE=(CODE>>16)==0x800f||(CODE>>16)==0x8034||(CODE>>16)==0x8046,^105m){MCE=1}[CODE:0..0xffffffff,T@:0..1=0]"),
         scancode_mask: 0xffff_7fff,
         protocol_no: 19,
