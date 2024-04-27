@@ -233,56 +233,56 @@ mod test {
     #[test]
     fn compare_encode_to_irctl() {
         for proto in [
-            liblircd::rc_proto::RC_PROTO_RC5,
-            liblircd::rc_proto::RC_PROTO_RC5X_20,
-            liblircd::rc_proto::RC_PROTO_RC5_SZ,
-            liblircd::rc_proto::RC_PROTO_JVC,
-            liblircd::rc_proto::RC_PROTO_SONY12,
-            liblircd::rc_proto::RC_PROTO_SONY15,
-            liblircd::rc_proto::RC_PROTO_SONY20,
-            liblircd::rc_proto::RC_PROTO_NEC,
-            liblircd::rc_proto::RC_PROTO_NECX,
-            liblircd::rc_proto::RC_PROTO_NEC32,
-            liblircd::rc_proto::RC_PROTO_SANYO,
-            liblircd::rc_proto::RC_PROTO_RC6_0,
-            liblircd::rc_proto::RC_PROTO_RC6_6A_20,
-            liblircd::rc_proto::RC_PROTO_RC6_6A_24,
-            liblircd::rc_proto::RC_PROTO_RC6_6A_32,
-            liblircd::rc_proto::RC_PROTO_RC6_MCE,
-            liblircd::rc_proto::RC_PROTO_SHARP,
-            liblircd::rc_proto::RC_PROTO_RCMM12,
-            liblircd::rc_proto::RC_PROTO_RCMM24,
-            liblircd::rc_proto::RC_PROTO_RCMM32,
-            liblircd::rc_proto::RC_PROTO_XBOX_DVD,
+            libirctl::rc_proto::RC_PROTO_RC5,
+            libirctl::rc_proto::RC_PROTO_RC5X_20,
+            libirctl::rc_proto::RC_PROTO_RC5_SZ,
+            libirctl::rc_proto::RC_PROTO_JVC,
+            libirctl::rc_proto::RC_PROTO_SONY12,
+            libirctl::rc_proto::RC_PROTO_SONY15,
+            libirctl::rc_proto::RC_PROTO_SONY20,
+            libirctl::rc_proto::RC_PROTO_NEC,
+            libirctl::rc_proto::RC_PROTO_NECX,
+            libirctl::rc_proto::RC_PROTO_NEC32,
+            libirctl::rc_proto::RC_PROTO_SANYO,
+            libirctl::rc_proto::RC_PROTO_RC6_0,
+            libirctl::rc_proto::RC_PROTO_RC6_6A_20,
+            libirctl::rc_proto::RC_PROTO_RC6_6A_24,
+            libirctl::rc_proto::RC_PROTO_RC6_6A_32,
+            libirctl::rc_proto::RC_PROTO_RC6_MCE,
+            libirctl::rc_proto::RC_PROTO_SHARP,
+            libirctl::rc_proto::RC_PROTO_RCMM12,
+            libirctl::rc_proto::RC_PROTO_RCMM24,
+            libirctl::rc_proto::RC_PROTO_RCMM32,
+            libirctl::rc_proto::RC_PROTO_XBOX_DVD,
         ] {
-            let name = unsafe { CStr::from_ptr(liblircd::protocol_name(proto)) }
+            let name = unsafe { CStr::from_ptr(libirctl::protocol_name(proto)) }
                 .to_str()
                 .unwrap();
             let linux = LinuxProtocol::find(name).unwrap();
 
             assert_eq!(linux.scancode_mask, unsafe {
-                liblircd::protocol_scancode_mask(proto)
+                libirctl::protocol_scancode_mask(proto)
             });
             assert_eq!(linux.protocol_no, proto as u32);
             let mut rng = rand::thread_rng();
 
-            if unsafe { liblircd::protocol_encoder_available(proto) } {
+            if unsafe { libirctl::protocol_encoder_available(proto) } {
                 let irp = Irp::parse(linux.irp.unwrap()).unwrap();
 
-                if proto == liblircd::rc_proto::RC_PROTO_NEC
-                    || proto == liblircd::rc_proto::RC_PROTO_NECX
-                    || proto == liblircd::rc_proto::RC_PROTO_NEC32
+                if proto == libirctl::rc_proto::RC_PROTO_NEC
+                    || proto == libirctl::rc_proto::RC_PROTO_NECX
+                    || proto == libirctl::rc_proto::RC_PROTO_NEC32
                 {
                     assert_eq!(irp.carrier(), 38400);
-                } else if proto == liblircd::rc_proto::RC_PROTO_JVC {
+                } else if proto == libirctl::rc_proto::RC_PROTO_JVC {
                     assert_eq!(irp.carrier(), 37900);
                 } else {
                     assert_eq!(irp.carrier(), unsafe {
-                        liblircd::protocol_carrier(proto) as i64
+                        libirctl::protocol_carrier(proto) as i64
                     });
                 }
 
-                let max_size = unsafe { liblircd::protocol_max_size(proto) } as usize;
+                let max_size = unsafe { libirctl::protocol_max_size(proto) } as usize;
 
                 let mut irctl = vec![0u32; max_size];
 
@@ -292,7 +292,7 @@ mod test {
                     irctl.resize(max_size as usize, 0);
 
                     let len =
-                        unsafe { liblircd::protocol_encode(proto, scancode, irctl.as_mut_ptr()) };
+                        unsafe { libirctl::protocol_encode(proto, scancode, irctl.as_mut_ptr()) };
 
                     assert!(
                         len as usize <= max_size,
@@ -309,17 +309,17 @@ mod test {
                     our.remove_trailing_gap();
 
                     if [
-                        liblircd::rc_proto::RC_PROTO_JVC,
-                        liblircd::rc_proto::RC_PROTO_NEC,
-                        liblircd::rc_proto::RC_PROTO_NECX,
-                        liblircd::rc_proto::RC_PROTO_NEC32,
-                        liblircd::rc_proto::RC_PROTO_SANYO,
-                        liblircd::rc_proto::RC_PROTO_SHARP,
-                        liblircd::rc_proto::RC_PROTO_RC6_0,
-                        liblircd::rc_proto::RC_PROTO_RC6_6A_20,
-                        liblircd::rc_proto::RC_PROTO_RC6_6A_24,
-                        liblircd::rc_proto::RC_PROTO_RC6_6A_32,
-                        liblircd::rc_proto::RC_PROTO_RC6_MCE,
+                        libirctl::rc_proto::RC_PROTO_JVC,
+                        libirctl::rc_proto::RC_PROTO_NEC,
+                        libirctl::rc_proto::RC_PROTO_NECX,
+                        libirctl::rc_proto::RC_PROTO_NEC32,
+                        libirctl::rc_proto::RC_PROTO_SANYO,
+                        libirctl::rc_proto::RC_PROTO_SHARP,
+                        libirctl::rc_proto::RC_PROTO_RC6_0,
+                        libirctl::rc_proto::RC_PROTO_RC6_6A_20,
+                        libirctl::rc_proto::RC_PROTO_RC6_6A_24,
+                        libirctl::rc_proto::RC_PROTO_RC6_6A_32,
+                        libirctl::rc_proto::RC_PROTO_RC6_MCE,
                     ]
                     .contains(&proto)
                     {

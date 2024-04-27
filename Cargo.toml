@@ -34,12 +34,14 @@ irp = { version = "0.3.2", path = "irp" }
 assert_cmd = "2.0"
 serde_json = "1.0"
 liblircd = { path = "liblircd" }
+libirctl = { path = "libirctl" }
 rand = "0.8"
 
 [workspace]
 members = [
 	"irp",
 	"liblircd",
+	"libirctl",
 	"irp/tests/rust-irptransmogrifier",
 ]
 
