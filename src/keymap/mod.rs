@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+mod encode;
 mod parse;
 mod protocol;
 

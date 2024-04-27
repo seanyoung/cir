@@ -1,5 +1,4 @@
 use cir::keymap::Keymap;
-use irp::{Irp, Vartable};
 use libirctl::{encode_bpf_protocol, free_keymap, keymap, parse_keymap};
 use std::{ffi::CString, fs::File, io::Read, path::PathBuf};
 
@@ -32,13 +31,7 @@ fn irctl_compare_encode(path: &str, scancode: u32) {
 
     let keymap = Keymap::parse(&contents, &path).unwrap();
 
-    let irp = keymap[0].irp.as_ref().unwrap();
-    let irp = Irp::parse(irp).unwrap();
-
-    let mut vars = Vartable::new();
-    vars.set("CODE".into(), scancode.into());
-
-    let mut message = irp.encode_raw(vars, 0).unwrap();
+    let mut message = keymap[0].encode_scancode(scancode.into(), 0).unwrap();
 
     message.remove_trailing_gap();
 
