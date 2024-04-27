@@ -1,6 +1,7 @@
 use super::LinuxProtocol;
 
 impl LinuxProtocol {
+    /// Find the protocol that matches the name exactly
     pub fn find(name: &str) -> Option<&'static LinuxProtocol> {
         LINUX_PROTOCOLS.iter().find(|e| e.name == name)
     }
@@ -23,6 +24,26 @@ impl LinuxProtocol {
         let name = str_like(name);
 
         LINUX_PROTOCOLS.iter().find(|e| str_like(e.name) == name)
+    }
+
+    /// Find list of protocols supported by this decoder. Some linux kernel decoders
+    /// can decode multiple (closely related) IR protocols.
+    pub fn find_decoder(name: &str) -> Option<&'static [LinuxProtocol]> {
+        if let Some(start) = LINUX_PROTOCOLS.iter().position(|p| p.decoder == name) {
+            let mut end = start;
+
+            while LINUX_PROTOCOLS
+                .get(end + 1)
+                .map(|p| p.decoder == name)
+                .unwrap_or_default()
+            {
+                end += 1;
+            }
+
+            Some(&LINUX_PROTOCOLS[start..=end])
+        } else {
+            None
+        }
     }
 }
 
@@ -227,4 +248,13 @@ fn find_like() {
 
     let p = LinuxProtocol::find_like("sony-12").unwrap();
     assert_eq!(p.name, "sony12");
+
+    let Some(p) = LinuxProtocol::find_decoder("sony") else {
+        panic!();
+    };
+
+    assert_eq!(p.len(), 3);
+    assert_eq!(p[0].name, "sony12");
+    assert_eq!(p[1].name, "sony15");
+    assert_eq!(p[2].name, "sony20");
 }

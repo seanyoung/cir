@@ -8,7 +8,7 @@ use log::trace;
 use std::{collections::HashMap, fmt, fmt::Write};
 
 /// NFA Decoder state
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Decoder<'a> {
     pos: Vec<(usize, Vartable<'a>)>,
     options: Options<'a>,

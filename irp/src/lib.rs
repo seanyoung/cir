@@ -222,7 +222,7 @@ impl fmt::Display for Event {
 }
 
 /// Options for the decoder
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Options<'a> {
     /// Name of the decoder
     pub name: &'a str,

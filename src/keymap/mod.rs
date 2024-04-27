@@ -1,6 +1,7 @@
 use irp::{Message, Pronto};
 use std::collections::HashMap;
 
+mod decode;
 mod encode;
 mod parse;
 mod protocol;

@@ -1,4 +1,4 @@
-use super::{Keymap, LinuxProtocol};
+use super::{Keymap, LinuxProtocol, Raw};
 use irp::{Irp, Message, Vartable};
 use itertools::Itertools;
 
@@ -83,7 +83,7 @@ pub fn encode(
 
         for raw_code in &remote.raw {
             if raw_code.keycode == *encode_code {
-                let encoded = remote.encode_raw(encode_code, repeats)?;
+                let encoded = remote.encode_raw(raw_code, repeats);
 
                 message.extend(&encoded);
 
@@ -109,8 +109,10 @@ impl Keymap {
     pub fn encode(&self, code: &str, repeats: u64) -> Result<Message, String> {
         if let Some((scancode, _)) = self.scancodes.iter().find(|(_, v)| *v == code) {
             self.encode_scancode(*scancode, repeats)
+        } else if let Some(raw) = self.raw.iter().find(|e| e.keycode == code) {
+            Ok(self.encode_raw(raw, repeats))
         } else {
-            self.encode_raw(code, repeats)
+            Err(format!("{code} not found"))
         }
     }
 
@@ -161,28 +163,24 @@ impl Keymap {
         irp.encode_raw(vars, repeats)
     }
 
-    pub fn encode_raw(&self, code: &str, repeats: u64) -> Result<Message, String> {
-        if let Some(raw) = self.raw.iter().find(|e| e.keycode == code) {
-            if let Some(pronto) = &raw.pronto {
-                return Ok(pronto.encode(repeats as usize));
-            }
-
-            let e = raw.raw.as_ref().unwrap();
-
-            let mut m = e.clone();
-
-            if repeats > 0 {
-                let rep = raw.repeat.as_ref().unwrap_or(e);
-
-                for _ in 0..repeats {
-                    m.extend(rep);
-                }
-            }
-
-            return Ok(m);
+    pub fn encode_raw(&self, raw: &Raw, repeats: u64) -> Message {
+        if let Some(pronto) = &raw.pronto {
+            return pronto.encode(repeats as usize);
         }
 
-        Err(format!("{code} not found"))
+        let e = raw.raw.as_ref().unwrap();
+
+        let mut m = e.clone();
+
+        if repeats > 0 {
+            let rep = raw.repeat.as_ref().unwrap_or(e);
+
+            for _ in 0..repeats {
+                m.extend(rep);
+            }
+        }
+
+        m
     }
 }
 

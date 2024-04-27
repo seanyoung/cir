@@ -151,16 +151,23 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
                 };
 
                 let raw = if let Some(Value::String(raw)) = e.get("raw") {
-                    let raw =
+                    let mut raw =
                         Message::parse(raw).map_err(|e| format!("{}: {e}", filename.display()))?;
+
+                    if !raw.has_trailing_gap() {
+                        raw.raw.push(20000);
+                    }
                     Some(raw)
                 } else {
                     None
                 };
 
                 let repeat = if let Some(Value::String(repeat)) = e.get("repeat") {
-                    let repeat = Message::parse(repeat)
+                    let mut repeat = Message::parse(repeat)
                         .map_err(|e| format!("{}: {e}", filename.display()))?;
+                    if !repeat.has_trailing_gap() {
+                        repeat.raw.push(20000);
+                    }
                     Some(repeat)
                 } else {
                     None

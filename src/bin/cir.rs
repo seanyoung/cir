@@ -125,8 +125,8 @@ enum DecodeCommands {
     #[command(about = "Decode using IRP Notation")]
     Irp(DecodeIrp),
 
-    #[command(about = "Decode using lircd.conf file")]
-    Lircd(DecodeLircd),
+    #[command(about = "Decode using keymap or lircd.conf file")]
+    Keymap(DecodeKeymap),
 }
 
 #[derive(Args)]
@@ -136,9 +136,9 @@ struct DecodeIrp {
 }
 
 #[derive(Args)]
-struct DecodeLircd {
-    /// lircd.conf file
-    lircdconf: OsString,
+struct DecodeKeymap {
+    /// Keymap or lircd.conf file
+    keymap: PathBuf,
 }
 
 #[cfg(target_os = "linux")]
@@ -541,8 +541,12 @@ fn main() {
             DecodeCommands::Irp(irp) => {
                 commands::decode::decode_irp(decode, &irp.irp);
             }
-            DecodeCommands::Lircd(lircd) => {
-                commands::decode::decode_lircd(decode, &lircd.lircdconf);
+            DecodeCommands::Keymap(keymap) => {
+                if keymap.keymap.to_string_lossy().ends_with(".lircd.conf") {
+                    commands::decode::decode_lircd(decode, &keymap.keymap);
+                } else {
+                    commands::decode::decode_keymap(decode, &keymap.keymap);
+                }
             }
         },
         Commands::Transmit(transmit) => commands::transmit::transmit(transmit),

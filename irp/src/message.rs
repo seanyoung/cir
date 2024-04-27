@@ -17,18 +17,16 @@ impl Message {
         }
     }
 
-    /// Concatenate to packets
+    /// Concatenate two messages. Self must have a trailing gap.
     pub fn extend(&mut self, other: &Message) {
+        assert!(self.raw.is_empty() || self.has_trailing_gap());
+
         if self.carrier.is_none() {
             self.carrier = other.carrier;
         }
 
         if self.duty_cycle.is_none() {
             self.duty_cycle = other.duty_cycle;
-        }
-
-        if !self.raw.is_empty() && !self.has_trailing_gap() {
-            self.raw.push(20000);
         }
 
         self.raw.extend_from_slice(&other.raw);
