@@ -1,6 +1,6 @@
 #[cfg(target_os = "linux")]
 use super::config::{open_lirc, Purpose};
-use cir::{linux_protocol::LinuxProtocol, lircd_conf};
+use cir::{keymap::LinuxProtocol, lircd_conf};
 use irp::{Irp, Message, Pronto, Vartable};
 use log::{error, info, warn};
 use std::{ffi::OsStr, fs, path::Path, str::FromStr};

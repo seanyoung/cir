@@ -1,10 +1,4 @@
-pub struct LinuxProtocol {
-    pub name: &'static str,
-    pub decoder: &'static str,
-    pub irp: Option<&'static str>,
-    pub scancode_mask: u32,
-    pub protocol_no: u32,
-}
+use super::LinuxProtocol;
 
 impl LinuxProtocol {
     pub fn find(name: &str) -> Option<&'static LinuxProtocol> {

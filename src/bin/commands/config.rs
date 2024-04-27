@@ -1,6 +1,7 @@
 use aya::programs::{Link, LircMode2};
 use cir::{
-    keymap, lirc, lircd_conf,
+    keymap::Keymap,
+    lirc, lircd_conf,
     rc_maps::parse_rc_maps_file,
     rcdev,
     rcdev::{enumerate_rc_dev, Rcdev},
@@ -163,7 +164,7 @@ fn clear_scancodes(inputdev: &Device) {
 fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
     let keymap_contents = fs::read_to_string(keymap_filename).unwrap();
 
-    let map = match keymap::parse(&keymap_contents, keymap_filename) {
+    let map = match Keymap::parse(&keymap_contents, keymap_filename) {
         Ok(map) => map,
         Err(e) => {
             eprintln!("error: {}: {e}", keymap_filename.display());
