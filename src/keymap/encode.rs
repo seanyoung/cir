@@ -1,15 +1,117 @@
 use super::{Keymap, LinuxProtocol};
 use irp::{Irp, Message, Vartable};
+use itertools::Itertools;
 
-impl Keymap {
-    pub fn encode(&self, code: &str, repeats: u64) -> Result<Message, String> {
-        if let Some(scancodes) = &self.scancodes {
-            if let Some((scancode, _)) = scancodes.iter().find(|(_, v)| *v == code) {
-                return self.encode_scancode(*scancode, repeats);
+/// Encode the given codes into raw IR, ready for transmit. This has been validated
+/// against the send output of lircd using all the remotes present in the
+/// lirc-remotes database.
+pub fn encode(
+    keymaps: &[Keymap],
+    remote: Option<&str>,
+    codes: &[&str],
+    repeats: u64,
+) -> Result<Message, String> {
+    let mut message = Message::new();
+
+    let remotes: Vec<&Keymap> = keymaps
+        .iter()
+        .filter(|r| {
+            if let Some(needle) = remote {
+                needle == r.name
+            } else {
+                true
+            }
+        })
+        .collect();
+
+    if remotes.is_empty() {
+        if let Some(needle) = remote {
+            return Err(format!("remote {needle} not found"));
+        } else {
+            return Err(String::from("no remote found"));
+        }
+    }
+
+    for encode_code in codes {
+        let remotes: Vec<(&Keymap, usize)> = remotes
+            .iter()
+            .filter_map(|remote| {
+                let count = remote
+                    .scancodes
+                    .values()
+                    .filter(|code| code == encode_code)
+                    .count()
+                    + remote
+                        .raw
+                        .iter()
+                        .filter(|code| code.keycode == *encode_code)
+                        .count();
+
+                if count > 0 {
+                    Some((*remote, count))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if remotes.len() > 1 {
+            log::warn!(
+                "multiple remotes have a definition of code {}: {}",
+                encode_code,
+                remotes
+                    .iter()
+                    .map(|remote| remote.0.name.as_str())
+                    .join(", ")
+            );
+        }
+
+        if remotes.is_empty() {
+            return Err(format!("code {encode_code} not found"));
+        }
+
+        let (remote, count) = remotes[0];
+
+        if count > 1 {
+            log::warn!(
+                "remote {} has {} definitions of the code {}",
+                remote.name,
+                count,
+                *encode_code
+            );
+        }
+
+        for raw_code in &remote.raw {
+            if raw_code.keycode == *encode_code {
+                let encoded = remote.encode_raw(encode_code, repeats)?;
+
+                message.extend(&encoded);
+
+                break;
             }
         }
 
-        self.encode_raw(code, repeats)
+        for (scancode, keycode) in &remote.scancodes {
+            if keycode == *encode_code {
+                let encoded = remote.encode_scancode(*scancode, repeats)?;
+
+                message.extend(&encoded);
+
+                break;
+            }
+        }
+    }
+
+    Ok(message)
+}
+
+impl Keymap {
+    pub fn encode(&self, code: &str, repeats: u64) -> Result<Message, String> {
+        if let Some((scancode, _)) = self.scancodes.iter().find(|(_, v)| *v == code) {
+            self.encode_scancode(*scancode, repeats)
+        } else {
+            self.encode_raw(code, repeats)
+        }
     }
 
     pub fn encode_scancode(&self, scancode: u64, repeats: u64) -> Result<Message, String> {
@@ -54,30 +156,24 @@ impl Keymap {
     }
 
     pub fn encode_raw(&self, code: &str, repeats: u64) -> Result<Message, String> {
-        if let Some(raw) = &self.raw {
-            if let Some(raw) = raw.iter().find(|e| e.keycode == code) {
-                if let Some(pronto) = &raw.pronto {
-                    return Ok(pronto.encode(repeats as usize));
-                }
-
-                let e = raw.raw.as_ref().unwrap();
-
-                let mut m = e.clone();
-
-                if repeats > 0 && m.has_trailing_gap() {
-                    let rep = raw.repeat.as_ref().unwrap_or(e);
-
-                    for _ in 0..repeats {
-                        m.extend(rep);
-
-                        if rep.has_trailing_gap() {
-                            break;
-                        }
-                    }
-                }
-
-                return Ok(m);
+        if let Some(raw) = self.raw.iter().find(|e| e.keycode == code) {
+            if let Some(pronto) = &raw.pronto {
+                return Ok(pronto.encode(repeats as usize));
             }
+
+            let e = raw.raw.as_ref().unwrap();
+
+            let mut m = e.clone();
+
+            if repeats > 0 {
+                let rep = raw.repeat.as_ref().unwrap_or(e);
+
+                for _ in 0..repeats {
+                    m.extend(rep);
+                }
+            }
+
+            return Ok(m);
         }
 
         Err(format!("{code} not found"))

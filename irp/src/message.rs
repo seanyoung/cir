@@ -27,6 +27,10 @@ impl Message {
             self.duty_cycle = other.duty_cycle;
         }
 
+        if !self.raw.is_empty() && !self.has_trailing_gap() {
+            self.raw.push(20000);
+        }
+
         self.raw.extend_from_slice(&other.raw);
     }
 

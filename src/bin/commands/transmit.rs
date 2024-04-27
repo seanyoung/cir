@@ -1,9 +1,12 @@
 #[cfg(target_os = "linux")]
 use super::config::{open_lirc, Purpose};
-use cir::{keymap::LinuxProtocol, lircd_conf};
+use cir::{
+    keymap::{Keymap, LinuxProtocol},
+    lircd_conf,
+};
 use irp::{Irp, Message, Pronto, Vartable};
 use log::{error, info, warn};
-use std::{ffi::OsStr, fs, path::Path, str::FromStr};
+use std::{fs, path::Path, str::FromStr};
 use terminal_size::{terminal_size, Width};
 
 pub fn transmit(transmit: &crate::Transmit) {
@@ -196,43 +199,87 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
             p.encode(pronto.repeats as usize)
         }
         crate::TransmitCommands::RawIR(rawir) => encode_rawir(rawir),
-        crate::TransmitCommands::Lircd(lircd) => {
-            let remotes = match lircd_conf::parse(&lircd.conf) {
-                Ok(r) => r,
-                Err(_) => std::process::exit(2),
-            };
-
-            if !lircd.codes.is_empty() {
-                let codes: Vec<&str> = lircd.codes.iter().map(|v| v.as_str()).collect();
-                let m =
-                    lircd_conf::encode(&remotes, lircd.remote.as_deref(), &codes, lircd.repeats);
-
-                match m {
-                    Ok(mut m) => {
-                        if lircd.carrier.is_some() {
-                            m.carrier = lircd.carrier;
-                        }
-
-                        if lircd.duty_cycle.is_some() {
-                            m.duty_cycle = lircd.duty_cycle;
-                        }
-
-                        m
-                    }
-                    Err(e) => {
-                        error!("{}", e);
-
-                        list_remotes(&lircd.conf, &remotes, None);
-
-                        std::process::exit(2);
-                    }
-                }
+        crate::TransmitCommands::Keymap(args) => {
+            if args.keymap.to_string_lossy().ends_with(".lircd.conf") {
+                encode_lircd_conf(args)
             } else {
-                list_remotes(&lircd.conf, &remotes, lircd.remote.as_deref());
+                encode_keymap(args)
+            }
+        }
+    }
+}
+
+fn encode_keymap(args: &crate::TransmitKeymap) -> Message {
+    let remotes = match Keymap::parse(&args.keymap) {
+        Ok(r) => r,
+        Err(_) => std::process::exit(2),
+    };
+
+    if !args.codes.is_empty() {
+        let codes: Vec<&str> = args.codes.iter().map(|v| v.as_str()).collect();
+        let m = cir::keymap::encode(&remotes, args.remote.as_deref(), &codes, args.repeats);
+
+        match m {
+            Ok(mut m) => {
+                if args.carrier.is_some() {
+                    m.carrier = args.carrier;
+                }
+
+                if args.duty_cycle.is_some() {
+                    m.duty_cycle = args.duty_cycle;
+                }
+
+                m
+            }
+            Err(e) => {
+                error!("{}", e);
+
+                list_keymap_remotes(&args.keymap, &remotes, None);
 
                 std::process::exit(2);
             }
         }
+    } else {
+        list_keymap_remotes(&args.keymap, &remotes, args.remote.as_deref());
+
+        std::process::exit(2);
+    }
+}
+
+fn encode_lircd_conf(lircd: &crate::TransmitKeymap) -> Message {
+    let remotes = match lircd_conf::parse(&lircd.keymap) {
+        Ok(r) => r,
+        Err(_) => std::process::exit(2),
+    };
+
+    if !lircd.codes.is_empty() {
+        let codes: Vec<&str> = lircd.codes.iter().map(|v| v.as_str()).collect();
+        let m = lircd_conf::encode(&remotes, lircd.remote.as_deref(), &codes, lircd.repeats);
+
+        match m {
+            Ok(mut m) => {
+                if lircd.carrier.is_some() {
+                    m.carrier = lircd.carrier;
+                }
+
+                if lircd.duty_cycle.is_some() {
+                    m.duty_cycle = lircd.duty_cycle;
+                }
+
+                m
+            }
+            Err(e) => {
+                error!("{}", e);
+
+                list_lircd_remotes(&lircd.keymap, &remotes, None);
+
+                std::process::exit(2);
+            }
+        }
+    } else {
+        list_lircd_remotes(&lircd.keymap, &remotes, lircd.remote.as_deref());
+
+        std::process::exit(2);
     }
 }
 
@@ -340,14 +387,11 @@ fn encode_rawir(transmit: &crate::TransmitRawIR) -> Message {
     message
 }
 
-fn list_remotes(filename: &OsStr, remotes: &[lircd_conf::Remote], needle: Option<&str>) {
+fn list_keymap_remotes(filename: &Path, remotes: &[Keymap], needle: Option<&str>) {
     let size = terminal_size();
 
     if size.is_some() {
-        println!(
-            "\nAvailable remotes and codes in {}:\n",
-            Path::new(filename).display()
-        );
+        println!("\nAvailable remotes and codes in {}:\n", filename.display());
     }
 
     let mut remote_found = false;
@@ -360,11 +404,75 @@ fn list_remotes(filename: &OsStr, remotes: &[lircd_conf::Remote], needle: Option
         }
         remote_found = true;
 
-        let codes = remote
+        let mut codes: Vec<_> = remote
+            .scancodes
+            .values()
+            .map(|code| code.as_str())
+            .chain(remote.raw.iter().map(|code| code.keycode.as_str()))
+            .collect();
+
+        codes.sort();
+
+        if let Some((Width(term_witdh), _)) = size {
+            let mut pos = 2;
+            let mut res = String::new();
+            let mut first = true;
+
+            for code in codes {
+                if first {
+                    first = false
+                } else {
+                    res.push_str(", ");
+                }
+
+                if pos + code.len() + 2 < term_witdh as usize {
+                    res.push_str(code);
+                    pos += code.len() + 2;
+                } else {
+                    res.push_str("\n  ");
+                    res.push_str(code);
+                    pos = code.len() + 4;
+                }
+            }
+
+            println!("Remote:\n  {}\nCodes:\n  {}", remote.name, res);
+        } else {
+            for code in codes {
+                println!("{code}");
+            }
+        }
+    }
+
+    if !remote_found {
+        error!("not remote found");
+    }
+}
+
+fn list_lircd_remotes(filename: &Path, remotes: &[lircd_conf::Remote], needle: Option<&str>) {
+    let size = terminal_size();
+
+    if size.is_some() {
+        println!("\nAvailable remotes and codes in {}:\n", filename.display());
+    }
+
+    let mut remote_found = false;
+
+    for remote in remotes {
+        if let Some(needle) = needle {
+            if remote.name != needle {
+                continue;
+            }
+        }
+        remote_found = true;
+
+        let mut codes: Vec<_> = remote
             .codes
             .iter()
             .map(|code| code.name.as_str())
-            .chain(remote.raw_codes.iter().map(|code| code.name.as_str()));
+            .chain(remote.raw_codes.iter().map(|code| code.name.as_str()))
+            .collect();
+
+        codes.sort();
 
         if let Some((Width(term_witdh), _)) = size {
             let mut pos = 2;

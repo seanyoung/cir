@@ -5,6 +5,7 @@ mod encode;
 mod parse;
 mod protocol;
 
+pub use encode::encode;
 /// A Linux keymap, either toml or text format used by ir-keytable
 #[derive(PartialEq, Debug, Default)]
 pub struct Keymap {
@@ -13,8 +14,8 @@ pub struct Keymap {
     pub variant: Option<String>,
     pub irp: Option<String>,
     pub rc_protocol: Option<u16>,
-    pub raw: Option<Vec<Raw>>,
-    pub scancodes: Option<HashMap<u64, String>>,
+    pub raw: Vec<Raw>,
+    pub scancodes: HashMap<u64, String>,
 }
 
 #[derive(PartialEq, Debug)]

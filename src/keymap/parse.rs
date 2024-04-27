@@ -2,7 +2,7 @@
 
 use super::{Keymap, Raw};
 use irp::{Message, Pronto};
-use std::{collections::HashMap, ffi::OsStr, fmt::Write, path::Path};
+use std::{collections::HashMap, ffi::OsStr, fmt::Write, fs::File, io::Read, path::Path};
 use toml::{Table, Value};
 
 peg::parser! {
@@ -20,7 +20,7 @@ peg::parser! {
             let mut protocol = vec![Keymap {
                     name: first.0.to_owned(),
                     protocol: first.1[0].to_owned(),
-                    scancodes: Some(scancodes),
+                    scancodes,
                     ..Default::default()
             }];
 
@@ -70,8 +70,19 @@ fn string_to_scancode(s: &str) -> Result<u64, std::num::ParseIntError> {
     }
 }
 impl Keymap {
+    pub fn parse(path: &Path) -> Result<Vec<Keymap>, String> {
+        let mut f = File::open(path).map_err(|e| format!("{e}"))?;
+
+        let mut contents = String::new();
+
+        f.read_to_string(&mut contents)
+            .map_err(|e| format!("{e}"))?;
+
+        Keymap::parse_text(&contents, path)
+    }
+
     /// Parse a rc keymap file, either toml or old text format. No validation is done of key codes or protocol names
-    pub fn parse(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
+    pub fn parse_text(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
         if filename.extension() == Some(OsStr::new("toml")) {
             parse_toml(contents, filename)
         } else {
@@ -119,16 +130,14 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
         }
 
         let mut irp = None;
-        let mut raw = None;
-        let mut scancodes = None;
+        let mut raw_entries = Vec::new();
+        let mut scancodes = HashMap::new();
 
         if protocol == "raw" {
             // find raw entries
             let Some(Value::Array(e)) = entry.get("raw") else {
                 return Err("raw protocol is misssing raw entries".into());
             };
-
-            let mut res = Vec::new();
 
             for e in e {
                 let Some(Value::String(keycode)) = e.get("keycode") else {
@@ -167,15 +176,13 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
                     return Err("raw entry has neither pronto hex code nor raw".to_string());
                 }
 
-                res.push(Raw {
+                raw_entries.push(Raw {
                     keycode: keycode.to_owned(),
                     raw,
                     repeat,
                     pronto,
                 });
             }
-
-            raw = Some(res);
         } else {
             if entry.get("raw").is_some() {
                 return Err("raw entries for non-raw protocol".to_string());
@@ -192,8 +199,6 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
             }
 
             if let Some(Value::Table(codes)) = entry.get("scancodes") {
-                let mut res = HashMap::new();
-
                 for (scancode, keycode) in codes {
                     let scancode = string_to_scancode(scancode)
                         .map_err(|_| format!("{scancode} is a not valid scancode"))?;
@@ -201,10 +206,8 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
                         return Err(format!("{}: keycode should be string", filename.display()));
                     };
 
-                    res.insert(scancode, keycode.to_owned());
+                    scancodes.insert(scancode, keycode.to_owned());
                 }
-
-                scancodes = Some(res);
             }
         }
 
@@ -212,7 +215,7 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
             name: name.to_owned(),
             protocol: protocol.to_owned(),
             variant,
-            raw,
+            raw: raw_entries,
             rc_protocol,
             scancodes,
             irp,
@@ -414,17 +417,15 @@ fn parse_toml_test() {
     0x1e1c = "KEY_TV"
     "#;
 
-    let k = Keymap::parse(s, Path::new("x.toml")).unwrap();
+    let k = Keymap::parse_text(s, Path::new("x.toml")).unwrap();
 
     assert_eq!(k[0].name, "hauppauge");
     assert_eq!(k[0].protocol, "rc5");
     assert_eq!(k[0].variant, Some(String::from("rc5")));
-    if let Some(scancodes) = &k[0].scancodes {
-        for s in scancodes {
-            match (s.0, s.1.as_str()) {
-                (0x1e3b, "KEY_SELECT") | (0x1e3d, "KEY_POWER2") | (0x1e1c, "KEY_TV") => {}
-                _ => panic!("{s:?} not expected"),
-            }
+    for s in &k[0].scancodes {
+        match (s.0, s.1.as_str()) {
+            (0x1e3b, "KEY_SELECT") | (0x1e3d, "KEY_POWER2") | (0x1e1c, "KEY_TV") => {}
+            _ => panic!("{s:?} not expected"),
         }
     }
 
@@ -439,7 +440,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        Keymap::parse(s, Path::new("x.toml")),
+        Keymap::parse_text(s, Path::new("x.toml")),
         Err("raw protocol is misssing raw entries".to_string())
     );
 
@@ -452,7 +453,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        Keymap::parse(s, Path::new("x.toml")),
+        Keymap::parse_text(s, Path::new("x.toml")),
         Err("raw entry has neither pronto hex code nor raw".to_string())
     );
 
@@ -466,7 +467,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        Keymap::parse(s, Path::new("x.toml")),
+        Keymap::parse_text(s, Path::new("x.toml")),
         Err("raw entry has neither pronto hex code nor raw".to_string())
     );
 }
@@ -480,17 +481,15 @@ fn parse_text_test() {
     0x1e1c KEY_TV
     "#;
 
-    let k = Keymap::parse(s, Path::new("hauppauge")).unwrap();
+    let k = Keymap::parse_text(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k[0].name, "hauppauge");
     assert_eq!(k[0].protocol, "RC5");
     assert_eq!(k[0].variant, None);
-    if let Some(scancodes) = &k[0].scancodes {
-        for s in scancodes {
-            match (s.0, s.1.as_str()) {
-                (0x1e3b, "KEY_SELECT") | (0x1e3d, "KEY_POWER2") | (0x1e1c, "KEY_TV") => {}
-                _ => panic!("{s:?} not expected"),
-            }
+    for s in &k[0].scancodes {
+        match (s.0, s.1.as_str()) {
+            (0x1e3b, "KEY_SELECT") | (0x1e3d, "KEY_POWER2") | (0x1e1c, "KEY_TV") => {}
+            _ => panic!("{s:?} not expected"),
         }
     }
 
@@ -504,21 +503,19 @@ fn parse_text_test() {
     0x800f0403 KEY_NUMERIC_3
     "#;
 
-    let k = Keymap::parse(s, Path::new("hauppauge")).unwrap();
+    let k = Keymap::parse_text(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k[0].name, "rc6_mce");
     assert_eq!(k[0].protocol, "RC6");
     assert_eq!(k[1].protocol, "foo");
     assert_eq!(k[0].variant, None);
-    if let Some(scancodes) = &k[0].scancodes {
-        for s in scancodes {
-            match (s.0, s.1.as_str()) {
-                (0x800f0400, "KEY_NUMERIC_0")
-                | (0x800f0401, "KEY_NUMERIC_1")
-                | (0x800f0402, "KEY_NUMERIC_2")
-                | (0x800f0403, "KEY_NUMERIC_3") => {}
-                _ => panic!("{s:?} not expected"),
-            }
+    for s in &k[0].scancodes {
+        match (s.0, s.1.as_str()) {
+            (0x800f0400, "KEY_NUMERIC_0")
+            | (0x800f0401, "KEY_NUMERIC_1")
+            | (0x800f0402, "KEY_NUMERIC_2")
+            | (0x800f0403, "KEY_NUMERIC_3") => {}
+            _ => panic!("{s:?} not expected"),
         }
     }
 
@@ -529,19 +526,15 @@ fn parse_text_test() {
     0x28c2 KEY_NUMERIC_2
     "#;
 
-    let k = Keymap::parse(s, Path::new("hauppauge")).unwrap();
+    let k = Keymap::parse_text(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k[0].name, "streamzap");
     assert_eq!(k[0].protocol, "RC-5-SZ");
     assert_eq!(k[0].variant, None);
-    if let Some(scancodes) = &k[0].scancodes {
-        for s in scancodes {
-            match (s.0, s.1.as_str()) {
-                (0x28c0, "KEY_NUMERIC_0")
-                | (0x28c1, "KEY_NUMERIC_1")
-                | (0x28c2, "KEY_NUMERIC_2") => {}
-                _ => panic!("{s:?} not expected"),
-            }
+    for s in &k[0].scancodes {
+        match (s.0, s.1.as_str()) {
+            (0x28c0, "KEY_NUMERIC_0") | (0x28c1, "KEY_NUMERIC_1") | (0x28c2, "KEY_NUMERIC_2") => {}
+            _ => panic!("{s:?} not expected"),
         }
     }
 }
@@ -559,7 +552,7 @@ fn parse_bpf_toml_test() {
     0x1e1c = "KEY_TV"
     "#;
 
-    let k = Keymap::parse(s, Path::new("x.toml")).unwrap();
+    let k = Keymap::parse_text(s, Path::new("x.toml")).unwrap();
 
     assert_eq!(k[0].name, "meh");
     assert_eq!(k[0].protocol, "manchester");
@@ -582,7 +575,7 @@ fn parse_bpf_toml_test() {
     0x1e1c = "KEY_TV"
     "#;
 
-    let k = Keymap::parse(s, Path::new("x.toml")).unwrap();
+    let k = Keymap::parse_text(s, Path::new("x.toml")).unwrap();
 
     assert_eq!(k[0].name, "meh");
     assert_eq!(k[0].protocol, "manchester");

@@ -164,7 +164,7 @@ fn clear_scancodes(inputdev: &Device) {
 fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
     let keymap_contents = fs::read_to_string(keymap_filename).unwrap();
 
-    let map = match Keymap::parse(&keymap_contents, keymap_filename) {
+    let map = match Keymap::parse_text(&keymap_contents, keymap_filename) {
         Ok(map) => map,
         Err(e) => {
             eprintln!("error: {}: {e}", keymap_filename.display());
@@ -173,31 +173,29 @@ fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
     };
 
     for p in map {
-        if let Some(scancodes) = p.scancodes {
-            for (scancode, keycode) in scancodes {
-                let key = match Key::from_str(&keycode) {
-                    Ok(key) => key,
-                    Err(_) => {
-                        eprintln!("error: ‘{keycode}’ is not a valid keycode");
-                        continue;
-                    }
-                };
+        for (scancode, keycode) in p.scancodes {
+            let key = match Key::from_str(&keycode) {
+                Ok(key) => key,
+                Err(_) => {
+                    eprintln!("error: ‘{keycode}’ is not a valid keycode");
+                    continue;
+                }
+            };
 
-                // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible
-                let scancode = if let Ok(scancode) = u32::try_from(scancode) {
-                    scancode.to_ne_bytes().to_vec()
-                } else {
-                    scancode.to_ne_bytes().to_vec()
-                };
+            // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible
+            let scancode = if let Ok(scancode) = u32::try_from(scancode) {
+                scancode.to_ne_bytes().to_vec()
+            } else {
+                scancode.to_ne_bytes().to_vec()
+            };
 
-                match inputdev.update_scancode(key, &scancode) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        eprintln!(
+            match inputdev.update_scancode(key, &scancode) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!(
                             "error: failed to update key mapping from scancode {scancode:x?} to {key:?}: {e}"
                         );
-                        std::process::exit(1);
-                    }
+                    std::process::exit(1);
                 }
             }
         }

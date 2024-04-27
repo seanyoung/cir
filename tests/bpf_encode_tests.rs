@@ -29,7 +29,7 @@ fn irctl_compare_encode(path: &str, scancode: u32) {
 
     f.read_to_string(&mut contents).unwrap();
 
-    let keymap = Keymap::parse(&contents, &path).unwrap();
+    let keymap = Keymap::parse_text(&contents, &path).unwrap();
 
     let mut message = keymap[0].encode_scancode(scancode.into(), 0).unwrap();
 

@@ -3,9 +3,7 @@ use clap::{
     value_parser, ArgAction, ArgMatches, Args, Command, FromArgMatches, Parser, Subcommand,
 };
 use log::{Level, LevelFilter, Metadata, Record};
-use std::ffi::OsString;
-#[cfg(target_os = "linux")]
-use std::path::PathBuf;
+use std::{ffi::OsString, path::PathBuf};
 
 mod commands;
 
@@ -281,7 +279,7 @@ enum TransmitCommands {
     Irp(TransmitIrp),
     Pronto(TransmitPronto),
     RawIR(TransmitRawIR),
-    Lircd(TransmitLircd),
+    Keymap(TransmitKeymap),
 }
 
 #[derive(Args, Debug)]
@@ -410,7 +408,7 @@ enum Transmitables {
 }
 
 #[derive(Args, Debug)]
-struct TransmitLircd {
+struct TransmitKeymap {
     /// Override carrier in Hz, 0 for unmodulated
     #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(0..1_000_000), help_heading = "DEVICE")]
     carrier: Option<i64>,
@@ -419,9 +417,9 @@ struct TransmitLircd {
     #[arg(long = "duty-cycle", short = 'u', value_parser = value_parser!(u8).range(1..99), help_heading = "DEVICE")]
     duty_cycle: Option<u8>,
 
-    /// lircd.conf file
-    #[arg(name = "CONF")]
-    conf: OsString,
+    /// Keymap or lircd.conf file
+    #[arg(name = "KEYMAP")]
+    keymap: PathBuf,
 
     /// Remote to use from lircd.conf file
     #[arg(name = "REMOTE", long = "remote", short = 'm')]
@@ -448,14 +446,14 @@ impl FromArgMatches for TransmitCommands {
                 Ok(Self::RawIR(rawir))
             }
             Some(("pronto", args)) => Ok(Self::Pronto(TransmitPronto::from_arg_matches(args)?)),
-            Some(("lircd", args)) => Ok(Self::Lircd(TransmitLircd::from_arg_matches(args)?)),
+            Some(("keymap", args)) => Ok(Self::Keymap(TransmitKeymap::from_arg_matches(args)?)),
             Some((_, _)) => Err(Error::raw(
                 ErrorKind::InvalidSubcommand,
-                "Valid subcommands are `irp`, `lircd`, `pronto`,  and `rawir`",
+                "Valid subcommands are `irp`, `keymap`, `pronto`,  and `rawir`",
             )),
             None => Err(Error::raw(
                 ErrorKind::MissingSubcommand,
-                "Valid subcommands are `irp`, `lircd`, `pronto`,  and `rawir`",
+                "Valid subcommands are `irp`, `keymap`, `pronto`,  and `rawir`",
             )),
         }
     }
@@ -471,11 +469,11 @@ impl FromArgMatches for TransmitCommands {
                 *self = Self::RawIR(rawir);
             }
             Some(("pronto", args)) => *self = Self::Pronto(TransmitPronto::from_arg_matches(args)?),
-            Some(("lircd", args)) => *self = Self::Lircd(TransmitLircd::from_arg_matches(args)?),
+            Some(("keymap", args)) => *self = Self::Keymap(TransmitKeymap::from_arg_matches(args)?),
             Some((_, _)) => {
                 return Err(Error::raw(
                     ErrorKind::InvalidSubcommand,
-                    "Valid subcommands are `irp`, `lircd`, `pronto`,  and `rawir`",
+                    "Valid subcommands are `irp`, `keymap`, `pronto`,  and `rawir`",
                 ))
             }
             None => (),
@@ -490,8 +488,8 @@ impl Subcommand for TransmitCommands {
         cmd.subcommand(TransmitIrp::augment_args(
             Command::new("irp").about("Encode using IRP language and transmit"),
         ))
-        .subcommand(TransmitLircd::augment_args(
-            Command::new("lircd").about("Transmit codes from lircd.conf file"),
+        .subcommand(TransmitKeymap::augment_args(
+            Command::new("keymap").about("Transmit codes from keymap or lircd.conf file"),
         ))
         .subcommand(TransmitPronto::augment_args(
             Command::new("pronto").about("Parse pronto hex code and transmit"),
@@ -505,8 +503,8 @@ impl Subcommand for TransmitCommands {
         cmd.subcommand(TransmitIrp::augment_args(
             Command::new("irp").about("Encode using IRP language and transmit"),
         ))
-        .subcommand(TransmitLircd::augment_args(
-            Command::new("lircd").about("Transmit codes from lircd.conf file"),
+        .subcommand(TransmitKeymap::augment_args(
+            Command::new("keymap").about("Transmit codes from keymap or lircd.conf file"),
         ))
         .subcommand(TransmitPronto::augment_args(
             Command::new("pronto").about("Parse pronto hex code and transmit"),
@@ -517,7 +515,7 @@ impl Subcommand for TransmitCommands {
         .subcommand_required(true)
     }
     fn has_subcommand(name: &str) -> bool {
-        matches!(name, "irp" | "lircd" | "pronto" | "rawir")
+        matches!(name, "irp" | "keymap" | "pronto" | "rawir")
     }
 }
 
