@@ -183,14 +183,6 @@ fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
                     }
                 };
 
-                let scancode = match u64::from_str_radix(scancode.trim_start_matches("0x"), 16) {
-                    Ok(scancode) => scancode,
-                    Err(_) => {
-                        eprintln!("error: ‘{scancode}’ is not a valid scancode");
-                        continue;
-                    }
-                };
-
                 // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible
                 let scancode = if let Ok(scancode) = u32::try_from(scancode) {
                     scancode.to_ne_bytes().to_vec()

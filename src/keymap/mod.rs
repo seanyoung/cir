@@ -1,3 +1,4 @@
+use irp::{Message, Pronto};
 use std::collections::HashMap;
 
 mod encode;
@@ -5,7 +6,7 @@ mod parse;
 mod protocol;
 
 /// A Linux keymap, either toml or text format used by ir-keytable
-#[derive(PartialEq, Eq, Debug, Default)]
+#[derive(PartialEq, Debug, Default)]
 pub struct Keymap {
     pub name: String,
     pub protocol: String,
@@ -13,15 +14,15 @@ pub struct Keymap {
     pub irp: Option<String>,
     pub rc_protocol: Option<u16>,
     pub raw: Option<Vec<Raw>>,
-    pub scancodes: Option<HashMap<String, String>>,
+    pub scancodes: Option<HashMap<u64, String>>,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Debug)]
 pub struct Raw {
     pub keycode: String,
-    pub raw: Option<String>,
-    pub repeat: Option<String>,
-    pub pronto: Option<String>,
+    pub raw: Option<Message>,
+    pub repeat: Option<Message>,
+    pub pronto: Option<Pronto>,
 }
 
 pub struct LinuxProtocol {

@@ -24,7 +24,7 @@ pub use protocols::Protocol;
 use num_rational::Rational64;
 use std::{collections::HashMap, fmt, rc::Rc};
 
-#[derive(Debug, PartialEq, Default, Eq)]
+#[derive(Debug, PartialEq, Default, Clone, Eq)]
 /// An encoded raw infrared message
 pub struct Message {
     /// The carrier for the message. None means unknown, Some(0) means unmodulated

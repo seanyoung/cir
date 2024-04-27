@@ -1,6 +1,7 @@
 //! Parse linux rc keymaps
 
 use super::{Keymap, Raw};
+use irp::{Message, Pronto};
 use std::{collections::HashMap, ffi::OsStr, fmt::Write, path::Path};
 use toml::{Table, Value};
 
@@ -12,7 +13,8 @@ peg::parser! {
             let mut scancodes = HashMap::new();
 
             for (code, name) in lines.into_iter().flatten() {
-                scancodes.insert(code.to_owned(), name.to_owned());
+                let code = string_to_scancode(code).unwrap();
+                scancodes.insert(code, name.to_owned());
             }
 
             let mut protocol = vec![Keymap {
@@ -60,6 +62,13 @@ peg::parser! {
     }
 }
 
+fn string_to_scancode(s: &str) -> Result<u64, std::num::ParseIntError> {
+    if let Some(hex) = s.strip_prefix("0x") {
+        u64::from_str_radix(hex, 16)
+    } else {
+        str::parse(s)
+    }
+}
 impl Keymap {
     /// Parse a rc keymap file, either toml or old text format. No validation is done of key codes or protocol names
     pub fn parse(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
@@ -127,19 +136,22 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
                 };
 
                 let raw = if let Some(Value::String(raw)) = e.get("raw") {
-                    Some(raw.to_owned())
+                    let raw = Message::parse(raw)?;
+                    Some(raw)
                 } else {
                     None
                 };
 
                 let repeat = if let Some(Value::String(repeat)) = e.get("repeat") {
-                    Some(repeat.to_owned())
+                    let repeat = Message::parse(repeat)?;
+                    Some(repeat)
                 } else {
                     None
                 };
 
                 let pronto = if let Some(Value::String(pronto)) = e.get("pronto") {
-                    Some(pronto.to_owned())
+                    let pronto = Pronto::parse(pronto)?;
+                    Some(pronto)
                 } else {
                     None
                 };
@@ -182,12 +194,14 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
             if let Some(Value::Table(codes)) = entry.get("scancodes") {
                 let mut res = HashMap::new();
 
-                for (key, value) in codes {
-                    let Value::String(value) = value else {
-                        return Err(format!("{}: scancode should be string", filename.display()));
+                for (scancode, keycode) in codes {
+                    let scancode = string_to_scancode(scancode)
+                        .map_err(|_| format!("{scancode} is a not valid scancode"))?;
+                    let Value::String(keycode) = keycode else {
+                        return Err(format!("{}: keycode should be string", filename.display()));
                     };
 
-                    res.insert(key.to_owned(), value.to_owned());
+                    res.insert(scancode, keycode.to_owned());
                 }
 
                 scancodes = Some(res);
@@ -407,8 +421,8 @@ fn parse_toml_test() {
     assert_eq!(k[0].variant, Some(String::from("rc5")));
     if let Some(scancodes) = &k[0].scancodes {
         for s in scancodes {
-            match (s.0.as_str(), s.1.as_str()) {
-                ("0x1e3b", "KEY_SELECT") | ("0x1e3d", "KEY_POWER2") | ("0x1e1c", "KEY_TV") => {}
+            match (s.0, s.1.as_str()) {
+                (0x1e3b, "KEY_SELECT") | (0x1e3d, "KEY_POWER2") | (0x1e1c, "KEY_TV") => {}
                 _ => panic!("{s:?} not expected"),
             }
         }
@@ -473,8 +487,8 @@ fn parse_text_test() {
     assert_eq!(k[0].variant, None);
     if let Some(scancodes) = &k[0].scancodes {
         for s in scancodes {
-            match (s.0.as_str(), s.1.as_str()) {
-                ("0x1e3b", "KEY_SELECT") | ("0x1e3d", "KEY_POWER2") | ("0x1e1c", "KEY_TV") => {}
+            match (s.0, s.1.as_str()) {
+                (0x1e3b, "KEY_SELECT") | (0x1e3d, "KEY_POWER2") | (0x1e1c, "KEY_TV") => {}
                 _ => panic!("{s:?} not expected"),
             }
         }
@@ -498,11 +512,11 @@ fn parse_text_test() {
     assert_eq!(k[0].variant, None);
     if let Some(scancodes) = &k[0].scancodes {
         for s in scancodes {
-            match (s.0.as_str(), s.1.as_str()) {
-                ("0x800f0400", "KEY_NUMERIC_0")
-                | ("0x800f0401", "KEY_NUMERIC_1")
-                | ("0x800f0402", "KEY_NUMERIC_2")
-                | ("0x800f0403", "KEY_NUMERIC_3") => {}
+            match (s.0, s.1.as_str()) {
+                (0x800f0400, "KEY_NUMERIC_0")
+                | (0x800f0401, "KEY_NUMERIC_1")
+                | (0x800f0402, "KEY_NUMERIC_2")
+                | (0x800f0403, "KEY_NUMERIC_3") => {}
                 _ => panic!("{s:?} not expected"),
             }
         }
@@ -522,10 +536,10 @@ fn parse_text_test() {
     assert_eq!(k[0].variant, None);
     if let Some(scancodes) = &k[0].scancodes {
         for s in scancodes {
-            match (s.0.as_str(), s.1.as_str()) {
-                ("0x28c0", "KEY_NUMERIC_0")
-                | ("0x28c1", "KEY_NUMERIC_1")
-                | ("0x28c2", "KEY_NUMERIC_2") => {}
+            match (s.0, s.1.as_str()) {
+                (0x28c0, "KEY_NUMERIC_0")
+                | (0x28c1, "KEY_NUMERIC_1")
+                | (0x28c2, "KEY_NUMERIC_2") => {}
                 _ => panic!("{s:?} not expected"),
             }
         }

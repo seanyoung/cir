@@ -2,6 +2,16 @@ use super::{Keymap, LinuxProtocol};
 use irp::{Irp, Message, Vartable};
 
 impl Keymap {
+    pub fn encode(&self, code: &str, repeats: u64) -> Result<Message, String> {
+        if let Some(scancodes) = &self.scancodes {
+            if let Some((scancode, _)) = scancodes.iter().find(|(_, v)| *v == code) {
+                return self.encode_scancode(*scancode, repeats);
+            }
+        }
+
+        self.encode_raw(code, repeats)
+    }
+
     pub fn encode_scancode(&self, scancode: u64, repeats: u64) -> Result<Message, String> {
         let irp = if let Some(i) = &self.irp {
             i.as_str()
@@ -41,6 +51,36 @@ impl Keymap {
         }
 
         irp.encode_raw(vars, repeats)
+    }
+
+    pub fn encode_raw(&self, code: &str, repeats: u64) -> Result<Message, String> {
+        if let Some(raw) = &self.raw {
+            if let Some(raw) = raw.iter().find(|e| e.keycode == code) {
+                if let Some(pronto) = &raw.pronto {
+                    return Ok(pronto.encode(repeats as usize));
+                }
+
+                let e = raw.raw.as_ref().unwrap();
+
+                let mut m = e.clone();
+
+                if repeats > 0 && m.has_trailing_gap() {
+                    let rep = raw.repeat.as_ref().unwrap_or(e);
+
+                    for _ in 0..repeats {
+                        m.extend(rep);
+
+                        if rep.has_trailing_gap() {
+                            break;
+                        }
+                    }
+                }
+
+                return Ok(m);
+            }
+        }
+
+        Err(format!("{code} not found"))
     }
 }
 
