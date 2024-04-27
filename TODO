@@ -13,6 +13,9 @@
 - cir decode irp should read IrpProtocols.xml
 - cir decode keymap should support keymap.toml
 - access to io_error in aya
+- parse of keymap.toml should ensure that raw codes have trailing spaces
+  -> remove Message.extend() hack
+- cir transmit rawir -S sony15:12 -r 2 ??
 
 irp language oddities
 

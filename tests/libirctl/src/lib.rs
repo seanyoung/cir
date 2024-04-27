@@ -14,8 +14,8 @@ use std::{
 pub struct keymap {
     next: *const keymap,
     name: *const c_char,
-    protocol: *const c_char,
-    variant: *const c_char,
+    pub protocol: *const c_char,
+    pub variant: *const c_char,
     param: *const protocol_param,
     scancode: *const scancode_entry,
     raw: *const raw_entry,
@@ -87,7 +87,7 @@ pub enum rc_proto {
 
 // These functions are defined in ir-encode.[ch], which comes from v4l-utils' ir-ctl
 extern "C" {
-    pub fn protocol_match(name: *const c_char, proto: rc_proto);
+    pub fn protocol_match(name: *const c_char, proto: *mut rc_proto) -> bool;
     pub fn protocol_carrier(proto: rc_proto) -> u32;
     pub fn protocol_max_size(proto: rc_proto) -> u32;
     pub fn protocol_scancode_valid(proto: rc_proto, scancode: *mut u32) -> bool;
