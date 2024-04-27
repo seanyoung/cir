@@ -37,7 +37,7 @@ fn encode_lircd_raw_test() {
         .args([
             "transmit",
             "--dry-run",
-            "lircd",
+            "keymap",
             "testdata/lircd_conf/pace/DC420N.lircd.conf",
             "1",
         ])
@@ -67,7 +67,7 @@ fn encode_lircd_aiwa_test() {
         .args([
             "transmit",
             "--dry-run",
-            "lircd",
+            "keymap",
             "testdata/lircd_conf/aiwa/RC-5VP05.lircd.conf",
             "AUTO",
         ])
@@ -158,7 +158,7 @@ fn encode_lircd_grundig_test() {
         .args([
             "transmit",
             "--dry-run",
-            "lircd",
+            "keymap",
             "testdata/lircd_conf/grundig/RP75_LCD.lircd.conf",
             "-m",
             "grundig_rp75",
@@ -189,7 +189,7 @@ fn empty_lircd_conf() {
         .args([
             "transmit",
             "--dry-run",
-            "lircd",
+            "keymap",
             "testdata/lircd_conf/empty",
         ])
         .assert();
@@ -203,11 +203,144 @@ fn empty_lircd_conf() {
 
     assert_eq!(
         stderr,
-        r#"error: testdata/lircd_conf/empty: no remote definitions found
+        r#"error: testdata/lircd_conf/empty: parse error at error at 1:3: expected "table"
 "#
     );
 }
 
+#[test]
+fn keymaps() {
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args([
+            "transmit",
+            "--dry-run",
+            "-v",
+            "keymap",
+            "testdata/rc_keymaps/RM-687C.toml",
+            "KEY_0",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stdout, "");
+
+    assert_eq!(
+        stderr,
+        r#"debug: using irp for encoding: {msb}<565,-637|1166,-637>(2369,-637,CODE:12,-40m) [CODE:0..4095]
+info: carrier: 38000Hz
+info: rawir: +2369 -637 +1166 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565 -637 +565 -637 +565 -40637
+"#
+    );
+
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args([
+            "transmit",
+            "--dry-run",
+            "keymap",
+            "testdata/rc_keymaps/RM-786.toml",
+            "KEY_CABLEFWD",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stdout, "");
+
+    assert_eq!(
+        stderr,
+        r#"info: rawir: +2437 -553 +618 -569 +619 -576 +1239 -573 +618 -572 +1239 -578 +1238 -580 +616 -597 +619 -570 +618 -564 +618 -577 +618 -573 +1242
+"#
+    );
+
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args([
+            "transmit",
+            "--dry-run",
+            "keymap",
+            "foo.toml",
+            "KEY_CABLEFWD",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stdout, "");
+
+    assert_eq!(
+        stderr,
+        r#"error: foo.toml: No such file or directory (os error 2)
+"#
+    );
+
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args([
+            "transmit",
+            "--dry-run",
+            "keymap",
+            "Cargo.toml",
+            "KEY_CABLEFWD",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stdout, "");
+
+    assert_eq!(
+        stderr,
+        r#"error: Cargo.toml: missing top level protocols array
+"#
+    );
+
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args([
+            "transmit",
+            "--dry-run",
+            "keymap",
+            "testdata/rc_keymaps/rc6_mce.toml",
+            "KEY_ENTER",
+            "-v",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stdout, "");
+
+    assert_eq!(
+        stderr,
+        r#"debug: using irp for encoding: {36k,444,msb}<-1,1|1,-1>(6,-2,1:1,6:3,-2,2,CODE:16:16,T:1,CODE:15,MCE=(CODE>>16)==0x800f||(CODE>>16)==0x8034||(CODE>>16)==0x8046,^105m){MCE=1}[CODE:0..0xffffffff,T@:0..1=0]
+info: carrier: 36000Hz
+info: rawir: +2664 -888 +444 -444 +444 -444 +444 -888 +444 -888 +1332 -888 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +888 -444 +444 -444 +444 -444 +444 -888 +444 -444 +444 -444 +444 -444 +444 -444 +888 -888 +444 -444 +444 -444 +444 -444 +444 -444 +444 -444 +888 -888 +888 -444 +444 -68148
+"#
+    );
+}
 ///
 /// This tests needs a /dev/lirc0 rc-loopback device
 #[test]

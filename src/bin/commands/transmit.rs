@@ -212,7 +212,10 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
 fn encode_keymap(args: &crate::TransmitKeymap) -> Message {
     let remotes = match Keymap::parse(&args.keymap) {
         Ok(r) => r,
-        Err(_) => std::process::exit(2),
+        Err(e) => {
+            log::error!("{e}");
+            std::process::exit(2);
+        }
     };
 
     if !args.codes.is_empty() {

@@ -71,12 +71,12 @@ fn string_to_scancode(s: &str) -> Result<u64, std::num::ParseIntError> {
 }
 impl Keymap {
     pub fn parse(path: &Path) -> Result<Vec<Keymap>, String> {
-        let mut f = File::open(path).map_err(|e| format!("{e}"))?;
+        let mut f = File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
 
         let mut contents = String::new();
 
         f.read_to_string(&mut contents)
-            .map_err(|e| format!("{e}"))?;
+            .map_err(|e| format!("{}: {e}", path.display()))?;
 
         Keymap::parse_text(&contents, path)
     }
@@ -86,13 +86,16 @@ impl Keymap {
         if filename.extension() == Some(OsStr::new("toml")) {
             parse_toml(contents, filename)
         } else {
-            text_keymap::keymap(contents).map_err(|pos| format!("parse error at {pos}"))
+            text_keymap::keymap(contents)
+                .map_err(|pos| format!("{}: parse error at {pos}", filename.display()))
         }
     }
 }
 
 fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
-    let top = contents.parse::<Table>().map_err(|e| e.to_string())?;
+    let top = contents
+        .parse::<Table>()
+        .map_err(|e| format!("{}: {e}", filename.display()))?;
 
     let Some(Value::Array(protocols)) = top.get("protocols") else {
         return Err(format!(
@@ -136,30 +139,36 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
         if protocol == "raw" {
             // find raw entries
             let Some(Value::Array(e)) = entry.get("raw") else {
-                return Err("raw protocol is misssing raw entries".into());
+                return Err(format!(
+                    "{}: raw protocol is misssing raw entries",
+                    filename.display()
+                ));
             };
 
             for e in e {
                 let Some(Value::String(keycode)) = e.get("keycode") else {
-                    return Err("missing keycode".into());
+                    return Err(format!("{}: missing keycode", filename.display()));
                 };
 
                 let raw = if let Some(Value::String(raw)) = e.get("raw") {
-                    let raw = Message::parse(raw)?;
+                    let raw =
+                        Message::parse(raw).map_err(|e| format!("{}: {e}", filename.display()))?;
                     Some(raw)
                 } else {
                     None
                 };
 
                 let repeat = if let Some(Value::String(repeat)) = e.get("repeat") {
-                    let repeat = Message::parse(repeat)?;
+                    let repeat = Message::parse(repeat)
+                        .map_err(|e| format!("{}: {e}", filename.display()))?;
                     Some(repeat)
                 } else {
                     None
                 };
 
                 let pronto = if let Some(Value::String(pronto)) = e.get("pronto") {
-                    let pronto = Pronto::parse(pronto)?;
+                    let pronto = Pronto::parse(pronto)
+                        .map_err(|e| format!("{}: {e}", filename.display()))?;
                     Some(pronto)
                 } else {
                     None
@@ -167,13 +176,22 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
 
                 if pronto.is_some() {
                     if raw.is_some() {
-                        return Err("raw entry has both pronto hex code and raw".to_string());
+                        return Err(format!(
+                            "{}: raw entry has both pronto hex code and raw",
+                            filename.display()
+                        ));
                     }
                     if repeat.is_some() {
-                        return Err("raw entry has both pronto hex code and repeat".to_string());
+                        return Err(format!(
+                            "{}: raw entry has both pronto hex code and repeat",
+                            filename.display()
+                        ));
                     }
                 } else if raw.is_none() {
-                    return Err("raw entry has neither pronto hex code nor raw".to_string());
+                    return Err(format!(
+                        "{}: raw entry has neither pronto hex code nor raw",
+                        filename.display()
+                    ));
                 }
 
                 raw_entries.push(Raw {
@@ -185,7 +203,10 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
             }
         } else {
             if entry.get("raw").is_some() {
-                return Err("raw entries for non-raw protocol".to_string());
+                return Err(format!(
+                    "{}: raw entries for non-raw protocol",
+                    filename.display()
+                ));
             }
 
             if protocol == "irp" {
@@ -193,15 +214,19 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
                     irp = Some(entry.to_owned());
                 }
             } else if entry.get("irp").is_some() {
-                return Err("set the protocol to irp when using irp".to_string());
+                return Err(format!(
+                    "{}: set the protocol to irp when using irp",
+                    filename.display()
+                ));
             } else {
                 irp = bpf_protocol_irp(protocol, entry.as_table().unwrap());
             }
 
             if let Some(Value::Table(codes)) = entry.get("scancodes") {
                 for (scancode, keycode) in codes {
-                    let scancode = string_to_scancode(scancode)
-                        .map_err(|_| format!("{scancode} is a not valid scancode"))?;
+                    let scancode = string_to_scancode(scancode).map_err(|_| {
+                        format!("{}: {scancode} is a not valid scancode", filename.display())
+                    })?;
                     let Value::String(keycode) = keycode else {
                         return Err(format!("{}: keycode should be string", filename.display()));
                     };
@@ -441,7 +466,7 @@ fn parse_toml_test() {
 
     assert_eq!(
         Keymap::parse_text(s, Path::new("x.toml")),
-        Err("raw protocol is misssing raw entries".to_string())
+        Err("x.toml: raw protocol is misssing raw entries".to_string())
     );
 
     let s = r#"
@@ -454,7 +479,7 @@ fn parse_toml_test() {
 
     assert_eq!(
         Keymap::parse_text(s, Path::new("x.toml")),
-        Err("raw entry has neither pronto hex code nor raw".to_string())
+        Err("x.toml: raw entry has neither pronto hex code nor raw".to_string())
     );
 
     let s = r#"
@@ -468,7 +493,7 @@ fn parse_toml_test() {
 
     assert_eq!(
         Keymap::parse_text(s, Path::new("x.toml")),
-        Err("raw entry has neither pronto hex code nor raw".to_string())
+        Err("x.toml: raw entry has neither pronto hex code nor raw".to_string())
     );
 }
 

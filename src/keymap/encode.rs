@@ -131,6 +131,8 @@ impl Keymap {
             }
         };
 
+        log::debug!("using irp for encoding: {irp}");
+
         let irp = Irp::parse(irp)?;
 
         let mut vars = Vartable::new();
