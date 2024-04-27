@@ -3,7 +3,7 @@ use std::fs::read_to_string;
 
 #[test]
 fn encode() {
-    let conf = read_to_string("../testdata/lircd_conf/thomson/ROC740.lircd.conf").unwrap();
+    let conf = read_to_string("../../testdata/lircd_conf/thomson/ROC740.lircd.conf").unwrap();
 
     //unsafe { lirc_log_set_stdout() };
 
@@ -37,7 +37,7 @@ fn encode() {
         }
     }
 
-    let conf = read_to_string("../testdata/lircd_conf/motorola/DCH3200.lircd.conf").unwrap();
+    let conf = read_to_string("../../testdata/lircd_conf/motorola/DCH3200.lircd.conf").unwrap();
 
     // unsafe { lirc_log_set_stdout() };
 
@@ -70,7 +70,7 @@ fn encode() {
         }
     }
 
-    let conf = read_to_string("../testdata/lircd_conf/motorola/QIP2500.lircd.conf").unwrap();
+    let conf = read_to_string("../../testdata/lircd_conf/motorola/QIP2500.lircd.conf").unwrap();
 
     let conf = LircdConf::parse(&conf).unwrap();
 
@@ -110,7 +110,7 @@ fn encode() {
 
     // now test decode of a remote with toggle_bit_mask set (more than one bit)
 
-    let conf = read_to_string("../testdata/lircd_conf/d-link/DSM-10.lircd.conf").unwrap();
+    let conf = read_to_string("../../testdata/lircd_conf/d-link/DSM-10.lircd.conf").unwrap();
 
     //unsafe { lirc_log_set_stdout() };
 
@@ -163,7 +163,7 @@ fn encode() {
 
     // now test decoder of a remote with an ignore_mask
 
-    let conf = read_to_string("../testdata/lircd_conf/apple/A1156.lircd.conf").unwrap();
+    let conf = read_to_string("../../testdata/lircd_conf/apple/A1156.lircd.conf").unwrap();
 
     //unsafe { lirc_log_set_stdout() };
 
