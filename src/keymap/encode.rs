@@ -138,7 +138,7 @@ impl Keymap {
         let mut vars = Vartable::new();
 
         let mut remaining_bits = 64;
-        let mut scancode = scancode;
+        let mut scancode_bits = scancode;
 
         for p in irp.parameters.iter().rev() {
             if p.name == "T" {
@@ -148,10 +148,14 @@ impl Keymap {
             if bits > remaining_bits {
                 return Err("too many parameters for 64 bit scancode".into());
             }
-            vars.set(p.name.clone(), (scancode & gen_mask(bits)) as i64);
+            vars.set(p.name.clone(), (scancode_bits & gen_mask(bits)) as i64);
 
             remaining_bits -= bits;
-            scancode >>= bits;
+            scancode_bits >>= bits;
+        }
+
+        if scancode_bits > 0 {
+            log::warn!("IRP did not use all bits in scancode {scancode:#x}");
         }
 
         irp.encode_raw(vars, repeats)
