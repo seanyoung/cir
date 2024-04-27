@@ -45,7 +45,7 @@ pub struct raw_entry {
 }
 
 extern "C" {
-    pub fn parse_keymap(fname: *const c_char, keymap: *const *const keymap, verbose: bool) -> i32;
+    pub fn parse_keymap(fname: *const c_char, keymap: *mut *mut keymap, verbose: bool) -> i32;
     pub fn free_keymap(keymap: *const keymap);
     pub fn keymap_param(keymap: *const keymap, name: *const c_char, fallback: i32) -> i32;
 }

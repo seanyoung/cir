@@ -1,6 +1,6 @@
 //! Parse linux rc keymaps
 
-use std::{collections::HashMap, ffi::OsStr, path::Path};
+use std::{collections::HashMap, ffi::OsStr, fmt::Write, path::Path};
 use toml::{Table, Value};
 
 #[derive(PartialEq, Eq, Debug, Default)]
@@ -9,6 +9,7 @@ pub struct Protocol {
     pub protocol: String,
     pub variant: Option<String>,
     pub irp: Option<String>,
+    pub rc_protocol: Option<u16>,
     pub raw: Option<Vec<Raw>>,
     pub scancodes: Option<HashMap<String, String>>,
 }
@@ -120,6 +121,18 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Keymap, String> {
             variant = Some(entry.to_owned());
         }
 
+        let mut rc_protocol = None;
+        if let Some(Value::Integer(n)) = entry.get("rc_protocol") {
+            if let Ok(n) = (*n).try_into() {
+                rc_protocol = Some(n);
+            } else {
+                return Err(format!(
+                    "{}: rc_protocol {n} must be 16 bit value",
+                    filename.display()
+                ));
+            }
+        }
+
         let mut irp = None;
         let mut raw = None;
         let mut scancodes = None;
@@ -184,6 +197,10 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Keymap, String> {
                 if let Some(Value::String(entry)) = entry.get("irp") {
                     irp = Some(entry.to_owned());
                 }
+            } else if entry.get("irp").is_some() {
+                return Err("set the protocol to irp when using irp".to_string());
+            } else {
+                irp = bpf_protocol_irp(protocol, entry.as_table().unwrap());
             }
 
             if let Some(Value::Table(codes)) = entry.get("scancodes") {
@@ -206,12 +223,192 @@ fn parse_toml(contents: &str, filename: &Path) -> Result<Keymap, String> {
             protocol: protocol.to_owned(),
             variant,
             raw,
+            rc_protocol,
             scancodes,
             irp,
         });
     }
 
     Ok(Keymap { protocols: res })
+}
+
+fn bpf_protocol_irp(protocol: &str, entry: &Table) -> Option<String> {
+    let param = |name: &str, default: i64| -> i64 {
+        if let Some(Value::Integer(n)) = entry.get(name) {
+            *n
+        } else {
+            default
+        }
+    };
+
+    match protocol {
+        "pulse_distance" => {
+            let mut irp = "{".to_owned();
+            let bits = param("bits", 4);
+
+            if param("reverse", 0) == 0 {
+                irp.push_str("msb,");
+            }
+
+            if entry.contains_key("carrier") {
+                write!(irp, "{}Hz,", param("carrier", 0)).unwrap();
+            }
+
+            if irp.ends_with(',') {
+                irp.pop();
+            }
+
+            write!(
+                irp,
+                "}}<{},-{}|{},-{}>({},-{},CODE:{},{},-40m",
+                param("bit_pulse", 625),
+                param("bit_0_space", 375),
+                param("bit_pulse", 625),
+                param("bit_1_space", 1625),
+                param("header_pulse", 2125),
+                param("header_space", 1875),
+                bits,
+                param("trailer_pulse", 625),
+            )
+            .unwrap();
+
+            let header_optional = param("header_optional", 0);
+
+            if header_optional > 0 {
+                write!(
+                    irp,
+                    ",(CODE:{},{},-40m)*",
+                    bits,
+                    param("trailer_pulse", 625),
+                )
+                .unwrap();
+            } else {
+                let repeat_pulse = param("repeat_pulse", 0);
+                if repeat_pulse > 0 {
+                    write!(
+                        irp,
+                        ",({},-{},{},-40)*",
+                        repeat_pulse,
+                        param("repeat_space", 0),
+                        param("trailer_pulse", 625)
+                    )
+                    .unwrap();
+                }
+            }
+
+            write!(irp, ") [CODE:0..{}]", gen_mask(bits)).unwrap();
+
+            Some(irp)
+        }
+        "pulse_length" => {
+            let mut irp = "{".to_owned();
+            let bits = param("bits", 4);
+
+            if param("reverse", 0) == 0 {
+                irp.push_str("msb,");
+            }
+
+            if entry.contains_key("carrier") {
+                write!(irp, "{}Hz,", param("carrier", 0)).unwrap();
+            }
+
+            if irp.ends_with(',') {
+                irp.pop();
+            }
+
+            write!(
+                irp,
+                "}}<{},-{}|{},-{}>({},-{},CODE:{},-40m",
+                param("bit_0_pulse", 375),
+                param("bit_space", 625),
+                param("bit_1_pulse", 1625),
+                param("bit_space", 625),
+                param("header_pulse", 2125),
+                param("header_space", 1875),
+                bits,
+            )
+            .unwrap();
+
+            let header_optional = param("header_optional", 0);
+
+            if header_optional > 0 {
+                write!(irp, ",(CODE:{},-40m)*", bits).unwrap();
+            } else {
+                let repeat_pulse = param("repeat_pulse", 0);
+                if repeat_pulse > 0 {
+                    write!(
+                        irp,
+                        ",({},-{},{},-40)*",
+                        repeat_pulse,
+                        param("repeat_space", 0),
+                        param("trailer_pulse", 625)
+                    )
+                    .unwrap();
+                }
+            }
+
+            write!(irp, ") [CODE:0..{}]", gen_mask(bits)).unwrap();
+
+            Some(irp)
+        }
+        "manchester" => {
+            let mut irp = "{msb,".to_owned();
+            let bits = param("bits", 14);
+            let toggle_bit = param("toggle_bit", 100);
+
+            if entry.contains_key("carrier") {
+                write!(irp, "{}Hz,", param("carrier", 0)).unwrap();
+            }
+
+            if irp.ends_with(',') {
+                irp.pop();
+            }
+
+            write!(
+                irp,
+                "}}<-{},{}|{},-{}>(",
+                param("zero_space", 888),
+                param("zero_pulse", 888),
+                param("one_pulse", 888),
+                param("one_space", 888),
+            )
+            .unwrap();
+
+            let header_pulse = param("header_pulse", 0);
+            let header_space = param("header_space", 0);
+
+            if header_pulse > 0 && header_space > 0 {
+                write!(irp, "{},-{},", header_pulse, header_space).unwrap();
+            }
+
+            if toggle_bit >= bits {
+                write!(irp, "CODE:{},-40m", bits,).unwrap();
+            } else {
+                let leading = bits - toggle_bit;
+                if leading > 1 {
+                    write!(irp, "CODE:{}:{},", leading - 1, toggle_bit + 1).unwrap();
+                }
+                write!(irp, "T:1,").unwrap();
+                if toggle_bit > 0 {
+                    write!(irp, "CODE:{},", toggle_bit).unwrap();
+                }
+                irp.pop();
+            }
+
+            write!(irp, ",-40m) [CODE:0..{}]", gen_mask(bits)).unwrap();
+
+            Some(irp)
+        }
+        _ => None,
+    }
+}
+
+fn gen_mask(v: i64) -> u64 {
+    if v < 64 {
+        (1u64 << v) - 1
+    } else {
+        u64::MAX
+    }
 }
 
 #[test]
@@ -357,4 +554,53 @@ fn parse_text_test() {
             }
         }
     }
+}
+
+#[test]
+fn parse_bpf_toml_test() {
+    let s = r#"
+    [[protocols]]
+    name = "meh"
+    protocol = "manchester"
+    toggle_bit = 12
+    [protocols.scancodes]
+    0x1e3b = "KEY_SELECT"
+    0x1e3d = "KEY_POWER2"
+    0x1e1c = "KEY_TV"
+    "#;
+
+    let k = parse(s, Path::new("x.toml")).unwrap();
+
+    assert_eq!(k.protocols[0].name, "meh");
+    assert_eq!(k.protocols[0].protocol, "manchester");
+    assert_eq!(
+        k.protocols[0].irp,
+        Some("{msb}<-888,888|888,-888>(CODE:1:13,T:1,CODE:12,-40m) [CODE:0..16383]".into())
+    );
+
+    let s = r#"
+    [[protocols]]
+    name = "meh"
+    protocol = "manchester"
+    toggle_bit = 1
+    carrier = 38000
+    header_pulse = 300
+    header_space = 350
+    [protocols.scancodes]
+    0x1e3b = "KEY_SELECT"
+    0x1e3d = "KEY_POWER2"
+    0x1e1c = "KEY_TV"
+    "#;
+
+    let k = parse(s, Path::new("x.toml")).unwrap();
+
+    assert_eq!(k.protocols[0].name, "meh");
+    assert_eq!(k.protocols[0].protocol, "manchester");
+    assert_eq!(
+        k.protocols[0].irp,
+        Some(
+            "{msb,38000Hz}<-888,888|888,-888>(300,-350,CODE:12:2,T:1,CODE:1,-40m) [CODE:0..16383]"
+                .into()
+        )
+    );
 }
