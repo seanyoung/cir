@@ -1,9 +1,8 @@
 # cir - a new implementation of linux infrared tools
 
-For Linux, there are tools to interact with any infrared hardware:
-`ir-ctl` and `ir-keytable`. These tools can load simple infrared keymaps
-and load decoders, and transmit simple IR. The IR decoders are hardcoded
-and a small hardcoded set is included with the kernel.
+For Linux, there are tools for infrared: `ir-ctl` and `ir-keytable`. These
+tools can load simple infrared keymaps and load decoders, and transmit simple
+IR. The IR decoders and encoders are hardcoded.
 There is also the lirc daemon and its tools, which supports many more IR
 protocols but certainly not all.
 
@@ -20,7 +19,7 @@ NEC, RC-5 and a few others.
 [IRP](http://hifi-remote.com/wiki/index.php?title=IRP_Notation) is a
 DSL language which can
 express [any IR protocol](http://hifi-remote.com/wiki/index.php/DecodeIR).
-The aim is parse IRP and compile a decoder to BPF. So, any protocol can
+We can parse IRP and compile a decoder to BPF using LLVM. So, any protocol can
 be supported directly.
 
 ## Listing IR devices (cir config)
@@ -55,52 +54,56 @@ rc0:
 
 ## Transmit/Send (cir transmit)
 
-If you have a `.lircd.conf` file or `.toml` keymap, you can send with the following
+If you have a `.lircd.conf` file or `.toml` keymap, you can transmit with the following
 command:
 
 ```
-cir transmit keymap foo.lircd.conf KEY_CHANNELUP
+$ cir transmit keymap RM-Y173.lircd.conf KEY_CHANNELUP
+info: carrier: 38000Hz
+info: rawir: +2485 -527 +656 -527 +656 -527 +656 -527 +656 -527 +1262 -527 +656 -527 +656 -527 +1262 -527 +656 -527 +656 -527 +656 -527 +656 -26274
 ```
 Alternatively, you can send raw IR directly like so:
 ```
-cir transmit rawir '+9000 -4500 +560'
+$ cir transmit rawir '+9000 -4500 +560'
 ```
-You can also files or linux kernel scancodes, exactly like the `ir-ctl` tool. This supports
+You can also send files or linux kernel scancodes, using the same options like `ir-ctl`. This supports
 mode2 files or raw IR files.
 ```
-cir transmit rawir -s input-file -S nec:0xcafe
+$ cir transmit rawir -s input-file -S nec:0xcafe
 ```
 You can send pronto codes:
 ```
-cir transmit pronto '5000 0073 0000 0001 0001 0001'
+$ cir transmit pronto '5000 0073 0000 0001 0001 0001'
 ```
 Lastly you use IRP notation and set the parameters. This is great for experimenting with IRP; use the `--dry-run` (`-n`)
 to avoid sending.
 ```
-cir transmit irp -n -fF=2 '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
+$ cir transmit irp -n -fF=2 '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
+info: carrier: 40000Hz
+info: rawir: +2400 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -32400
 ```
 
 ## Decoding (cir decode)
 
-Use this if have a `.lircd.conf` file or `.toml` keymap, and want to decode the IR, without changing
+Use this if have a `.lircd.conf` file or `.toml` keymap, and want to decode the IR. This does not change
 any configation.
 
 ```
-cir decode keymap foo.lircd.conf
+$ cir decode keymap foo.lircd.conf
 ```
 This will infrared from the first lirc device. You can also decode IR on the command line or a file.
 
 ```
-cir decode keymap foo.lircd.conf -r '+9000 -4500 +560'
+$ cir decode keymap foo.lircd.conf -r '+9000 -4500 +560'
 ```
 or
 ```
-cir decode keymap foo.lircd.conf -f input-file
+$ cir decode keymap foo.lircd.conf -f input-file
 ```
 If you wish to decode using IRP Notation that is possible too:
 
 ```
-cir decode irp '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
+$ cir decode irp '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
 ```
 Like above the input can be from a lirc device (optionally specify the device with 
 `-d /dev/lirc1` or `-s rc`), on the command line (`-r '+100 -200 +100'`) or a file (`-f filename`).
@@ -110,14 +113,14 @@ Like above the input can be from a lirc device (optionally specify the device wi
 This is the cir equivalent of `ir-keytable -w`.
 
 ```
-cir config -s rc0 -w foo.lircd.conf
+$ cir config -s rc0 -w foo.lircd.conf
 ```
 This will generate a BPF decoder for `foo.lircd.conf` and load it.
 
 On startup, `ir-keytable -a -s rc0` read the correct keymap from `/etc/rc_maps.cfg`. 
 
 ```
-cir auto -s rc0
+$ cir auto -s rc0
 ```
 
 ## Test configuration (cir test)
@@ -125,7 +128,7 @@ cir auto -s rc0
 This is the cir equivalent of `ir-keytable -t`
 
 ```
-cir test
+$ cir test
 ```
 
 ## Status
@@ -141,3 +144,10 @@ need the `llvm-devel` package install and `llvm-dev` on Ubuntu.
 ```
 cargo install --git https://github.com/seanyoung/cir cir
 ```
+
+## Tests
+
+- The IRP encoder and decoder is compared against IrpTransmogrifier with a large set of inputs.
+- The parsing, encoding and decoding of lircd.conf files is compared against lirc (see liblircd)
+- The encoding of linux protocols is compared against ir-ctl (see libirctl)
+- There are more tests
