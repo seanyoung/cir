@@ -479,8 +479,8 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::Config) {
 
                     println!(
                         "\tVendor/product\t\t: {:04x}:{:04x} version 0x{:04x}",
-                        id.product(),
                         id.vendor(),
+                        id.product(),
                         id.version()
                     );
 

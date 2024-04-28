@@ -1,17 +1,18 @@
 # cir - a new implementation of linux infrared tools
 
-aka as "daemon-less lircd, ir-keytable, ir-ctl combined and much more".
-
-For Linux, there are two tools to interact with any infrared hardware:
-ir-ctl and ir-keytable. These tools can load simple infrared keymaps
+For Linux, there are tools to interact with any infrared hardware:
+`ir-ctl` and `ir-keytable`. These tools can load simple infrared keymaps
 and load decoders, and transmit simple IR. The IR decoders are hardcoded
-and a small set is included.
+and a small hardcoded set is included with the kernel.
+There is also the lirc daemon and its tools, which supports many more IR
+protocols but certainly not all.
 
-This tool replaced both those tools, but with three major new features:
+This tool replaces all those tools, but with major new features:
 
  - Pronto hex codes
  - IRP support
  - lircd.conf remote definition support
+ - daemon-less (using BPF)
 
 Pronto hex codes are a fairly straightforward way of encoding raw IR,
 NEC, RC-5 and a few others.
@@ -22,15 +23,37 @@ express [any IR protocol](http://hifi-remote.com/wiki/index.php/DecodeIR).
 The aim is parse IRP and compile a decoder to BPF. So, any protocol can
 be supported directly.
 
-## Listing IR devices
+## Listing IR devices (cir config)
 
 This is the cir equivalent of both `ir-keytable` with no arguments and `ir-ctl -f`.
 
 ```
-cir config
+$ cir config
+rc0:
+        Device Name             : Media Center Ed. eHome Infrared Remote Transceiver (1784:0008)
+        Driver                  : mceusb
+        Default Keymap          : rc-rc6-mce
+        Input Device            : /dev/input/event10
+        Bus                     : USB
+        Vendor/product          : 1784:0008 version 0x0101
+        Repeat                  : delay 500 ms, period 125 ms
+        LIRC Device             : /dev/lirc0
+        LIRC Receiver           : raw receiver
+        LIRC Resolution         : 50 microseconds
+        LIRC Timeout            : 125000 microseconds
+        LIRC Timeout Range      : 50 to 1250000 microseconds
+        LIRC Wideband Receiver  : yes
+        LIRC Measure Carrier    : yes
+        LIRC Transmitter        : yes
+        LIRC Set Tx Carrier     : yes
+        LIRC Set Tx Duty Cycle  : no
+        LIRC Transmitters       : 2
+        BPF protocols           : 
+        Supported Protocols     : rc-5 nec rc-6 jvc sony rc-5-sz sanyo sharp mce_kbd xmp imon rc-mm
+        Enabled Protocols       : 
 ```
 
-## Transmit/Send
+## Transmit/Send (cir transmit)
 
 If you have a `.lircd.conf` file or `.toml` keymap, you can send with the following
 command:
@@ -57,7 +80,7 @@ to avoid sending.
 cir transmit irp -n -fF=2 '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
 ```
 
-## Decoding
+## Decoding (cir decode)
 
 Use this if have a `.lircd.conf` file or `.toml` keymap, and want to decode the IR, without changing
 any configation.
@@ -74,8 +97,15 @@ or
 ```
 cir decode keymap foo.lircd.conf -f input-file
 ```
+If you wish to decode using IRP Notation that is possible too:
 
-## Configuration
+```
+cir decode irp '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
+```
+Like above the input can be from a lirc device (optionally specify the device with 
+`-d /dev/lirc1` or `-s rc`), on the command line (`-r '+100 -200 +100'`) or a file (`-f filename`).
+
+## Configuration (cir config -w)
 
 This is the cir equivalent of `ir-keytable -w`.
 
@@ -90,7 +120,7 @@ On startup, `ir-keytable -a -s rc0` read the correct keymap from `/etc/rc_maps.c
 cir auto -s rc0
 ```
 
-## Test configuration
+## Test configuration (cir test)
 
 This is the cir equivalent of `ir-keytable -t`
 
@@ -109,5 +139,5 @@ On Linux, cir depends on llvm for BPF code generation. On Fedora you
 need the `llvm-devel` package install and `llvm-dev` on Ubuntu.
 
 ```
-cargo install --git https://github.com/seanyoung/cir
+cargo install --git https://github.com/seanyoung/cir cir
 ```
