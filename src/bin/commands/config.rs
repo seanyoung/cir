@@ -70,9 +70,7 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    if !config.keymaps.is_empty() {
-        load_keymaps(config.clear, &mut rcdev, Some(config), &config.keymaps);
-    }
+    load_keymaps(config.clear, &mut rcdev, Some(config), &config.keymaps);
 }
 
 fn load_keymaps(
@@ -103,20 +101,18 @@ fn load_keymaps(
         None
     };
 
-    if !keymaps.is_empty() {
-        for keymap_filename in keymaps.iter() {
-            if keymap_filename.to_string_lossy().ends_with(".lircd.conf") {
-                load_lircd(&inputdev, &chdev, config, keymap_filename);
-            } else {
-                load_keymap(
-                    &inputdev,
-                    &chdev,
-                    config,
-                    keymap_filename,
-                    &mut protocols,
-                    &rcdev.supported_protocols,
-                );
-            }
+    for keymap_filename in keymaps.iter() {
+        if keymap_filename.to_string_lossy().ends_with(".lircd.conf") {
+            load_lircd(&inputdev, &chdev, config, keymap_filename);
+        } else {
+            load_keymap(
+                &inputdev,
+                &chdev,
+                config,
+                keymap_filename,
+                &mut protocols,
+                &rcdev.supported_protocols,
+            );
         }
     }
 
@@ -202,7 +198,7 @@ fn load_keymap(
     protocols: &mut Vec<usize>,
     supported_protocols: &[String],
 ) {
-    let map = match Keymap::parse(keymap_filename) {
+    let keymaps = match Keymap::parse(keymap_filename) {
         Ok(map) => map,
         Err(e) => {
             eprintln!("error: {}: {e}", keymap_filename.display());
@@ -210,8 +206,8 @@ fn load_keymap(
         }
     };
 
-    for p in map {
-        for (scancode, keycode) in &p.scancodes {
+    for keymap in keymaps {
+        for (scancode, keycode) in &keymap.scancodes {
             // TODO: needs some logic to check for KEY_{} etc like load_lircd
             let key = match Key::from_str(keycode) {
                 Ok(key) => key,
@@ -240,7 +236,7 @@ fn load_keymap(
         }
 
         let Some(chdev) = chdev else {
-            if let Some(p) = LinuxProtocol::find_decoder(&p.protocol) {
+            if let Some(p) = LinuxProtocol::find_decoder(&keymap.protocol) {
                 for p in p {
                     if let Some(index) = supported_protocols.iter().position(|e| e == p.decoder) {
                         if !protocols.contains(&index) {
@@ -273,7 +269,7 @@ fn load_keymap(
         }
 
         let mut options = Options {
-            name: &p.name,
+            name: &keymap.name,
             max_gap,
             ..Default::default()
         };
@@ -286,7 +282,7 @@ fn load_keymap(
             options.object = decode.save_object;
         }
 
-        let dfas = match p.build_dfa(&options) {
+        let dfas = match keymap.build_dfa(&options) {
             Ok(dfas) => dfas,
             Err(e) => {
                 println!("{}: {e}", keymap_filename.display());
@@ -312,7 +308,7 @@ fn load_keymap(
             };
 
             let program: &mut LircMode2 = bpf
-                .program_mut(&p.name)
+                .program_mut(&keymap.name)
                 .expect("function missing")
                 .try_into()
                 .unwrap();
