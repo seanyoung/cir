@@ -597,37 +597,6 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::Config) {
                                 "no"
                             }
                         );
-
-                        match LircMode2::query(lircdev.as_file()) {
-                            Ok(list) => {
-                                print!("\tBPF protocols\t\t: ");
-
-                                let mut first = true;
-
-                                for e in list {
-                                    if first {
-                                        first = false;
-                                    } else {
-                                        print!(", ")
-                                    }
-
-                                    match e.info() {
-                                        Ok(info) => match info.name_as_str() {
-                                            Some(name) => print!("{name}"),
-                                            None => print!("{}", info.id()),
-                                        },
-                                        Err(err) => {
-                                            print!("{err}")
-                                        }
-                                    }
-                                }
-
-                                println!();
-                            }
-                            Err(err) => {
-                                println!("\tBPF protocols\t\t: {err}")
-                            }
-                        }
                     } else if lircdev.can_receive_scancodes() {
                         println!("\tLIRC Receiver\t\t: scancode");
                     } else {
@@ -668,6 +637,39 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::Config) {
                         }
                     } else {
                         println!("\tLIRC Transmitter\t: no");
+                    }
+
+                    if lircdev.can_receive_raw() {
+                        match LircMode2::query(lircdev.as_file()) {
+                            Ok(list) => {
+                                print!("\tBPF protocols\t\t: ");
+
+                                let mut first = true;
+
+                                for e in list {
+                                    if first {
+                                        first = false;
+                                    } else {
+                                        print!(", ")
+                                    }
+
+                                    match e.info() {
+                                        Ok(info) => match info.name_as_str() {
+                                            Some(name) => print!("{name}"),
+                                            None => print!("{}", info.id()),
+                                        },
+                                        Err(err) => {
+                                            print!("{err}")
+                                        }
+                                    }
+                                }
+
+                                println!();
+                            }
+                            Err(err) => {
+                                println!("\tBPF protocols\t\t: {err}")
+                            }
+                        }
                     }
                 }
                 Err(err) => {
