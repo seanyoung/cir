@@ -5,8 +5,7 @@ ir-ctl and ir-keytable. These tools can load simple infrared keymaps
 and load decoders, and transmit simple IR. The IR decoders are hardcoded
 and a small set is included.
 
-This project plans to completely replace both those tools, but with
-three major new features:
+This tool replaced both those tools, but with three major new features:
 
  - Pronto hex codes
  - IRP support
@@ -21,4 +20,12 @@ express [any IR protocol](http://hifi-remote.com/wiki/index.php/DecodeIR).
 The aim is parse IRP and compile a decoder to BPF. So, any protocol can
 be supported directly.
 
-This is a while away and there is much work to be done.
+## Status
+
+All the functionality is in place to load keymaps. More tests are needed,
+and more polish. The aim is to have this done by the end of 2024.
+
+## Building
+
+On Linux, cir depends on llvm for BPF code generation. On Fedora you
+need the `llvm-devel` package install and `llvm-dev` on Ubuntu.

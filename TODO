@@ -6,7 +6,6 @@
 - calculate minimum $extent for avoiding runtime calcs
 - lead in gap (or whatever irptransmogrifier calls it)
 - Formatting of ir receive is poor/broken
-- Test all keymaps
 - lircd.conf generate -> send to lircd -> correct result?
 - DFA edges can be overlapping - removing overlapping parts
 - rc_mapping() kfunc

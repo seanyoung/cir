@@ -2,8 +2,12 @@
 //! controller is either an infrared receiver/transmitter or a cec interface.
 
 use crate::rc_maps::KeymapTable;
-use std::path::Path;
-use std::{fs, io};
+use itertools::Itertools;
+use std::{
+    fs::{self, OpenOptions},
+    io::{self, Write},
+    path::Path,
+};
 
 /// Single remote controller device on linux (either infrared or cec device)
 #[derive(Debug, Default, Clone)]
@@ -133,6 +137,31 @@ impl KeymapTable {
     pub fn matches(&self, rcdev: &Rcdev) -> bool {
         (self.driver == "*" || self.driver == rcdev.driver)
             && (self.table == "*" || self.table == rcdev.default_keymap)
+    }
+}
+
+impl Rcdev {
+    pub fn set_enabled_protocols(&mut self, protocols: &[usize]) -> Result<(), String> {
+        let string = if protocols.is_empty() {
+            "none".into()
+        } else {
+            protocols
+                .iter()
+                .map(|i| self.supported_protocols[*i].as_str())
+                .join(" ")
+        };
+
+        let path = format!("/sys/class/rc/{}/protocols", self.name);
+
+        let mut f = OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .map_err(|e| format!("{path}: {e}"))?;
+
+        f.write_all(string.as_bytes())
+            .map_err(|e| format!("{path}: {e}"))?;
+
+        Ok(())
     }
 }
 

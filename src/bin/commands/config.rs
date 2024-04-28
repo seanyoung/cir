@@ -1,17 +1,16 @@
 use aya::programs::{Link, LircMode2};
 use cir::{
-    keymap::Keymap,
+    keymap::{Keymap, LinuxProtocol},
     lirc, lircd_conf,
     rc_maps::parse_rc_maps_file,
-    rcdev,
-    rcdev::{enumerate_rc_dev, Rcdev},
+    rcdev::{self, enumerate_rc_dev, Rcdev},
 };
 use evdev::{Device, Key};
+use irp::Options;
 use itertools::Itertools;
 use log::debug;
 use std::{
     convert::TryFrom,
-    fs,
     os::fd::AsFd,
     path::{Path, PathBuf},
     str::FromStr,
@@ -35,24 +34,24 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    let rcdev = find_devices(&config.device, Purpose::Receive);
+    let mut rcdev = find_devices(&config.device, Purpose::Receive);
 
     if rcdev.inputdev.is_none() {
         eprintln!("error: input device is missing");
         std::process::exit(1);
     }
 
-    let inputdev = rcdev.inputdev.as_ref().unwrap();
-
-    let mut inputdev = match Device::open(inputdev) {
-        Ok(l) => l,
-        Err(s) => {
-            eprintln!("error: {inputdev}: {s}");
-            std::process::exit(1);
-        }
-    };
-
     if config.delay.is_some() || config.period.is_some() {
+        let inputdev = rcdev.inputdev.as_ref().unwrap();
+
+        let mut inputdev = match Device::open(inputdev) {
+            Ok(l) => l,
+            Err(s) => {
+                eprintln!("error: {inputdev}: {s}");
+                std::process::exit(1);
+            }
+        };
+
         let mut repeat = inputdev
             .get_auto_repeat()
             .expect("auto repeat is supported");
@@ -71,30 +70,18 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    if config.clear {
-        if let Some(lircdev) = &rcdev.lircdev {
-            clear_bpf_programs(lircdev);
-        }
-        clear_scancodes(&inputdev);
-    }
-
-    for keymap_filename in &config.keymaps {
-        if keymap_filename.to_string_lossy().ends_with(".lircd.conf") {
-            load_lircd(&inputdev, &rcdev.lircdev, config, keymap_filename);
-        } else {
-            load_keymap(&inputdev, keymap_filename);
-        }
+    if !config.keymaps.is_empty() {
+        load_keymaps(config.clear, &mut rcdev, Some(config), &config.keymaps);
     }
 }
 
-pub fn auto(auto: &crate::Auto) {
-    let rcdev = find_devices(&auto.device, Purpose::Receive);
-
-    if rcdev.inputdev.is_none() {
-        eprintln!("error: input device is missing");
-        std::process::exit(1);
-    }
-
+fn load_keymaps(
+    clear: bool,
+    rcdev: &mut Rcdev,
+    config: Option<&crate::Config>,
+    keymaps: &[PathBuf],
+) {
+    let mut protocols = Vec::new();
     let inputdev = rcdev.inputdev.as_ref().unwrap();
 
     let inputdev = match Device::open(inputdev) {
@@ -105,12 +92,53 @@ pub fn auto(auto: &crate::Auto) {
         }
     };
 
+    let chdev = if clear || !keymaps.is_empty() {
+        clear_scancodes(&inputdev);
+        if let Some(lircdev) = &rcdev.lircdev {
+            clear_bpf_programs(lircdev)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    if !keymaps.is_empty() {
+        for keymap_filename in keymaps.iter() {
+            if keymap_filename.to_string_lossy().ends_with(".lircd.conf") {
+                load_lircd(&inputdev, &chdev, config, keymap_filename);
+            } else {
+                load_keymap(
+                    &inputdev,
+                    &chdev,
+                    config,
+                    keymap_filename,
+                    &mut protocols,
+                    &rcdev.supported_protocols,
+                );
+            }
+        }
+    }
+
+    if let Err(e) = rcdev.set_enabled_protocols(&protocols) {
+        eprintln!("{e}");
+        std::process::exit(1);
+    }
+}
+
+pub fn auto(auto: &crate::Auto) {
+    let mut rcdev = find_devices(&auto.device, Purpose::Receive);
+
+    if rcdev.inputdev.is_none() {
+        eprintln!("error: input device is missing");
+        std::process::exit(1);
+    }
+
     match parse_rc_maps_file(&auto.cfgfile) {
         Ok(keymaps) => {
             for map in keymaps {
                 if map.matches(&rcdev) {
-                    clear_scancodes(&inputdev);
-                    load_keymap(&inputdev, Path::new(&map.file));
+                    load_keymaps(true, &mut rcdev, None, &[PathBuf::from(map.file)]);
                     return;
                 }
             }
@@ -130,7 +158,7 @@ pub fn auto(auto: &crate::Auto) {
     }
 }
 
-fn clear_bpf_programs(lircdev: &str) {
+fn clear_bpf_programs(lircdev: &str) -> Option<lirc::Lirc> {
     match lirc::open(PathBuf::from(lircdev)) {
         Ok(fd) => match LircMode2::query(fd.as_fd()) {
             Ok(links) => {
@@ -139,12 +167,17 @@ fn clear_bpf_programs(lircdev: &str) {
                         eprintln!("error: {lircdev}: unable detach: {e}");
                     }
                 }
+                Some(fd)
             }
             Err(e) => {
                 eprintln!("error: {lircdev}: to query for bpf programs: {e}");
+                None
             }
         },
-        Err(e) => eprintln!("error: {lircdev}: {e}"),
+        Err(e) => {
+            eprintln!("error: {lircdev}: {e}");
+            None
+        }
     }
 }
 
@@ -161,10 +194,15 @@ fn clear_scancodes(inputdev: &Device) {
     }
 }
 
-fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
-    let keymap_contents = fs::read_to_string(keymap_filename).unwrap();
-
-    let map = match Keymap::parse_text(&keymap_contents, keymap_filename) {
+fn load_keymap(
+    inputdev: &Device,
+    chdev: &Option<lirc::Lirc>,
+    config: Option<&crate::Config>,
+    keymap_filename: &Path,
+    protocols: &mut Vec<usize>,
+    supported_protocols: &[String],
+) {
+    let map = match Keymap::parse(keymap_filename) {
         Ok(map) => map,
         Err(e) => {
             eprintln!("error: {}: {e}", keymap_filename.display());
@@ -173,8 +211,9 @@ fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
     };
 
     for p in map {
-        for (scancode, keycode) in p.scancodes {
-            let key = match Key::from_str(&keycode) {
+        for (scancode, keycode) in &p.scancodes {
+            // TODO: needs some logic to check for KEY_{} etc like load_lircd
+            let key = match Key::from_str(keycode) {
                 Ok(key) => key,
                 Err(_) => {
                     eprintln!("error: ‘{keycode}’ is not a valid keycode");
@@ -183,7 +222,7 @@ fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
             };
 
             // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible
-            let scancode = if let Ok(scancode) = u32::try_from(scancode) {
+            let scancode = if let Ok(scancode) = u32::try_from(*scancode) {
                 scancode.to_ne_bytes().to_vec()
             } else {
                 scancode.to_ne_bytes().to_vec()
@@ -199,13 +238,98 @@ fn load_keymap(inputdev: &Device, keymap_filename: &Path) {
                 }
             }
         }
+
+        let Some(chdev) = chdev else {
+            if let Some(p) = LinuxProtocol::find_decoder(&p.protocol) {
+                for p in p {
+                    if let Some(index) = supported_protocols.iter().position(|e| e == p.decoder) {
+                        if !protocols.contains(&index) {
+                            protocols.push(index);
+                        }
+                    } else {
+                        eprintln!("error: no lirc device found for BPF decoding");
+                        std::process::exit(1);
+                    }
+                }
+                continue;
+            } else {
+                eprintln!("error: no lirc device found for BPF decoding");
+                std::process::exit(1);
+            }
+        };
+
+        let mut max_gap = 100000;
+
+        if let Ok(timeout) = chdev.get_timeout() {
+            let dev_max_gap = (timeout * 9) / 10;
+
+            log::trace!(
+                "device reports timeout of {}, using 90% of that as {} max_gap",
+                timeout,
+                dev_max_gap
+            );
+
+            max_gap = dev_max_gap;
+        }
+
+        let mut options = Options {
+            name: &p.name,
+            max_gap,
+            ..Default::default()
+        };
+
+        if let Some(decode) = &config {
+            options.nfa = decode.options.save_nfa;
+            options.dfa = decode.options.save_dfa;
+            options.llvm_ir = decode.save_llvm_ir;
+            options.assembly = decode.save_assembly;
+            options.object = decode.save_object;
+        }
+
+        let dfas = match p.build_dfa(&options) {
+            Ok(dfas) => dfas,
+            Err(e) => {
+                println!("{}: {e}", keymap_filename.display());
+                std::process::exit(1);
+            }
+        };
+
+        for dfa in dfas {
+            let bpf = match dfa.compile_bpf(&options) {
+                Ok((bpf, _)) => bpf,
+                Err(e) => {
+                    eprintln!("error: {}: {e}", keymap_filename.display());
+                    std::process::exit(1);
+                }
+            };
+
+            let mut bpf = match aya::Bpf::load(&bpf) {
+                Ok(bpf) => bpf,
+                Err(e) => {
+                    eprintln!("error: {}: {e}", keymap_filename.display());
+                    std::process::exit(1);
+                }
+            };
+
+            let program: &mut LircMode2 = bpf
+                .program_mut(&p.name)
+                .expect("function missing")
+                .try_into()
+                .unwrap();
+
+            program.load().unwrap();
+
+            let link = program.attach(chdev.as_fd()).expect("attach");
+
+            program.take_link(link).unwrap();
+        }
     }
 }
 
 fn load_lircd(
     inputdev: &Device,
-    lircdev: &Option<String>,
-    decode: &crate::Config,
+    chdev: &Option<lirc::Lirc>,
+    config: Option<&crate::Config>,
     keymap_filename: &Path,
 ) {
     let remotes = match lircd_conf::parse(keymap_filename) {
@@ -216,21 +340,9 @@ fn load_lircd(
     for remote in remotes {
         log::info!("Configuring remote {}", remote.name);
 
-        let Some(lircdev) = lircdev else {
+        let Some(chdev) = chdev else {
             eprintln!("error: no lirc device found");
             std::process::exit(1);
-        };
-
-        debug!("opening {}", lircdev);
-
-        let lircpath = PathBuf::from(lircdev);
-
-        let chdev = match lirc::open(&lircpath) {
-            Ok(l) => l,
-            Err(s) => {
-                eprintln!("error: {}: {}", lircpath.display(), s);
-                std::process::exit(1);
-            }
         };
 
         let mut max_gap = 100000;
@@ -250,11 +362,13 @@ fn load_lircd(
         let mut options = remote.default_options(None, None, max_gap);
 
         options.repeat_mask = remote.repeat_mask;
-        options.nfa = decode.options.save_nfa;
-        options.dfa = decode.options.save_dfa;
-        options.llvm_ir = decode.save_llvm_ir;
-        options.assembly = decode.save_assembly;
-        options.object = decode.save_object;
+        if let Some(decode) = &config {
+            options.nfa = decode.options.save_nfa;
+            options.dfa = decode.options.save_dfa;
+            options.llvm_ir = decode.save_llvm_ir;
+            options.assembly = decode.save_assembly;
+            options.object = decode.save_object;
+        }
 
         let dfa = remote.build_dfa(&options);
 
