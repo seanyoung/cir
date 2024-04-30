@@ -637,19 +637,19 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::Config) {
 
                     if lircdev.can_receive_raw() {
                         match LircMode2::query(lircdev.as_file()) {
-                            Ok(list) => {
+                            Ok(links) => {
                                 print!("\tBPF protocols\t\t: ");
 
                                 let mut first = true;
 
-                                for e in list {
+                                for link in links {
                                     if first {
                                         first = false;
                                     } else {
-                                        print!(", ")
+                                        print!(" ")
                                     }
 
-                                    match e.info() {
+                                    match link.info() {
                                         Ok(info) => match info.name_as_str() {
                                             Some(name) => print!("{name}"),
                                             None => print!("{}", info.id()),
