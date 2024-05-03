@@ -299,25 +299,10 @@ fn load_keymap(
                 }
             };
 
-            let mut bpf = match aya::Bpf::load(&bpf) {
-                Ok(bpf) => bpf,
-                Err(e) => {
-                    eprintln!("error: {}: {e}", keymap_filename.display());
-                    std::process::exit(1);
-                }
-            };
-
-            let program: &mut LircMode2 = bpf
-                .program_mut(&keymap.name)
-                .expect("function missing")
-                .try_into()
-                .unwrap();
-
-            program.load().unwrap();
-
-            let link = program.attach(chdev.as_fd()).expect("attach");
-
-            program.take_link(link).unwrap();
+            if let Err(e) = chdev.attach_bpf(&bpf) {
+                eprintln!("error: {}: {e}", keymap_filename.display());
+                std::process::exit(1);
+            }
         }
     }
 }
@@ -376,25 +361,10 @@ fn load_lircd(
             }
         };
 
-        let mut bpf = match aya::Bpf::load(&bpf) {
-            Ok(bpf) => bpf,
-            Err(e) => {
-                eprintln!("error: {}: {e}", keymap_filename.display());
-                std::process::exit(1);
-            }
-        };
-
-        let program: &mut LircMode2 = bpf
-            .program_mut(&remote.name)
-            .expect("function missing")
-            .try_into()
-            .unwrap();
-
-        program.load().unwrap();
-
-        let link = program.attach(chdev.as_fd()).expect("attach");
-
-        program.take_link(link).unwrap();
+        if let Err(e) = chdev.attach_bpf(&bpf) {
+            eprintln!("error: {}: {e}", keymap_filename.display());
+            std::process::exit(1);
+        }
 
         for code in remote.codes {
             let mut name = code.name.to_uppercase();

@@ -1,5 +1,6 @@
 //! Interface to lirc chardevs on Linux
 
+use aya::programs::LircMode2;
 use nix::{ioctl_read, ioctl_write_ptr};
 use num_integer::Integer;
 use std::{
@@ -455,6 +456,46 @@ impl Lirc {
 
     pub fn as_file(&self) -> &File {
         &self.file
+    }
+
+    /// Load and attach bpf program.
+    pub fn attach_bpf(&self, bpf: &[u8]) -> Result<(), String> {
+        let mut bpf = match aya::Bpf::load(bpf) {
+            Ok(bpf) => bpf,
+            Err(e) => {
+                return Err(format!("{e}"));
+            }
+        };
+
+        let mut iter = bpf.programs_mut();
+
+        let Some((_, program)) = iter.next() else {
+            return Err("missing program".into());
+        };
+
+        if iter.next().is_some() {
+            return Err("only single program expected".into());
+        }
+
+        let program: &mut LircMode2 = match program.try_into() {
+            Ok(program) => program,
+            Err(e) => {
+                return Err(format!("{e}"));
+            }
+        };
+
+        if let Err(e) = program.load() {
+            return Err(format!("{e}"));
+        }
+
+        match program.attach(self.as_fd()) {
+            Ok(link) => {
+                program.take_link(link).unwrap();
+
+                Ok(())
+            }
+            Err(e) => Err(format!("{e}")),
+        }
     }
 }
 
