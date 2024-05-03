@@ -82,7 +82,7 @@ fn rc5() {
 
     let mut context = TestContext {
         sample: [0u8; 4],
-        map: [0u8; 16384],
+        map: [0u64; 1024],
         codes: Vec::new(),
     };
 
@@ -106,16 +106,18 @@ fn rc5() {
             context.sample[3] |= 1;
         }
 
-        let map =
-            unsafe { std::slice::from_raw_parts(context.map.as_ptr() as *const u64, vars.len()) };
-
         let vars = vars
             .iter()
             .enumerate()
-            .map(|(i, name)| format!("{name}={}", map[i]))
+            .map(|(i, name)| format!("{name}={}", context.map[i]))
             .join(",");
 
-        let mbuff = &context.map[0..value_size.unwrap()];
+        let mbuff = unsafe {
+            std::slice::from_raw_parts(
+                context.map.as_ptr().cast(),
+                vars.len() * std::mem::size_of::<u64>(),
+            )
+        };
 
         println!("executing {raw} {vars}");
 
@@ -138,7 +140,7 @@ fn rc5() {
 #[repr(C)]
 struct TestContext {
     sample: [u8; 4],
-    map: [u8; 16384],
+    map: [u64; 1024],
     codes: Vec<u64>,
 }
 
