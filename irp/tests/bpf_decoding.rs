@@ -7,7 +7,11 @@ use aya_obj::{
 use irp::{Irp, Options, Vartable};
 use itertools::Itertools;
 use num::Integer;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::DerefMut,
+    sync::{atomic::AtomicI32, Mutex},
+};
 
 #[test]
 fn rc5() {
@@ -41,6 +45,8 @@ fn rc5() {
 
     let mut rel_maps = Vec::new();
 
+    let map_id = unsafe { TESTS_NEXT_MAP_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst) };
+
     for (name, map) in maps.iter() {
         let Map::Legacy(def) = map else {
             panic!();
@@ -54,7 +60,7 @@ fn rc5() {
         assert!(value_size.is_none());
         value_size = Some(def.def.value_size as usize);
 
-        rel_maps.push((name.as_str(), 7, map));
+        rel_maps.push((name.as_str(), map_id, map));
     }
 
     obj.relocate_maps(rel_maps.into_iter(), &text_sections)
@@ -74,18 +80,34 @@ fn rc5() {
 
     let mut vm = rbpf::EbpfVmMbuff::new(Some(data)).unwrap();
 
+    let mut context = TestContext {
+        sample: [0u8; 4],
+        map: [0u8; 16384],
+        codes: Vec::new(),
+    };
+
+    unsafe {
+        let mut map = TEST_CONTEXTS.lock().unwrap();
+
+        if map.is_none() {
+            *map.deref_mut() = Some(HashMap::default());
+        }
+
+        map.as_mut().unwrap().insert(map_id, &mut context);
+    }
+
     vm.register_helper(1, bpf_map_lookup_elem).unwrap();
     vm.register_helper(77, bpf_rc_repeat).unwrap();
     vm.register_helper(78, bpf_rc_keydown).unwrap();
 
     for (i, raw) in message.raw.iter().enumerate() {
-        let mut e = raw.to_le_bytes();
+        context.sample = raw.to_le_bytes();
         if i.is_even() {
-            e[3] = 1;
+            context.sample[3] |= 1;
         }
 
         let map =
-            unsafe { std::slice::from_raw_parts(MAP_MEMORY.as_ptr() as *const u64, vars.len()) };
+            unsafe { std::slice::from_raw_parts(context.map.as_ptr() as *const u64, vars.len()) };
 
         let vars = vars
             .iter()
@@ -93,47 +115,75 @@ fn rc5() {
             .map(|(i, name)| format!("{name}={}", map[i]))
             .join(",");
 
-        println!("executing {e:?} {raw} {vars}");
+        let mbuff = &context.map[0..value_size.unwrap()];
 
-        let mbuff = unsafe { &MAP_MEMORY[0..value_size.unwrap()] };
+        println!("executing {raw} {vars}");
 
-        let _return = vm.execute_program(mbuff, &e).unwrap();
-        assert_eq!(_return, 0);
+        let ret = vm.execute_program(mbuff, &context.sample).unwrap();
+        assert_eq!(ret, 0);
     }
 
+    assert_eq!(context.codes, vec![102]);
+
     unsafe {
-        assert_eq!(CODES, vec![102]);
+        TEST_CONTEXTS
+            .lock()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .remove(&map_id);
     }
 }
 
-static mut MAP_MEMORY: [u8; 16384] = [0u8; 16384];
-static mut CODES: Vec<u64> = Vec::new();
+#[repr(C)]
+struct TestContext {
+    sample: [u8; 4],
+    map: [u8; 16384],
+    codes: Vec<u64>,
+}
+
+static mut TEST_CONTEXTS: Mutex<Option<HashMap<i32, *mut TestContext>>> = Mutex::new(None);
+static mut TESTS_NEXT_MAP_ID: AtomicI32 = AtomicI32::new(1);
 
 fn bpf_map_lookup_elem(def: u64, key: u64, _arg3: u64, _arg4: u64, _arg5: u64) -> u64 {
-    assert_eq!(def, 7);
-
     unsafe {
+        let def = def as i32;
+        let e = *TEST_CONTEXTS
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .get(&def)
+            .unwrap();
+
         let ptr = key as *const u32;
         assert_eq!(*ptr, 0);
+
+        (*e).map.as_ptr() as u64
     }
-
-    let p = unsafe { MAP_MEMORY.as_ptr() };
-
-    p as u64
 }
 
-fn bpf_rc_keydown(_ctx: u64, protocol: u64, code: u64, flags: u64, _arg4: u64) -> u64 {
+fn bpf_rc_keydown(ctx: u64, protocol: u64, code: u64, flags: u64, _arg4: u64) -> u64 {
+    let testmem = ctx as *mut TestContext;
     println!("rc_keydown protocol:{protocol} code:{code} flags:{flags}");
 
     unsafe {
-        CODES.push(code);
+        (*testmem).codes.push(code);
     }
 
     0
 }
 
-fn bpf_rc_repeat(_ctx: u64, _arg2: u64, _arg3: u64, _arg4: u64, _arg5: u64) -> u64 {
+fn bpf_rc_repeat(ctx: u64, _arg2: u64, _arg3: u64, _arg4: u64, _arg5: u64) -> u64 {
+    let testmem: *mut TestContext = ctx as *mut TestContext;
+
     println!("rc_repeat");
+
+    unsafe {
+        if let Some(last) = (*testmem).codes.last() {
+            (*testmem).codes.push(*last);
+        }
+    }
 
     0
 }
