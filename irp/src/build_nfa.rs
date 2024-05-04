@@ -43,7 +43,7 @@ pub(crate) enum Action {
         left: Rc<Expression>,
         right: Rc<Expression>,
     },
-    Done(Event, Vec<String>),
+    Done(Event, Vec<(String, u8)>),
 }
 
 #[derive(PartialEq, Default, Clone, Debug)]
@@ -149,7 +149,7 @@ impl NFA {
 
         self.verts[pos]
             .entry
-            .push(Action::Done(event, vec!["CODE".into()]));
+            .push(Action::Done(event, vec![("CODE".into(), 64)]));
     }
 }
 
@@ -233,7 +233,8 @@ impl<'a> Builder<'a> {
                 .iter()
                 .filter_map(|param| {
                     if self.cur.vars.contains_key(&param.name) {
-                        Some(param.name.to_owned())
+                        let bits = param.max.ilog2() as u8 + 1;
+                        Some((param.name.to_owned(), bits))
                     } else {
                         None
                     }

@@ -123,7 +123,13 @@ fn actions(actions: &[Action]) -> Vec<String> {
             }
             Action::Set { var, expr } => format!("{var} = {expr}"),
             Action::AssertEq { left, right } => format!("assert {left} = {right}",),
-            Action::Done(event, res) => format!("{} ({})", event, res.iter().join(", ")),
+            Action::Done(event, res) => format!(
+                "{} ({})",
+                event,
+                res.iter()
+                    .map(|(name, bits)| format!("{name}:{bits}"))
+                    .join(", ")
+            ),
         })
         .collect::<Vec<String>>()
 }

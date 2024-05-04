@@ -13,7 +13,6 @@ use inkwell::{
     values::{BasicValue, FunctionValue, GlobalValue, IntValue, PointerValue},
     AddressSpace, IntPredicate, OptimizationLevel,
 };
-use log::info;
 use std::{collections::HashMap, fs::File, io::Write, rc::Rc, sync::OnceLock};
 
 static LLVM_INIT: OnceLock<()> = OnceLock::new();
@@ -59,7 +58,7 @@ impl DFA {
         if options.llvm_ir {
             let filename = options.filename(".ll");
 
-            info!("saving llvm ir as {filename}");
+            log::info!("saving llvm ir as {filename}");
 
             builder.module.print_to_file(&filename).unwrap();
         }
@@ -87,7 +86,7 @@ impl DFA {
                     let slice = mem_buf.as_slice();
                     let filename = options.filename(".s");
 
-                    info!("saving assembly as {filename}");
+                    log::info!("saving assembly as {filename}");
 
                     let mut file = match File::create(&filename) {
                         Ok(file) => file,
@@ -109,7 +108,7 @@ impl DFA {
                 if options.object {
                     let filename = options.filename(".o");
 
-                    info!("saving object file as {filename}");
+                    log::info!("saving object file as {filename}");
                     let mut file = match File::create(&filename) {
                         Ok(file) => file,
                         Err(e) => return Err(e.to_string()),
@@ -431,7 +430,7 @@ impl<'a> Builder<'a> {
 
                             self.builder.position_at_end(ok);
                         }
-                        Action::Done(Event::Repeat, vars) if vars.is_empty() => {
+                        Action::Done(Event::Repeat | Event::Down, vars) if vars.is_empty() => {
                             let fn_type = i32.fn_type(&[i32_ptr.into()], false);
 
                             let bpf_rc_repeat = i64.const_int(77, false).const_to_pointer(i32_ptr);
@@ -445,7 +444,7 @@ impl<'a> Builder<'a> {
                                 )
                                 .unwrap();
                         }
-                        Action::Done(ev, _) => {
+                        Action::Done(ev, vars) => {
                             let flags = if self.vars.contains_key("T") {
                                 // T should be 0 or 1; this corresponds with LIRC_SCANCODE_FLAGS_TOGGLE
                                 self.load_var("T", context)
@@ -466,7 +465,25 @@ impl<'a> Builder<'a> {
                                 )
                                 .unwrap();
 
-                            let code = self.load_var("CODE", context);
+                            let mut code = context.i64_type().const_zero();
+
+                            for (var, bits) in vars {
+                                if var == "T" {
+                                    continue;
+                                }
+                                code = self
+                                    .builder
+                                    .build_left_shift(
+                                        code,
+                                        context.i64_type().const_int((*bits).into(), false),
+                                        "",
+                                    )
+                                    .unwrap();
+
+                                let value = self.load_var(var, context);
+
+                                code = self.builder.build_or(code, value, var).unwrap();
+                            }
 
                             let protocol = context
                                 .i32_type()
@@ -526,7 +543,14 @@ impl<'a> Builder<'a> {
                     }
                 }
 
-                assert_eq!(vert.entry.len(), 0);
+                for entry in &vert.entry {
+                    if let Action::Set { var, expr } = entry {
+                        let value = self.expression(expr, context);
+                        self.update_var(var, value);
+                    } else {
+                        panic!("{entry:?}");
+                    }
+                }
 
                 self.write_dirty();
                 self.clear_vars();
@@ -624,6 +648,70 @@ impl<'a> Builder<'a> {
         }
     }
 
+    fn popcnt(&self, context: &'a Context) -> FunctionValue<'a> {
+        let i64 = context.i64_type();
+
+        let fn_type = i64.fn_type(&[i64.into()], false);
+
+        // use llvm popcount builtin - has good code generation
+        let name = "llvm.ctpop.i64";
+        if let Some(function) = self.module.get_function(name) {
+            function
+        } else {
+            self.module.add_function(name, fn_type, None)
+        }
+    }
+
+    fn abs(&self, context: &'a Context) -> FunctionValue<'a> {
+        let name = "llvm.abs.i64";
+        if let Some(function) = self.module.get_function(name) {
+            function
+        } else {
+            let i64 = context.i64_type();
+            let i1 = context.bool_type();
+
+            let fn_type = i64.fn_type(&[i64.into(), i1.into()], false);
+
+            self.module.add_function(name, fn_type, None)
+        }
+    }
+
+    fn bitreverse(
+        &self,
+        context: &'a Context,
+        value: IntValue<'a>,
+        length: IntValue<'a>,
+    ) -> IntValue<'a> {
+        let name = "llvm.bitreverse.i64";
+        let function = if let Some(function) = self.module.get_function(name) {
+            function
+        } else {
+            let i64 = context.i64_type();
+
+            let fn_type = i64.fn_type(&[i64.into()], false);
+
+            self.module.add_function(name, fn_type, None)
+        };
+
+        let value = self
+            .builder
+            .build_call(function, &[value.into()], "")
+            .unwrap()
+            .try_as_basic_value()
+            .left()
+            .unwrap()
+            .into_int_value();
+
+        let shift = self
+            .builder
+            .build_int_sub(context.i64_type().const_int(64, false), length, "shift")
+            .unwrap();
+
+        self.builder
+            .build_right_shift(value, shift, false, "")
+            .unwrap()
+    }
+
     fn tolerance_eq(
         &self,
         context: &'a Context,
@@ -637,9 +725,7 @@ impl<'a> Builder<'a> {
         let i64 = context.i64_type();
         let i1 = context.bool_type();
 
-        let fn_type = i64.fn_type(&[i64.into(), i1.into()], false);
-
-        let function = self.module.add_function("llvm.abs.i64", fn_type, None);
+        let function = self.abs(context);
 
         let abs_diff = self
             .builder
@@ -750,12 +836,8 @@ impl<'a> Builder<'a> {
             Expression::BitCount(expr) => {
                 let expr = self.expression(expr, context);
 
-                let i64 = context.i64_type();
-
-                let fn_type = i64.fn_type(&[i64.into()], false);
-
                 // use llvm popcount builtin - has good code generation
-                let function = self.module.add_function("llvm.ctpop.i64", fn_type, None);
+                let function = self.popcnt(context);
 
                 self.builder
                     .build_call(function, &[expr.into()], "")
@@ -769,8 +851,8 @@ impl<'a> Builder<'a> {
             Expression::Add(left, right) => binary!(left, right, build_int_add),
             Expression::Subtract(left, right) => binary!(left, right, build_int_sub),
             Expression::Multiply(left, right) => binary!(left, right, build_int_mul),
-            Expression::Divide(left, right) => binary!(left, right, build_int_signed_div),
-            Expression::Modulo(left, right) => binary!(left, right, build_int_signed_rem),
+            Expression::Divide(left, right) => binary!(left, right, build_int_unsigned_div),
+            Expression::Modulo(left, right) => binary!(left, right, build_int_unsigned_rem),
 
             Expression::BitwiseAnd(left, right) => binary!(left, right, build_and),
             Expression::BitwiseOr(left, right) => binary!(left, right, build_or),
@@ -794,6 +876,116 @@ impl<'a> Builder<'a> {
             Expression::NotEqual(left, right) => compare!(left, right, IntPredicate::NE),
             Expression::Identifier(name) => self.load_var(name, context),
 
+            Expression::BitField {
+                value,
+                reverse,
+                length,
+                offset,
+            } => {
+                let mut value = self.expression(value, context);
+                if let Some(offset) = offset {
+                    let offset = self.expression(offset, context);
+                    value = self
+                        .builder
+                        .build_right_shift(value, offset, false, "")
+                        .unwrap();
+                }
+                let length = self.expression(length, context);
+
+                if *reverse {
+                    self.bitreverse(context, value, length)
+                } else {
+                    let mask = self
+                        .builder
+                        .build_int_sub(
+                            self.builder
+                                .build_left_shift(
+                                    length,
+                                    context.i64_type().const_int(1, false),
+                                    "",
+                                )
+                                .unwrap(),
+                            context.i64_type().const_int(1, false),
+                            "mask",
+                        )
+                        .unwrap();
+
+                    self.builder.build_and(value, mask, "").unwrap()
+                }
+            }
+            Expression::BitReverse(value, count, offset) => {
+                let mut value = self.expression(value, context);
+
+                if *offset > 0 {
+                    let offset = context.i64_type().const_int(*offset as u64, false);
+                    value = self
+                        .builder
+                        .build_right_shift(value, offset, false, "")
+                        .unwrap();
+                }
+
+                let count = context.i64_type().const_int(*count as u64, false);
+
+                self.bitreverse(context, value, count)
+            }
+            Expression::InfiniteBitField { value, offset } => {
+                let value = self.expression(value, context);
+                let offset = self.expression(offset, context);
+
+                self.builder
+                    .build_right_shift(value, offset, false, "")
+                    .unwrap()
+            }
+            Expression::Log2(value) => {
+                // This is essentially is-power-of-2
+                let value = self.expression(value, context);
+
+                // use llvm popcount builtin - has good code generation
+                let function = self.popcnt(context);
+
+                let value = self
+                    .builder
+                    .build_call(function, &[value.into()], "")
+                    .unwrap()
+                    .try_as_basic_value()
+                    .left()
+                    .unwrap()
+                    .into_int_value();
+
+                let cmp = self
+                    .builder
+                    .build_int_compare(
+                        IntPredicate::EQ,
+                        value,
+                        context.i64_type().const_int(1, false),
+                        "is_power_of_2",
+                    )
+                    .unwrap();
+
+                self.builder
+                    .build_int_z_extend(cmp, context.i64_type(), "log2")
+                    .unwrap()
+            }
+            Expression::Power(base, exp) => {
+                if let Expression::Number(2) = base.as_ref() {
+                    let value = self.expression(exp, context);
+                    self.builder
+                        .build_left_shift(context.i64_type().const_int(1, false), value, "power")
+                        .unwrap()
+                } else {
+                    unimplemented!("{expr}")
+                }
+            }
+            Expression::FlashConstant(..)
+            | Expression::FlashIdentifier(..)
+            | Expression::GapConstant(..)
+            | Expression::GapIdentifier(..)
+            | Expression::ExtentConstant(..)
+            | Expression::ExtentIdentifier(..)
+            | Expression::Assignment(..)
+            | Expression::List(..)
+            | Expression::Variation(..)
+            | Expression::Stream(..) => unreachable!(),
             _ => unimplemented!("{expr}"),
         }
     }

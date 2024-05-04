@@ -453,7 +453,7 @@ impl<'a> Decoder<'a> {
                     let mut res: HashMap<String, i64> = HashMap::new();
 
                     for (name, (val, _)) in &vartable.vars {
-                        if include.contains(name) {
+                        if include.iter().any(|(entry_name, _)| entry_name == name) {
                             trace!("done {}", event);
 
                             res.insert(name.to_owned(), *val);
