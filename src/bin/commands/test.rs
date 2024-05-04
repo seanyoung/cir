@@ -1,4 +1,4 @@
-use cir::lirc;
+use cir::lirc::{Lirc, LIRC_SCANCODE_FLAG_REPEAT, LIRC_SCANCODE_FLAG_TOGGLE};
 use evdev::{Device, InputEventKind};
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
 use nix::fcntl::{FcntlArg, OFlag};
@@ -24,7 +24,7 @@ pub fn test(test: &crate::Test) {
     if let Some(lircdev) = rcdev.lircdev {
         let lircpath = PathBuf::from(lircdev);
 
-        let mut lircdev = match lirc::open(&lircpath) {
+        let mut lircdev = match Lirc::open(&lircpath) {
             Ok(l) => l,
             Err(s) => {
                 eprintln!("error: {}: {}", lircpath.display(), s);
@@ -258,12 +258,12 @@ pub fn test(test: &crate::Test) {
                     "scancode={:x} keycode={:?}{}{}",
                     entry.scancode,
                     keycode,
-                    if (entry.flags & lirc::LIRC_SCANCODE_FLAG_REPEAT) != 0 {
+                    if (entry.flags & LIRC_SCANCODE_FLAG_REPEAT) != 0 {
                         " repeat"
                     } else {
                         ""
                     },
-                    if (entry.flags & lirc::LIRC_SCANCODE_FLAG_TOGGLE) != 0 {
+                    if (entry.flags & LIRC_SCANCODE_FLAG_TOGGLE) != 0 {
                         " toggle"
                     } else {
                         ""

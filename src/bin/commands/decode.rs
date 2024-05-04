@@ -1,7 +1,7 @@
 #[cfg(target_os = "linux")]
 use super::config::{find_devices, Purpose};
 #[cfg(target_os = "linux")]
-use cir::lirc;
+use cir::lirc::Lirc;
 use cir::{keymap::Keymap, lircd_conf::parse};
 use irp::{Decoder, InfraredData, Irp, Message, Options};
 use itertools::Itertools;
@@ -51,7 +51,7 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
 
             log::trace!("opening lirc device: {}", lircpath.display());
 
-            let mut lircdev = match lirc::open(&lircpath) {
+            let mut lircdev = match Lirc::open(&lircpath) {
                 Ok(l) => l,
                 Err(s) => {
                     eprintln!("error: {}: {}", lircpath.display(), s);
@@ -265,7 +265,7 @@ pub fn decode_keymap(decode: &crate::Decode, path: &Path) {
 
             log::trace!("opening lirc device: {}", lircpath.display());
 
-            let mut lircdev = match lirc::open(&lircpath) {
+            let mut lircdev = match Lirc::open(&lircpath) {
                 Ok(l) => l,
                 Err(s) => {
                     eprintln!("error: {}: {}", lircpath.display(), s);
@@ -482,7 +482,7 @@ pub fn decode_lircd(decode: &crate::Decode, conf: &PathBuf) {
 
             log::trace!("opening lirc device: {}", lircpath.display());
 
-            let mut lircdev = match lirc::open(&lircpath) {
+            let mut lircdev = match Lirc::open(&lircpath) {
                 Ok(l) => l,
                 Err(s) => {
                     eprintln!("error: {}: {}", lircpath.display(), s);

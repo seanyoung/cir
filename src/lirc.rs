@@ -1,7 +1,9 @@
 //! Interface to lirc chardevs on Linux
 
-use aya::programs::{Link, LircMode2, ProgramError};
-use nix::{ioctl_read, ioctl_write_ptr};
+use aya::{
+    programs::{Link, LircMode2, ProgramError},
+    Bpf,
+};
 use num_integer::Integer;
 use std::{
     fmt,
@@ -18,63 +20,68 @@ use std::{
     time::{Duration, Instant},
 };
 
-const LIRC_MAGIC: u8 = b'i';
+// ioctl_read! declares public functions which we don't want, no need for them
+mod internal {
+    use nix::{ioctl_read, ioctl_write_ptr};
 
-const LIRC_SET_SEND_CARRIER: u8 = 0x13;
-const LIRC_SET_SEND_DUTY_CYCLE: u8 = 0x15;
-const LIRC_SET_TRANSMITTER_MASK: u8 = 0x17;
-const LIRC_GET_FEATURES: u8 = 0x00;
-const LIRC_GET_REC_TIMEOUT: u8 = 0x24;
-const LIRC_SET_REC_TIMEOUT: u8 = 0x18;
-const LIRC_GET_MIN_TIMEOUT: u8 = 0x08;
-const LIRC_GET_MAX_TIMEOUT: u8 = 0x09;
-const LIRC_SET_WIDEBAND_RECEIVER: u8 = 0x23;
-const LIRC_SET_MEASURE_CARRIER_MODE: u8 = 0x1d;
-const LIRC_SET_REC_MODE: u8 = 0x12;
-const LIRC_GET_REC_RESOLUTION: u8 = 0x07;
+    const LIRC_MAGIC: u8 = b'i';
 
-ioctl_read!(lirc_get_features, LIRC_MAGIC, LIRC_GET_FEATURES, u32);
-ioctl_read!(lirc_get_rec_timeout, LIRC_MAGIC, LIRC_GET_REC_TIMEOUT, u32);
-ioctl_read!(lirc_get_min_timeout, LIRC_MAGIC, LIRC_GET_MIN_TIMEOUT, u32);
-ioctl_read!(lirc_get_max_timeout, LIRC_MAGIC, LIRC_GET_MAX_TIMEOUT, u32);
-ioctl_read!(
-    lirc_get_rec_resolution,
-    LIRC_MAGIC,
-    LIRC_GET_REC_RESOLUTION,
-    u32
-);
-ioctl_write_ptr!(
-    lirc_set_send_carrier,
-    LIRC_MAGIC,
-    LIRC_SET_SEND_CARRIER,
-    u32
-);
-ioctl_write_ptr!(
-    lirc_set_send_duty_cycle,
-    LIRC_MAGIC,
-    LIRC_SET_SEND_DUTY_CYCLE,
-    u32
-);
-ioctl_write_ptr!(
-    lirc_set_transmitter_mask,
-    LIRC_MAGIC,
-    LIRC_SET_TRANSMITTER_MASK,
-    u32
-);
-ioctl_write_ptr!(
-    lirc_set_wideband_receiver,
-    LIRC_MAGIC,
-    LIRC_SET_WIDEBAND_RECEIVER,
-    u32
-);
-ioctl_write_ptr!(
-    lirc_set_measure_carrier,
-    LIRC_MAGIC,
-    LIRC_SET_MEASURE_CARRIER_MODE,
-    u32
-);
-ioctl_write_ptr!(lirc_set_rec_timeout, LIRC_MAGIC, LIRC_SET_REC_TIMEOUT, u32);
-ioctl_write_ptr!(lirc_set_rec_mode, LIRC_MAGIC, LIRC_SET_REC_MODE, u32);
+    const LIRC_SET_SEND_CARRIER: u8 = 0x13;
+    const LIRC_SET_SEND_DUTY_CYCLE: u8 = 0x15;
+    const LIRC_SET_TRANSMITTER_MASK: u8 = 0x17;
+    const LIRC_GET_FEATURES: u8 = 0x00;
+    const LIRC_GET_REC_TIMEOUT: u8 = 0x24;
+    const LIRC_SET_REC_TIMEOUT: u8 = 0x18;
+    const LIRC_GET_MIN_TIMEOUT: u8 = 0x08;
+    const LIRC_GET_MAX_TIMEOUT: u8 = 0x09;
+    const LIRC_SET_WIDEBAND_RECEIVER: u8 = 0x23;
+    const LIRC_SET_MEASURE_CARRIER_MODE: u8 = 0x1d;
+    const LIRC_SET_REC_MODE: u8 = 0x12;
+    const LIRC_GET_REC_RESOLUTION: u8 = 0x07;
+
+    ioctl_read!(lirc_get_features, LIRC_MAGIC, LIRC_GET_FEATURES, u32);
+    ioctl_read!(lirc_get_rec_timeout, LIRC_MAGIC, LIRC_GET_REC_TIMEOUT, u32);
+    ioctl_read!(lirc_get_min_timeout, LIRC_MAGIC, LIRC_GET_MIN_TIMEOUT, u32);
+    ioctl_read!(lirc_get_max_timeout, LIRC_MAGIC, LIRC_GET_MAX_TIMEOUT, u32);
+    ioctl_read!(
+        lirc_get_rec_resolution,
+        LIRC_MAGIC,
+        LIRC_GET_REC_RESOLUTION,
+        u32
+    );
+    ioctl_write_ptr!(
+        lirc_set_send_carrier,
+        LIRC_MAGIC,
+        LIRC_SET_SEND_CARRIER,
+        u32
+    );
+    ioctl_write_ptr!(
+        lirc_set_send_duty_cycle,
+        LIRC_MAGIC,
+        LIRC_SET_SEND_DUTY_CYCLE,
+        u32
+    );
+    ioctl_write_ptr!(
+        lirc_set_transmitter_mask,
+        LIRC_MAGIC,
+        LIRC_SET_TRANSMITTER_MASK,
+        u32
+    );
+    ioctl_write_ptr!(
+        lirc_set_wideband_receiver,
+        LIRC_MAGIC,
+        LIRC_SET_WIDEBAND_RECEIVER,
+        u32
+    );
+    ioctl_write_ptr!(
+        lirc_set_measure_carrier,
+        LIRC_MAGIC,
+        LIRC_SET_MEASURE_CARRIER_MODE,
+        u32
+    );
+    ioctl_write_ptr!(lirc_set_rec_timeout, LIRC_MAGIC, LIRC_SET_REC_TIMEOUT, u32);
+    ioctl_write_ptr!(lirc_set_rec_mode, LIRC_MAGIC, LIRC_SET_REC_MODE, u32);
+}
 
 const LIRC_CAN_SET_SEND_CARRIER: u32 = 0x100;
 const LIRC_CAN_SET_SEND_DUTY_CYCLE: u32 = 0x200;
@@ -149,16 +156,11 @@ impl LircRaw {
     }
 }
 
-/// Open a lirc chardev, which should have a path like "/dev/lirc0"
-pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Lirc> {
-    lirc_open(path.as_ref())
-}
-
 fn lirc_open(path: &Path) -> io::Result<Lirc> {
     let file = OpenOptions::new().read(true).write(true).open(path)?;
     let mut features = 0u32;
 
-    if let Ok(0) = unsafe { lirc_get_features(file.as_raw_fd(), &mut features) } {
+    if let Ok(0) = unsafe { internal::lirc_get_features(file.as_raw_fd(), &mut features) } {
         Ok(Lirc {
             path: PathBuf::from(path),
             file,
@@ -174,6 +176,11 @@ fn lirc_open(path: &Path) -> io::Result<Lirc> {
 }
 
 impl Lirc {
+    /// Open a lirc chardev, which should have a path like "/dev/lirc0"
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Lirc> {
+        lirc_open(path.as_ref())
+    }
+
     /// Transmit infrared. Each element in the array describes the number of microseconds the IR should be on and off,
     /// respectively.
     pub fn send(&mut self, data: &[u32]) -> io::Result<()> {
@@ -280,7 +287,7 @@ impl Lirc {
     /// Set the send carrier. A carrier of 0 means unmodulated
     pub fn set_send_carrier(&mut self, carrier: u32) -> io::Result<()> {
         // The ioctl should return 0, but on old kernels it may return the new carrier setting; just ignore
-        unsafe { lirc_set_send_carrier(self.file.as_raw_fd(), &carrier)? };
+        unsafe { internal::lirc_set_send_carrier(self.file.as_raw_fd(), &carrier)? };
 
         Ok(())
     }
@@ -289,21 +296,23 @@ impl Lirc {
     pub fn set_send_duty_cycle(&mut self, duty_cycle: u32) -> io::Result<()> {
         debug_assert!(duty_cycle > 1 && duty_cycle < 100);
 
-        unsafe { lirc_set_send_duty_cycle(self.file.as_raw_fd(), &duty_cycle)? };
+        unsafe { internal::lirc_set_send_duty_cycle(self.file.as_raw_fd(), &duty_cycle)? };
 
         Ok(())
     }
 
     pub fn num_transmitters(&mut self) -> io::Result<u32> {
         // If the LIRC_SET_TRANSMITTER_MASK is called with an invalid mask, the number of transmitters are returned
-        let count = unsafe { lirc_set_transmitter_mask(self.file.as_raw_fd(), &!0)? };
+        let count = unsafe { internal::lirc_set_transmitter_mask(self.file.as_raw_fd(), &!0)? };
 
         Ok(count.try_into().unwrap())
     }
 
     /// Set the send carrier. A carrier of 0 means unmodulated
     pub fn set_transmitter_mask(&mut self, transmitter_mask: u32) -> io::Result<()> {
-        let res = unsafe { lirc_set_transmitter_mask(self.file.as_raw_fd(), &transmitter_mask)? };
+        let res = unsafe {
+            internal::lirc_set_transmitter_mask(self.file.as_raw_fd(), &transmitter_mask)?
+        };
 
         if res != 0 {
             Err(Error::new(
@@ -322,7 +331,7 @@ impl Lirc {
 
     /// Set the receiving timeout in microseconds
     pub fn set_timeout(&mut self, timeout: u32) -> io::Result<()> {
-        unsafe { lirc_set_rec_timeout(self.file.as_raw_fd(), &timeout)? };
+        unsafe { internal::lirc_set_rec_timeout(self.file.as_raw_fd(), &timeout)? };
 
         Ok(())
     }
@@ -331,7 +340,7 @@ impl Lirc {
     pub fn get_timeout(&self) -> io::Result<u32> {
         let mut timeout = 0u32;
 
-        unsafe { lirc_get_rec_timeout(self.file.as_raw_fd(), &mut timeout)? };
+        unsafe { internal::lirc_get_rec_timeout(self.file.as_raw_fd(), &mut timeout)? };
 
         Ok(timeout)
     }
@@ -340,8 +349,8 @@ impl Lirc {
     pub fn get_min_max_timeout(&self) -> io::Result<Range<u32>> {
         let mut min = 0u32;
         let mut max = 0u32;
-        unsafe { lirc_get_min_timeout(self.file.as_raw_fd(), &mut min)? };
-        unsafe { lirc_get_max_timeout(self.file.as_raw_fd(), &mut max)? };
+        unsafe { internal::lirc_get_min_timeout(self.file.as_raw_fd(), &mut min)? };
+        unsafe { internal::lirc_get_max_timeout(self.file.as_raw_fd(), &mut max)? };
 
         Ok(min..max)
     }
@@ -355,7 +364,7 @@ impl Lirc {
     pub fn set_wideband_receiver(&mut self, enable: bool) -> io::Result<()> {
         let enable = enable.into();
 
-        unsafe { lirc_set_wideband_receiver(self.file.as_raw_fd(), &enable)? };
+        unsafe { internal::lirc_set_wideband_receiver(self.file.as_raw_fd(), &enable)? };
 
         Ok(())
     }
@@ -369,7 +378,7 @@ impl Lirc {
     pub fn set_measure_carrier(&mut self, enable: bool) -> io::Result<()> {
         let enable = enable.into();
 
-        unsafe { lirc_set_measure_carrier(self.file.as_raw_fd(), &enable)? };
+        unsafe { internal::lirc_set_measure_carrier(self.file.as_raw_fd(), &enable)? };
 
         Ok(())
     }
@@ -385,7 +394,7 @@ impl Lirc {
         if !self.raw_mode {
             let mode = LIRC_MODE_MODE2;
 
-            unsafe { lirc_set_rec_mode(self.file.as_raw_fd(), &mode)? };
+            unsafe { internal::lirc_set_rec_mode(self.file.as_raw_fd(), &mode)? };
 
             self.raw_mode = true;
         }
@@ -413,7 +422,7 @@ impl Lirc {
         if self.raw_mode {
             let mode = LIRC_MODE_SCANCODE;
 
-            unsafe { lirc_set_rec_mode(self.file.as_raw_fd(), &mode)? };
+            unsafe { internal::lirc_set_rec_mode(self.file.as_raw_fd(), &mode)? };
 
             self.raw_mode = false;
         }
@@ -449,18 +458,15 @@ impl Lirc {
     pub fn receiver_resolution(&self) -> io::Result<u32> {
         let mut res = 0u32;
 
-        unsafe { lirc_get_rec_resolution(self.file.as_raw_fd(), &mut res)? };
+        unsafe { internal::lirc_get_rec_resolution(self.file.as_raw_fd(), &mut res)? };
 
         Ok(res)
     }
 
-    pub fn as_file(&self) -> &File {
-        &self.file
-    }
-
-    /// Load and attach bpf program.
+    /// Load and attach bpf program. The bpf program should a valid ELF object file,
+    /// which contains a single LircMode2 program.
     pub fn attach_bpf(&self, bpf: &[u8]) -> Result<(), String> {
-        let mut bpf = match aya::Bpf::load(bpf) {
+        let mut bpf = match Bpf::load(bpf) {
             Ok(bpf) => bpf,
             Err(e) => {
                 return Err(format!("{e}"));

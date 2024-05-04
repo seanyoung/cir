@@ -1,6 +1,7 @@
 use cir::{
     keymap::{Keymap, LinuxProtocol},
-    lirc, lircd_conf,
+    lirc::Lirc,
+    lircd_conf,
     rc_maps::parse_rc_maps_file,
     rcdev::{self, enumerate_rc_dev, Rcdev},
 };
@@ -91,7 +92,7 @@ fn load_keymaps(
     let chdev = if clear || !keymaps.is_empty() {
         clear_scancodes(&inputdev);
         if let Some(lircdev) = &rcdev.lircdev {
-            let lirc = match lirc::open(PathBuf::from(lircdev)) {
+            let lirc = match Lirc::open(PathBuf::from(lircdev)) {
                 Ok(fd) => fd,
                 Err(e) => {
                     eprintln!("error: {lircdev}: {e}");
@@ -180,7 +181,7 @@ fn clear_scancodes(inputdev: &Device) {
 
 fn load_keymap(
     inputdev: &Device,
-    chdev: &Option<lirc::Lirc>,
+    chdev: &Option<Lirc>,
     config: Option<&crate::Config>,
     keymap_filename: &Path,
     protocols: &mut Vec<usize>,
@@ -297,7 +298,7 @@ fn load_keymap(
 
 fn load_lircd(
     inputdev: &Device,
-    chdev: &Option<lirc::Lirc>,
+    chdev: &Option<Lirc>,
     config: Option<&crate::Config>,
     keymap_filename: &Path,
 ) {
@@ -496,7 +497,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::Config) {
         if let Some(lircdev) = &rcdev.lircdev {
             println!("\tLIRC Device\t\t: {lircdev}");
 
-            match lirc::open(PathBuf::from(lircdev)) {
+            match Lirc::open(PathBuf::from(lircdev)) {
                 Ok(mut lircdev) => {
                     if lircdev.can_receive_raw() {
                         println!("\tLIRC Receiver\t\t: raw receiver");
@@ -683,7 +684,7 @@ pub fn find_devices(device: &crate::RcDevice, purpose: Purpose) -> Rcdev {
         } else {
             let lircpath = PathBuf::from(rc.lircdev.as_ref().unwrap());
 
-            let lirc = match lirc::open(&lircpath) {
+            let lirc = match Lirc::open(&lircpath) {
                 Ok(l) => l,
                 Err(e) => {
                     eprintln!("error: {}: {}", lircpath.display(), e);
@@ -706,7 +707,7 @@ pub fn find_devices(device: &crate::RcDevice, purpose: Purpose) -> Rcdev {
     list[entry].clone()
 }
 
-pub fn open_lirc(device: &crate::RcDevice, purpose: Purpose) -> lirc::Lirc {
+pub fn open_lirc(device: &crate::RcDevice, purpose: Purpose) -> Lirc {
     let rcdev = find_devices(device, purpose);
 
     if let Some(lircdev) = rcdev.lircdev {
@@ -714,7 +715,7 @@ pub fn open_lirc(device: &crate::RcDevice, purpose: Purpose) -> lirc::Lirc {
 
         let lircpath = PathBuf::from(lircdev);
 
-        match lirc::open(&lircpath) {
+        match Lirc::open(&lircpath) {
             Ok(l) => l,
             Err(s) => {
                 eprintln!("error: {}: {}", lircpath.display(), s);
