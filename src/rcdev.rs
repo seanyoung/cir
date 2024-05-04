@@ -2,6 +2,7 @@
 //! controller is either an infrared receiver/transmitter or a cec interface.
 
 use crate::rc_maps::KeymapTable;
+use evdev::{Device, Key};
 use itertools::Itertools;
 use std::{
     fs::{self, OpenOptions},
@@ -10,7 +11,7 @@ use std::{
 };
 
 /// Single remote controller device on linux (either infrared or cec device)
-#[derive(Debug, Default, Clone)]
+#[derive(Default)]
 pub struct Rcdev {
     /// Name of rc. This is usually "rc" followed by a number
     pub name: String,
@@ -29,6 +30,8 @@ pub struct Rcdev {
     pub supported_protocols: Vec<String>,
     /// Which protocols are enabled. This indexes into supported_protocols
     pub enabled_protocols: Vec<usize>,
+    /// input device
+    input_chdev: Option<Device>,
 }
 
 /// Get a list of rc devices attached to the system. If none are present, not found error maybe returned
@@ -90,6 +93,7 @@ pub fn enumerate_rc_dev() -> io::Result<Vec<Rcdev>> {
                 lircdev,
                 enabled_protocols,
                 supported_protocols,
+                input_chdev: None,
             })
         }
     }
@@ -160,6 +164,59 @@ impl Rcdev {
 
         f.write_all(string.as_bytes())
             .map_err(|e| format!("{path}: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Open the input device associated with this rc device. Note that tx-only devices do not have
+    /// an input device, or the kernel might have been compiled wihout CONFIG_INPUT.
+    pub fn open_input(&mut self) -> Result<&mut Device, std::io::Error> {
+        if self.input_chdev.is_some() {
+            return Ok(self.input_chdev.as_mut().unwrap());
+        }
+
+        if let Some(input_dev) = &self.inputdev {
+            self.input_chdev = Some(evdev::Device::open(input_dev)?);
+            Ok(self.input_chdev.as_mut().unwrap())
+        } else {
+            Err(std::io::Error::new(
+                io::ErrorKind::NotFound,
+                "input device not found",
+            ))
+        }
+    }
+
+    /// Clear all the scancode mappings
+    pub fn clear_scancodes(&mut self) -> Result<(), std::io::Error> {
+        self.open_input()?;
+
+        let inputdev = self.input_chdev.as_ref().unwrap();
+        loop {
+            match inputdev.update_scancode_by_index(0, Key::KEY_RESERVED, &[]) {
+                Ok(_) => (),
+                Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => break,
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Add a single scancode mapping
+    pub fn update_scancode(&mut self, key: Key, scancode: u64) -> Result<(), std::io::Error> {
+        self.open_input()?;
+
+        // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible
+        let scancode = if let Ok(scancode) = u32::try_from(scancode) {
+            scancode.to_ne_bytes().to_vec()
+        } else {
+            scancode.to_ne_bytes().to_vec()
+        };
+        let inputdev = self.input_chdev.as_ref().unwrap();
+
+        inputdev.update_scancode(key, &scancode)?;
 
         Ok(())
     }

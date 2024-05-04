@@ -10,7 +10,6 @@ use irp::Options;
 use itertools::Itertools;
 use log::debug;
 use std::{
-    convert::TryFrom,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -35,18 +34,11 @@ pub fn config(config: &crate::Config) {
 
     let mut rcdev = find_devices(&config.device, Purpose::Receive);
 
-    if rcdev.inputdev.is_none() {
-        eprintln!("error: input device is missing");
-        std::process::exit(1);
-    }
-
     if config.delay.is_some() || config.period.is_some() {
-        let inputdev = rcdev.inputdev.as_ref().unwrap();
-
-        let mut inputdev = match Device::open(inputdev) {
-            Ok(l) => l,
-            Err(s) => {
-                eprintln!("error: {inputdev}: {s}");
+        let inputdev = match rcdev.open_input() {
+            Ok(dev) => dev,
+            Err(e) => {
+                eprintln!("error: input: {e}");
                 std::process::exit(1);
             }
         };
@@ -79,18 +71,13 @@ fn load_keymaps(
     keymaps: &[PathBuf],
 ) {
     let mut protocols = Vec::new();
-    let inputdev = rcdev.inputdev.as_ref().unwrap();
-
-    let inputdev = match Device::open(inputdev) {
-        Ok(l) => l,
-        Err(s) => {
-            eprintln!("error: {inputdev}: {s}");
-            std::process::exit(1);
-        }
-    };
 
     let chdev = if clear || !keymaps.is_empty() {
-        clear_scancodes(&inputdev);
+        if let Err(e) = rcdev.clear_scancodes() {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+
         if let Some(lircdev) = &rcdev.lircdev {
             let lirc = match Lirc::open(PathBuf::from(lircdev)) {
                 Ok(fd) => fd,
@@ -115,16 +102,9 @@ fn load_keymaps(
 
     for keymap_filename in keymaps.iter() {
         if keymap_filename.to_string_lossy().ends_with(".lircd.conf") {
-            load_lircd(&inputdev, &chdev, config, keymap_filename);
+            load_lircd(rcdev, &chdev, config, keymap_filename);
         } else {
-            load_keymap(
-                &inputdev,
-                &chdev,
-                config,
-                keymap_filename,
-                &mut protocols,
-                &rcdev.supported_protocols,
-            );
+            load_keymap(rcdev, &chdev, config, keymap_filename, &mut protocols);
         }
     }
 
@@ -166,26 +146,12 @@ pub fn auto(auto: &crate::Auto) {
     }
 }
 
-fn clear_scancodes(inputdev: &Device) {
-    loop {
-        match inputdev.update_scancode_by_index(0, Key::KEY_RESERVED, &[]) {
-            Ok(_) => (),
-            Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => break,
-            Err(e) => {
-                eprintln!("error: unable to remove scancode entry: {e}");
-                std::process::exit(1);
-            }
-        }
-    }
-}
-
 fn load_keymap(
-    inputdev: &Device,
+    rcdev: &mut Rcdev,
     chdev: &Option<Lirc>,
     config: Option<&crate::Config>,
     keymap_filename: &Path,
     protocols: &mut Vec<usize>,
-    supported_protocols: &[String],
 ) {
     let keymaps = match Keymap::parse(keymap_filename) {
         Ok(map) => map,
@@ -206,14 +172,7 @@ fn load_keymap(
                 }
             };
 
-            // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible
-            let scancode = if let Ok(scancode) = u32::try_from(*scancode) {
-                scancode.to_ne_bytes().to_vec()
-            } else {
-                scancode.to_ne_bytes().to_vec()
-            };
-
-            match inputdev.update_scancode(key, &scancode) {
+            match rcdev.update_scancode(key, *scancode) {
                 Ok(_) => (),
                 Err(e) => {
                     eprintln!(
@@ -227,7 +186,11 @@ fn load_keymap(
         let Some(chdev) = chdev else {
             if let Some(p) = LinuxProtocol::find_decoder(&keymap.protocol) {
                 for p in p {
-                    if let Some(index) = supported_protocols.iter().position(|e| e == p.decoder) {
+                    if let Some(index) = rcdev
+                        .supported_protocols
+                        .iter()
+                        .position(|e| e == p.decoder)
+                    {
                         if !protocols.contains(&index) {
                             protocols.push(index);
                         }
@@ -297,7 +260,7 @@ fn load_keymap(
 }
 
 fn load_lircd(
-    inputdev: &Device,
+    rcdev: &mut Rcdev,
     chdev: &Option<Lirc>,
     config: Option<&crate::Config>,
     keymap_filename: &Path,
@@ -374,18 +337,12 @@ fn load_lircd(
                 }
             };
 
-            // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible
-            let scancode = if let Ok(scancode) = u32::try_from(code.code[0]) {
-                scancode.to_ne_bytes().to_vec()
-            } else {
-                code.code[0].to_ne_bytes().to_vec()
-            };
-
-            match inputdev.update_scancode(key, &scancode) {
+            match rcdev.update_scancode(key, code.code[0]) {
                 Ok(_) => (),
                 Err(e) => {
                     eprintln!(
-                        "error: failed to update key mapping from scancode {scancode:x?} to {key:?}: {e}"
+                        "error: failed to update key mapping from scancode {:x?} to {key:?}: {e}",
+                        code.code[0]
                     );
                     std::process::exit(1);
                 }
@@ -649,7 +606,7 @@ pub enum Purpose {
 
 /// Enumerate all rc devices and find the lirc and input devices
 pub fn find_devices(device: &crate::RcDevice, purpose: Purpose) -> Rcdev {
-    let list = match enumerate_rc_dev() {
+    let mut list = match enumerate_rc_dev() {
         Ok(list) if list.is_empty() => {
             eprintln!("error: no devices found");
             std::process::exit(1);
@@ -704,7 +661,7 @@ pub fn find_devices(device: &crate::RcDevice, purpose: Purpose) -> Rcdev {
         std::process::exit(1);
     };
 
-    list[entry].clone()
+    list.remove(entry)
 }
 
 pub fn open_lirc(device: &crate::RcDevice, purpose: Purpose) -> Lirc {
