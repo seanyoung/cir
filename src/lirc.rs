@@ -1,6 +1,6 @@
 //! Interface to lirc chardevs on Linux
 
-use aya::programs::LircMode2;
+use aya::programs::{Link, LircMode2, ProgramError};
 use nix::{ioctl_read, ioctl_write_ptr};
 use num_integer::Integer;
 use std::{
@@ -496,6 +496,31 @@ impl Lirc {
             }
             Err(e) => Err(format!("{e}")),
         }
+    }
+
+    /// query bpf programs
+    pub fn query_bpf(&self) -> Result<Vec<String>, ProgramError> {
+        let links = LircMode2::query(self.as_fd())?;
+        let mut res = Vec::new();
+
+        for link in links {
+            let info = link.info()?;
+            match info.name_as_str() {
+                Some(name) => res.push(name.to_owned()),
+                None => res.push(format!("{}", info.id())),
+            }
+        }
+
+        Ok(res)
+    }
+
+    /// Remove all attached bpf programs
+    pub fn clear_bpf(&self) -> Result<(), ProgramError> {
+        let links = LircMode2::query(self.as_fd())?;
+        for link in links {
+            link.detach()?;
+        }
+        Ok(())
     }
 }
 

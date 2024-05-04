@@ -1,4 +1,3 @@
-use aya::programs::{Link, LircMode2};
 use cir::{
     keymap::{Keymap, LinuxProtocol},
     lirc, lircd_conf,
@@ -11,7 +10,6 @@ use itertools::Itertools;
 use log::debug;
 use std::{
     convert::TryFrom,
-    os::fd::AsFd,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -93,7 +91,20 @@ fn load_keymaps(
     let chdev = if clear || !keymaps.is_empty() {
         clear_scancodes(&inputdev);
         if let Some(lircdev) = &rcdev.lircdev {
-            clear_bpf_programs(lircdev)
+            let lirc = match lirc::open(PathBuf::from(lircdev)) {
+                Ok(fd) => fd,
+                Err(e) => {
+                    eprintln!("error: {lircdev}: {e}");
+                    std::process::exit(1);
+                }
+            };
+
+            if let Err(e) = lirc.clear_bpf() {
+                eprintln!("error: {lircdev}: {e}");
+                std::process::exit(1);
+            }
+
+            Some(lirc)
         } else {
             None
         }
@@ -150,29 +161,6 @@ pub fn auto(auto: &crate::Auto) {
         Err(e) => {
             eprintln!("{e}");
             std::process::exit(1);
-        }
-    }
-}
-
-fn clear_bpf_programs(lircdev: &str) -> Option<lirc::Lirc> {
-    match lirc::open(PathBuf::from(lircdev)) {
-        Ok(fd) => match LircMode2::query(fd.as_fd()) {
-            Ok(links) => {
-                for link in links {
-                    if let Err(e) = link.detach() {
-                        eprintln!("error: {lircdev}: unable detach: {e}");
-                    }
-                }
-                Some(fd)
-            }
-            Err(e) => {
-                eprintln!("error: {lircdev}: to query for bpf programs: {e}");
-                None
-            }
-        },
-        Err(e) => {
-            eprintln!("error: {lircdev}: {e}");
-            None
         }
     }
 }
@@ -300,7 +288,7 @@ fn load_keymap(
             };
 
             if let Err(e) = chdev.attach_bpf(&bpf) {
-                eprintln!("error: {}: {e}", keymap_filename.display());
+                eprintln!("error: {}: attach bpf: {e}", keymap_filename.display());
                 std::process::exit(1);
             }
         }
@@ -362,7 +350,7 @@ fn load_lircd(
         };
 
         if let Err(e) = chdev.attach_bpf(&bpf) {
-            eprintln!("error: {}: {e}", keymap_filename.display());
+            eprintln!("error: {}: attach bpf: {e}", keymap_filename.display());
             std::process::exit(1);
         }
 
@@ -606,31 +594,9 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::Config) {
                     }
 
                     if lircdev.can_receive_raw() {
-                        match LircMode2::query(lircdev.as_file()) {
+                        match lircdev.query_bpf() {
                             Ok(links) => {
-                                print!("\tBPF protocols\t\t: ");
-
-                                let mut first = true;
-
-                                for link in links {
-                                    if first {
-                                        first = false;
-                                    } else {
-                                        print!(" ")
-                                    }
-
-                                    match link.info() {
-                                        Ok(info) => match info.name_as_str() {
-                                            Some(name) => print!("{name}"),
-                                            None => print!("{}", info.id()),
-                                        },
-                                        Err(err) => {
-                                            print!("{err}")
-                                        }
-                                    }
-                                }
-
-                                println!();
+                                println!("\tBPF protocols\t\t: {}", links.iter().join(" "));
                             }
                             Err(err) => {
                                 println!("\tBPF protocols\t\t: {err}")
