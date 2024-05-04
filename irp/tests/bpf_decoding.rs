@@ -90,7 +90,8 @@ fn decode_all() {
 
             let mut decodes = bpf_decode(&dfa, &options, &protocol.name, &msg);
 
-            let mut ok = true;
+            // if nothing decoded, we fail to decode
+            let mut ok = !decodes.is_empty();
 
             while let Some(code) = decodes.pop() {
                 let mut received = code;
@@ -160,7 +161,7 @@ fn decode_all() {
         failing_protocols.len()
     );
 
-    assert!((52..=61).contains(&fails));
+    assert_eq!(failing_protocols.len(), 39);
 }
 
 fn bpf_decode(dfa: &DFA, options: &Options, name: &str, message: &Message) -> Vec<u64> {
@@ -250,7 +251,10 @@ fn bpf_decode(dfa: &DFA, options: &Options, name: &str, message: &Message) -> Ve
             )
         };
 
-        println!("executing {raw} {vars}");
+        println!(
+            "executing {}{raw} {vars}",
+            if i.is_even() { '-' } else { '+' }
+        );
 
         let ret = vm.execute_program(mbuff, &context.sample).unwrap();
         assert_eq!(ret, 0);

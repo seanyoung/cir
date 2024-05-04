@@ -1042,7 +1042,7 @@ impl<'a> Builder<'a> {
                                 self.decoder_state_ty,
                                 self.decoder_state,
                                 e.offset as u32,
-                                name,
+                                &format!("{name}_ptr"),
                             )
                             .unwrap(),
                         e.value.unwrap(),

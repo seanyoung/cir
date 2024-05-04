@@ -2,7 +2,10 @@ use irp::{Decoder, Event, InfraredData, Irp, Message, Options, Protocol, Vartabl
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
 use rand::Rng;
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 #[test]
 fn test() {
@@ -423,16 +426,17 @@ fn compare_encode_to_transmogrifier() {
 
 #[test]
 fn decode_all() {
-    let protocols = Protocol::parse(&PathBuf::from(
+    let mut protocols = Protocol::parse(&PathBuf::from(
         "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ))
     .unwrap();
 
     let mut total_tests = 0;
     let mut fails = 0;
+    let mut failed_protocols: HashSet<&str> = HashSet::new();
     let mut rng = rand::thread_rng();
 
-    for mut protocol in protocols {
+    for protocol in &mut protocols {
         println!("trying {}", protocol.name);
 
         if protocol.name == "NEC-Shirriff" {
@@ -496,6 +500,7 @@ fn decode_all() {
             let mut decodes = Vec::new();
 
             for data in InfraredData::from_u32_slice(&msg.raw) {
+                // TODO: fix DFA decoding here
                 decoder.nfa_input(data, &nfa, |ev, res| decodes.push((ev, res)));
             }
 
@@ -538,6 +543,8 @@ fn decode_all() {
 
                 if params == res {
                     ok = true;
+                } else {
+                    failed_protocols.insert(&protocol.name);
                 }
             }
 
@@ -563,6 +570,7 @@ fn decode_all() {
     }
 
     println!("tests: {total_tests} fails: {fails}");
+    println!("Failed protocols: {failed_protocols:?}");
 
     assert_eq!(fails, 0);
 }
