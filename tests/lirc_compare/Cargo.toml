@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 cir = { path = "../.." }
 irp = { path = "../../irp" }
-liblircd = { path = "../../liblircd" }
+liblircd = { path = "../../tests/liblircd" }
 num-integer = "0.1"
 
 [workspace]

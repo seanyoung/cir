@@ -1,4 +1,4 @@
-use irp::{InfraredData, Irp, Message, NFADecoder, Vartable};
+use irp::{Decoder, InfraredData, Irp, Message, Options, Vartable};
 use irptransmogrifier::{create_jvm, IrpTransmogrifierRender};
 use itertools::Itertools;
 use rand::Rng;
@@ -29,6 +29,13 @@ fn main() {
                     vars.set(param.name.to_owned(), value);
                 }
 
+                let options = Options {
+                    aeps: 100,
+                    eps: 3,
+                    max_gap: 100000,
+                    ..Default::default()
+                };
+
                 // encode with irp crate
                 match irp.encode(vars.clone()) {
                     Ok(our) => {
@@ -42,9 +49,9 @@ fn main() {
                             assert!(compare_with_rounding(&our[i], &their[i]));
                         }
 
-                        match irp.build_nfa() {
-                            Ok(nfa) => {
-                                let mut decoder = NFADecoder::new(100, 3, 100000);
+                        match irp.compile(&options) {
+                            Ok(dfa) => {
+                                let mut decoder = Decoder::new(options);
                                 let mut decoded = false;
 
                                 for part in our {
@@ -53,7 +60,7 @@ fn main() {
                                     let mut failed = false;
 
                                     for i in ir {
-                                        decoder.input(i, &nfa, |ev, fields| {
+                                        decoder.dfa_input(i, &dfa, |ev, fields| {
                                             println!(
                                                 "decode {i} {ev}: {}",
                                                 fields
