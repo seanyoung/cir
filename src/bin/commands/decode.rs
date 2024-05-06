@@ -26,8 +26,18 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
         }
     };
 
-    let nfa = match irp.build_nfa() {
-        Ok(nfa) => nfa,
+    let mut options = Options {
+        name: "irp",
+        aeps: abs_tolerance,
+        eps: rel_tolerance,
+        max_gap,
+        ..Default::default()
+    };
+
+    options.nfa = decode.options.save_nfa;
+    options.dfa = decode.options.save_dfa;
+    let dfa = match irp.compile(&options) {
+        Ok(dfa) => dfa,
         Err(s) => {
             eprintln!("unable to compile irp ‘{irp_str}’: {s}");
             std::process::exit(2);
@@ -45,21 +55,11 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
         std::process::exit(2);
     }
 
-    let mut options = Options {
-        aeps: abs_tolerance,
-        eps: rel_tolerance,
-        max_gap,
-        ..Default::default()
-    };
-
-    options.nfa = decode.options.save_nfa;
-    options.dfa = decode.options.save_dfa;
-
     let mut decoder = Decoder::new(options);
 
     let mut feed_decoder = |raw: &[InfraredData]| {
         for ir in raw {
-            decoder.nfa_input(*ir, &nfa, |event, var| {
+            decoder.dfa_input(*ir, &dfa, |event, var| {
                 let mut var: Vec<(String, i64)> = var.into_iter().collect();
                 var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                 println!(
