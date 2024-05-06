@@ -35,91 +35,15 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
     };
 
     let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
+
+    #[cfg(target_os = "linux")]
+    let lircdev = open_lirc(input_on_cli, decode, &mut abs_tolerance, &mut max_gap);
+
     #[cfg(not(target_os = "linux"))]
     if !input_on_cli {
         eprintln!("no infrared input provided");
         std::process::exit(2);
     }
-
-    #[cfg(target_os = "linux")]
-    let lircdev = if !input_on_cli {
-        // open lirc
-        let rcdev = find_devices(&decode.device, Purpose::Receive);
-
-        if let Some(lircdev) = rcdev.lircdev {
-            let lircpath = std::path::PathBuf::from(lircdev);
-
-            log::trace!("opening lirc device: {}", lircpath.display());
-
-            let mut lircdev = match Lirc::open(&lircpath) {
-                Ok(l) => l,
-                Err(s) => {
-                    eprintln!("error: {}: {}", lircpath.display(), s);
-                    std::process::exit(1);
-                }
-            };
-
-            if decode.learning {
-                let mut learning_mode = false;
-
-                if lircdev.can_measure_carrier() {
-                    if let Err(err) = lircdev.set_measure_carrier(true) {
-                        eprintln!("error: {lircdev}: failed to enable measure carrier: {err}");
-                        std::process::exit(1);
-                    }
-                    learning_mode = true;
-                }
-
-                if lircdev.can_use_wideband_receiver() {
-                    if let Err(err) = lircdev.set_wideband_receiver(true) {
-                        eprintln!("error: {lircdev}: failed to enable wideband receiver: {err}");
-                        std::process::exit(1);
-                    }
-                    learning_mode = true;
-                }
-
-                if !learning_mode {
-                    eprintln!("error: {lircdev}: lirc device does not support learning mode");
-                    std::process::exit(1);
-                }
-            }
-
-            if lircdev.can_receive_raw() {
-                if let Ok(resolution) = lircdev.receiver_resolution() {
-                    if resolution > abs_tolerance {
-                        info!(
-                            "{} resolution is {}, using absolute tolerance {} rather than {}",
-                            lircdev, resolution, resolution, abs_tolerance
-                        );
-
-                        abs_tolerance = resolution;
-                    }
-                }
-
-                if let Ok(timeout) = lircdev.get_timeout() {
-                    let dev_max_gap = (timeout * 9) / 10;
-
-                    log::trace!(
-                        "device reports timeout of {}, using 90% of that as {} max_gap",
-                        timeout,
-                        dev_max_gap
-                    );
-
-                    max_gap = dev_max_gap;
-                }
-
-                Some(lircdev)
-            } else {
-                error!("{}: device cannot receive raw", lircdev);
-                std::process::exit(1);
-            }
-        } else {
-            error!("{}: no lirc device found", rcdev.name);
-            std::process::exit(1);
-        }
-    } else {
-        None
-    };
 
     let mut options = Options {
         aeps: abs_tolerance,
@@ -233,6 +157,96 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn open_lirc(
+    input_on_cli: bool,
+    decode: &crate::Decode,
+    abs_tolerance: &mut u32,
+    max_gap: &mut u32,
+) -> Option<Lirc> {
+    if input_on_cli {
+        return None;
+    }
+
+    // open lirc
+    let rcdev = find_devices(&decode.device, Purpose::Receive);
+
+    if let Some(lircdev) = rcdev.lircdev {
+        let lircpath = std::path::PathBuf::from(lircdev);
+
+        log::trace!("opening lirc device: {}", lircpath.display());
+
+        let mut lircdev = match Lirc::open(&lircpath) {
+            Ok(l) => l,
+            Err(s) => {
+                eprintln!("error: {}: {}", lircpath.display(), s);
+                std::process::exit(1);
+            }
+        };
+
+        if decode.learning {
+            let mut learning_mode = false;
+
+            if lircdev.can_measure_carrier() {
+                if let Err(err) = lircdev.set_measure_carrier(true) {
+                    eprintln!("error: {lircdev}: failed to enable measure carrier: {err}");
+                    std::process::exit(1);
+                }
+                learning_mode = true;
+            }
+
+            if lircdev.can_use_wideband_receiver() {
+                if let Err(err) = lircdev.set_wideband_receiver(true) {
+                    eprintln!("error: {lircdev}: failed to enable wideband receiver: {err}");
+                    std::process::exit(1);
+                }
+                learning_mode = true;
+            }
+
+            if !learning_mode {
+                eprintln!("error: {lircdev}: lirc device does not support learning mode");
+                std::process::exit(1);
+            }
+        }
+
+        if lircdev.can_receive_raw() {
+            if let Ok(resolution) = lircdev.receiver_resolution() {
+                if resolution > *abs_tolerance {
+                    log::info!(
+                        "{} resolution is {}, using absolute tolerance {} rather than {}",
+                        lircdev,
+                        resolution,
+                        resolution,
+                        abs_tolerance
+                    );
+
+                    *abs_tolerance = resolution;
+                }
+            }
+
+            if let Ok(timeout) = lircdev.get_timeout() {
+                let dev_max_gap = (timeout * 9) / 10;
+
+                log::trace!(
+                    "device reports timeout of {}, using 90% of that as {} max_gap",
+                    timeout,
+                    dev_max_gap
+                );
+
+                *max_gap = dev_max_gap;
+            }
+
+            Some(lircdev)
+        } else {
+            error!("{}: device cannot receive raw", lircdev);
+            std::process::exit(1);
+        }
+    } else {
+        error!("{}: no lirc device found", rcdev.name);
+        std::process::exit(1);
+    }
+}
+
 pub fn decode_keymap(decode: &crate::Decode, path: &Path) {
     #[allow(unused_mut)]
     let mut abs_tolerance = decode.options.aeps;
@@ -249,91 +263,15 @@ pub fn decode_keymap(decode: &crate::Decode, path: &Path) {
     };
 
     let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
+
+    #[cfg(target_os = "linux")]
+    let lircdev = open_lirc(input_on_cli, decode, &mut abs_tolerance, &mut max_gap);
+
     #[cfg(not(target_os = "linux"))]
     if !input_on_cli {
         eprintln!("no infrared input provided");
         std::process::exit(2);
     }
-
-    #[cfg(target_os = "linux")]
-    let lircdev = if !input_on_cli {
-        // open lirc
-        let rcdev = find_devices(&decode.device, Purpose::Receive);
-
-        if let Some(lircdev) = rcdev.lircdev {
-            let lircpath = PathBuf::from(lircdev);
-
-            log::trace!("opening lirc device: {}", lircpath.display());
-
-            let mut lircdev = match Lirc::open(&lircpath) {
-                Ok(l) => l,
-                Err(s) => {
-                    eprintln!("error: {}: {}", lircpath.display(), s);
-                    std::process::exit(1);
-                }
-            };
-
-            if decode.learning {
-                let mut learning_mode = false;
-
-                if lircdev.can_measure_carrier() {
-                    if let Err(err) = lircdev.set_measure_carrier(true) {
-                        eprintln!("error: {lircdev}: failed to enable measure carrier: {err}");
-                        std::process::exit(1);
-                    }
-                    learning_mode = true;
-                }
-
-                if lircdev.can_use_wideband_receiver() {
-                    if let Err(err) = lircdev.set_wideband_receiver(true) {
-                        eprintln!("error: {lircdev}: failed to enable wideband receiver: {err}");
-                        std::process::exit(1);
-                    }
-                    learning_mode = true;
-                }
-
-                if !learning_mode {
-                    eprintln!("error: {lircdev}: lirc device does not support learning mode");
-                    std::process::exit(1);
-                }
-            }
-
-            if lircdev.can_receive_raw() {
-                if let Ok(resolution) = lircdev.receiver_resolution() {
-                    if resolution > abs_tolerance {
-                        info!(
-                            "{} resolution is {}, using absolute tolerance {} rather than {}",
-                            lircdev, resolution, resolution, abs_tolerance
-                        );
-
-                        abs_tolerance = resolution;
-                    }
-                }
-
-                if let Ok(timeout) = lircdev.get_timeout() {
-                    let dev_max_gap = (timeout * 9) / 10;
-
-                    log::trace!(
-                        "device reports timeout of {}, using 90% of that as {} max_gap",
-                        timeout,
-                        dev_max_gap
-                    );
-
-                    max_gap = dev_max_gap;
-                }
-
-                Some(lircdev)
-            } else {
-                error!("{}: device cannot receive raw", lircdev);
-                std::process::exit(1);
-            }
-        } else {
-            error!("{}: no lirc device found", rcdev.name);
-            std::process::exit(1);
-        }
-    } else {
-        None
-    };
 
     let mut decoders = keymaps
         .iter()
@@ -466,91 +404,15 @@ pub fn decode_lircd(decode: &crate::Decode, conf: &PathBuf) {
     };
 
     let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
+
+    #[cfg(target_os = "linux")]
+    let lircdev = open_lirc(input_on_cli, decode, &mut abs_tolerance, &mut max_gap);
+
     #[cfg(not(target_os = "linux"))]
     if !input_on_cli {
         eprintln!("no infrared input provided");
         std::process::exit(2);
     }
-
-    #[cfg(target_os = "linux")]
-    let lircdev = if !input_on_cli {
-        // open lirc
-        let rcdev = find_devices(&decode.device, Purpose::Receive);
-
-        if let Some(lircdev) = rcdev.lircdev {
-            let lircpath = PathBuf::from(lircdev);
-
-            log::trace!("opening lirc device: {}", lircpath.display());
-
-            let mut lircdev = match Lirc::open(&lircpath) {
-                Ok(l) => l,
-                Err(s) => {
-                    eprintln!("error: {}: {}", lircpath.display(), s);
-                    std::process::exit(1);
-                }
-            };
-
-            if decode.learning {
-                let mut learning_mode = false;
-
-                if lircdev.can_measure_carrier() {
-                    if let Err(err) = lircdev.set_measure_carrier(true) {
-                        eprintln!("error: {lircdev}: failed to enable measure carrier: {err}");
-                        std::process::exit(1);
-                    }
-                    learning_mode = true;
-                }
-
-                if lircdev.can_use_wideband_receiver() {
-                    if let Err(err) = lircdev.set_wideband_receiver(true) {
-                        eprintln!("error: {lircdev}: failed to enable wideband receiver: {err}");
-                        std::process::exit(1);
-                    }
-                    learning_mode = true;
-                }
-
-                if !learning_mode {
-                    eprintln!("error: {lircdev}: lirc device does not support learning mode");
-                    std::process::exit(1);
-                }
-            }
-
-            if lircdev.can_receive_raw() {
-                if let Ok(resolution) = lircdev.receiver_resolution() {
-                    if resolution > abs_tolerance {
-                        info!(
-                            "{} resolution is {}, using absolute tolerance {} rather than {}",
-                            lircdev, resolution, resolution, abs_tolerance
-                        );
-
-                        abs_tolerance = resolution;
-                    }
-                }
-
-                if let Ok(timeout) = lircdev.get_timeout() {
-                    let dev_max_gap = (timeout * 9) / 10;
-
-                    log::trace!(
-                        "device reports timeout of {}, using 90% of that as {} max_gap",
-                        timeout,
-                        dev_max_gap
-                    );
-
-                    max_gap = dev_max_gap;
-                }
-
-                Some(lircdev)
-            } else {
-                error!("{}: device cannot receive raw", lircdev);
-                std::process::exit(1);
-            }
-        } else {
-            error!("{}: no lirc device found", rcdev.name);
-            std::process::exit(1);
-        }
-    } else {
-        None
-    };
 
     let mut decoders = remotes
         .iter()
