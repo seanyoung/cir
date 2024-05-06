@@ -26,6 +26,17 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
         }
     };
 
+    let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
+
+    #[cfg(target_os = "linux")]
+    let lircdev = open_lirc(input_on_cli, decode, &mut abs_tolerance, &mut max_gap);
+
+    #[cfg(not(target_os = "linux"))]
+    if !input_on_cli {
+        eprintln!("no infrared input provided");
+        std::process::exit(2);
+    }
+
     let mut options = Options {
         name: "irp",
         aeps: abs_tolerance,
@@ -43,17 +54,6 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
             std::process::exit(2);
         }
     };
-
-    let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
-
-    #[cfg(target_os = "linux")]
-    let lircdev = open_lirc(input_on_cli, decode, &mut abs_tolerance, &mut max_gap);
-
-    #[cfg(not(target_os = "linux"))]
-    if !input_on_cli {
-        eprintln!("no infrared input provided");
-        std::process::exit(2);
-    }
 
     let mut decoder = Decoder::new(options);
 
