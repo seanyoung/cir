@@ -456,6 +456,8 @@ fn decode_all() {
 
         let max_gap = if protocol.name == "Epson" {
             100000
+        } else if protocol.name == "NRC17" {
+            110500
         } else {
             20000
         };
@@ -571,7 +573,7 @@ fn decode_all() {
     println!("tests: {total_tests} fails: {fails}");
     println!("Failed protocols: {failed_protocols:?}");
 
-    let expected_failures = HashSet::from(["Pioneer-2Part", "NRC17", "Epson", "F12x", "Roku-8bit"]);
+    let expected_failures = HashSet::from(["Pioneer-2Part", "Epson", "F12x", "Roku-8bit"]);
     assert_eq!(failed_protocols, expected_failures);
 }
 

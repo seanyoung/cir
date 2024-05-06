@@ -50,6 +50,8 @@ fn decode_all() {
 
         let max_gap = if protocol.name == "Epson" {
             100000
+        } else if protocol.name == "NRC17" {
+            110500
         } else {
             20000
         };
@@ -161,7 +163,7 @@ fn decode_all() {
         failing_protocols.len()
     );
 
-    assert_eq!(failing_protocols.len(), 39);
+    assert_eq!(failing_protocols.len(), 38);
 }
 
 fn bpf_decode(dfa: &DFA, options: &Options, name: &str, message: &Message) -> Vec<u64> {
