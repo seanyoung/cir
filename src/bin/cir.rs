@@ -36,10 +36,16 @@ enum Commands {
     Transmit(Transmit),
     #[cfg(target_os = "linux")]
     #[command(about = "List IR and CEC devices")]
-    Config(Config),
+    List(List),
+    #[cfg(target_os = "linux")]
+    #[command(about = "Load keymaps or lircd.conf remotes")]
+    Load(Load),
     #[cfg(target_os = "linux")]
     #[command(about = "Receive IR and print to stdout")]
     Test(Test),
+    #[cfg(target_os = "linux")]
+    #[command(about = "Configure IR and CEC devices")]
+    Config(Config),
     #[cfg(target_os = "linux")]
     #[command(about = "Auto-load keymaps based on configuration")]
     Auto(Auto),
@@ -120,6 +126,22 @@ struct DecodeOptions {
     #[arg(long = "save-dfa", global = true, help_heading = "DECODING")]
     save_dfa: bool,
 }
+
+#[derive(Args)]
+struct BpfDecodeOptions {
+    /// Save the LLVM IR
+    #[arg(long = "save-llvm-ir", help_heading = "DECODING")]
+    save_llvm_ir: bool,
+
+    /// Save the Assembly
+    #[arg(long = "save-asm", help_heading = "DECODING")]
+    save_assembly: bool,
+
+    /// Save the Object
+    #[arg(long = "save-object", help_heading = "DECODING")]
+    save_object: bool,
+}
+
 #[derive(Subcommand)]
 enum DecodeCommands {
     #[command(about = "Decode using IRP Notation")]
@@ -169,7 +191,37 @@ struct RcDevice {
 
 #[cfg(target_os = "linux")]
 #[derive(Args)]
-struct Config {
+struct Load {
+    #[cfg(target_os = "linux")]
+    #[clap(flatten)]
+    device: RcDevice,
+
+    /// Set receiving timeout
+    #[arg(long = "timeout", short = 't')]
+    timeout: Option<u32>,
+
+    /// Sets the delay before repeating a keystroke
+    #[arg(long = "delay", short = 'D', name = "DELAY")]
+    delay: Option<u32>,
+
+    /// Sets the period before repeating a keystroke
+    #[arg(long = "period", short = 'P', name = "PERIOD")]
+    period: Option<u32>,
+
+    /// Load toml or lircd.conf keymap
+    #[arg(name = "KEYMAP")]
+    keymaps: Vec<PathBuf>,
+
+    #[clap(flatten)]
+    options: DecodeOptions,
+
+    #[clap(flatten)]
+    bpf_options: BpfDecodeOptions,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Args)]
+struct List {
     #[cfg(target_os = "linux")]
     #[clap(flatten)]
     device: RcDevice,
@@ -177,6 +229,14 @@ struct Config {
     /// Display the scancode to keycode mapping
     #[arg(long = "read-mapping", short = 'm')]
     mapping: bool,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Args)]
+struct Config {
+    #[cfg(target_os = "linux")]
+    #[clap(flatten)]
+    device: RcDevice,
 
     /// Clear existing configuration
     #[arg(long = "clear", short = 'c')]
@@ -194,10 +254,6 @@ struct Config {
     #[arg(long = "period", short = 'P', name = "PERIOD")]
     period: Option<u32>,
 
-    /// Load toml or lircd.conf keymap
-    #[arg(long = "keymap", short = 'w', name = "KEYMAP")]
-    keymaps: Vec<PathBuf>,
-
     // TODO:
     // --irp '{}<>()[]'
     // set scancode (like ir-keytable --set-key/-k)
@@ -205,17 +261,8 @@ struct Config {
     #[clap(flatten)]
     options: DecodeOptions,
 
-    /// Save the LLVM IR
-    #[arg(long = "save-llvm-ir", help_heading = "DECODING")]
-    save_llvm_ir: bool,
-
-    /// Save the Assembly
-    #[arg(long = "save-asm", help_heading = "DECODING")]
-    save_assembly: bool,
-
-    /// Save the Object
-    #[arg(long = "save-object", help_heading = "DECODING")]
-    save_object: bool,
+    #[clap(flatten)]
+    bpf_options: BpfDecodeOptions,
 }
 
 #[cfg(target_os = "linux")]
@@ -550,6 +597,10 @@ fn main() {
             }
         },
         Commands::Transmit(transmit) => commands::transmit::transmit(transmit),
+        #[cfg(target_os = "linux")]
+        Commands::List(list) => commands::list::list(list),
+        #[cfg(target_os = "linux")]
+        Commands::Load(load) => commands::config::load(load),
         #[cfg(target_os = "linux")]
         Commands::Config(config) => commands::config::config(config),
         #[cfg(target_os = "linux")]
