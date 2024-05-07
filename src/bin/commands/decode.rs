@@ -13,8 +13,8 @@ use std::{
 
 pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
     #[allow(unused_mut)]
-    let mut abs_tolerance = decode.options.aeps;
-    let rel_tolerance = decode.options.eps;
+    let mut abs_tolerance = decode.options.aeps.unwrap_or(100);
+    let rel_tolerance = decode.options.eps.unwrap_or(3);
     #[allow(unused_mut)]
     let mut max_gap = 100000;
 
@@ -29,7 +29,7 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
     let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
 
     #[cfg(target_os = "linux")]
-    let lircdev = open_lirc(input_on_cli, decode, &mut abs_tolerance, &mut max_gap);
+    let lircdev = open_lirc(input_on_cli, decode, Some(&mut abs_tolerance), &mut max_gap);
 
     #[cfg(not(target_os = "linux"))]
     if !input_on_cli {
@@ -161,7 +161,7 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
 fn open_lirc(
     input_on_cli: bool,
     decode: &crate::Decode,
-    abs_tolerance: &mut u32,
+    abs_tolerance: Option<&mut u32>,
     max_gap: &mut u32,
 ) -> Option<Lirc> {
     if input_on_cli {
@@ -210,17 +210,19 @@ fn open_lirc(
         }
 
         if lircdev.can_receive_raw() {
-            if let Ok(resolution) = lircdev.receiver_resolution() {
-                if resolution > *abs_tolerance {
-                    log::info!(
-                        "{} resolution is {}, using absolute tolerance {} rather than {}",
-                        lircdev,
-                        resolution,
-                        resolution,
-                        abs_tolerance
-                    );
+            if let Some(abs_tolerance) = abs_tolerance {
+                if let Ok(resolution) = lircdev.receiver_resolution() {
+                    if resolution > *abs_tolerance {
+                        log::info!(
+                            "{} resolution is {}, using absolute tolerance {} rather than {}",
+                            lircdev,
+                            resolution,
+                            resolution,
+                            abs_tolerance
+                        );
 
-                    *abs_tolerance = resolution;
+                        *abs_tolerance = resolution;
+                    }
                 }
             }
 
@@ -249,8 +251,8 @@ fn open_lirc(
 
 pub fn decode_keymap(decode: &crate::Decode, path: &Path) {
     #[allow(unused_mut)]
-    let mut abs_tolerance = decode.options.aeps;
-    let rel_tolerance = decode.options.eps;
+    let mut abs_tolerance = decode.options.aeps.unwrap_or(100);
+    let rel_tolerance = decode.options.eps.unwrap_or(3);
     #[allow(unused_mut)]
     let mut max_gap = 100000;
 
@@ -265,7 +267,7 @@ pub fn decode_keymap(decode: &crate::Decode, path: &Path) {
     let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
 
     #[cfg(target_os = "linux")]
-    let lircdev = open_lirc(input_on_cli, decode, &mut abs_tolerance, &mut max_gap);
+    let lircdev = open_lirc(input_on_cli, decode, Some(&mut abs_tolerance), &mut max_gap);
 
     #[cfg(not(target_os = "linux"))]
     if !input_on_cli {
@@ -406,7 +408,7 @@ pub fn decode_lircd(decode: &crate::Decode, conf: &PathBuf) {
     let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
 
     #[cfg(target_os = "linux")]
-    let lircdev = open_lirc(input_on_cli, decode, &mut abs_tolerance, &mut max_gap);
+    let lircdev = open_lirc(input_on_cli, decode, abs_tolerance.as_mut(), &mut max_gap);
 
     #[cfg(not(target_os = "linux"))]
     if !input_on_cli {
@@ -417,8 +419,7 @@ pub fn decode_lircd(decode: &crate::Decode, conf: &PathBuf) {
     let mut decoders = remotes
         .iter()
         .map(|remote| {
-            let mut options =
-                remote.default_options(Some(abs_tolerance), Some(rel_tolerance), max_gap);
+            let mut options = remote.default_options(abs_tolerance, rel_tolerance, max_gap);
 
             options.nfa = decode.options.save_nfa;
             options.dfa = decode.options.save_dfa;

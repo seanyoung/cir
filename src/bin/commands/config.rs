@@ -317,6 +317,8 @@ fn load_keymap(
         if let Some(decode) = &decode_options {
             options.nfa = decode.save_nfa;
             options.dfa = decode.save_dfa;
+            options.aeps = decode.aeps.unwrap_or(100);
+            options.eps = decode.eps.unwrap_or(3);
         }
 
         if let Some(decode) = &bpf_decode_options {
@@ -384,7 +386,11 @@ fn load_lircd(
             max_gap = dev_max_gap;
         }
 
-        let mut options = remote.default_options(None, None, max_gap);
+        let mut options = remote.default_options(
+            decode_options.and_then(|decode| decode.aeps),
+            decode_options.and_then(|decode| decode.eps),
+            max_gap,
+        );
 
         options.repeat_mask = remote.repeat_mask;
 

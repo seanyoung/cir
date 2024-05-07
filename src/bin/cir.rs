@@ -101,44 +101,42 @@ struct DecodeOptions {
             long = "absolute-tolerance",
             value_parser = value_parser!(u32).range(0..100000),
             global = true,
-            default_value_t = 100,
             name = "AEPS",
             help_heading = "DECODING"
         )]
-    aeps: u32,
+    aeps: Option<u32>,
 
     /// Relative tolerance in %
     #[arg(
             long = "relative-tolerance",
             value_parser = value_parser!(u32).range(0..1000),
             global = true,
-            default_value_t = 3,
             name = "EPS",
             help_heading = "DECODING"
         )]
-    eps: u32,
+    eps: Option<u32>,
 
     /// Save the NFA
-    #[arg(long = "save-nfa", global = true, help_heading = "DECODING")]
+    #[arg(long = "save-nfa", global = true, help_heading = "ADVANCED")]
     save_nfa: bool,
 
     /// Save the DFA
-    #[arg(long = "save-dfa", global = true, help_heading = "DECODING")]
+    #[arg(long = "save-dfa", global = true, help_heading = "ADVANCED")]
     save_dfa: bool,
 }
 
 #[derive(Args)]
 struct BpfDecodeOptions {
     /// Save the LLVM IR
-    #[arg(long = "save-llvm-ir", help_heading = "DECODING")]
+    #[arg(long = "save-llvm-ir", help_heading = "ADVANCED")]
     save_llvm_ir: bool,
 
     /// Save the Assembly
-    #[arg(long = "save-asm", help_heading = "DECODING")]
+    #[arg(long = "save-asm", help_heading = "ADVANCED")]
     save_assembly: bool,
 
     /// Save the Object
-    #[arg(long = "save-object", help_heading = "DECODING")]
+    #[arg(long = "save-object", help_heading = "ADVANCED")]
     save_object: bool,
 }
 
