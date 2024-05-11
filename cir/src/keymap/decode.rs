@@ -60,7 +60,7 @@ impl Keymap {
             vec![nfa]
         };
 
-        // TODO: merge NFAs so we end up with on DFA
+        // TODO: merge NFAs so we end up with one DFA
         Ok(nfa.iter().map(|nfa| nfa.build_dfa(options)).collect())
     }
 

@@ -26,11 +26,6 @@ fn decode_all() {
     let mut rng = rand::thread_rng();
 
     for protocol in &mut protocols {
-        // TODO: See https://github.com/qmonnet/rbpf/pull/108
-        if protocol.name.starts_with("XMP") {
-            continue;
-        }
-
         println!("trying {}: {}", protocol.name, protocol.irp);
 
         if protocol.name == "NEC-Shirriff" {
