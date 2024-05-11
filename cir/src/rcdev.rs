@@ -230,17 +230,17 @@ mod tests {
 
     #[test]
     fn parse_bad() {
-        let e = parse_rc_maps_file(&PathBuf::from("testdata/rc_maps_cfg/bad.cfg")).unwrap_err();
+        let e = parse_rc_maps_file(&PathBuf::from("../testdata/rc_maps_cfg/bad.cfg")).unwrap_err();
 
         assert_eq!(
             format!("{e}"),
-            "testdata/rc_maps_cfg/bad.cfg:4: error: invalid parameters"
+            "../testdata/rc_maps_cfg/bad.cfg:4: error: invalid parameters"
         );
     }
 
     #[test]
     fn parse_good() {
-        let t = parse_rc_maps_file(&PathBuf::from("testdata/rc_maps_cfg/ttusbir.cfg")).unwrap();
+        let t = parse_rc_maps_file(&PathBuf::from("../testdata/rc_maps_cfg/ttusbir.cfg")).unwrap();
 
         assert_eq!(t.len(), 2);
 

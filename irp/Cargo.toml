@@ -27,8 +27,8 @@ inkwell = { version = "0.4", features = [ "target-bpf", "llvm15-0-force-dynamic"
 bpf = [ "inkwell" ]
 
 [dev-dependencies]
-cir = { path = ".." }
+cir = { path = "../cir" }
 rand = "0.8"
-irptransmogrifier = { path = "tests/rust-irptransmogrifier" }
+irptransmogrifier = { workspace = true }
 aya-obj = { version = "0.1", features = [ "std" ] }
 rbpf = "0.2"

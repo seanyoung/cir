@@ -10,7 +10,7 @@ use std::{
 
 #[test]
 fn lircd_testdata() {
-    recurse(&PathBuf::from("testdata/lircd_conf"));
+    recurse(&PathBuf::from("../testdata/lircd_conf"));
 }
 
 fn recurse(path: &Path) {
@@ -164,19 +164,20 @@ fn lircd_encode_decode(path: &Path) {
 
                 // let's see if lircd can decode its own creation
 
-                if path == OsStr::new("testdata/lircd_conf/creative/livedrive.lircd.conf") {
+                if path == OsStr::new("../testdata/lircd_conf/creative/livedrive.lircd.conf") {
                     // not decodable, missing ptrail
                     continue;
                 }
 
-                if path == OsStr::new("testdata/lircd_conf/meridian/MSR.lircd.conf") {
+                if path == OsStr::new("../testdata/lircd_conf/meridian/MSR.lircd.conf") {
                     // not decodable, missing plead/header
                     continue;
                 }
 
-                if path == OsStr::new("testdata/lircd_conf/logitech/logitech.lircd.conf")
-                    || path == OsStr::new("testdata/lircd_conf/pcmak/pcmak.lircd.conf")
-                    || path == OsStr::new("testdata/lircd_conf/pixelview/remotemaster.lircd.conf")
+                if path == OsStr::new("../testdata/lircd_conf/logitech/logitech.lircd.conf")
+                    || path == OsStr::new("../testdata/lircd_conf/pcmak/pcmak.lircd.conf")
+                    || path
+                        == OsStr::new("../testdata/lircd_conf/pixelview/remotemaster.lircd.conf")
                 {
                     // not decodable, leading space (both lircd and irp crate)
                     continue;

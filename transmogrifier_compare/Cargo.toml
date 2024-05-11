@@ -5,9 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-irp = { path = "../.." }
-irptransmogrifier = { path = "../rust-irptransmogrifier" }
+irp = { path = "../irp" }
+irptransmogrifier = { workspace = true }
 rand = "0.8"
 itertools = "0.12"
-
-[workspace]

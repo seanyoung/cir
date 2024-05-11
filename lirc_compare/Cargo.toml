@@ -1,0 +1,10 @@
+[package]
+name = "lirc_compare"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cir = { path = "../cir" }
+irp = { path = "../irp" }
+liblircd = { workspace = true }
+num-integer = "0.1"

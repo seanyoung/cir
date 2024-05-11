@@ -5,6 +5,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
-irp = { path = "../.." }
+irp = { path = "../irp" }
 rand = "0.8"
 j4rs = "0.18"

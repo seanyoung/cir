@@ -55,7 +55,7 @@ fn irctl_compare_encode(path: &Path, scancode: u32, our_keymap: &Keymap) {
 
 #[test]
 fn keymap_encode() {
-    recurse(Path::new("testdata/rc_keymaps"));
+    recurse(Path::new("../testdata/rc_keymaps"));
 }
 
 fn recurse(path: &Path) {
