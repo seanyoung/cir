@@ -14,8 +14,7 @@ clap = { version = "4.5", features = [ "derive" ] }
 toml = "0.8"
 itertools = "0.12"
 evdev = { git = "https://github.com/emberian/evdev" }
-mio = { version = "0.8", features = [ "os-poll", "os-ext" ] }
-nix = { version = "0.28", features = [ "fs", "ioctl" ] }
+nix = { version = "0.28", features = [ "fs", "ioctl", "poll" ] }
 humantime = "2.1"
 bitflags = "2.5"
 num-integer = "0.1"

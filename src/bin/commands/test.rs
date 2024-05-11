@@ -1,8 +1,11 @@
 use cir::lirc::{Lirc, LIRC_SCANCODE_FLAG_REPEAT, LIRC_SCANCODE_FLAG_TOGGLE};
 use evdev::Device;
-use mio::{unix::SourceFd, Events, Interest, Poll, Token};
-use nix::fcntl::{FcntlArg, OFlag};
-use std::os::unix::io::AsRawFd;
+use nix::{
+    errno::Errno,
+    fcntl::{FcntlArg, OFlag},
+    poll::{poll, PollFd, PollFlags, PollTimeout},
+};
+use std::os::{fd::AsFd, unix::io::AsRawFd};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -12,11 +15,7 @@ use super::config::{find_devices, open_lirc, Purpose};
 #[allow(clippy::comparison_chain)]
 pub fn test(test: &crate::Test) {
     let rcdev = find_devices(&test.device, Purpose::Receive);
-    let raw_token: Token = Token(0);
-    let scancodes_token: Token = Token(1);
-    let input_token: Token = Token(2);
 
-    let mut poll = Poll::new().expect("failed to create poll");
     let mut scandev = None;
     let mut rawdev = None;
     let mut eventdev = None;
@@ -99,14 +98,6 @@ pub fn test(test: &crate::Test) {
         }
 
         if lircdev.can_receive_raw() {
-            poll.registry()
-                .register(
-                    &mut SourceFd(&lircdev.as_raw_fd()),
-                    raw_token,
-                    Interest::READABLE,
-                )
-                .expect("failed to add raw poll");
-
             if lircdev.can_receive_scancodes() {
                 let mut lircdev = open_lirc(&test.device, Purpose::Receive);
 
@@ -119,10 +110,6 @@ pub fn test(test: &crate::Test) {
                 nix::fcntl::fcntl(raw_fd, FcntlArg::F_SETFL(OFlag::O_NONBLOCK))
                     .expect("should be able to set non-blocking");
 
-                poll.registry()
-                    .register(&mut SourceFd(&raw_fd), scancodes_token, Interest::READABLE)
-                    .expect("failed to add scancodes poll");
-
                 scandev = Some(lircdev);
             }
 
@@ -132,10 +119,6 @@ pub fn test(test: &crate::Test) {
 
             nix::fcntl::fcntl(raw_fd, FcntlArg::F_SETFL(OFlag::O_NONBLOCK))
                 .expect("should be able to set non-blocking");
-
-            poll.registry()
-                .register(&mut SourceFd(&raw_fd), scancodes_token, Interest::READABLE)
-                .expect("failed to add scancodes poll");
 
             scandev = Some(lircdev);
         }
@@ -155,10 +138,6 @@ pub fn test(test: &crate::Test) {
         nix::fcntl::fcntl(raw_fd, FcntlArg::F_SETFL(OFlag::O_NONBLOCK))
             .expect("should be able to set non-blocking");
 
-        poll.registry()
-            .register(&mut SourceFd(&raw_fd), input_token, Interest::READABLE)
-            .expect("failed to add scancodes poll");
-
         eventdev = Some(inputdev);
     }
 
@@ -166,7 +145,6 @@ pub fn test(test: &crate::Test) {
     let mut carrier = None;
     let mut leading_space = true;
     let mut scanbuf = Vec::with_capacity(1024);
-    let mut events = Events::with_capacity(4);
     let mut last_event_time = None;
     let mut last_lirc_time = None;
 
@@ -312,6 +290,25 @@ pub fn test(test: &crate::Test) {
             }
         }
 
-        poll.poll(&mut events, None).expect("poll should not fail");
+        let mut polls: Vec<PollFd> = Vec::new();
+
+        if let Some(dev) = &scandev {
+            polls.push(PollFd::new(dev.as_fd(), PollFlags::POLLIN));
+        }
+
+        if let Some(dev) = &rawdev {
+            polls.push(PollFd::new(dev.as_fd(), PollFlags::POLLIN));
+        }
+
+        if let Some(dev) = &eventdev {
+            polls.push(PollFd::new(dev.as_fd(), PollFlags::POLLIN));
+        }
+
+        if let Err(e) = poll(&mut polls, PollTimeout::NONE) {
+            if e != Errno::EINTR && e != Errno::EAGAIN {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
     }
 }
