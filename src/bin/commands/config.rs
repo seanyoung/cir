@@ -6,7 +6,7 @@ use cir::{
     rcdev::{enumerate_rc_dev, Rcdev},
 };
 use evdev::Key;
-use irp::Options;
+use irp::{Irp, Options};
 use log::debug;
 use std::{
     path::{Path, PathBuf},
@@ -85,9 +85,140 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    // TODO
-    // set scancode
-    // load irp
+    if !config.scankey.is_empty() {
+        for (scancode, keycode) in &config.scankey {
+            let key = match Key::from_str(keycode) {
+                Ok(key) => key,
+                Err(_) => {
+                    eprintln!("error: ‘{keycode}’ is not a valid keycode");
+                    continue;
+                }
+            };
+
+            match rcdev.update_scancode(key, *scancode) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!(
+                            "error: failed to update key mapping from scancode {scancode:x?} to {key:?}: {e}"
+                        );
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    if !config.protocol.is_empty() {
+        let mut res = Vec::new();
+
+        for name in &config.protocol {
+            if name.is_empty() {
+                // nothing to do
+            } else if name == "all" {
+                for pos in 0..rcdev.supported_protocols.len() {
+                    if !res.contains(&pos) {
+                        res.push(pos);
+                    }
+                }
+            } else if let Some(pos) = rcdev.supported_protocols.iter().position(|e| e == name) {
+                if !res.contains(&pos) {
+                    res.push(pos);
+                }
+            } else {
+                eprintln!("error: {}: does not support protocol {name}", rcdev.name);
+                std::process::exit(1);
+            }
+        }
+
+        if let Err(e) = rcdev.set_enabled_protocols(&res) {
+            eprintln!("error: {}: {e}", rcdev.name);
+            std::process::exit(1);
+        }
+    }
+
+    if let Some(irp_notation) = &config.irp {
+        let irp = match Irp::parse(irp_notation) {
+            Ok(irp) => irp,
+            Err(e) => {
+                eprintln!("error: {irp_notation}: {e}");
+                std::process::exit(1);
+            }
+        };
+
+        let mut max_gap = 100000;
+
+        let chdev = if let Some(lircdev) = &rcdev.lircdev {
+            let lirc = match Lirc::open(PathBuf::from(lircdev)) {
+                Ok(fd) => fd,
+                Err(e) => {
+                    eprintln!("error: {lircdev}: {e}");
+                    std::process::exit(1);
+                }
+            };
+
+            if !lirc.can_receive_raw() {
+                eprintln!(
+                    "error: {}: not a raw receiver, irp not supported",
+                    rcdev.name
+                );
+                std::process::exit(1);
+            }
+
+            lirc
+        } else {
+            eprintln!("error: {}: no lirc device, irp not supported", rcdev.name);
+            std::process::exit(1);
+        };
+
+        if let Some(timeout) = config.timeout {
+            max_gap = timeout;
+        } else if let Ok(timeout) = chdev.get_timeout() {
+            let dev_max_gap = (timeout * 9) / 10;
+
+            log::trace!(
+                "device reports timeout of {}, using 90% of that as {} max_gap",
+                timeout,
+                dev_max_gap
+            );
+
+            max_gap = dev_max_gap;
+        }
+
+        let mut options = Options {
+            name: "irp",
+            max_gap,
+            ..Default::default()
+        };
+
+        options.nfa = config.options.save_nfa;
+        options.dfa = config.options.save_dfa;
+        options.aeps = config.options.aeps.unwrap_or(100);
+        options.eps = config.options.eps.unwrap_or(3);
+
+        options.llvm_ir = config.bpf_options.save_llvm_ir;
+        options.assembly = config.bpf_options.save_assembly;
+        options.object = config.bpf_options.save_object;
+
+        let dfa = match irp.compile(&options) {
+            Ok(dfa) => dfa,
+            Err(e) => {
+                println!("error: irp: {e}");
+                std::process::exit(1);
+            }
+        };
+
+        let bpf = match dfa.compile_bpf(&options) {
+            Ok((bpf, _)) => bpf,
+            Err(e) => {
+                eprintln!("error: irp: {e}");
+                std::process::exit(1);
+            }
+        };
+
+        if let Err(e) = chdev.attach_bpf(&bpf) {
+            eprintln!("error: attach bpf: {e}",);
+            std::process::exit(1);
+        }
+    }
 }
 
 pub fn load(load: &crate::Load) {

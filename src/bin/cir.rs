@@ -117,26 +117,26 @@ struct DecodeOptions {
     eps: Option<u32>,
 
     /// Save the NFA
-    #[arg(long = "save-nfa", global = true, help_heading = "ADVANCED")]
+    #[arg(long = "save-nfa", global = true, help_heading = "DEBUGGING")]
     save_nfa: bool,
 
     /// Save the DFA
-    #[arg(long = "save-dfa", global = true, help_heading = "ADVANCED")]
+    #[arg(long = "save-dfa", global = true, help_heading = "DEBUGGING")]
     save_dfa: bool,
 }
 
 #[derive(Args)]
 struct BpfDecodeOptions {
     /// Save the LLVM IR
-    #[arg(long = "save-llvm-ir", help_heading = "ADVANCED")]
+    #[arg(long = "save-llvm-ir", help_heading = "DEBUGGING")]
     save_llvm_ir: bool,
 
     /// Save the Assembly
-    #[arg(long = "save-asm", help_heading = "ADVANCED")]
+    #[arg(long = "save-asm", help_heading = "DEBUGGING")]
     save_assembly: bool,
 
     /// Save the Object
-    #[arg(long = "save-object", help_heading = "ADVANCED")]
+    #[arg(long = "save-object", help_heading = "DEBUGGING")]
     save_object: bool,
 }
 
@@ -230,6 +230,22 @@ struct List {
 }
 
 #[cfg(target_os = "linux")]
+fn parse_scankey(arg: &str) -> Result<(u64, String), String> {
+    if let Some((scancode, keycode)) = arg.split_once('=') {
+        let scancode = if let Some(hex) = scancode.strip_prefix("0x") {
+            u64::from_str_radix(hex, 16)
+        } else {
+            str::parse(scancode)
+        }
+        .map_err(|e| format!("{e}"))?;
+
+        Ok((scancode, keycode.to_owned()))
+    } else {
+        Err("missing `=` separator".into())
+    }
+}
+
+#[cfg(target_os = "linux")]
 #[derive(Args)]
 struct Config {
     #[cfg(target_os = "linux")]
@@ -252,10 +268,23 @@ struct Config {
     #[arg(long = "period", short = 'P', name = "PERIOD")]
     period: Option<u32>,
 
-    // TODO:
-    // --irp '{}<>()[]'
-    // set scancode (like ir-keytable --set-key/-k)
-    // set protocol (like ir-keytabke -P)
+    /// Load decoder based on IRP Notation
+    #[arg(long = "irp", short = 'i', name = "IRP")]
+    irp: Option<String>,
+
+    /// Protocol to enable
+    #[arg(
+        long = "protocol",
+        short = 'p',
+        value_delimiter = ',',
+        name = "PROTOCOL"
+    )]
+    protocol: Vec<String>,
+
+    /// Scancode to keycode mapping to add
+    #[arg(long = "set-key", short = 'k', value_parser = parse_scankey, value_delimiter = ',', name = "SCANKEY")]
+    scankey: Vec<(u64, String)>,
+
     #[clap(flatten)]
     options: DecodeOptions,
 
@@ -348,7 +377,7 @@ struct TransmitIrp {
     #[arg(long = "field", short = 'f', value_delimiter = ',')]
     fields: Vec<String>,
 
-    /// IRP protocol
+    /// IRP Notation
     #[arg(name = "IRP")]
     irp: String,
 }
@@ -531,7 +560,7 @@ impl FromArgMatches for TransmitCommands {
 impl Subcommand for TransmitCommands {
     fn augment_subcommands(cmd: Command) -> Command {
         cmd.subcommand(TransmitIrp::augment_args(
-            Command::new("irp").about("Encode using IRP language and transmit"),
+            Command::new("irp").about("Encode using IRP Notation and transmit"),
         ))
         .subcommand(TransmitKeymap::augment_args(
             Command::new("keymap").about("Transmit codes from keymap or lircd.conf file"),
@@ -546,7 +575,7 @@ impl Subcommand for TransmitCommands {
     }
     fn augment_subcommands_for_update(cmd: Command) -> Command {
         cmd.subcommand(TransmitIrp::augment_args(
-            Command::new("irp").about("Encode using IRP language and transmit"),
+            Command::new("irp").about("Encode using IRP Notation and transmit"),
         ))
         .subcommand(TransmitKeymap::augment_args(
             Command::new("keymap").about("Transmit codes from keymap or lircd.conf file"),

@@ -16,7 +16,7 @@ This tool replaces all those tools, but with major new features:
 Pronto hex codes are a fairly straightforward way of encoding raw IR,
 NEC, RC-5 and a few others.
 
-[IRP](http://hifi-remote.com/wiki/index.php?title=IRP_Notation) is a
+[IRP Notation](http://hifi-remote.com/wiki/index.php?title=IRP_Notation) is a
 DSL language which can
 express [any IR protocol](http://hifi-remote.com/wiki/index.php/DecodeIR).
 We can parse IRP and compile a decoder to BPF using LLVM. So, any protocol can
