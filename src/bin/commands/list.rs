@@ -215,8 +215,11 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::List) {
 
                     if lircdev.can_receive_raw() {
                         match lircdev.query_bpf() {
-                            Ok(links) => {
+                            Ok(Some(links)) => {
                                 println!("\tBPF protocols\t\t: {}", links.iter().join(" "));
+                            }
+                            Ok(None) => {
+                                println!("\tBPF protocols\t\t: No kernel support")
                             }
                             Err(err) => {
                                 println!("\tBPF protocols\t\t: {err}")

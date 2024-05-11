@@ -156,11 +156,20 @@ pub fn config(config: &crate::Config) {
             };
 
             if !lirc.can_receive_raw() {
-                eprintln!(
-                    "error: {}: not a raw receiver, irp not supported",
-                    rcdev.name
-                );
+                eprintln!("error: {}: not a raw receiver, irp not supported", lircdev);
                 std::process::exit(1);
+            }
+
+            match lirc.query_bpf() {
+                Ok(Some(_)) => (),
+                Ok(None) => {
+                    eprintln!("error: {}: no kernel BPF support, rebuild kernel with CONFIG_BPF_LIRC_MODE2", lircdev);
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("error: {}: {e}", lircdev);
+                    std::process::exit(1);
+                }
             }
 
             lirc
@@ -475,6 +484,26 @@ fn load_keymap(
                 }
             };
 
+            if !chdev.can_receive_raw() {
+                eprintln!("error: {}: not a raw receiver, irp not supported", chdev);
+                std::process::exit(1);
+            }
+
+            match chdev.query_bpf() {
+                Ok(Some(_)) => (),
+                Ok(None) => {
+                    eprintln!(
+                    "error: {}: no kernel BPF support, rebuild kernel with CONFIG_BPF_LIRC_MODE2",
+                    chdev
+                );
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("error: {}: {e}", chdev);
+                    std::process::exit(1);
+                }
+            }
+
             if let Err(e) = chdev.attach_bpf(&bpf) {
                 eprintln!("error: {}: attach bpf: {e}", keymap_filename.display());
                 std::process::exit(1);
@@ -545,6 +574,26 @@ fn load_lircd(
                 std::process::exit(1);
             }
         };
+
+        if !chdev.can_receive_raw() {
+            eprintln!("error: {}: not a raw receiver, irp not supported", chdev);
+            std::process::exit(1);
+        }
+
+        match chdev.query_bpf() {
+            Ok(Some(_)) => (),
+            Ok(None) => {
+                eprintln!(
+                    "error: {}: no kernel BPF support, rebuild kernel with CONFIG_BPF_LIRC_MODE2",
+                    chdev
+                );
+                std::process::exit(1);
+            }
+            Err(e) => {
+                eprintln!("error: {}: {e}", chdev);
+                std::process::exit(1);
+            }
+        }
 
         if let Err(e) = chdev.attach_bpf(&bpf) {
             eprintln!("error: {}: attach bpf: {e}", keymap_filename.display());

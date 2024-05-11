@@ -504,9 +504,17 @@ impl Lirc {
         }
     }
 
-    /// query bpf programs
-    pub fn query_bpf(&self) -> Result<Vec<String>, ProgramError> {
-        let links = LircMode2::query(self.as_fd())?;
+    /// Query bpf programs attached to lirc dev. Returns Ok(None) if there is no support
+    /// for bpf programs with the current kernel.
+    pub fn query_bpf(&self) -> Result<Option<Vec<String>>, ProgramError> {
+        let res = LircMode2::query(self.as_fd());
+
+        if res.as_ref().is_err_and(is_syscall_unsupported) {
+            return Ok(None);
+        }
+
+        let links = res?;
+
         let mut res = Vec::new();
 
         for link in links {
@@ -517,15 +525,23 @@ impl Lirc {
             }
         }
 
-        Ok(res)
+        Ok(Some(res))
     }
 
     /// Remove all attached bpf programs
     pub fn clear_bpf(&self) -> Result<(), ProgramError> {
-        let links = LircMode2::query(self.as_fd())?;
+        let res = LircMode2::query(self.as_fd());
+
+        if res.as_ref().is_err_and(is_syscall_unsupported) {
+            return Ok(());
+        }
+
+        let links = res?;
+
         for link in links {
             link.detach()?;
         }
+
         Ok(())
     }
 }
@@ -546,4 +562,23 @@ impl fmt::Display for Lirc {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "{}", self.path.display())
     }
+}
+
+/// If LircMode2::query() fails, is this due to the syscall not being supported,
+/// or another reason (e.g. permission denied)
+fn is_syscall_unsupported(error: &ProgramError) -> bool {
+    if let ProgramError::SyscallError(syscall_error) = &error {
+        // No support for the syscall
+        if syscall_error.call == "bpf_prog_query"
+            // kernel not built with CONFIG_BPF_LIRC_MODE2
+            && syscall_error.io_error.kind() == ErrorKind::InvalidInput
+            // kernel not built with CONFIG_BPF_SYSCALL
+            || syscall_error.io_error.kind() == ErrorKind::Unsupported
+        {
+            return true;
+        }
+    }
+
+    // another reason (permission denied, not sure what else could go wrong)
+    false
 }

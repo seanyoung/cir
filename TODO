@@ -13,7 +13,6 @@ Necessary:
 Nice to have:
 - ir encode/send needs to read xml file
 - cir decode irp should read IrpProtocols.xml
-- access to io_error in aya
 - cir transmit rawir -S sony15:12 -r 2 ??
 - pcmak leading gap not decoded
 - encoding toggle_bit_mask not used when popcount > 1
