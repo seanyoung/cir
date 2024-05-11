@@ -20,7 +20,7 @@ fn irctl_compare_encode(path: &Path, scancode: u32, our_keymap: &Keymap) {
 
     let mut length = 0;
 
-    if ["pulse_distance", "pulse_length", "manchster"].contains(&our_keymap.protocol.as_str()) {
+    if ["pulse_distance", "pulse_length", "manchester"].contains(&our_keymap.protocol.as_str()) {
         unsafe { encode_bpf_protocol(keymap, scancode, buf.as_mut_ptr(), &mut length) };
     } else {
         let protocol = unsafe {
@@ -66,7 +66,7 @@ fn recurse(path: &Path) {
             recurse(&path);
         } else if path.to_string_lossy().ends_with(".toml") {
             for keymap in Keymap::parse(&path).unwrap() {
-                if ["pulse_distance", "pulse_length", "manchster"]
+                if ["pulse_distance", "pulse_length", "manchester"]
                     .contains(&keymap.protocol.as_str())
                 {
                     for scancode in keymap.scancodes.keys() {
