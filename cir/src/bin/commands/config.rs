@@ -475,7 +475,7 @@ fn load_keymap(
             }
         };
 
-        for dfa in dfas {
+        for (dfa, _) in dfas {
             let bpf = match dfa.compile_bpf(&options) {
                 Ok((bpf, _)) => bpf,
                 Err(e) => {

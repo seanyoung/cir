@@ -6,13 +6,16 @@ use log::debug;
 
 pub struct KeymapDecoder<'a> {
     pub remote: &'a Keymap,
-    pub dfa: Vec<DFA>,
+    pub dfa: Vec<(DFA, Option<Irp>)>,
     pub decoder: Vec<Decoder<'a>>,
 }
 
 impl Keymap {
     /// Create DFAs for this remote
-    pub fn build_dfa<'b>(&'b self, options: &Options<'b>) -> Result<Vec<DFA>, String> {
+    pub fn build_dfa<'b>(
+        &'b self,
+        options: &Options<'b>,
+    ) -> Result<Vec<(DFA, Option<Irp>)>, String> {
         let nfa = if self.raw.is_empty() {
             let mut irps = Vec::new();
             if let Some(irp) = &self.irp {
@@ -46,7 +49,7 @@ impl Keymap {
 
                     let irp = Irp::parse(irp).unwrap();
 
-                    irp.build_nfa().unwrap()
+                    (irp.build_nfa().unwrap(), Some(irp))
                 })
                 .collect()
         } else {
@@ -57,11 +60,14 @@ impl Keymap {
                 nfa.add_raw(&message.raw, irp::Event::Down, u32::MAX as i64 + i as i64);
             }
 
-            vec![nfa]
+            vec![(nfa, None)]
         };
 
         // TODO: merge NFAs so we end up with one DFA
-        Ok(nfa.iter().map(|nfa| nfa.build_dfa(options)).collect())
+        Ok(nfa
+            .into_iter()
+            .map(|(nfa, irp)| (nfa.build_dfa(options), irp))
+            .collect())
     }
 
     /// Create a decoder for this remote
@@ -84,10 +90,36 @@ impl<'a> KeymapDecoder<'a> {
         F: FnMut(&'a str, u64),
     {
         for i in 0..self.dfa.len() {
-            self.decoder[i].dfa_input(ir, &self.dfa[i], |_, vars| {
-                // FIXME: vars do not have to be called CODE
-                if let Some(decoded) = vars.get("CODE") {
-                    let decoded = *decoded as u64;
+            self.decoder[i].dfa_input(ir, &self.dfa[i].0, |_, vars| {
+                let scancode: Option<u64> = if let Some(irp) = &self.dfa[i].1 {
+                    let mut scancode = 0;
+                    let mut found = true;
+
+                    for param in &irp.parameters {
+                        if param.name == "T" {
+                            continue;
+                        }
+
+                        if let Some(v) = vars.get(&param.name) {
+                            log::debug!("variable {}={v}", param.name);
+
+                            scancode <<= param.max.ilog2() + 1;
+                            scancode |= *v as u64;
+                        } else {
+                            found = false;
+                        }
+                    }
+
+                    found.then(|| {
+                        log::debug!("scancode 0x{scancode:x}");
+
+                        scancode
+                    })
+                } else {
+                    vars.get("CODE").map(|v| *v as u64)
+                };
+
+                if let Some(decoded) = scancode {
                     if self.remote.raw.is_empty() {
                         if let Some(key_code) = self.remote.scancodes.get(&decoded) {
                             callback(key_code, decoded);

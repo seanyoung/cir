@@ -104,6 +104,8 @@ debug: generated DFA for Sony-RM-U305C
 debug: generated NFA for Sony-RM-U305C
 debug: generated DFA for Sony-RM-U305C
 info: decoding: +2400 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +1200 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +600 -600 +1200 -26400
+debug: variable CODE=1048672
+debug: scancode 0x100060
 "#
     );
 
@@ -113,6 +115,31 @@ info: decoding: +2400 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +12
 "#
     );
 
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args([
+            "decode", "keymap", "../testdata/rc_keymaps/sony-12.toml", "-r",
+            "+2400 -600 +1200 -600 +600 -600 +1200 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -26400"
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(
+        stderr,
+        r#"info: decoding: +2400 -600 +1200 -600 +600 -600 +1200 -600 +600 -600 +1200 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -600 +600 -26400
+"#
+    );
+
+    assert_eq!(
+        stdout,
+        r#"decoded: keymap:Sony-RM-U305C code:KEY_SONY-AV-AV-I/O
+"#
+    );
     let mut cmd = Command::cargo_bin("cir").unwrap();
 
     let assert = cmd
