@@ -30,5 +30,5 @@ bpf = [ "inkwell" ]
 cir = { path = ".." }
 rand = "0.8"
 irptransmogrifier = { path = "tests/rust-irptransmogrifier" }
-aya-obj = "0.1"
+aya-obj = { version = "0.1", features = [ "std" ] }
 rbpf = "0.2"

@@ -2,7 +2,7 @@
 
 use aya::{
     programs::{Link, LircMode2, ProgramError},
-    Bpf,
+    Ebpf,
 };
 use num_integer::Integer;
 use std::{
@@ -466,7 +466,7 @@ impl Lirc {
     /// Load and attach bpf program. The bpf program should a valid ELF object file,
     /// which contains a single LircMode2 program.
     pub fn attach_bpf(&self, bpf: &[u8]) -> Result<(), String> {
-        let mut bpf = match Bpf::load(bpf) {
+        let mut bpf = match Ebpf::load(bpf) {
             Ok(bpf) => bpf,
             Err(e) => {
                 return Err(format!("{e}"));
