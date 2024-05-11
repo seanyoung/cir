@@ -1,5 +1,5 @@
 use cir::lirc::{Lirc, LIRC_SCANCODE_FLAG_REPEAT, LIRC_SCANCODE_FLAG_TOGGLE};
-use evdev::{Device, InputEventKind};
+use evdev::Device;
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
 use nix::fcntl::{FcntlArg, OFlag};
 use std::os::unix::io::AsRawFd;
@@ -227,7 +227,7 @@ pub fn test(test: &crate::Test) {
             }
 
             for entry in &scanbuf {
-                let keycode = evdev::Key::new(entry.keycode as u16);
+                let keycode = evdev::KeyCode::new(entry.keycode as u16);
 
                 let timestamp = Duration::new(
                     entry.timestamp / 1_000_000_000,
@@ -301,53 +301,7 @@ pub fn test(test: &crate::Test) {
 
                         last_event_time = Some(timestamp);
 
-                        let ty = ev.event_type();
-                        let value = ev.value();
-
-                        match ev.kind() {
-                            InputEventKind::Misc(misc) => {
-                                println!("{ty:?}: {misc:?} = {value:#010x}");
-                            }
-                            InputEventKind::Synchronization(sync) => {
-                                println!("{sync:?}");
-                            }
-                            InputEventKind::Key(key) if value == 1 => {
-                                println!("KEY_DOWN: {key:?} ");
-                            }
-                            InputEventKind::Key(key) if value == 0 => {
-                                println!("KEY_UP: {key:?}");
-                            }
-                            InputEventKind::Key(key) => {
-                                println!("{ty:?} {key:?} {value}");
-                            }
-                            InputEventKind::RelAxis(rel) => {
-                                println!("{ty:?} {rel:?} {value:#08x}");
-                            }
-                            InputEventKind::AbsAxis(abs) => {
-                                println!("{ty:?} {abs:?} {value:#08x}");
-                            }
-                            InputEventKind::Switch(switch) => {
-                                println!("{ty:?} {switch:?} {value:#08x}");
-                            }
-                            InputEventKind::Led(led) => {
-                                println!("{ty:?} {led:?} {value:#08x}");
-                            }
-                            InputEventKind::Sound(sound) => {
-                                println!("{ty:?} {sound:?} {value:#08x}");
-                            }
-                            InputEventKind::ForceFeedback(ff) => {
-                                println!("forcefeedback {ff}");
-                            }
-                            InputEventKind::ForceFeedbackStatus(ff) => {
-                                println!("forcefeedback status {ff}");
-                            }
-                            InputEventKind::UInput(u) => {
-                                println!("uinput {u}");
-                            }
-                            InputEventKind::Other => {
-                                println!("other");
-                            }
-                        }
+                        println!("{ev:?}");
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => (),

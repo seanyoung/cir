@@ -2,7 +2,7 @@
 //! controller is either an infrared receiver/transmitter or a cec interface.
 
 use crate::rc_maps::KeymapTable;
-use evdev::{Device, Key};
+use evdev::{Device, KeyCode};
 use itertools::Itertools;
 use std::{
     fs::{self, OpenOptions},
@@ -192,7 +192,7 @@ impl Rcdev {
 
         let inputdev = self.input_chdev.as_ref().unwrap();
         loop {
-            match inputdev.update_scancode_by_index(0, Key::KEY_RESERVED, &[]) {
+            match inputdev.update_scancode_by_index(0, KeyCode::KEY_RESERVED, &[]) {
                 Ok(_) => (),
                 Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => break,
                 Err(e) => {
@@ -205,7 +205,7 @@ impl Rcdev {
     }
 
     /// Add a single scancode mapping
-    pub fn update_scancode(&mut self, key: Key, scancode: u64) -> Result<(), std::io::Error> {
+    pub fn update_scancode(&mut self, key: KeyCode, scancode: u64) -> Result<(), std::io::Error> {
         self.open_input()?;
 
         // Kernels from before v5.7 want the scancode in 4 bytes; try this if possible

@@ -5,7 +5,7 @@ use cir::{
     rc_maps::parse_rc_maps_file,
     rcdev::{enumerate_rc_dev, Rcdev},
 };
-use evdev::Key;
+use evdev::KeyCode;
 use irp::{Irp, Options};
 use log::debug;
 use std::{
@@ -87,7 +87,7 @@ pub fn config(config: &crate::Config) {
 
     if !config.scankey.is_empty() {
         for (scancode, keycode) in &config.scankey {
-            let key = match Key::from_str(keycode) {
+            let key = match KeyCode::from_str(keycode) {
                 Ok(key) => key,
                 Err(_) => {
                     eprintln!("error: ‘{keycode}’ is not a valid keycode");
@@ -392,7 +392,7 @@ fn load_keymap(
     for keymap in keymaps {
         for (scancode, keycode) in &keymap.scancodes {
             // TODO: needs some logic to check for KEY_{} etc like load_lircd
-            let key = match Key::from_str(keycode) {
+            let key = match KeyCode::from_str(keycode) {
                 Ok(key) => key,
                 Err(_) => {
                     eprintln!("error: ‘{keycode}’ is not a valid keycode");
@@ -605,7 +605,7 @@ fn load_lircd(
             if !name.starts_with("KEY_") {
                 name.insert_str(0, "KEY_");
             };
-            let key = match Key::from_str(&name) {
+            let key = match KeyCode::from_str(&name) {
                 Ok(key) => key,
                 Err(_) => {
                     eprintln!(

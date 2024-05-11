@@ -76,7 +76,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::List) {
                                             // kernel v5.7 and later give 64 bit scancodes
                                             let scancode =
                                                 u64::from_ne_bytes(scancode.try_into().unwrap());
-                                            let keycode = evdev::Key::new(keycode as u16);
+                                            let keycode = evdev::KeyCode::new(keycode as u16);
 
                                             println!(
                                                 "\tScancode\t\t: 0x{scancode:08x} => {keycode:?}"
@@ -86,7 +86,7 @@ fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::List) {
                                             // kernel v5.6 and earlier give 32 bit scancodes
                                             let scancode =
                                                 u32::from_ne_bytes(scancode.try_into().unwrap());
-                                            let keycode = evdev::Key::new(keycode as u16);
+                                            let keycode = evdev::KeyCode::new(keycode as u16);
 
                                             println!(
                                                 "\tScancode\t\t: 0x{scancode:08x} => {keycode:?}"
