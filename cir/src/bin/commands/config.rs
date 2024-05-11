@@ -504,6 +504,12 @@ fn load_keymap(
                 }
             }
 
+            log::debug!(
+                "attaching bpf program for {} to {}",
+                keymap_filename.display(),
+                chdev
+            );
+
             if let Err(e) = chdev.attach_bpf(&bpf) {
                 eprintln!("error: {}: attach bpf: {e}", keymap_filename.display());
                 std::process::exit(1);
@@ -599,6 +605,8 @@ fn load_lircd(
             eprintln!("error: {}: attach bpf: {e}", keymap_filename.display());
             std::process::exit(1);
         }
+
+        log::debug!("attaching bpf program for {} to {}", remote.name, chdev);
 
         for code in remote.codes {
             let mut name = code.name.to_uppercase();

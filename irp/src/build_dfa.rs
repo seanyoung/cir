@@ -3,7 +3,7 @@ use super::{
     expression::clone_filter,
     Expression, Irp, Options,
 };
-use log::info;
+use log::{debug, info};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -55,12 +55,16 @@ impl NFA {
             let filename = options.filename("_nfa.dot");
             info!("saving NFA as {filename}");
             self.dotgraphviz(&filename);
+        } else {
+            debug!("generated NFA for {}", options.name);
         }
 
         if options.dfa {
             let filename = options.filename("_dfa.dot");
             info!("saving DFA as {filename}");
             dfa.dotgraphviz(&filename);
+        } else {
+            debug!("generated DFA for {}", options.name);
         }
 
         dfa

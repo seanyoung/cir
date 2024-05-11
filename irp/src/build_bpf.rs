@@ -61,6 +61,8 @@ impl DFA {
             log::info!("saving llvm ir as {filename}");
 
             builder.module.print_to_file(&filename).unwrap();
+        } else {
+            log::debug!("generated llvm ir for {}", options.name);
         }
 
         builder.module.verify().unwrap();
@@ -115,6 +117,8 @@ impl DFA {
                     };
 
                     file.write_all(slice).unwrap();
+                } else {
+                    log::debug!("generated object file for {}", options.name);
                 }
 
                 let mut vars = vec![String::new(); builder.vars.len()];
