@@ -310,6 +310,10 @@ struct Test {
     /// Stop receiving after first timeout message
     #[arg(long = "one-shot", short = '1')]
     one_shot: bool,
+
+    /// Only print raw IR
+    #[arg(long = "raw", short = 'r')]
+    raw: bool,
 }
 
 #[cfg(target_os = "linux")]

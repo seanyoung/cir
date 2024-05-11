@@ -15,7 +15,6 @@ toml = "0.8"
 itertools = "0.12"
 evdev = { git = "https://github.com/emberian/evdev" }
 nix = { version = "0.28", features = [ "fs", "ioctl", "poll" ] }
-humantime = "2.1"
 bitflags = "2.5"
 num-integer = "0.1"
 terminal_size = "0.3"

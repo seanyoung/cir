@@ -3,7 +3,6 @@ Necessary:
 - calculate maximum length for timeout
 - calculate minimum $extent for avoiding runtime calcs
 - lead in gap (or whatever irptransmogrifier calls it)
-- Formatting of ir receive is poor/broken
 - DFA edges can be overlapping - removing overlapping parts
 - keymap needs aeps/eps/ignore_mask/gap?
 - lircd decoding toggle_bit_mask with more than 1 bit not supported
