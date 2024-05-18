@@ -13,10 +13,10 @@ use std::{
     str::FromStr,
 };
 
-pub fn config(config: &crate::Config) {
-    let mut rcdev = find_devices(&config.device, Purpose::Receive);
+pub fn keymap(args: &crate::Keymap) {
+    let mut rcdev = find_devices(&args.device, Purpose::Receive);
 
-    if config.delay.is_some() || config.period.is_some() {
+    if args.delay.is_some() || args.period.is_some() {
         let inputdev = match rcdev.open_input() {
             Ok(dev) => dev,
             Err(e) => {
@@ -29,11 +29,11 @@ pub fn config(config: &crate::Config) {
             .get_auto_repeat()
             .expect("auto repeat is supported");
 
-        if let Some(delay) = config.delay {
+        if let Some(delay) = args.delay {
             repeat.delay = delay;
         }
 
-        if let Some(period) = config.period {
+        if let Some(period) = args.period {
             repeat.period = period;
         }
 
@@ -43,7 +43,7 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    if config.clear {
+    if args.clear {
         if let Err(e) = rcdev.clear_scancodes() {
             eprintln!("error: input: {e}");
             std::process::exit(1);
@@ -65,7 +65,7 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    if let Some(timeout) = config.timeout {
+    if let Some(timeout) = args.timeout {
         if let Some(lircdev) = &rcdev.lircdev {
             let mut lirc = match Lirc::open(PathBuf::from(lircdev)) {
                 Ok(fd) => fd,
@@ -85,8 +85,41 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    if !config.scankey.is_empty() {
-        for (scancode, keycode) in &config.scankey {
+    if let Some(cfgfile) = &args.auto_load {
+        match parse_rc_maps_file(cfgfile) {
+            Ok(keymaps) => {
+                let keymaps: Vec<_> = keymaps
+                    .iter()
+                    .filter_map(|map| {
+                        if map.matches(&rcdev) {
+                            Some(PathBuf::from(&map.file))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if keymaps.is_empty() {
+                    eprintln!(
+                        "{}: error: no match for driver ‘{}’ and default keymap ‘{}’",
+                        cfgfile.display(),
+                        rcdev.driver,
+                        rcdev.default_keymap
+                    );
+                    std::process::exit(2);
+                } else {
+                    load_keymaps(true, &mut rcdev, None, None, &keymaps);
+                }
+            }
+            Err(e) => {
+                eprintln!("error: {}: {e}", cfgfile.display());
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if !args.scankey.is_empty() {
+        for (scancode, keycode) in &args.scankey {
             let key = match KeyCode::from_str(keycode) {
                 Ok(key) => key,
                 Err(_) => {
@@ -107,10 +140,10 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    if !config.protocol.is_empty() {
+    if !args.protocol.is_empty() {
         let mut res = Vec::new();
 
-        for name in &config.protocol {
+        for name in &args.protocol {
             if name.is_empty() {
                 // nothing to do
             } else if name == "all" {
@@ -135,7 +168,7 @@ pub fn config(config: &crate::Config) {
         }
     }
 
-    if let Some(irp_notation) = &config.irp {
+    if let Some(irp_notation) = &args.irp {
         let irp = match Irp::parse(irp_notation) {
             Ok(irp) => irp,
             Err(e) => {
@@ -178,7 +211,7 @@ pub fn config(config: &crate::Config) {
             std::process::exit(1);
         };
 
-        if let Some(timeout) = config.timeout {
+        if let Some(timeout) = args.timeout {
             max_gap = timeout;
         } else if let Ok(timeout) = chdev.get_timeout() {
             let dev_max_gap = (timeout * 9) / 10;
@@ -198,14 +231,14 @@ pub fn config(config: &crate::Config) {
             ..Default::default()
         };
 
-        options.nfa = config.options.save_nfa;
-        options.dfa = config.options.save_dfa;
-        options.aeps = config.options.aeps.unwrap_or(100);
-        options.eps = config.options.eps.unwrap_or(3);
+        options.nfa = args.options.save_nfa;
+        options.dfa = args.options.save_dfa;
+        options.aeps = args.options.aeps.unwrap_or(100);
+        options.eps = args.options.eps.unwrap_or(3);
 
-        options.llvm_ir = config.bpf_options.save_llvm_ir;
-        options.assembly = config.bpf_options.save_assembly;
-        options.object = config.bpf_options.save_object;
+        options.llvm_ir = args.bpf_options.save_llvm_ir;
+        options.assembly = args.bpf_options.save_assembly;
+        options.object = args.bpf_options.save_object;
 
         let dfa = match irp.compile(&options) {
             Ok(dfa) => dfa,
@@ -228,45 +261,16 @@ pub fn config(config: &crate::Config) {
             std::process::exit(1);
         }
     }
-}
 
-pub fn load(load: &crate::Load) {
-    let mut rcdev = find_devices(&load.device, Purpose::Receive);
-
-    if load.delay.is_some() || load.period.is_some() {
-        let inputdev = match rcdev.open_input() {
-            Ok(dev) => dev,
-            Err(e) => {
-                eprintln!("error: input: {e}");
-                std::process::exit(1);
-            }
-        };
-
-        let mut repeat = inputdev
-            .get_auto_repeat()
-            .expect("auto repeat is supported");
-
-        if let Some(delay) = load.delay {
-            repeat.delay = delay;
-        }
-
-        if let Some(period) = load.period {
-            repeat.period = period;
-        }
-
-        if let Err(e) = inputdev.update_auto_repeat(&repeat) {
-            eprintln!("error: failed to update autorepeat: {e}");
-            std::process::exit(1);
-        }
+    if !args.write.is_empty() {
+        load_keymaps(
+            true,
+            &mut rcdev,
+            Some(&args.options),
+            Some(&args.bpf_options),
+            &args.write,
+        )
     }
-
-    load_keymaps(
-        true,
-        &mut rcdev,
-        Some(&load.options),
-        Some(&load.bpf_options),
-        &load.keymaps,
-    );
 }
 
 fn load_keymaps(
@@ -330,46 +334,6 @@ fn load_keymaps(
     if let Err(e) = rcdev.set_enabled_protocols(&protocols) {
         eprintln!("{e}");
         std::process::exit(1);
-    }
-}
-
-pub fn auto(auto: &crate::Auto) {
-    let mut rcdev = find_devices(&auto.device, Purpose::Receive);
-
-    if rcdev.inputdev.is_none() {
-        eprintln!("error: {}: input device is missing", rcdev.name);
-        std::process::exit(1);
-    }
-
-    match parse_rc_maps_file(&auto.cfgfile) {
-        Ok(keymaps) => {
-            let keymaps: Vec<_> = keymaps
-                .iter()
-                .filter_map(|map| {
-                    if map.matches(&rcdev) {
-                        Some(PathBuf::from(&map.file))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            if keymaps.is_empty() {
-                eprintln!(
-                    "{}: error: no match for driver ‘{}’ and default keymap ‘{}’",
-                    auto.cfgfile.display(),
-                    rcdev.driver,
-                    rcdev.default_keymap
-                );
-                std::process::exit(2);
-            } else {
-                load_keymaps(true, &mut rcdev, None, None, &keymaps);
-            }
-        }
-        Err(e) => {
-            eprintln!("error: {}: {e}", auto.cfgfile.display());
-            std::process::exit(1);
-        }
     }
 }
 

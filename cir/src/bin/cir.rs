@@ -38,17 +38,11 @@ enum Commands {
     #[command(about = "List IR and CEC devices")]
     List(List),
     #[cfg(target_os = "linux")]
-    #[command(about = "Load keymaps or lircd.conf remotes")]
-    Load(Load),
+    #[command(about = "Configure IR and CEC devices")]
+    Keymap(Keymap),
     #[cfg(target_os = "linux")]
     #[command(about = "Receive IR and print to stdout")]
     Test(Test),
-    #[cfg(target_os = "linux")]
-    #[command(about = "Configure IR and CEC devices")]
-    Config(Config),
-    #[cfg(target_os = "linux")]
-    #[command(about = "Auto-load keymaps based on configuration")]
-    Auto(Auto),
 }
 
 #[derive(Args)]
@@ -189,36 +183,6 @@ struct RcDevice {
 
 #[cfg(target_os = "linux")]
 #[derive(Args)]
-struct Load {
-    #[cfg(target_os = "linux")]
-    #[clap(flatten)]
-    device: RcDevice,
-
-    /// Set receiving timeout
-    #[arg(long = "timeout", short = 't')]
-    timeout: Option<u32>,
-
-    /// Sets the delay before repeating a keystroke
-    #[arg(long = "delay", short = 'D', name = "DELAY")]
-    delay: Option<u32>,
-
-    /// Sets the period before repeating a keystroke
-    #[arg(long = "period", short = 'P', name = "PERIOD")]
-    period: Option<u32>,
-
-    /// Load toml or lircd.conf keymap
-    #[arg(name = "KEYMAP")]
-    keymaps: Vec<PathBuf>,
-
-    #[clap(flatten)]
-    options: DecodeOptions,
-
-    #[clap(flatten)]
-    bpf_options: BpfDecodeOptions,
-}
-
-#[cfg(target_os = "linux")]
-#[derive(Args)]
 struct List {
     #[cfg(target_os = "linux")]
     #[clap(flatten)]
@@ -247,10 +211,14 @@ fn parse_scankey(arg: &str) -> Result<(u64, String), String> {
 
 #[cfg(target_os = "linux")]
 #[derive(Args)]
-struct Config {
+struct Keymap {
     #[cfg(target_os = "linux")]
     #[clap(flatten)]
     device: RcDevice,
+
+    /// Auto-load keymaps, based on a configuration file.
+    #[arg(long = "auto-load", short = 'a', conflicts_with_all = ["clear", "KEYMAP", "IRP", "PROTOCOL", "SCANKEY"])]
+    auto_load: Option<PathBuf>,
 
     /// Clear existing configuration
     #[arg(long = "clear", short = 'c')]
@@ -284,6 +252,10 @@ struct Config {
     /// Scancode to keycode mapping to add
     #[arg(long = "set-key", short = 'k', value_parser = parse_scankey, value_delimiter = ',', name = "SCANKEY")]
     scankey: Vec<(u64, String)>,
+
+    /// Load toml or lircd.conf keymap
+    #[arg(name = "KEYMAP")]
+    write: Vec<PathBuf>,
 
     #[clap(flatten)]
     options: DecodeOptions,
@@ -627,17 +599,13 @@ fn main() {
                 }
             }
         },
-        Commands::Transmit(transmit) => commands::transmit::transmit(transmit),
+        Commands::Transmit(args) => commands::transmit::transmit(args),
         #[cfg(target_os = "linux")]
-        Commands::List(list) => commands::list::list(list),
+        Commands::List(args) => commands::list::list(args),
         #[cfg(target_os = "linux")]
-        Commands::Load(load) => commands::config::load(load),
+        Commands::Keymap(args) => commands::keymap::keymap(args),
         #[cfg(target_os = "linux")]
-        Commands::Config(config) => commands::config::config(config),
-        #[cfg(target_os = "linux")]
-        Commands::Test(test) => commands::test::test(test),
-        #[cfg(target_os = "linux")]
-        Commands::Auto(auto) => commands::config::auto(auto),
+        Commands::Test(args) => commands::test::test(args),
     }
 }
 

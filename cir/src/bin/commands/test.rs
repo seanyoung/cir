@@ -12,7 +12,7 @@ use std::os::{fd::AsFd, unix::io::AsRawFd};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use super::config::{find_devices, open_lirc, Purpose};
+use super::keymap::{find_devices, open_lirc, Purpose};
 
 // Clippy comparison_chain doesn't make any sense. It make the code _worse_
 #[allow(clippy::comparison_chain)]

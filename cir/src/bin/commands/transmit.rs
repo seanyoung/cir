@@ -1,5 +1,5 @@
 #[cfg(target_os = "linux")]
-use super::config::{open_lirc, Purpose};
+use super::keymap::{open_lirc, Purpose};
 use cir::{
     keymap::{Keymap, LinuxProtocol},
     lircd_conf,

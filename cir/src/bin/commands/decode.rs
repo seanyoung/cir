@@ -1,5 +1,5 @@
 #[cfg(target_os = "linux")]
-use super::config::{find_devices, Purpose};
+use super::keymap::{find_devices, Purpose};
 #[cfg(target_os = "linux")]
 use cir::lirc::Lirc;
 use cir::{keymap::Keymap, lircd_conf::parse};
