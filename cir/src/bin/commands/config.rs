@@ -3,7 +3,7 @@ use cir::{
     lirc::Lirc,
     lircd_conf,
     rc_maps::parse_rc_maps_file,
-    rcdev::{enumerate_rc_dev, Rcdev},
+    rcdev::Rcdev,
 };
 use evdev::KeyCode;
 use irp::{Irp, Options};
@@ -650,7 +650,7 @@ pub enum Purpose {
 
 /// Enumerate all rc devices and find the lirc and input devices
 pub fn find_devices(device: &crate::RcDevice, purpose: Purpose) -> Rcdev {
-    let mut list = match enumerate_rc_dev() {
+    let mut list = match Rcdev::enumerate_devices() {
         Ok(list) if list.is_empty() => {
             eprintln!("error: no devices found");
             std::process::exit(1);

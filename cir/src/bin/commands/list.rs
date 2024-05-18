@@ -1,10 +1,10 @@
-use cir::{lirc::Lirc, rcdev};
+use cir::{lirc::Lirc, rcdev::Rcdev};
 use evdev::Device;
 use itertools::Itertools;
 use std::path::PathBuf;
 
 pub fn list(args: &crate::List) {
-    match rcdev::enumerate_rc_dev() {
+    match Rcdev::enumerate_devices() {
         Ok(list) => {
             print_rc_dev(&list, args);
         }
@@ -15,7 +15,7 @@ pub fn list(args: &crate::List) {
     }
 }
 
-fn print_rc_dev(list: &[rcdev::Rcdev], config: &crate::List) {
+fn print_rc_dev(list: &[Rcdev], config: &crate::List) {
     let mut printed = 0;
 
     for rcdev in list {
