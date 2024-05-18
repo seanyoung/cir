@@ -107,21 +107,21 @@ Use this if have a `.lircd.conf` file or `.toml` keymap, and want to decode the 
 any configation.
 
 ```bash
-cir decode keymap foo.lircd.conf
+cir decode --keymap foo.lircd.conf
 ```
 This will infrared from the first lirc device. You can also decode IR on the command line or a file.
 
 ```bash
-cir decode keymap foo.lircd.conf -r '+9000 -4500 +560'
+cir decode --keymap foo.lircd.conf -r '+9000 -4500 +560'
 ```
 or
 ```bash
-cir decode keymap foo.lircd.conf -f input-file
+cir decode --keymap foo.lircd.conf -f input-file
 ```
 If you wish to decode using IRP Notation that is possible too:
 
 ```bash
-cir decode irp '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
+cir decode --irp '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
 ```
 Like above the input can be from a lirc device (optionally specify the device with
 `-d /dev/lirc1` or `-s rc`), on the command line (`-r '+100 -200 +100'`) or a file (`-f filename`).
@@ -132,20 +132,18 @@ This is the cir equivalent of `ir-keytable -w`, however cir can not just load ke
 also load `.lircd.conf` files.
 
 ```bash
-cir load -s rc0 foo.lircd.conf
+cir keymap -s rc0 foo.lircd.conf
 ```
 This will generate a BPF decoder for `foo.lircd.conf` and load it.
 
 On startup, `ir-keytable -a -s rc0` read the correct keymap from `/etc/rc_maps.cfg`.
 
 ```bash
-cir auto -s rc0
+cir keymap -s rc0
 ```
-## Configuration (cir config)
-
-`cir config` is usually not needed, this for tweaking things like auto-repeat or lirc timeout. For example:
+Setting the auto-repeat parameters.
 ```bash
-cir config -P 125 -D 500
+cir keymap -P 125 -D 500
 ```
 
 ## Test configuration (cir test)

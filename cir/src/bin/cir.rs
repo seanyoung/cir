@@ -81,11 +81,16 @@ struct Decode {
     )]
     rawir: Vec<String>,
 
+    /// IRP Notation
+    #[arg(long = "irp", short = 'i', required_unless_present = "keymap")]
+    irp: Option<String>,
+
+    /// Keymap or lircd.conf file
+    #[arg(long = "keymap", short = 'k')]
+    keymap: Option<PathBuf>,
+
     #[clap(flatten)]
     options: DecodeOptions,
-
-    #[command(subcommand)]
-    commands: DecodeCommands,
 }
 
 #[derive(Args)]
@@ -132,27 +137,6 @@ struct BpfDecodeOptions {
     /// Save the Object
     #[arg(long = "save-object", help_heading = "DEBUGGING")]
     save_object: bool,
-}
-
-#[derive(Subcommand)]
-enum DecodeCommands {
-    #[command(about = "Decode using IRP Notation")]
-    Irp(DecodeIrp),
-
-    #[command(about = "Decode using keymap or lircd.conf file")]
-    Keymap(DecodeKeymap),
-}
-
-#[derive(Args)]
-struct DecodeIrp {
-    /// IRP Notation
-    irp: String,
-}
-
-#[derive(Args)]
-struct DecodeKeymap {
-    /// Keymap or lircd.conf file
-    keymap: PathBuf,
 }
 
 #[cfg(target_os = "linux")]
@@ -587,18 +571,19 @@ fn main() {
     log::set_max_level(level);
 
     match &args.command {
-        Commands::Decode(decode) => match &decode.commands {
-            DecodeCommands::Irp(irp) => {
-                commands::decode::decode_irp(decode, &irp.irp);
-            }
-            DecodeCommands::Keymap(keymap) => {
-                if keymap.keymap.to_string_lossy().ends_with(".lircd.conf") {
-                    commands::decode::decode_lircd(decode, &keymap.keymap);
+        Commands::Decode(decode) => {
+            if let Some(irp) = &decode.irp {
+                commands::decode::decode_irp(decode, irp)
+            } else {
+                let keymap = decode.keymap.as_ref().unwrap();
+
+                if keymap.to_string_lossy().ends_with(".lircd.conf") {
+                    commands::decode::decode_lircd(decode, keymap);
                 } else {
-                    commands::decode::decode_keymap(decode, &keymap.keymap);
+                    commands::decode::decode_keymap(decode, keymap);
                 }
             }
-        },
+        }
         Commands::Transmit(args) => commands::transmit::transmit(args),
         #[cfg(target_os = "linux")]
         Commands::List(args) => commands::list::list(args),
