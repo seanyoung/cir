@@ -1,3 +1,5 @@
+//! Parse, encode and decode linux rc keymaps
+
 use irp::{Message, Pronto};
 use std::collections::HashMap;
 

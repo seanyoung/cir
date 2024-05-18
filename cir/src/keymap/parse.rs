@@ -70,7 +70,8 @@ fn string_to_scancode(s: &str) -> Result<u64, std::num::ParseIntError> {
     }
 }
 impl Keymap {
-    pub fn parse(path: &Path) -> Result<Vec<Keymap>, String> {
+    /// Load a file and parse it as a Keymap
+    pub fn parse_file(path: &Path) -> Result<Vec<Keymap>, String> {
         let mut f = File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
 
         let mut contents = String::new();
@@ -78,11 +79,11 @@ impl Keymap {
         f.read_to_string(&mut contents)
             .map_err(|e| format!("{}: {e}", path.display()))?;
 
-        Keymap::parse_text(&contents, path)
+        Keymap::parse_str(&contents, path)
     }
 
     /// Parse a rc keymap file, either toml or old text format. No validation is done of key codes or protocol names
-    pub fn parse_text(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
+    pub fn parse_str(contents: &str, filename: &Path) -> Result<Vec<Keymap>, String> {
         if filename.extension() == Some(OsStr::new("toml")) {
             parse_toml(contents, filename)
         } else {
@@ -449,7 +450,7 @@ fn parse_toml_test() {
     0x1e1c = "KEY_TV"
     "#;
 
-    let k = Keymap::parse_text(s, Path::new("x.toml")).unwrap();
+    let k = Keymap::parse_str(s, Path::new("x.toml")).unwrap();
 
     assert_eq!(k[0].name, "hauppauge");
     assert_eq!(k[0].protocol, "rc5");
@@ -472,7 +473,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        Keymap::parse_text(s, Path::new("x.toml")),
+        Keymap::parse_str(s, Path::new("x.toml")),
         Err("x.toml: raw protocol is misssing raw entries".to_string())
     );
 
@@ -485,7 +486,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        Keymap::parse_text(s, Path::new("x.toml")),
+        Keymap::parse_str(s, Path::new("x.toml")),
         Err("x.toml: raw entry has neither pronto hex code nor raw".to_string())
     );
 
@@ -499,7 +500,7 @@ fn parse_toml_test() {
     "#;
 
     assert_eq!(
-        Keymap::parse_text(s, Path::new("x.toml")),
+        Keymap::parse_str(s, Path::new("x.toml")),
         Err("x.toml: raw entry has neither pronto hex code nor raw".to_string())
     );
 }
@@ -513,7 +514,7 @@ fn parse_text_test() {
     0x1e1c KEY_TV
     "#;
 
-    let k = Keymap::parse_text(s, Path::new("hauppauge")).unwrap();
+    let k = Keymap::parse_str(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k[0].name, "hauppauge");
     assert_eq!(k[0].protocol, "RC5");
@@ -535,7 +536,7 @@ fn parse_text_test() {
     0x800f0403 KEY_NUMERIC_3
     "#;
 
-    let k = Keymap::parse_text(s, Path::new("hauppauge")).unwrap();
+    let k = Keymap::parse_str(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k[0].name, "rc6_mce");
     assert_eq!(k[0].protocol, "RC6");
@@ -558,7 +559,7 @@ fn parse_text_test() {
     0x28c2 KEY_NUMERIC_2
     "#;
 
-    let k = Keymap::parse_text(s, Path::new("hauppauge")).unwrap();
+    let k = Keymap::parse_str(s, Path::new("hauppauge")).unwrap();
 
     assert_eq!(k[0].name, "streamzap");
     assert_eq!(k[0].protocol, "RC-5-SZ");
@@ -584,7 +585,7 @@ fn parse_bpf_toml_test() {
     0x1e1c = "KEY_TV"
     "#;
 
-    let k = Keymap::parse_text(s, Path::new("x.toml")).unwrap();
+    let k = Keymap::parse_str(s, Path::new("x.toml")).unwrap();
 
     assert_eq!(k[0].name, "meh");
     assert_eq!(k[0].protocol, "manchester");
@@ -607,7 +608,7 @@ fn parse_bpf_toml_test() {
     0x1e1c = "KEY_TV"
     "#;
 
-    let k = Keymap::parse_text(s, Path::new("x.toml")).unwrap();
+    let k = Keymap::parse_str(s, Path::new("x.toml")).unwrap();
 
     assert_eq!(k[0].name, "meh");
     assert_eq!(k[0].protocol, "manchester");

@@ -256,7 +256,7 @@ pub fn decode_keymap(decode: &crate::Decode, path: &Path) {
     #[allow(unused_mut)]
     let mut max_gap = 100000;
 
-    let keymaps = match Keymap::parse(path) {
+    let keymaps = match Keymap::parse_file(path) {
         Ok(r) => r,
         Err(e) => {
             log::error!("{e}");
@@ -303,7 +303,7 @@ pub fn decode_keymap(decode: &crate::Decode, path: &Path) {
         for ir in raw {
             for decoder in &mut decoders {
                 decoder.input(*ir, |name, _| {
-                    println!("decoded: keymap:{} code:{}", decoder.remote.name, name);
+                    println!("decoded: keymap:{} code:{}", decoder.keymap.name, name);
                 });
             }
         }

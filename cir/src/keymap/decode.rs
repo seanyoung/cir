@@ -5,7 +5,7 @@ use irp::{Decoder, InfraredData, Irp, Options, DFA, NFA};
 use log::debug;
 
 pub struct KeymapDecoder<'a> {
-    pub remote: &'a Keymap,
+    pub keymap: &'a Keymap,
     pub dfa: Vec<(DFA, Option<Irp>)>,
     pub decoder: Vec<Decoder<'a>>,
 }
@@ -77,7 +77,7 @@ impl Keymap {
         let decoder = vec![Decoder::new(options); dfa.len()];
 
         Ok(KeymapDecoder {
-            remote: self,
+            keymap: self,
             dfa,
             decoder,
         })
@@ -120,14 +120,14 @@ impl<'a> KeymapDecoder<'a> {
                 };
 
                 if let Some(decoded) = scancode {
-                    if self.remote.raw.is_empty() {
-                        if let Some(key_code) = self.remote.scancodes.get(&decoded) {
+                    if self.keymap.raw.is_empty() {
+                        if let Some(key_code) = self.keymap.scancodes.get(&decoded) {
                             callback(key_code, decoded);
                         }
                     } else {
                         let decoded: usize = decoded as usize - u32::MAX as usize;
 
-                        callback(&self.remote.raw[decoded].keycode, decoded as u64);
+                        callback(&self.keymap.raw[decoded].keycode, decoded as u64);
                     }
                 }
             })

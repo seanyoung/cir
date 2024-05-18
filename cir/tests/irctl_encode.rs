@@ -65,7 +65,7 @@ fn recurse(path: &Path) {
         if e.metadata().unwrap().file_type().is_dir() {
             recurse(&path);
         } else if path.to_string_lossy().ends_with(".toml") {
-            for keymap in Keymap::parse(&path).unwrap() {
+            for keymap in Keymap::parse_file(&path).unwrap() {
                 if ["pulse_distance", "pulse_length", "manchester"]
                     .contains(&keymap.protocol.as_str())
                 {

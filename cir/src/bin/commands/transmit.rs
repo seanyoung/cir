@@ -210,7 +210,7 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
 }
 
 fn encode_keymap(args: &crate::TransmitKeymap) -> Message {
-    let remotes = match Keymap::parse(&args.keymap) {
+    let remotes = match Keymap::parse_file(&args.keymap) {
         Ok(r) => r,
         Err(e) => {
             log::error!("{e}");

@@ -381,7 +381,7 @@ fn load_keymap(
     keymap_filename: &Path,
     protocols: &mut Vec<usize>,
 ) {
-    let keymaps = match Keymap::parse(keymap_filename) {
+    let keymaps = match Keymap::parse_file(keymap_filename) {
         Ok(map) => map,
         Err(e) => {
             eprintln!("error: {}: {e}", keymap_filename.display());
