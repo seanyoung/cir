@@ -156,6 +156,7 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
                 }
             };
 
+            #[allow(unused_mut)]
             let mut m = if tx_irp.pronto {
                 match irp.encode_pronto(vars) {
                     Ok(p) => {
@@ -177,10 +178,12 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
                 }
             };
 
+            #[cfg(target_os = "linux")]
             if tx_irp.carrier.is_some() {
                 m.carrier = tx_irp.carrier;
             }
 
+            #[cfg(target_os = "linux")]
             if tx_irp.duty_cycle.is_some() {
                 m.duty_cycle = tx_irp.duty_cycle;
             }
@@ -223,11 +226,14 @@ fn encode_keymap(args: &crate::TransmitKeymap) -> Message {
         let m = cir::keymap::encode(&remotes, args.remote.as_deref(), &codes, args.repeats);
 
         match m {
+            #[allow(unused_mut)]
             Ok(mut m) => {
+                #[cfg(target_os = "linux")]
                 if args.carrier.is_some() {
                     m.carrier = args.carrier;
                 }
 
+                #[cfg(target_os = "linux")]
                 if args.duty_cycle.is_some() {
                     m.duty_cycle = args.duty_cycle;
                 }
@@ -260,11 +266,14 @@ fn encode_lircd_conf(lircd: &crate::TransmitKeymap) -> Message {
         let m = lircd_conf::encode(&remotes, lircd.remote.as_deref(), &codes, lircd.repeats);
 
         match m {
+            #[allow(unused_mut)]
             Ok(mut m) => {
+                #[cfg(target_os = "linux")]
                 if lircd.carrier.is_some() {
                     m.carrier = lircd.carrier;
                 }
 
+                #[cfg(target_os = "linux")]
                 if lircd.duty_cycle.is_some() {
                     m.duty_cycle = lircd.duty_cycle;
                 }

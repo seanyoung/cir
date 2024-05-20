@@ -322,10 +322,12 @@ struct TransmitIrp {
     pronto: bool,
 
     /// Set carrier in Hz, 0 for unmodulated
-    #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(1..1_000_000), hide = true, help_heading = "DEVICE")]
+    #[cfg(target_os = "linux")]
+    #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(1..1_000_000), help_heading = "DEVICE")]
     carrier: Option<i64>,
 
     /// Override duty cycle % (1 to 99)
+    #[cfg(target_os = "linux")]
     #[arg(long = "duty-cycle", short = 'u', value_parser = value_parser!(u8).range(1..99), help_heading = "DEVICE")]
     duty_cycle: Option<u8>,
 
@@ -377,10 +379,12 @@ struct TransmitRawIR {
     rawir: Vec<String>,
 
     /// Set carrier in Hz, 0 for unmodulated
-    #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(1..1_000_000), hide = true, help_heading = "DEVICE")]
+    #[cfg(target_os = "linux")]
+    #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(1..1_000_000), help_heading = "DEVICE")]
     carrier: Option<i64>,
 
     /// Set send duty cycle % (1 to 99)
+    #[cfg(target_os = "linux")]
     #[arg(long = "duty-cycle", short = 'u', value_parser = value_parser!(u8).range(1..99), help_heading = "DEVICE")]
     duty_cycle: Option<u8>,
 
@@ -444,10 +448,12 @@ enum Transmitables {
 #[derive(Args, Debug)]
 struct TransmitKeymap {
     /// Override carrier in Hz, 0 for unmodulated
+    #[cfg(target_os = "linux")]
     #[arg(long = "carrier", short = 'c', value_parser = value_parser!(i64).range(0..1_000_000), help_heading = "DEVICE")]
     carrier: Option<i64>,
 
     /// Override duty cycle % (1 to 99)
+    #[cfg(target_os = "linux")]
     #[arg(long = "duty-cycle", short = 'u', value_parser = value_parser!(u8).range(1..99), help_heading = "DEVICE")]
     duty_cycle: Option<u8>,
 
