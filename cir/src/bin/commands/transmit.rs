@@ -117,185 +117,70 @@ pub fn transmit(transmit: &crate::Transmit) {
 }
 
 fn encode_args(transmit: &crate::Transmit) -> Message {
-    match &transmit.commands {
-        crate::TransmitCommands::Irp(tx_irp) => {
-            let mut vars = irp::Vartable::new();
+    let mut vars = irp::Vartable::new();
 
-            for field in &tx_irp.fields {
-                let list: Vec<&str> = field.trim().split('=').collect();
+    for field in &transmit.arguments {
+        let list: Vec<&str> = field.trim().split('=').collect();
 
-                if list.len() != 2 {
-                    eprintln!("argument to --field must be X=1");
-                    std::process::exit(2);
-                }
-
-                let value = match if list[1].starts_with("0x") {
-                    i64::from_str_radix(&list[1][2..], 16)
-                } else if list[1].starts_with("0o") {
-                    i64::from_str_radix(&list[1][2..], 8)
-                } else if list[1].starts_with("0b") {
-                    i64::from_str_radix(&list[1][2..], 2)
-                } else {
-                    list[1].parse()
-                } {
-                    Ok(v) => v,
-                    Err(_) => {
-                        eprintln!("‘{}’ is not a valid number", list[1]);
-                        std::process::exit(2);
-                    }
-                };
-
-                vars.set(list[0].to_string(), value);
-            }
-
-            let irp = match Irp::parse(&tx_irp.irp) {
-                Ok(m) => m,
-                Err(s) => {
-                    eprintln!("unable to parse irp ‘{}’: {s}", tx_irp.irp);
-                    std::process::exit(2);
-                }
-            };
-
-            #[allow(unused_mut)]
-            let mut m = if tx_irp.pronto {
-                match irp.encode_pronto(vars) {
-                    Ok(p) => {
-                        println!("{p}");
-                        std::process::exit(0);
-                    }
-                    Err(s) => {
-                        eprintln!("error: {s}");
-                        std::process::exit(2);
-                    }
-                }
-            } else {
-                match irp.encode_raw(vars, tx_irp.repeats) {
-                    Ok(m) => m,
-                    Err(s) => {
-                        eprintln!("error: {s}");
-                        std::process::exit(2);
-                    }
-                }
-            };
-
-            #[cfg(target_os = "linux")]
-            if tx_irp.carrier.is_some() {
-                m.carrier = tx_irp.carrier;
-            }
-
-            #[cfg(target_os = "linux")]
-            if tx_irp.duty_cycle.is_some() {
-                m.duty_cycle = tx_irp.duty_cycle;
-            }
-
-            m
-        }
-        crate::TransmitCommands::Pronto(pronto) => {
-            let p = match Pronto::parse(&pronto.pronto) {
-                Ok(pronto) => pronto,
-                Err(err) => {
-                    eprintln!("error: {err}");
-                    std::process::exit(2);
-                }
-            };
-
-            p.encode(pronto.repeats as usize)
-        }
-        crate::TransmitCommands::RawIR(rawir) => encode_rawir(rawir),
-        crate::TransmitCommands::Keymap(args) => {
-            if args.keymap.to_string_lossy().ends_with(".lircd.conf") {
-                encode_lircd_conf(args)
-            } else {
-                encode_keymap(args)
-            }
-        }
-    }
-}
-
-fn encode_keymap(args: &crate::TransmitKeymap) -> Message {
-    let remotes = match Keymap::parse_file(&args.keymap) {
-        Ok(r) => r,
-        Err(e) => {
-            log::error!("{e}");
+        if list.len() != 2 {
+            eprintln!("argument to --field must be X=1");
             std::process::exit(2);
         }
-    };
 
-    if !args.codes.is_empty() {
-        let codes: Vec<&str> = args.codes.iter().map(|v| v.as_str()).collect();
-        let m = cir::keymap::encode(&remotes, args.remote.as_deref(), &codes, args.repeats);
-
-        match m {
-            #[allow(unused_mut)]
-            Ok(mut m) => {
-                #[cfg(target_os = "linux")]
-                if args.carrier.is_some() {
-                    m.carrier = args.carrier;
-                }
-
-                #[cfg(target_os = "linux")]
-                if args.duty_cycle.is_some() {
-                    m.duty_cycle = args.duty_cycle;
-                }
-
-                m
-            }
-            Err(e) => {
-                error!("{}", e);
-
-                list_keymap_remotes(&args.keymap, &remotes, None);
-
+        let value = match if list[1].starts_with("0x") {
+            i64::from_str_radix(&list[1][2..], 16)
+        } else if list[1].starts_with("0o") {
+            i64::from_str_radix(&list[1][2..], 8)
+        } else if list[1].starts_with("0b") {
+            i64::from_str_radix(&list[1][2..], 2)
+        } else {
+            list[1].parse()
+        } {
+            Ok(v) => v,
+            Err(_) => {
+                eprintln!("‘{}’ is not a valid number", list[1]);
                 std::process::exit(2);
+            }
+        };
+
+        vars.set(list[0].to_string(), value);
+    }
+
+    let (lircd_conf, keymap) = if let Some(path) = &transmit.keymap {
+        if path.to_string_lossy().ends_with(".lircd.conf") {
+            match lircd_conf::parse(path) {
+                Ok(r) => {
+                    if transmit.list_codes {
+                        list_lircd_remotes(path, &r, transmit.remote.as_deref());
+
+                        std::process::exit(0);
+                    }
+
+                    (Some(r), None)
+                }
+                Err(_) => std::process::exit(2),
+            }
+        } else {
+            match Keymap::parse_file(path) {
+                Ok(r) => {
+                    if transmit.list_codes {
+                        list_keymap_remotes(path, &r, transmit.remote.as_deref());
+
+                        std::process::exit(0);
+                    }
+
+                    (None, Some(r))
+                }
+                Err(e) => {
+                    log::error!("{e}");
+                    std::process::exit(2);
+                }
             }
         }
     } else {
-        list_keymap_remotes(&args.keymap, &remotes, args.remote.as_deref());
-
-        std::process::exit(2);
-    }
-}
-
-fn encode_lircd_conf(lircd: &crate::TransmitKeymap) -> Message {
-    let remotes = match lircd_conf::parse(&lircd.keymap) {
-        Ok(r) => r,
-        Err(_) => std::process::exit(2),
+        (None, None)
     };
 
-    if !lircd.codes.is_empty() {
-        let codes: Vec<&str> = lircd.codes.iter().map(|v| v.as_str()).collect();
-        let m = lircd_conf::encode(&remotes, lircd.remote.as_deref(), &codes, lircd.repeats);
-
-        match m {
-            #[allow(unused_mut)]
-            Ok(mut m) => {
-                #[cfg(target_os = "linux")]
-                if lircd.carrier.is_some() {
-                    m.carrier = lircd.carrier;
-                }
-
-                #[cfg(target_os = "linux")]
-                if lircd.duty_cycle.is_some() {
-                    m.duty_cycle = lircd.duty_cycle;
-                }
-
-                m
-            }
-            Err(e) => {
-                error!("{}", e);
-
-                list_lircd_remotes(&lircd.keymap, &remotes, None);
-
-                std::process::exit(2);
-            }
-        }
-    } else {
-        list_lircd_remotes(&lircd.keymap, &remotes, lircd.remote.as_deref());
-
-        std::process::exit(2);
-    }
-}
-
-fn encode_rawir(transmit: &crate::TransmitRawIR) -> Message {
     enum Part {
         Raw(Message),
         Gap(u32),
@@ -365,6 +250,73 @@ fn encode_rawir(transmit: &crate::TransmitRawIR) -> Message {
             }
             crate::Transmitables::Gap(gap) => {
                 part.push(Part::Gap(*gap));
+            }
+            crate::Transmitables::Pronto(pronto) => {
+                let p = match Pronto::parse(pronto) {
+                    Ok(pronto) => pronto,
+                    Err(err) => {
+                        eprintln!("error: {err}");
+                        std::process::exit(2);
+                    }
+                };
+
+                let m = p.encode(transmit.repeats as usize);
+
+                part.push(Part::Raw(m));
+            }
+            crate::Transmitables::Irp(irp_notation) => {
+                let irp = match Irp::parse(irp_notation) {
+                    Ok(m) => m,
+                    Err(s) => {
+                        eprintln!("unable to parse irp ‘{}’: {s}", irp_notation);
+                        std::process::exit(2);
+                    }
+                };
+                match irp.encode_raw(vars.clone(), transmit.repeats) {
+                    Ok(m) => {
+                        part.push(Part::Raw(m));
+                    }
+                    Err(s) => {
+                        eprintln!("error: {s}");
+                        std::process::exit(2);
+                    }
+                }
+            }
+            crate::Transmitables::Code(code) => {
+                if let Some(lircd_conf) = &lircd_conf {
+                    match lircd_conf::encode(
+                        lircd_conf,
+                        transmit.remote.as_deref(),
+                        code,
+                        transmit.repeats,
+                    ) {
+                        Ok(m) => {
+                            part.push(Part::Raw(m));
+                        }
+                        Err(s) => {
+                            eprintln!("error: {s}");
+                            std::process::exit(2);
+                        }
+                    }
+                } else if let Some(keymap) = &keymap {
+                    match cir::keymap::encode(
+                        keymap,
+                        transmit.remote.as_deref(),
+                        code,
+                        transmit.repeats,
+                    ) {
+                        Ok(m) => {
+                            part.push(Part::Raw(m));
+                        }
+                        Err(s) => {
+                            eprintln!("error: {s}");
+                            std::process::exit(2);
+                        }
+                    }
+                } else {
+                    eprintln!("error: missing --keymap argument for --code");
+                    std::process::exit(2);
+                }
             }
         }
     }

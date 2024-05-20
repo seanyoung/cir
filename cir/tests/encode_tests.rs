@@ -8,9 +8,11 @@ fn encode_test() {
         .args([
             "transmit",
             "--dry-run",
-            "irp",
-            "-fF=12",
+            "-aF=12",
+            "--irp",
             "{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)+[F:0..255]",
+            "--repeats",
+            "1",
         ])
         .assert();
 
@@ -37,8 +39,9 @@ fn encode_lircd_raw_test() {
         .args([
             "transmit",
             "--dry-run",
-            "keymap",
+            "--keymap",
             "../testdata/lircd_conf/pace/DC420N.lircd.conf",
+            "--code",
             "1",
         ])
         .assert();
@@ -67,8 +70,9 @@ fn encode_lircd_aiwa_test() {
         .args([
             "transmit",
             "--dry-run",
-            "keymap",
+            "--keymap",
             "../testdata/lircd_conf/aiwa/RC-5VP05.lircd.conf",
+            "-K",
             "AUTO",
         ])
         .assert();
@@ -96,7 +100,6 @@ fn encode_rawir_test() {
         .args([
             "transmit",
             "--dry-run",
-            "rawir",
             r#"1000
             200
             1000"#,
@@ -122,7 +125,6 @@ fn encode_rawir_test() {
         .args([
             "transmit",
             "--dry-run",
-            "rawir",
             "-f",
             "../testdata/rawir/mode2",
             "345",
@@ -158,10 +160,11 @@ fn encode_lircd_grundig_test() {
         .args([
             "transmit",
             "--dry-run",
-            "keymap",
+            "--keymap",
             "../testdata/lircd_conf/grundig/RP75_LCD.lircd.conf",
             "-m",
             "grundig_rp75",
+            "--code",
             "0",
         ])
         .assert();
@@ -189,8 +192,9 @@ fn empty_lircd_conf() {
         .args([
             "transmit",
             "--dry-run",
-            "keymap",
+            "--keymap",
             "../testdata/lircd_conf/empty",
+            "--list-codes",
         ])
         .assert();
 
@@ -217,8 +221,9 @@ fn keymaps() {
             "transmit",
             "--dry-run",
             "-v",
-            "keymap",
+            "--keymap",
             "../testdata/rc_keymaps/RM-687C.toml",
+            "--code",
             "KEY_0",
         ])
         .assert();
@@ -244,8 +249,9 @@ info: rawir: +2369 -637 +1166 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565
         .args([
             "transmit",
             "--dry-run",
-            "keymap",
+            "-k",
             "../testdata/rc_keymaps/RM-786.toml",
+            "-K",
             "KEY_CABLEFWD",
         ])
         .assert();
@@ -269,8 +275,9 @@ info: rawir: +2369 -637 +1166 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565
         .args([
             "transmit",
             "--dry-run",
-            "keymap",
+            "--keymap",
             "foo.toml",
+            "--code",
             "KEY_CABLEFWD",
         ])
         .assert();
@@ -294,8 +301,9 @@ info: rawir: +2369 -637 +1166 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565
         .args([
             "transmit",
             "--dry-run",
-            "keymap",
+            "--keymap",
             "Cargo.toml",
+            "--code",
             "KEY_CABLEFWD",
         ])
         .assert();
@@ -319,8 +327,9 @@ info: rawir: +2369 -637 +1166 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565
         .args([
             "transmit",
             "--dry-run",
-            "keymap",
+            "--keymap",
             "../testdata/rc_keymaps/rc6_mce.toml",
+            "--code",
             "KEY_ENTER",
             "-v",
         ])

@@ -10,7 +10,7 @@ use num_integer::Integer;
 pub fn encode(
     lirc_remotes: &[Remote],
     remote: Option<&str>,
-    codes: &[&str],
+    code_name: &str,
     repeats: u64,
 ) -> Result<Message, String> {
     let mut message = Message::new();
@@ -34,71 +34,69 @@ pub fn encode(
         }
     }
 
-    for encode_code in codes {
-        let remotes: Vec<(&Remote, usize)> = remotes
-            .iter()
-            .filter_map(|remote| {
-                let count = remote
-                    .codes
+    let remotes: Vec<(&Remote, usize)> = remotes
+        .iter()
+        .filter_map(|remote| {
+            let count = remote
+                .codes
+                .iter()
+                .filter(|code| code.name == code_name)
+                .count()
+                + remote
+                    .raw_codes
                     .iter()
-                    .filter(|code| code.name == *encode_code)
-                    .count()
-                    + remote
-                        .raw_codes
-                        .iter()
-                        .filter(|code| code.name == *encode_code)
-                        .count();
+                    .filter(|code| code.name == code_name)
+                    .count();
 
-                if count > 0 {
-                    Some((*remote, count))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if remotes.len() > 1 {
-            warn!(
-                "multiple remotes have a definition of code {}: {}",
-                encode_code,
-                remotes
-                    .iter()
-                    .map(|remote| remote.0.name.as_str())
-                    .join(", ")
-            );
-        }
-
-        if remotes.is_empty() {
-            return Err(format!("code {encode_code} not found"));
-        }
-
-        let (remote, count) = remotes[0];
-
-        if count > 1 {
-            warn!(
-                "remote {} has {} definitions of the code {}",
-                remote.name, count, *encode_code
-            );
-        }
-
-        for raw_code in &remote.raw_codes {
-            if raw_code.name == *encode_code {
-                let encoded = remote.encode_raw(raw_code, repeats)?;
-
-                message.extend(&encoded);
-
-                break;
+            if count > 0 {
+                Some((*remote, count))
+            } else {
+                None
             }
+        })
+        .collect();
+
+    if remotes.len() > 1 {
+        warn!(
+            "multiple remotes have a definition of code {}: {}",
+            code_name,
+            remotes
+                .iter()
+                .map(|remote| remote.0.name.as_str())
+                .join(", ")
+        );
+    }
+
+    if remotes.is_empty() {
+        return Err(format!("code {code_name} not found"));
+    }
+
+    let (remote, count) = remotes[0];
+
+    if count > 1 {
+        warn!(
+            "remote {} has {} definitions of the code {}",
+            remote.name, count, code_name
+        );
+    }
+
+    for raw_code in &remote.raw_codes {
+        if raw_code.name == code_name {
+            let encoded = remote.encode_raw(raw_code, repeats)?;
+
+            message.extend(&encoded);
+
+            break;
         }
+    }
 
-        for code in &remote.codes {
-            if code.name == *encode_code {
-                let encoded = remote.encode(code, repeats)?;
+    for code in &remote.codes {
+        if code.name == code_name {
+            let encoded = remote.encode(code, repeats)?;
 
-                message.extend(&encoded);
+            message.extend(&encoded);
 
-                break;
-            }
+            break;
         }
     }
 

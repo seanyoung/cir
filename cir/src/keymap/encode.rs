@@ -8,7 +8,7 @@ use itertools::Itertools;
 pub fn encode(
     keymaps: &[Keymap],
     remote: Option<&str>,
-    codes: &[&str],
+    code: &str,
     repeats: u64,
 ) -> Result<Message, String> {
     let mut message = Message::new();
@@ -32,73 +32,63 @@ pub fn encode(
         }
     }
 
-    for encode_code in codes {
-        let remotes: Vec<(&Keymap, usize)> = remotes
-            .iter()
-            .filter_map(|remote| {
-                let count = remote
-                    .scancodes
-                    .values()
-                    .filter(|code| code == encode_code)
-                    .count()
-                    + remote
-                        .raw
-                        .iter()
-                        .filter(|code| code.keycode == *encode_code)
-                        .count();
+    let remotes: Vec<(&Keymap, usize)> = remotes
+        .iter()
+        .filter_map(|remote| {
+            let count = remote.scancodes.values().filter(|v| *v == code).count()
+                + remote.raw.iter().filter(|v| v.keycode == *code).count();
 
-                if count > 0 {
-                    Some((*remote, count))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if remotes.len() > 1 {
-            log::warn!(
-                "multiple remotes have a definition of code {}: {}",
-                encode_code,
-                remotes
-                    .iter()
-                    .map(|remote| remote.0.name.as_str())
-                    .join(", ")
-            );
-        }
-
-        if remotes.is_empty() {
-            return Err(format!("code {encode_code} not found"));
-        }
-
-        let (remote, count) = remotes[0];
-
-        if count > 1 {
-            log::warn!(
-                "remote {} has {} definitions of the code {}",
-                remote.name,
-                count,
-                *encode_code
-            );
-        }
-
-        for raw_code in &remote.raw {
-            if raw_code.keycode == *encode_code {
-                let encoded = remote.encode_raw(raw_code, repeats);
-
-                message.extend(&encoded);
-
-                break;
+            if count > 0 {
+                Some((*remote, count))
+            } else {
+                None
             }
+        })
+        .collect();
+
+    if remotes.len() > 1 {
+        log::warn!(
+            "multiple remotes have a definition of code {}: {}",
+            code,
+            remotes
+                .iter()
+                .map(|remote| remote.0.name.as_str())
+                .join(", ")
+        );
+    }
+
+    if remotes.is_empty() {
+        return Err(format!("code {code} not found"));
+    }
+
+    let (remote, count) = remotes[0];
+
+    if count > 1 {
+        log::warn!(
+            "remote {} has {} definitions of the code {}",
+            remote.name,
+            count,
+            code
+        );
+    }
+
+    for raw_code in &remote.raw {
+        if raw_code.keycode == code {
+            let encoded = remote.encode_raw(raw_code, repeats);
+
+            message.extend(&encoded);
+
+            break;
         }
+    }
 
-        for (scancode, keycode) in &remote.scancodes {
-            if keycode == *encode_code {
-                let encoded = remote.encode_scancode(*scancode, repeats)?;
+    for (scancode, keycode) in &remote.scancodes {
+        if keycode == code {
+            let encoded = remote.encode_scancode(*scancode, repeats)?;
 
-                message.extend(&encoded);
+            message.extend(&encoded);
 
-                break;
-            }
+            break;
         }
     }
 

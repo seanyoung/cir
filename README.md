@@ -64,9 +64,9 @@ rc0:
         LIRC Set Tx Carrier     : yes
         LIRC Set Tx Duty Cycle  : no
         LIRC Transmitters       : 2
-        BPF protocols           : 
+        BPF protocols           :
         Supported Protocols     : rc-5 nec rc-6 jvc sony rc-5-sz sanyo sharp mce_kbd xmp imon rc-mm
-        Enabled Protocols       : 
+        Enabled Protocols       :
 ```
 
 ## Transmit/Send (cir transmit)
@@ -75,25 +75,25 @@ If you have a `.lircd.conf` file or `.toml` keymap, you can transmit with the fo
 command:
 
 ```bash
-cir transmit keymap RM-Y173.lircd.conf KEY_CHANNELUP
+cir transmit --keymap RM-Y173.lircd.conf --code KEY_CHANNELUP
 ```
 Alternatively, you can send raw IR directly like so:
 ```bash
-cir transmit rawir '+9000 -4500 +560'
+cir transmit '+9000 -4500 +560'
 ```
 You can also send files or linux kernel scancodes, using the same options like `ir-ctl`. This supports
 mode2 files or raw IR files.
 ```bash
-cir transmit rawir -s input-file -S nec:0xcafe
+cir transmit -f input-file -S nec:0xcafe
 ```
 You can send pronto codes:
 ```bash
-cir transmit pronto '5000 0073 0000 0001 0001 0001'
+cir transmit --pronto '5000 0073 0000 0001 0001 0001'
 ```
 Lastly you use IRP notation and set the parameters. This is great for experimenting with IRP; use the `--dry-run` (`-n`)
 to avoid sending.
 ```bash
-cir transmit irp -n -fF=2 '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
+cir transmit -n -a F=2 --irp '{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]'
 ```
 This will give the following output:
 ```
