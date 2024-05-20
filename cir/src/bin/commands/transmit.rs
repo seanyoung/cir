@@ -314,7 +314,7 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
                         }
                     }
                 } else {
-                    eprintln!("error: missing --keymap argument for --code");
+                    eprintln!("error: missing --keymap argument for --keycode");
                     std::process::exit(2);
                 }
             }

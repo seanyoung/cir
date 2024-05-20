@@ -41,7 +41,7 @@ fn encode_lircd_raw_test() {
             "--dry-run",
             "--keymap",
             "../testdata/lircd_conf/pace/DC420N.lircd.conf",
-            "--code",
+            "--keycode",
             "1",
         ])
         .assert();
@@ -164,7 +164,7 @@ fn encode_lircd_grundig_test() {
             "../testdata/lircd_conf/grundig/RP75_LCD.lircd.conf",
             "-m",
             "grundig_rp75",
-            "--code",
+            "--keycode",
             "0",
         ])
         .assert();
@@ -223,7 +223,7 @@ fn keymaps() {
             "-v",
             "--keymap",
             "../testdata/rc_keymaps/RM-687C.toml",
-            "--code",
+            "--keycode",
             "KEY_0",
         ])
         .assert();
@@ -277,7 +277,7 @@ info: rawir: +2369 -637 +1166 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565
             "--dry-run",
             "--keymap",
             "foo.toml",
-            "--code",
+            "--keycode",
             "KEY_CABLEFWD",
         ])
         .assert();
@@ -303,7 +303,7 @@ info: rawir: +2369 -637 +1166 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565
             "--dry-run",
             "--keymap",
             "Cargo.toml",
-            "--code",
+            "--keycode",
             "KEY_CABLEFWD",
         ])
         .assert();
@@ -329,7 +329,7 @@ info: rawir: +2369 -637 +1166 -637 +565 -637 +565 -637 +1166 -637 +565 -637 +565
             "--dry-run",
             "--keymap",
             "../testdata/rc_keymaps/rc6_mce.toml",
-            "--code",
+            "--keycode",
             "KEY_ENTER",
             "-v",
         ])

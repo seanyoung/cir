@@ -75,7 +75,7 @@ If you have a `.lircd.conf` file or `.toml` keymap, you can transmit with the fo
 command:
 
 ```bash
-cir transmit --keymap RM-Y173.lircd.conf --code KEY_CHANNELUP
+cir transmit --keymap RM-Y173.lircd.conf --keycode KEY_CHANNELUP
 ```
 Alternatively, you can send raw IR directly like so:
 ```bash

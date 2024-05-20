@@ -29,12 +29,12 @@ struct App {
 }
 
 enum Commands {
-    Decode(Decode),
-    Transmit(Transmit),
     #[cfg(target_os = "linux")]
     List(List),
     #[cfg(target_os = "linux")]
     Keymap(Keymap),
+    Decode(Decode),
+    Transmit(Transmit),
     #[cfg(target_os = "linux")]
     Test(Test),
 }
@@ -167,13 +167,13 @@ struct List {
     device: RcDevice,
 
     /// Display the scancode to keycode mapping
-    #[arg(long = "read-mapping", short = 'm')]
+    #[arg(long = "read-mapping", short = 'r')]
     mapping: bool,
 }
 
 #[cfg(target_os = "linux")]
 fn parse_scankey(arg: &str) -> Result<(u64, String), String> {
-    if let Some((scancode, keycode)) = arg.split_once('=') {
+    if let Some((scancode, keycode)) = arg.split_once([':', '=']) {
         let scancode = if let Some(hex) = scancode.strip_prefix("0x") {
             u64::from_str_radix(hex, 16)
         } else {
@@ -305,7 +305,7 @@ struct Transmit {
     #[arg(long = "file", short = 'f', name = "FILE", help_heading = "INPUT")]
     files: Vec<OsString>,
 
-    /// Send scancode using old linux kernel protocols
+    /// Send scancode using linux kernel protocols
     #[arg(
         long = "scancode",
         short = 'S',
@@ -358,7 +358,7 @@ struct Transmit {
     remote: Option<String>,
 
     /// Code from keymap to send
-    #[arg(name = "CODES", long = "code", short = 'K', help_heading = "INPUT")]
+    #[arg(name = "CODE", long = "keycode", short = 'K', help_heading = "INPUT")]
     codes: Vec<String>,
 
     /// Set carrier in Hz, 0 for unmodulated
@@ -396,7 +396,7 @@ impl Transmit {
         arg!("FILE", OsString, File);
         arg!("RAWIR", String, RawIR);
         arg!("PRONTO", String, Pronto);
-        arg!("CODES", String, Code);
+        arg!("CODE", String, Code);
         arg!("IRP", String, Irp);
         arg!("GAP", u32, Gap);
         arg!("SCANCODE", String, Scancode);
@@ -448,7 +448,7 @@ impl FromArgMatches for Commands {
     fn update_from_arg_matches(&mut self, matches: &ArgMatches) -> Result<(), Error> {
         match matches.subcommand() {
             Some(("decode", args)) => *self = Self::Decode(Decode::from_arg_matches(args)?),
-            Some(("rawir", args)) => {
+            Some(("transmit", args)) => {
                 let mut tx = Transmit::from_arg_matches(args)?;
 
                 tx.transmitables(args);
@@ -530,8 +530,9 @@ impl Subcommand for Commands {
 
         cmd
     }
-    fn has_subcommand(name: &str) -> bool {
-        matches!(name, "irp" | "keymap" | "pronto" | "rawir")
+
+    fn has_subcommand(_name: &str) -> bool {
+        false
     }
 }
 
