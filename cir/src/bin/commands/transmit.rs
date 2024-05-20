@@ -116,10 +116,10 @@ pub fn transmit(transmit: &crate::Transmit) {
     }
 }
 
-fn encode_args(transmit: &crate::Transmit) -> Message {
+fn encode_args(args: &crate::Transmit) -> Message {
     let mut vars = irp::Vartable::new();
 
-    for field in &transmit.arguments {
+    for field in &args.arguments {
         let list: Vec<&str> = field.trim().split('=').collect();
 
         if list.len() != 2 {
@@ -146,12 +146,12 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
         vars.set(list[0].to_string(), value);
     }
 
-    let (lircd_conf, keymap) = if let Some(path) = &transmit.keymap {
+    let (lircd_conf, keymap) = if let Some(path) = &args.keymap {
         if path.to_string_lossy().ends_with(".lircd.conf") {
             match lircd_conf::parse(path) {
                 Ok(r) => {
-                    if transmit.list_codes {
-                        list_lircd_remotes(path, &r, transmit.remote.as_deref());
+                    if args.list_codes {
+                        list_lircd_remotes(path, &r, args.remote.as_deref());
 
                         std::process::exit(0);
                     }
@@ -163,8 +163,8 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
         } else {
             match Keymap::parse_file(path) {
                 Ok(r) => {
-                    if transmit.list_codes {
-                        list_keymap_remotes(path, &r, transmit.remote.as_deref());
+                    if args.list_codes {
+                        list_keymap_remotes(path, &r, args.remote.as_deref());
 
                         std::process::exit(0);
                     }
@@ -188,7 +188,7 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
 
     let mut part = Vec::new();
 
-    for tx in &transmit.transmitables {
+    for tx in &args.transmitables {
         match tx {
             crate::Transmitables::File(filename) => {
                 let input = match fs::read_to_string(filename) {
@@ -230,7 +230,7 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
                 }
             },
             crate::Transmitables::Scancode((protocol, scancode)) => {
-                match encode_scancode(protocol, *scancode) {
+                match encode_scancode(protocol, *scancode, args.repeats) {
                     Ok(m) => {
                         part.push(Part::Raw(m));
                     }
@@ -252,7 +252,7 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
                     }
                 };
 
-                let m = p.encode(transmit.repeats as usize);
+                let m = p.encode(args.repeats as usize);
 
                 part.push(Part::Raw(m));
             }
@@ -264,7 +264,7 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
                         std::process::exit(2);
                     }
                 };
-                match irp.encode_raw(vars.clone(), transmit.repeats) {
+                match irp.encode_raw(vars.clone(), args.repeats) {
                     Ok(m) => {
                         part.push(Part::Raw(m));
                     }
@@ -276,12 +276,8 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
             }
             crate::Transmitables::Code(code) => {
                 if let Some(lircd_conf) = &lircd_conf {
-                    match lircd_conf::encode(
-                        lircd_conf,
-                        transmit.remote.as_deref(),
-                        code,
-                        transmit.repeats,
-                    ) {
+                    match lircd_conf::encode(lircd_conf, args.remote.as_deref(), code, args.repeats)
+                    {
                         Ok(m) => {
                             part.push(Part::Raw(m));
                         }
@@ -291,12 +287,7 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
                         }
                     }
                 } else if let Some(keymap) = &keymap {
-                    match cir::keymap::encode(
-                        keymap,
-                        transmit.remote.as_deref(),
-                        code,
-                        transmit.repeats,
-                    ) {
+                    match cir::keymap::encode(keymap, args.remote.as_deref(), code, args.repeats) {
                         Ok(m) => {
                             part.push(Part::Raw(m));
                         }
@@ -465,7 +456,7 @@ fn list_lircd_remotes(filename: &Path, remotes: &[lircd_conf::Remote], needle: O
     }
 }
 
-fn encode_scancode(protocol: &str, mut scancode: u64) -> Result<Message, String> {
+fn encode_scancode(protocol: &str, mut scancode: u64, repeats: u64) -> Result<Message, String> {
     let Some(linux) = LinuxProtocol::find_like(protocol) else {
         return Err(format!("protocol {protocol} is not known"));
     };
@@ -487,5 +478,5 @@ fn encode_scancode(protocol: &str, mut scancode: u64) -> Result<Message, String>
 
     vars.set("CODE".into(), scancode as i64);
 
-    irp.encode_raw(vars, 1)
+    irp.encode_raw(vars, repeats)
 }

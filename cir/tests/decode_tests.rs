@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use pretty_assertions::assert_eq;
 
 #[test]
 fn toggle_bit_mask() {
@@ -94,9 +95,9 @@ fn keymap() {
 
     assert_eq!(
         stderr,
-        r#"debug: decoding irp {40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:16,^45m) [CODE:0..0x1fffff] for keymap Sony-RM-U305C
-debug: decoding irp {40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:8:16,^45m) [CODE:0..0xffffff] for keymap Sony-RM-U305C
-debug: decoding irp {40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:16,CODE:8:8,^45m) [CODE:0..0x1fffff] for keymap Sony-RM-U305C
+        r#"debug: decoding irp {40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:16,^45m)+ [CODE:0..0x1fffff] for keymap Sony-RM-U305C
+debug: decoding irp {40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:8:16,^45m)+ [CODE:0..0xffffff] for keymap Sony-RM-U305C
+debug: decoding irp {40k,600}<1,-1|2,-1>(4,-1,CODE:7,CODE:5:16,CODE:8:8,^45m)+ [CODE:0..0x1fffff] for keymap Sony-RM-U305C
 debug: generated NFA for Sony-RM-U305C
 debug: generated DFA for Sony-RM-U305C
 debug: generated NFA for Sony-RM-U305C

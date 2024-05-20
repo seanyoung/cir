@@ -12,7 +12,6 @@ Necessary:
 Nice to have:
 - ir encode/send needs to read xml file
 - cir decode irp should read IrpProtocols.xml
-- cir transmit -S sony15:12 -R 2 ??
 - pcmak leading gap not decoded
 - encoding toggle_bit_mask not used when popcount > 1
 - compare against kernel encoder/decoder
