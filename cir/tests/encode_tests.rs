@@ -100,6 +100,7 @@ fn encode_rawir_test() {
         .args([
             "transmit",
             "--dry-run",
+            "--raw",
             r#"1000
             200
             1000"#,
@@ -127,9 +128,11 @@ fn encode_rawir_test() {
             "--dry-run",
             "-f",
             "../testdata/rawir/mode2",
+            "-r",
             "345",
             "-g",
             "30000",
+            "-r",
             "+123 40 124",
             "-g",
             "40000",

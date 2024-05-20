@@ -6,7 +6,7 @@ use cir::{
 };
 use irp::{Irp, Message, Pronto, Vartable};
 use log::{error, info, warn};
-use std::{fs, path::Path, str::FromStr};
+use std::{fs, path::Path};
 use terminal_size::{terminal_size, Width};
 
 pub fn transmit(transmit: &crate::Transmit) {
@@ -229,23 +229,15 @@ fn encode_args(transmit: &crate::Transmit) -> Message {
                     std::process::exit(2);
                 }
             },
-            crate::Transmitables::Scancode(scancode) => {
-                if let Some((protocol, code)) = scancode.split_once(':') {
-                    match encode_scancode(protocol, code) {
-                        Ok(m) => {
-                            part.push(Part::Raw(m));
-                        }
-                        Err(msg) => {
-                            error!("{}", msg);
-                            std::process::exit(2);
-                        }
+            crate::Transmitables::Scancode((protocol, scancode)) => {
+                match encode_scancode(protocol, *scancode) {
+                    Ok(m) => {
+                        part.push(Part::Raw(m));
                     }
-                } else {
-                    error!(
-                        "{} is not a valid protocol, should be protocol:scancode",
-                        scancode
-                    );
-                    std::process::exit(2);
+                    Err(msg) => {
+                        error!("{}", msg);
+                        std::process::exit(2);
+                    }
                 }
             }
             crate::Transmitables::Gap(gap) => {
@@ -473,17 +465,7 @@ fn list_lircd_remotes(filename: &Path, remotes: &[lircd_conf::Remote], needle: O
     }
 }
 
-fn encode_scancode(protocol: &str, code: &str) -> Result<Message, String> {
-    let mut scancode = if let Ok(code) = if let Some(hex) = code.strip_prefix("0x") {
-        u64::from_str_radix(hex, 16)
-    } else {
-        u64::from_str(code)
-    } {
-        code
-    } else {
-        return Err(format!("invalid scancode {code}"));
-    };
-
+fn encode_scancode(protocol: &str, mut scancode: u64) -> Result<Message, String> {
     let Some(linux) = LinuxProtocol::find_like(protocol) else {
         return Err(format!("protocol {protocol} is not known"));
     };
@@ -495,7 +477,7 @@ fn encode_scancode(protocol: &str, code: &str) -> Result<Message, String> {
     let masked = scancode & linux.scancode_mask as u64;
 
     if masked != scancode {
-        warn!("error: scancode {scancode:#x} masked to {masked:#x}");
+        warn!("scancode {scancode:#x} masked to {masked:#x}");
         scancode = masked;
     }
 

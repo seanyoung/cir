@@ -79,7 +79,7 @@ cir transmit --keymap RM-Y173.lircd.conf --keycode KEY_CHANNELUP
 ```
 Alternatively, you can send raw IR directly like so:
 ```bash
-cir transmit '+9000 -4500 +560'
+cir transmit --raw '+9000 -4500 +560'
 ```
 You can also send files or linux kernel scancodes, using the same options like `ir-ctl`. This supports
 mode2 files or raw IR files.

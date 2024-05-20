@@ -187,6 +187,21 @@ fn parse_scankey(arg: &str) -> Result<(u64, String), String> {
     }
 }
 
+fn parse_scancode(arg: &str) -> Result<(String, u64), String> {
+    if let Some((protocol, scancode)) = arg.split_once(':') {
+        let scancode = if let Some(hex) = scancode.strip_prefix("0x") {
+            u64::from_str_radix(hex, 16)
+        } else {
+            str::parse(scancode)
+        }
+        .map_err(|e| format!("{e}"))?;
+
+        Ok((protocol.to_owned(), scancode))
+    } else {
+        Err("missing `:` separator".into())
+    }
+}
+
 #[cfg(target_os = "linux")]
 #[derive(Args)]
 struct Keymap {
@@ -297,7 +312,7 @@ struct Transmit {
     #[arg(long = "dry-run", short = 'n')]
     dry_run: bool,
 
-    /// List the codes in the keymap
+    /// List the codes in keymap
     #[arg(long = "list-codes", short = 'l', requires = "KEYMAP")]
     list_codes: bool,
 
@@ -305,16 +320,17 @@ struct Transmit {
     #[arg(long = "file", short = 'f', name = "FILE", help_heading = "INPUT")]
     files: Vec<OsString>,
 
-    /// Send scancode using linux kernel protocols
+    /// Send scancode using linux kernel protocol
     #[arg(
         long = "scancode",
         short = 'S',
         name = "SCANCODE",
+        value_parser = parse_scancode,
         help_heading = "INPUT"
     )]
-    scancodes: Vec<String>,
+    scancodes: Vec<(String, u64)>,
 
-    /// Set gap after each file
+    /// Trailing gap length if none present
     #[arg(long = "gap", short = 'g', name = "GAP", help_heading = "INPUT")]
     gaps: Vec<u32>,
 
@@ -322,30 +338,31 @@ struct Transmit {
     #[arg(long = "pronto", short = 'p', name = "PRONTO", help_heading = "INPUT")]
     pronto: Vec<String>,
 
-    /// Raw IR text
-    #[arg(name = "RAWIR", help_heading = "INPUT")]
+    /// Transmit raw IR
+    #[arg(long = "raw", short = 'r', name = "RAWIR", help_heading = "INPUT")]
     rawir: Vec<String>,
 
-    /// Number of IRP repeats to encode
+    /// Number of repeats to encode
     #[arg(
         long = "repeats",
-        short = 'r',
+        short = 'R',
         value_parser = value_parser!(u64).range(0..99),
         default_value_t = 0,
         help_heading = "INPUT"
     )]
     repeats: u64,
 
-    /// Set input variable like KEY=VALUE
+    /// Set IRP parameter like KEY=VALUE
     #[arg(
         long = "argument",
         short = 'a',
         value_delimiter = ',',
-        help_heading = "INPUT"
+        help_heading = "INPUT",
+        name = "ARGUMENT"
     )]
     arguments: Vec<String>,
 
-    /// IRP Notation
+    /// Transmit using IRP Notation
     #[arg(long = "irp", short = 'i', name = "IRP", help_heading = "INPUT")]
     irp: Vec<String>,
 
@@ -357,7 +374,7 @@ struct Transmit {
     #[arg(name = "REMOTE", long = "remote", short = 'm', help_heading = "INPUT")]
     remote: Option<String>,
 
-    /// Code from keymap to send
+    /// Code from keymap to transmit
     #[arg(name = "CODE", long = "keycode", short = 'K', help_heading = "INPUT")]
     codes: Vec<String>,
 
@@ -399,7 +416,7 @@ impl Transmit {
         arg!("CODE", String, Code);
         arg!("IRP", String, Irp);
         arg!("GAP", u32, Gap);
-        arg!("SCANCODE", String, Scancode);
+        arg!("SCANCODE", (String, u64), Scancode);
 
         part.sort_by(|a, b| a.1.cmp(&b.1));
 
@@ -414,7 +431,7 @@ enum Transmitables {
     Code(String),
     Irp(String),
     Gap(u32),
-    Scancode(String),
+    Scancode((String, u64)),
 }
 
 impl FromArgMatches for Commands {
