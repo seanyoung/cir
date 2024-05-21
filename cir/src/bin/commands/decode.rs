@@ -1,5 +1,6 @@
 #[cfg(target_os = "linux")]
 use super::keymap::{find_devices, Purpose};
+use crate::get_irp_protocols;
 #[cfg(target_os = "linux")]
 use cir::lirc::Lirc;
 use cir::{keymap::Keymap, lircd_conf::parse};
@@ -11,17 +12,38 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
+pub fn decode_irp(irp_protocols: &Path, decode: &crate::Decode, irp_notation: &String) {
+    let mut protocols = &Vec::new();
+
+    match get_irp_protocols(irp_protocols) {
+        Ok(res) => {
+            protocols = res;
+        }
+        Err(e) => {
+            log::error!("{}: {e}", irp_protocols.display());
+        }
+    };
+
+    let irp_notation = match protocols
+        .iter()
+        .find(|e| e.decodable && (&e.name == irp_notation || e.alt_name.contains(irp_notation)))
+    {
+        Some(e) => &e.irp,
+        None => irp_notation,
+    };
+
+    log::debug!("decoding IRP: {irp_notation}");
+
     #[allow(unused_mut)]
     let mut abs_tolerance = decode.options.aeps.unwrap_or(100);
     let rel_tolerance = decode.options.eps.unwrap_or(3);
     #[allow(unused_mut)]
     let mut max_gap = 100000;
 
-    let irp = match Irp::parse(irp_str) {
+    let irp = match Irp::parse(irp_notation) {
         Ok(m) => m,
         Err(s) => {
-            eprintln!("unable to parse irp ‘{irp_str}’: {s}");
+            eprintln!("unable to parse irp ‘{irp_notation}’: {s}");
             std::process::exit(2);
         }
     };
@@ -50,7 +72,7 @@ pub fn decode_irp(decode: &crate::Decode, irp_str: &String) {
     let dfa = match irp.compile(&options) {
         Ok(dfa) => dfa,
         Err(s) => {
-            eprintln!("unable to compile irp ‘{irp_str}’: {s}");
+            eprintln!("unable to compile irp ‘{irp_notation}’: {s}");
             std::process::exit(2);
         }
     };

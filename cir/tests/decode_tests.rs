@@ -207,3 +207,31 @@ debug: scancode 0x100060
 "#
     );
 }
+
+#[test]
+fn irp() {
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args([
+            "decode",
+            "-i",
+            "Blaupunkt",
+            "--irp-protocols=../irp/tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+            "--raw=+512 -2560 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -23040 +512 -2560 +512 -1024 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +1024 -1024 +512 -512 +512 -120832 +512 -2560 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -23040",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stderr, "info: decoding: +512 -2560 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -23040 +512 -2560 +512 -1024 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +1024 -1024 +512 -512 +512 -120832 +512 -2560 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -23040\n");
+
+    assert_eq!(
+        stdout,
+        r#"decoded: down D=1, F=0
+"#
+    );
+}

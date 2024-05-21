@@ -1,3 +1,5 @@
+use crate::get_irp_protocols;
+
 #[cfg(target_os = "linux")]
 use super::keymap::{open_lirc, Purpose};
 use cir::{
@@ -9,8 +11,8 @@ use log::{error, info, warn};
 use std::{fs, path::Path};
 use terminal_size::{terminal_size, Width};
 
-pub fn transmit(transmit: &crate::Transmit) {
-    let message = encode_args(transmit);
+pub fn transmit(args: &crate::App, transmit: &crate::Transmit) {
+    let message = encode_args(&args.irp_protocols, transmit);
 
     if let Some(carrier) = &message.carrier {
         if *carrier == 0 {
@@ -116,7 +118,7 @@ pub fn transmit(transmit: &crate::Transmit) {
     }
 }
 
-fn encode_args(args: &crate::Transmit) -> Message {
+fn encode_args(irp_protocols: &Path, args: &crate::Transmit) -> Message {
     let mut vars = irp::Vartable::new();
 
     for field in &args.arguments {
@@ -257,6 +259,26 @@ fn encode_args(args: &crate::Transmit) -> Message {
                 part.push(Part::Raw(m));
             }
             crate::Transmitables::Irp(irp_notation) => {
+                let mut protocols = &Vec::new();
+
+                match get_irp_protocols(irp_protocols) {
+                    Ok(res) => {
+                        protocols = res;
+                    }
+                    Err(e) => {
+                        log::error!("{}: {e}", irp_protocols.display());
+                    }
+                };
+
+                let irp_notation = match protocols.iter().find(|e| {
+                    !e.decode_only && (&e.name == irp_notation || e.alt_name.contains(irp_notation))
+                }) {
+                    Some(e) => &e.irp,
+                    None => irp_notation,
+                };
+
+                log::debug!("transmit IRP: {irp_notation}");
+
                 let irp = match Irp::parse(irp_notation) {
                     Ok(m) => m,
                     Err(s) => {

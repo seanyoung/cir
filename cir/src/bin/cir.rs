@@ -2,8 +2,14 @@ use clap::{
     error::{Error, ErrorKind},
     value_parser, ArgAction, ArgMatches, Args, Command, FromArgMatches, Parser, Subcommand,
 };
+use irp::Protocol;
 use log::{Level, LevelFilter, Metadata, Record};
-use std::{ffi::OsString, path::PathBuf};
+use std::{
+    ffi::OsString,
+    io,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
 mod commands;
 
@@ -23,6 +29,14 @@ struct App {
     /// Silence all warnings
     #[arg(long, short, global = true, conflicts_with = "verbose")]
     quiet: bool,
+
+    /// Location of IrpProtocols.xml
+    #[arg(
+        long = "irp-protocols",
+        global = true,
+        default_value = "/usr/share/rc_keymaps/IrpProtocols.xml"
+    )]
+    irp_protocols: PathBuf,
 
     #[command(subcommand)]
     command: Commands,
@@ -573,7 +587,7 @@ fn main() {
     match &args.command {
         Commands::Decode(decode) => {
             if let Some(irp) = &decode.irp {
-                commands::decode::decode_irp(decode, irp)
+                commands::decode::decode_irp(&args.irp_protocols, decode, irp)
             } else {
                 let keymap = decode.keymap.as_ref().unwrap();
 
@@ -584,7 +598,7 @@ fn main() {
                 }
             }
         }
-        Commands::Transmit(args) => commands::transmit::transmit(args),
+        Commands::Transmit(tx) => commands::transmit::transmit(&args, tx),
         #[cfg(target_os = "linux")]
         Commands::List(args) => commands::list::list(args),
         #[cfg(target_os = "linux")]
@@ -592,6 +606,12 @@ fn main() {
         #[cfg(target_os = "linux")]
         Commands::Test(args) => commands::test::test(args),
     }
+}
+
+static IRP_PROTOCOLS: OnceLock<io::Result<Vec<Protocol>>> = OnceLock::new();
+
+fn get_irp_protocols(path: &Path) -> &'static io::Result<Vec<Protocol>> {
+    IRP_PROTOCOLS.get_or_init(|| Protocol::parse(path))
 }
 
 static CLI_LOGGER: CliLogger = CliLogger;

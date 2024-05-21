@@ -64,6 +64,36 @@ info: rawir: +2664 -888 +444 -444 +444 -444 +444 -888 +444 -888 +888 -444 +444 -
 }
 
 #[test]
+fn encode_irp_test() {
+    let mut cmd = Command::cargo_bin("cir").unwrap();
+
+    let assert = cmd
+        .args([
+            "transmit",
+            "--dry-run",
+            "--irp=Blaupunkt",
+            "--irp-protocols",
+            "../irp/tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+            "-aF=0,D=1",
+        ])
+        .assert();
+
+    let output = assert.get_output();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(stdout, "");
+
+    assert_eq!(
+        stderr,
+        r#"info: carrier: 30300Hz
+info: rawir: +512 -2560 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -23040 +512 -2560 +512 -1024 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +1024 -1024 +512 -512 +512 -120832 +512 -2560 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -23040
+"#
+    );
+}
+
+#[test]
 fn encode_lircd_aiwa_test() {
     let mut cmd = Command::cargo_bin("cir").unwrap();
 

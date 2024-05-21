@@ -21,7 +21,7 @@ pub struct Protocol {
     pub minimum_leadout: u32,
     pub decode_only: bool,
     pub decodable: bool,
-    pub reject_repeatess: bool,
+    pub reject_repeatless: bool,
 }
 
 enum Element {
@@ -122,7 +122,7 @@ impl Protocol {
                                 protocol.decode_only = bool::from_str(&data).unwrap();
                             }
                             Element::RejectRepeatLess => {
-                                protocol.reject_repeatess = bool::from_str(&data).unwrap();
+                                protocol.reject_repeatless = bool::from_str(&data).unwrap();
                             }
                             Element::AbsoluteTolerance => {
                                 protocol.absolute_tolerance = u32::from_str(&data).unwrap();
