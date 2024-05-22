@@ -16,7 +16,7 @@ use std::{
 #[test]
 fn decode_all() {
     let mut protocols = Protocol::parse(&PathBuf::from(
-        "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+        "../IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ))
     .unwrap();
 

@@ -267,7 +267,7 @@ fn vars() {
 #[test]
 fn parse_all_of_them() {
     let protocols = Protocol::parse(&PathBuf::from(
-        "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+        "../IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ))
     .unwrap();
 
@@ -329,13 +329,13 @@ fn compare_with_rounding(l: &[u32], r: &[u32]) -> bool {
 #[test]
 fn compare_encode_to_transmogrifier() {
     let mut protocols = Protocol::parse(&PathBuf::from(
-        "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+        "../IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ))
     .unwrap();
 
     let mut total_tests = 0;
     let mut fails = 0;
-    let jvm = create_jvm("tests/IrpTransmogrifier");
+    let jvm = create_jvm("../IrpTransmogrifier");
     let mut rng = rand::thread_rng();
 
     protocols.push(Protocol {
@@ -427,7 +427,7 @@ fn compare_encode_to_transmogrifier() {
 #[test]
 fn decode_all() {
     let mut protocols = Protocol::parse(&PathBuf::from(
-        "tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+        "../IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
     ))
     .unwrap();
 

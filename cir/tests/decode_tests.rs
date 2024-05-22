@@ -217,7 +217,7 @@ fn irp() {
             "decode",
             "-i",
             "Blaupunkt",
-            "--irp-protocols=../irp/tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+            "--irp-protocols=../IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
             "--raw=+512 -2560 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -23040 +512 -2560 +512 -1024 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +1024 -1024 +512 -512 +512 -120832 +512 -2560 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -512 +512 -23040",
         ])
         .assert();

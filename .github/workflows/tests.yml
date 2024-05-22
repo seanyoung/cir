@@ -30,7 +30,7 @@ jobs:
     - name: Build IrpTransmogrifier
       run: |
           mvn -B -V package
-      working-directory: irp/tests/IrpTransmogrifier
+      working-directory: IrpTransmogrifier
     - name: Build
       run: cargo build --verbose
     - name: Run tests

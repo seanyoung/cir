@@ -14,6 +14,8 @@ fn encode_test() {
             "{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)+[F:0..255]",
             "--repeats",
             "1",
+            "--irp-protocols",
+            "../IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
         ])
         .assert();
 
@@ -73,7 +75,7 @@ fn encode_irp_test() {
             "--dry-run",
             "--irp=Blaupunkt",
             "--irp-protocols",
-            "../irp/tests/IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
+            "../IrpTransmogrifier/src/main/resources/IrpProtocols.xml",
             "-aF=0,D=1",
         ])
         .assert();
