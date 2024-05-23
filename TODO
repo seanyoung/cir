@@ -11,7 +11,6 @@ Necessary:
 
 Nice to have:
 - cir decode irp should try all protocols if nothing specified
-- cir decode should allow multiple IRPs/keymaps
 - pcmak leading gap not decoded
 - encoding toggle_bit_mask not used when popcount > 1
 - compare against kernel encoder/decoder

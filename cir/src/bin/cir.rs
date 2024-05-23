@@ -95,7 +95,7 @@ struct Decode {
 
     /// Keymap or lircd.conf file
     #[arg(long = "keymap", short = 'k', required_unless_present = "irp")]
-    keymap: Option<PathBuf>,
+    keymap: Vec<PathBuf>,
 
     #[clap(flatten)]
     options: DecodeOptions,
@@ -585,19 +585,7 @@ fn main() {
     log::set_max_level(level);
 
     match &args.command {
-        Commands::Decode(decode) => {
-            if !decode.irp.is_empty() {
-                commands::decode::decode_irp(&args.irp_protocols, decode)
-            } else {
-                let keymap = decode.keymap.as_ref().unwrap();
-
-                if keymap.to_string_lossy().ends_with(".lircd.conf") {
-                    commands::decode::decode_lircd(decode, keymap);
-                } else {
-                    commands::decode::decode_keymap(decode, keymap);
-                }
-            }
-        }
+        Commands::Decode(decode) => commands::decode::decode(&args, decode),
         Commands::Transmit(tx) => commands::transmit::transmit(&args, tx),
         #[cfg(target_os = "linux")]
         Commands::List(args) => commands::list::list(args),
