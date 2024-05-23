@@ -9,6 +9,7 @@ mod parse;
 mod protocol;
 
 pub use encode::encode;
+pub use protocol::LINUX_PROTOCOLS;
 
 /// A Linux keymap, either toml or text format used by ir-keytable
 #[derive(PartialEq, Debug, Default)]

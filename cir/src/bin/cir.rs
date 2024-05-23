@@ -89,13 +89,17 @@ struct Decode {
     )]
     rawir: Vec<String>,
 
-    /// IRP Notation
+    /// Decode using IRP Notation
     #[arg(long = "irp", short = 'i')]
     irp: Vec<String>,
 
-    /// Keymap or lircd.conf file
+    /// Decode using Keymap or lircd.conf file
     #[arg(long = "keymap", short = 'k')]
     keymap: Vec<PathBuf>,
+
+    /// Decode using all Linux Kernel Protocols
+    #[arg(long = "builtin-kernel-protocols", short = 'b')]
+    linux_kernel: bool,
 
     #[clap(flatten)]
     options: DecodeOptions,

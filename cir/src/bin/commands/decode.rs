@@ -3,7 +3,10 @@ use super::keymap::{find_devices, Purpose};
 use crate::get_irp_protocols;
 #[cfg(target_os = "linux")]
 use cir::lirc::Lirc;
-use cir::{keymap::Keymap, lircd_conf::parse};
+use cir::{
+    keymap::{Keymap, LINUX_PROTOCOLS},
+    lircd_conf::parse,
+};
 use irp::{Decoder, InfraredData, Irp, Message, Options};
 use itertools::Itertools;
 use log::{error, info};
@@ -20,7 +23,7 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
 
     let mut lircd_remotes = Vec::new();
     let mut rc_keymaps = Vec::new();
-    let mut irps = Vec::new();
+    let mut irps: Vec<(&str, &str, Irp)> = Vec::new();
 
     for irp_arg in &decode.irp {
         match get_irp_protocols(&global.irp_protocols) {
@@ -70,7 +73,25 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
         }
     }
 
-    if decode.irp.is_empty() && decode.keymap.is_empty() {
+    if decode.linux_kernel {
+        for protocol in LINUX_PROTOCOLS {
+            if let Some(irp_notation) = protocol.irp {
+                log::debug!("decoding kernel {}: {}", protocol.name, irp_notation);
+
+                let irp = match Irp::parse(irp_notation) {
+                    Ok(m) => m,
+                    Err(s) => {
+                        eprintln!("unable to parse irp ‘{}’: {s}", irp_notation);
+                        std::process::exit(2);
+                    }
+                };
+
+                irps.push((protocol.name, irp_notation, irp));
+            }
+        }
+    }
+
+    if !decode.linux_kernel && decode.irp.is_empty() && decode.keymap.is_empty() {
         match get_irp_protocols(&global.irp_protocols) {
             Ok(res) => {
                 irp_protocols_xml = res;

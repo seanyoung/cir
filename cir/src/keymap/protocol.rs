@@ -47,7 +47,7 @@ impl LinuxProtocol {
     }
 }
 
-const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
+pub const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
     LinuxProtocol {
         name: "rc5",
         decoder: "rc-5",
