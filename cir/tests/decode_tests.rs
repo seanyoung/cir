@@ -231,7 +231,7 @@ fn irp() {
 
     assert_eq!(
         stdout,
-        r#"decoded: down D=1, F=0
+        r#"decoded: Blaupunkt down D=1, F=0
 "#
     );
 }

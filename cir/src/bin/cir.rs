@@ -91,7 +91,7 @@ struct Decode {
 
     /// IRP Notation
     #[arg(long = "irp", short = 'i', required_unless_present = "keymap")]
-    irp: Option<String>,
+    irp: Vec<String>,
 
     /// Keymap or lircd.conf file
     #[arg(long = "keymap", short = 'k', required_unless_present = "irp")]
@@ -586,8 +586,8 @@ fn main() {
 
     match &args.command {
         Commands::Decode(decode) => {
-            if let Some(irp) = &decode.irp {
-                commands::decode::decode_irp(&args.irp_protocols, decode, irp)
+            if !decode.irp.is_empty() {
+                commands::decode::decode_irp(&args.irp_protocols, decode)
             } else {
                 let keymap = decode.keymap.as_ref().unwrap();
 

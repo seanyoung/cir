@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn decode_irp(irp_protocols: &Path, decode: &crate::Decode, irp_notation: &String) {
+pub fn decode_irp(irp_protocols: &Path, decode: &crate::Decode) {
     let mut protocols = &Vec::new();
 
     match get_irp_protocols(irp_protocols) {
@@ -24,29 +24,35 @@ pub fn decode_irp(irp_protocols: &Path, decode: &crate::Decode, irp_notation: &S
         }
     };
 
-    let irp_notation = match protocols
-        .iter()
-        .find(|e| e.decodable && (&e.name == irp_notation || e.alt_name.contains(irp_notation)))
-    {
-        Some(e) => &e.irp,
-        None => irp_notation,
-    };
-
-    log::debug!("decoding IRP: {irp_notation}");
-
     #[allow(unused_mut)]
     let mut abs_tolerance = decode.options.aeps.unwrap_or(100);
     let rel_tolerance = decode.options.eps.unwrap_or(3);
     #[allow(unused_mut)]
     let mut max_gap = 100000;
 
-    let irp = match Irp::parse(irp_notation) {
-        Ok(m) => m,
-        Err(s) => {
-            eprintln!("unable to parse irp ‘{irp_notation}’: {s}");
-            std::process::exit(2);
-        }
-    };
+    let mut irps = Vec::new();
+
+    for irp_arg in &decode.irp {
+        let irp_notation = match protocols
+            .iter()
+            .find(|e| e.decodable && (&e.name == irp_arg || e.alt_name.contains(irp_arg)))
+        {
+            Some(e) => &e.irp,
+            None => irp_arg,
+        };
+
+        log::debug!("decoding IRP: {irp_notation}");
+
+        let irp = match Irp::parse(irp_notation) {
+            Ok(m) => m,
+            Err(s) => {
+                eprintln!("unable to parse irp ‘{irp_notation}’: {s}");
+                std::process::exit(2);
+            }
+        };
+
+        irps.push((irp_arg, irp_notation, irp));
+    }
 
     let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
 
@@ -59,39 +65,46 @@ pub fn decode_irp(irp_protocols: &Path, decode: &crate::Decode, irp_notation: &S
         std::process::exit(2);
     }
 
-    let mut options = Options {
-        name: "irp",
-        aeps: abs_tolerance,
-        eps: rel_tolerance,
-        max_gap,
-        ..Default::default()
-    };
+    let mut decodables = Vec::new();
 
-    options.nfa = decode.options.save_nfa;
-    options.dfa = decode.options.save_dfa;
-    let dfa = match irp.compile(&options) {
-        Ok(dfa) => dfa,
-        Err(s) => {
-            eprintln!("unable to compile irp ‘{irp_notation}’: {s}");
-            std::process::exit(2);
-        }
-    };
+    for (name, irp_notation, irp) in irps {
+        let mut options = Options {
+            name,
+            aeps: abs_tolerance,
+            eps: rel_tolerance,
+            max_gap,
+            ..Default::default()
+        };
 
-    let mut decoder = Decoder::new(options);
+        options.nfa = decode.options.save_nfa;
+        options.dfa = decode.options.save_dfa;
+        let dfa = match irp.compile(&options) {
+            Ok(dfa) => dfa,
+            Err(s) => {
+                eprintln!("unable to compile irp ‘{irp_notation}’: {s}");
+                std::process::exit(2);
+            }
+        };
+
+        let decoder = Decoder::new(options);
+
+        decodables.push((decoder, dfa, name));
+    }
 
     let mut feed_decoder = |raw: &[InfraredData]| {
         for ir in raw {
-            decoder.dfa_input(*ir, &dfa, |event, var| {
-                let mut var: Vec<(String, i64)> = var.into_iter().collect();
-                var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-                println!(
-                    "decoded: {} {}",
-                    event,
-                    var.iter()
-                        .map(|(name, val)| format!("{name}={val}"))
-                        .join(", ")
-                );
-            });
+            for (decoder, dfa, name) in decodables.iter_mut() {
+                decoder.dfa_input(*ir, dfa, |event, var| {
+                    let mut var: Vec<(String, i64)> = var.into_iter().collect();
+                    var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+                    println!(
+                        "decoded: {name} {event} {}",
+                        var.iter()
+                            .map(|(name, val)| format!("{name}={val}"))
+                            .join(", ")
+                    );
+                });
+            }
         }
     };
 
