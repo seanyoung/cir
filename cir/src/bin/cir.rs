@@ -90,11 +90,11 @@ struct Decode {
     rawir: Vec<String>,
 
     /// IRP Notation
-    #[arg(long = "irp", short = 'i', required_unless_present = "keymap")]
+    #[arg(long = "irp", short = 'i')]
     irp: Vec<String>,
 
     /// Keymap or lircd.conf file
-    #[arg(long = "keymap", short = 'k', required_unless_present = "irp")]
+    #[arg(long = "keymap", short = 'k')]
     keymap: Vec<PathBuf>,
 
     #[clap(flatten)]

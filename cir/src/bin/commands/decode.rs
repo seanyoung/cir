@@ -70,6 +70,34 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
         }
     }
 
+    if decode.irp.is_empty() && decode.keymap.is_empty() {
+        match get_irp_protocols(&global.irp_protocols) {
+            Ok(res) => {
+                irp_protocols_xml = res;
+            }
+            Err(e) => {
+                log::error!("{}: {e}", &global.irp_protocols.display());
+                std::process::exit(2);
+            }
+        }
+
+        for protocol in irp_protocols_xml.iter().filter(|e| {
+            e.decodable && e.irp != "{38.4k,msb,564}<1,-1|1,-3>(16,-8,data:length,-50m) "
+        }) {
+            log::debug!("decoding IRP: {} {}", protocol.name, protocol.irp);
+
+            let irp = match Irp::parse(&protocol.irp) {
+                Ok(m) => m,
+                Err(s) => {
+                    eprintln!("unable to parse irp ‘{}’: {s}", protocol.irp);
+                    std::process::exit(2);
+                }
+            };
+
+            irps.push((&protocol.name, &protocol.irp, irp));
+        }
+    }
+
     let input_on_cli = !decode.file.is_empty() || !decode.rawir.is_empty();
 
     #[cfg(target_os = "linux")]
