@@ -102,9 +102,11 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
             }
         }
 
-        for (protocol_no, protocol) in irp_protocols_xml.iter().enumerate().filter(|(_, e)| {
-            e.decodable && e.irp != "{38.4k,msb,564}<1,-1|1,-3>(16,-8,data:length,-50m) "
-        }) {
+        for (protocol_no, protocol) in irp_protocols_xml
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.decodable)
+        {
             log::debug!("decoding IRP: {} {}", protocol.name, protocol.irp);
 
             let irp = match Irp::parse(&protocol.irp) {
