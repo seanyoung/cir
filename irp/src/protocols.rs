@@ -72,8 +72,8 @@ impl Protocol {
                     }
                     "parameter" => {
                         for attr in attributes {
-                            match attr.name.local_name.as_ref() {
-                                "prefer_over" => {
+                            match attr.value.as_ref() {
+                                "prefer-over" => {
                                     element = Element::PreferOver;
                                 }
                                 "absolute-tolerance" => {
@@ -94,16 +94,23 @@ impl Protocol {
                                 "minimum-leadout" => {
                                     element = Element::MinimumLeadout;
                                 }
-                                "reject_repeatless" => {
+                                "reject-repeatless" => {
                                     element = Element::RejectRepeatLess;
                                 }
-                                _ => (),
+                                "uei-executor"
+                                | "xml"
+                                | "frequency-tolerance"
+                                | "frequency-lower"
+                                | "frequency-upper" => {}
+                                elem => {
+                                    panic!("parameter {elem} unknown");
+                                }
                             }
                         }
                     }
                     _ => (),
                 },
-                Ok(XmlEvent::CData(data)) => {
+                Ok(XmlEvent::Characters(data) | XmlEvent::CData(data)) => {
                     if let Some(protocol) = &mut protocol {
                         match element {
                             Element::Irp => {

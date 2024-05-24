@@ -23,7 +23,7 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
 
     let mut lircd_remotes = Vec::new();
     let mut rc_keymaps = Vec::new();
-    let mut irps: Vec<(&str, &str, Irp)> = Vec::new();
+    let mut irps: Vec<(&str, &str, Irp, Option<usize>)> = Vec::new();
 
     for irp_arg in &decode.irp {
         match get_irp_protocols(&global.irp_protocols) {
@@ -53,7 +53,7 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
             }
         };
 
-        irps.push((irp_arg, irp_notation, irp));
+        irps.push((irp_arg, irp_notation, irp, None));
     }
 
     for path in &decode.keymap {
@@ -86,7 +86,7 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
                     }
                 };
 
-                irps.push((protocol.name, irp_notation, irp));
+                irps.push((protocol.name, irp_notation, irp, None));
             }
         }
     }
@@ -102,7 +102,7 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
             }
         }
 
-        for protocol in irp_protocols_xml.iter().filter(|e| {
+        for (protocol_no, protocol) in irp_protocols_xml.iter().enumerate().filter(|(_, e)| {
             e.decodable && e.irp != "{38.4k,msb,564}<1,-1|1,-3>(16,-8,data:length,-50m) "
         }) {
             log::debug!("decoding IRP: {} {}", protocol.name, protocol.irp);
@@ -115,7 +115,7 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
                 }
             };
 
-            irps.push((&protocol.name, &protocol.irp, irp));
+            irps.push((&protocol.name, &protocol.irp, irp, Some(protocol_no)));
         }
     }
 
@@ -157,7 +157,7 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
 
     let mut irp_decoders = Vec::new();
 
-    for (name, irp_notation, irp) in irps {
+    for (name, irp_notation, irp, protocol) in irps {
         let mut options = Options {
             name,
             aeps: abs_tolerance,
@@ -178,7 +178,7 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
 
         let decoder = Decoder::new(options);
 
-        irp_decoders.push((decoder, dfa, name));
+        irp_decoders.push((decoder, dfa, name, protocol));
     }
 
     let mut lircd_decoders = Vec::new();
@@ -203,17 +203,37 @@ pub fn decode(global: &crate::App, decode: &crate::Decode) {
                 });
             }
 
-            for (decoder, dfa, name) in irp_decoders.iter_mut() {
+            let mut decodes = Vec::new();
+
+            for (decoder, dfa, name, protocol) in irp_decoders.iter_mut() {
                 decoder.dfa_input(*ir, dfa, |event, var| {
                     let mut var: Vec<(String, i64)> = var.into_iter().collect();
                     var.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-                    println!(
-                        "decoded: {name} {event} {}",
-                        var.iter()
-                            .map(|(name, val)| format!("{name}={val}"))
-                            .join(", ")
-                    );
+                    decodes.push((
+                        *protocol,
+                        format!(
+                            "decoded: {name} {event} {}",
+                            var.iter()
+                                .map(|(name, val)| format!("{name}={val}"))
+                                .join(", ")
+                        ),
+                    ));
                 });
+            }
+
+            let prefer_over: Vec<&String> = decodes
+                .iter()
+                .filter_map(|e| e.0.as_ref().map(|no| &irp_protocols_xml[*no].prefer_over))
+                .flatten()
+                .collect();
+
+            for (proto_no, s) in decodes {
+                if let Some(no) = proto_no {
+                    if prefer_over.contains(&&irp_protocols_xml[no].name) {
+                        continue;
+                    }
+                }
+                println!("{s}");
             }
 
             for decoder in &mut lircd_decoders {
