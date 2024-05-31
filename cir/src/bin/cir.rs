@@ -223,7 +223,6 @@ fn parse_scancode(arg: &str) -> Result<(String, u64), String> {
 #[cfg(target_os = "linux")]
 #[derive(Args)]
 struct Keymap {
-    #[cfg(target_os = "linux")]
     #[clap(flatten)]
     device: RcDevice,
 
@@ -525,15 +524,12 @@ impl Subcommand for Commands {
             .subcommand(List::augment_args(
                 Command::new("list").about("List IR and CEC devices"),
             ))
-            .subcommand_required(true)
-            .subcommand(List::augment_args(
+            .subcommand(Keymap::augment_args(
                 Command::new("keymap").about("Configure IR and CEC devices"),
             ))
-            .subcommand_required(true)
-            .subcommand(List::augment_args(
+            .subcommand(Test::augment_args(
                 Command::new("test").about("Receive IR and print to stdout"),
-            ))
-            .subcommand_required(true);
+            ));
 
         cmd
     }
@@ -553,15 +549,12 @@ impl Subcommand for Commands {
             .subcommand(List::augment_args(
                 Command::new("list").about("List IR and CEC devices"),
             ))
-            .subcommand_required(true)
             .subcommand(List::augment_args(
                 Command::new("keymap").about("Configure IR and CEC devices"),
             ))
-            .subcommand_required(true)
             .subcommand(List::augment_args(
                 Command::new("test").about("Receive IR and print to stdout"),
-            ))
-            .subcommand_required(true);
+            ));
 
         cmd
     }
