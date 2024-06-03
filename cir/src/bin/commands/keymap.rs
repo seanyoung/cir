@@ -31,10 +31,14 @@ pub fn keymap(args: &crate::Keymap) {
 
         if let Some(delay) = args.delay {
             repeat.delay = delay;
+
+            log::debug!("updating autorepeat to delay:{}", delay);
         }
 
         if let Some(period) = args.period {
             repeat.period = period;
+
+            log::debug!("updating autorepeat to period:{}", period);
         }
 
         if let Err(e) = inputdev.update_auto_repeat(&repeat) {

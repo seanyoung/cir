@@ -980,6 +980,119 @@ impl<'a> Builder<'a> {
                     unimplemented!("{expr}")
                 }
             }
+            Expression::Or(left, right) => {
+                let left = self.expression(left, context);
+
+                let entry = self.builder.get_insert_block().unwrap();
+
+                let non_zero = self
+                    .builder
+                    .build_int_compare(
+                        IntPredicate::NE,
+                        left,
+                        context.i64_type().const_zero(),
+                        "non_zero",
+                    )
+                    .unwrap();
+
+                let eval_right = context.append_basic_block(self.function, "eval_right");
+                let done = context.append_basic_block(self.function, "done");
+
+                self.builder
+                    .build_conditional_branch(non_zero, eval_right, done)
+                    .unwrap();
+
+                self.builder.position_at_end(eval_right);
+
+                let right = self.expression(right, context);
+
+                self.builder.build_unconditional_branch(done).unwrap();
+
+                self.builder.position_at_end(done);
+
+                let res = self.builder.build_phi(context.i64_type(), "res").unwrap();
+
+                res.add_incoming(&[(&left, entry), (&right, eval_right)]);
+
+                res.as_basic_value().into_int_value()
+            }
+            Expression::And(left, right) => {
+                let left = self.expression(left, context);
+
+                let entry = self.builder.get_insert_block().unwrap();
+
+                let zero = self
+                    .builder
+                    .build_int_compare(
+                        IntPredicate::EQ,
+                        left,
+                        context.i64_type().const_zero(),
+                        "non_zero",
+                    )
+                    .unwrap();
+
+                let eval_right = context.append_basic_block(self.function, "eval_right");
+                let done = context.append_basic_block(self.function, "done");
+
+                self.builder
+                    .build_conditional_branch(zero, eval_right, done)
+                    .unwrap();
+
+                self.builder.position_at_end(eval_right);
+
+                let right = self.expression(right, context);
+
+                self.builder.build_unconditional_branch(done).unwrap();
+
+                self.builder.position_at_end(done);
+
+                let res = self.builder.build_phi(context.i64_type(), "res").unwrap();
+
+                res.add_incoming(&[(&left, entry), (&right, eval_right)]);
+
+                res.as_basic_value().into_int_value()
+            }
+            Expression::Conditional(cond, left, right) => {
+                let cond = self.expression(cond, context);
+
+                let non_zero = self
+                    .builder
+                    .build_int_compare(
+                        IntPredicate::NE,
+                        cond,
+                        context.i64_type().const_zero(),
+                        "non_zero",
+                    )
+                    .unwrap();
+
+                let eval_left = context.append_basic_block(self.function, "eval_left");
+                let eval_right = context.append_basic_block(self.function, "eval_right");
+                let done = context.append_basic_block(self.function, "done");
+
+                self.builder
+                    .build_conditional_branch(non_zero, eval_left, eval_right)
+                    .unwrap();
+
+                self.builder.position_at_end(eval_left);
+
+                let left = self.expression(left, context);
+
+                self.builder.build_unconditional_branch(done).unwrap();
+
+                self.builder.position_at_end(eval_right);
+
+                let right = self.expression(right, context);
+
+                self.builder.position_at_end(done);
+
+                self.builder.build_unconditional_branch(done).unwrap();
+
+                let res = self.builder.build_phi(context.i64_type(), "res").unwrap();
+
+                res.add_incoming(&[(&left, eval_left), (&right, eval_right)]);
+
+                res.as_basic_value().into_int_value()
+            }
             Expression::FlashConstant(..)
             | Expression::FlashIdentifier(..)
             | Expression::GapConstant(..)
@@ -990,7 +1103,6 @@ impl<'a> Builder<'a> {
             | Expression::List(..)
             | Expression::Variation(..)
             | Expression::Stream(..) => unreachable!(),
-            _ => unimplemented!("{expr}"),
         }
     }
 
