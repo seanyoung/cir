@@ -226,28 +226,58 @@ struct Keymap {
     #[clap(flatten)]
     device: RcDevice,
 
-    /// Auto-load keymaps, based on a configuration file.
-    #[arg(long = "auto-load", short = 'a', conflicts_with_all = ["clear", "KEYMAP", "IRP", "PROTOCOL", "SCANKEY"])]
+    /// Auto-load keymaps, based on a configuration file [default: /etc/rc_maps.cfg]
+    #[arg(
+        long = "auto-load",
+        short = 'a',
+        conflicts_with_all = ["clear", "KEYMAP", "IRP", "PROTOCOL", "SCANKEY"],
+        num_args = 0..=1,
+        default_missing_value = "/etc/rc_maps.cfg",
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
+    )]
     auto_load: Option<PathBuf>,
 
     /// Clear existing configuration
-    #[arg(long = "clear", short = 'c')]
+    #[arg(
+        long = "clear",
+        short = 'c',
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
+    )]
     clear: bool,
 
     /// Set receiving timeout
-    #[arg(long = "timeout", short = 't')]
+    #[arg(
+        long = "timeout",
+        short = 't',
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
+    )]
     timeout: Option<u32>,
 
     /// Sets the delay before repeating a keystroke
-    #[arg(long = "delay", short = 'D', name = "DELAY")]
+    #[arg(
+        long = "delay",
+        short = 'D',
+        name = "DELAY",
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
+    )]
     delay: Option<u32>,
 
     /// Sets the period before repeating a keystroke
-    #[arg(long = "period", short = 'P', name = "PERIOD")]
+    #[arg(
+        long = "period",
+        short = 'P',
+        name = "PERIOD",
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
+    )]
     period: Option<u32>,
 
     /// Load decoder based on IRP Notation
-    #[arg(long = "irp", short = 'i', name = "IRP")]
+    #[arg(
+        long = "irp",
+        short = 'i',
+        name = "IRP",
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
+    )]
     irp: Option<String>,
 
     /// Protocol to enable
@@ -255,16 +285,29 @@ struct Keymap {
         long = "protocol",
         short = 'p',
         value_delimiter = ',',
-        name = "PROTOCOL"
+        name = "PROTOCOL",
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
     )]
     protocol: Vec<String>,
 
     /// Scancode to keycode mapping to add
-    #[arg(long = "set-key", short = 'k', value_parser = parse_scankey, value_delimiter = ',', name = "SCANKEY")]
+    #[arg(
+        long = "set-key",
+        short = 'k',
+        value_parser = parse_scankey,
+        value_delimiter = ',',
+        name = "SCANKEY",
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
+    )]
     scankey: Vec<(u64, String)>,
 
     /// Load toml or lircd.conf keymap
-    #[arg(name = "KEYMAP")]
+    #[arg(
+        long = "write",
+        short = 'w',
+        name = "KEYMAP",
+        required_unless_present_any = ["auto_load", "clear", "DELAY", "KEYMAP", "IRP", "PERIOD", "PROTOCOL", "SCANKEY"]
+    )]
     write: Vec<PathBuf>,
 
     #[clap(flatten)]
