@@ -7,4 +7,4 @@ publish = false
 [dependencies]
 irp = { path = "../irp" }
 rand = "0.8"
-j4rs = "0.18"
+j4rs = "0.20"
