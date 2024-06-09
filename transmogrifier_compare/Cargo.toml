@@ -8,4 +8,4 @@ publish = false
 irp = { path = "../irp" }
 irptransmogrifier = { workspace = true }
 rand = "0.8"
-itertools = "0.12"
+itertools = "0.13"
