@@ -33,5 +33,6 @@ assert_cmd = "2.0"
 serde_json = "1.0"
 liblircd = { workspace = true }
 libirctl = { workspace = true }
+libkcodec = { workspace = true }
 rand = "0.8"
 pretty_assertions = "1.4"

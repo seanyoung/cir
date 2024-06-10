@@ -4,6 +4,7 @@ members = [
 	"cir",
 	"transmogrifier_compare",
 	"lirc_compare",
+	"libkcodec"
 ]
 default-members = [
 	"irp",
@@ -14,6 +15,7 @@ resolver = "2"
 [workspace.dependencies]
 libirctl = { path = "libirctl" }
 liblircd = { path = "liblircd" }
+libkcodec = { path = "libkcodec" }
 irptransmogrifier = { path = "rust-irptransmogrifier" }
 
 [profile.release]

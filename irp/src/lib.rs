@@ -228,13 +228,13 @@ pub struct Options<'a> {
     pub name: &'a str,
     // Name of the source file
     pub source: &'a str,
-    /// Absolute tolerance in microsecondes
+    /// Absolute tolerance in microseconds
     pub aeps: u32,
     /// Relative tolerance in percentage
     pub eps: u32,
     /// Maximum gap the input will contains
     pub max_gap: u32,
-    /// If non-zero, repeated presses can be xored with this value
+    /// If non-zero, repeated presses can be XORed with this value
     #[cfg(feature = "bpf")]
     pub repeat_mask: u64,
     /// Protocol no which will be passed to bpf_rc_keydown()

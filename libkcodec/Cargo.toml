@@ -1,0 +1,14 @@
+[package]
+name = "libkcodec"
+description = "linux kernel ir encoding/decoding as a library for testing"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL"
+
+[build-dependencies]
+cc = "1.0"
+
+[dependencies]
+libc = "0.2"
+libirctl = { workspace = true }
