@@ -95,27 +95,25 @@ This example encodes an button press using NEC encoding, encodes and then simply
 ```rust
 use irp::{Irp, Vartable};
 
-fn main() {
-    // nec protocol
-    let irp = Irp::parse(r#"
-        {38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*)
-        [D:0..255,S:0..255=255-D,F:0..255]"#)
-        .expect("parse should succeed");
-    // Set some values for D, S, and F
-    let mut vars = Vartable::new();
-    vars.set(String::from("D"), 255);
-    vars.set(String::from("S"), 52);
-    vars.set(String::from("F"), 1);
-    // encode message with 0 repeats
-    let message = irp.encode_raw(vars, 0).expect("encode should succeed");
-    if let Some(carrier) = &message.carrier {
-        println!("carrier: {}Hz", carrier);
-    }
-    if let Some(duty_cycle) = &message.duty_cycle {
-        println!("duty cycle: {}%", duty_cycle);
-    }
-    println!("{}", message.print_rawir());
+// nec protocol
+let irp = Irp::parse(r#"
+    {38.4k,564}<1,-1|1,-3>(16,-8,D:8,S:8,F:8,~F:8,1,^108m,(16,-4,1,^108m)*)
+    [D:0..255,S:0..255=255-D,F:0..255]"#)
+    .expect("parse should succeed");
+// Set some values for D, S, and F
+let mut vars = Vartable::new();
+vars.set(String::from("D"), 255);
+vars.set(String::from("S"), 52);
+vars.set(String::from("F"), 1);
+// encode message with 0 repeats
+let message = irp.encode_raw(vars, 0).expect("encode should succeed");
+if let Some(carrier) = &message.carrier {
+    println!("carrier: {}Hz", carrier);
 }
+if let Some(duty_cycle) = &message.duty_cycle {
+    println!("duty cycle: {}%", duty_cycle);
+}
+println!("{}", message.print_rawir());
 ```
 
 The output is in raw ir format, which looks like so:
@@ -137,21 +135,19 @@ Philips Pronto universal remote. The format is a series of 4 digits hex numbers.
 ```rust
 use irp::Pronto;
 
-fn main() {
-    let pronto = Pronto::parse(r#"
-        0000 006C 0000 0022 00AD 00AD 0016 0041 0016 0041 0016 0041 0016 0016 0016
-        0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0041 0016 0041 0016 0016
-        0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016
-        0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016 0041
-        0016 0041 0016 0041 0016 0041 0016 0041 0016 0041 0016 06FB
-        "#).expect("parse should succeed");
-    // encode using 1 repeats
-    let message = pronto.encode(1);
-    if let Some(carrier) = &message.carrier {
-        println!("carrier: {}Hz", carrier);
-    }
-    println!("{}", message.print_rawir());
+let pronto = Pronto::parse(r#"
+    0000 006C 0000 0022 00AD 00AD 0016 0041 0016 0041 0016 0041 0016 0016 0016
+    0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0041 0016 0041 0016 0016
+    0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016
+    0016 0016 0016 0016 0016 0016 0016 0016 0016 0016 0041 0016 0016 0016 0041
+    0016 0041 0016 0041 0016 0041 0016 0041 0016 0041 0016 06FB
+    "#).expect("parse should succeed");
+// encode using 1 repeats
+let message = pronto.encode(1);
+if let Some(carrier) = &message.carrier {
+    println!("carrier: {}Hz", carrier);
 }
+println!("{}", message.print_rawir());
 ```
 
 Output:
@@ -166,15 +162,13 @@ The IRP can also be encoded to pronto hex codes. Pronto hex codes have a repeati
 ```rust
 use irp::{Irp, Vartable};
 
-fn main() {
-    // sony8 protocol
-    let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]")
-        .expect("parse should succeed");
-    let mut vars = Vartable::new();
-    vars.set(String::from("F"), 1);
-    let pronto = irp.encode_pronto(vars).expect("encode should succeed");
-    println!("{}", pronto);
-}
+// sony8 protocol
+let irp = Irp::parse("{40k,600}<1,-1|2,-1>(4,-1,F:8,^45m)[F:0..255]")
+    .expect("parse should succeed");
+let mut vars = Vartable::new();
+vars.set(String::from("F"), 1);
+let pronto = irp.encode_pronto(vars).expect("encode should succeed");
+println!("{}", pronto);
 ```
 
 The output:
@@ -192,28 +186,26 @@ needs some matching parameters, and then we can feed it input.
 ```rust
 use irp::{Irp, InfraredData, Options, Decoder};
 
-fn main() {
-    let irp = Irp::parse(r#"
-        {36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)
-        [D:0..31,F:0..127,T@:0..1=0]"#)
-        .expect("parse should succeed");
-    let options = Options {
-        aeps: 100,
-        eps: 30,
-        max_gap: 20000,
-        ..Default::default()
-    };
-    let dfa = irp.compile(&options).expect("build dfa should succeed");
-    // Create a decoder with 100 microsecond tolerance, 30% relative tolerance,
-    // and 20000 microseconds maximum gap.
-    let mut decoder = Decoder::new(options);
-    for ir in InfraredData::from_rawir(
-        "+940 -860 +1790 -1750 +880 -880 +900 -890 +870 -900 +1750
-        -900 +890 -910 +840 -920 +870 -920 +840 -920 +870 -1810 +840 -125000").unwrap() {
-        decoder.dfa_input(ir, &dfa, |event, vars| {
-            println!("decoded: {} F={} D={} T={}", event, vars["F"], vars["D"], vars["T"]);
-        });
-    }
+let irp = Irp::parse(r#"
+    {36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)
+    [D:0..31,F:0..127,T@:0..1=0]"#)
+    .expect("parse should succeed");
+let options = Options {
+    aeps: 100,
+    eps: 30,
+    max_gap: 20000,
+    ..Default::default()
+};
+let dfa = irp.compile(&options).expect("build dfa should succeed");
+// Create a decoder with 100 microsecond tolerance, 30% relative tolerance,
+// and 20000 microseconds maximum gap.
+let mut decoder = Decoder::new(options);
+for ir in InfraredData::from_rawir(
+    "+940 -860 +1790 -1750 +880 -880 +900 -890 +870 -900 +1750
+    -900 +890 -910 +840 -920 +870 -920 +840 -920 +870 -1810 +840 -125000").unwrap() {
+    decoder.dfa_input(ir, &dfa, |event, vars| {
+        println!("decoded: {} F={} D={} T={}", event, vars["F"], vars["D"], vars["T"]);
+    });
 }
 ```
 
@@ -231,10 +223,8 @@ checked for consistency. The parse function returns a `Message`.
 ```rust
 use irp::Message;
 
-fn main() {
-    let rawir = Message::parse("+100 -100 +100").expect("parse should succeed");
-    println!("{}", rawir.print_rawir());
-}
+let rawir = Message::parse("+100 -100 +100").expect("parse should succeed");
+println!("{}", rawir.print_rawir());
 ```
 
 ## Parsing lirc mode2 pulse space files
@@ -254,21 +244,19 @@ This is an example of how to parse this. The result is printed in the more conci
 ```rust
 use irp::Message;
 
-fn main() {
-    let message = Message::parse_mode2(r#"
-        carrier 38400
-        pulse 9024
-        space 4512
-        pulse 4512
-    "#).expect("parse should succeed");
-    if let Some(carrier) = &message.carrier {
-        println!("carrier: {}Hz", carrier);
-    }
-    if let Some(duty_cycle) = &message.duty_cycle {
-        println!("duty cycle: {}%", duty_cycle);
-    }
-    println!("{}", message.print_rawir());
+let message = Message::parse_mode2(r#"
+    carrier 38400
+    pulse 9024
+    space 4512
+    pulse 4512
+"#).expect("parse should succeed");
+if let Some(carrier) = &message.carrier {
+    println!("carrier: {}Hz", carrier);
 }
+if let Some(duty_cycle) = &message.duty_cycle {
+    println!("duty cycle: {}%", duty_cycle);
+}
+println!("{}", message.print_rawir());
 ```
 
 ## Sending IR using cir crate
@@ -284,24 +272,22 @@ use irp::{Irp, Vartable};
 const RC5_IRP: &str =
     "{36k,msb,889}<1,-1|-1,1>((1,~F:1:6,T:1,D:5,F:6,^114m)*,T=1-T)[D:0..31,F:0..127,T@:0..1=0]";
 
-fn main() {
-    let mut dev = lirc::open("/dev/lirc0").unwrap();
+let mut dev = lirc::open("/dev/lirc0").unwrap();
 
-    let mut vars = Vartable::new();
-    vars.set("F".into(), 30);
-    vars.set("D".into(), 0);
-    let irp = Irp::parse(RC5_IRP).unwrap();
+let mut vars = Vartable::new();
+vars.set("F".into(), 30);
+vars.set("D".into(), 0);
+let irp = Irp::parse(RC5_IRP).unwrap();
 
-    let message = irp.encode_raw(vars, 1).unwrap();
+let message = irp.encode_raw(vars, 1).unwrap();
 
-    if let Some(carrier) = &message.carrier {
-        // set the carrier frequency (see the 36k in the IRP definition)
-        dev.set_send_carrier(*carrier as u32).unwrap();
-    }
-
-    // send the message
-    dev.send(&message.raw).unwrap();
-
-    println!("done");
+if let Some(carrier) = &message.carrier {
+    // set the carrier frequency (see the 36k in the IRP definition)
+    dev.set_send_carrier(*carrier as u32).unwrap();
 }
+
+// send the message
+dev.send(&message.raw).unwrap();
+
+println!("done");
 ```
