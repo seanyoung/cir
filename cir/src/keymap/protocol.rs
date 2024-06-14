@@ -211,14 +211,14 @@ pub const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
     LinuxProtocol {
         name: "rc-mm-12",
         decoder: "rc-mm",
-        irp: Some("{36k,msb}<166.7,-277.8|166.7,-444.4|166.7,-611.1|166.7,-777.8>(416.7,-277.8,CODE:12,166.7,^27.778m)+ [CODE:0..0xfff]"),
+        irp: Some("{36k,1p,msb}<6,-10|6,-16|6,-22|6,-28>(15,-10,CODE:12,6,^1000)+ [CODE:0..0xfff]"),
         scancode_mask: 0xfff,
         protocol_no: 24,
     },
     LinuxProtocol {
         name: "rc-mm-24",
         decoder: "rc-mm",
-        irp: Some("{36k,msb}<166.7,-277.8|166.7,-444.4|166.7,-611.1|166.7,-777.8>(416.7,-277.8,CODE:24,166.7,^27.778m)+ [CODE:0..0xffffff]"),
+        irp: Some("{36k,1p,msb}<6,-10|6,-16|6,-22|6,-28>(15,-10,CODE:24,6,^1000)+ [CODE:0..0xffffff]"),
         scancode_mask:  0xfff_fff,
         protocol_no: 25,
     },
@@ -226,7 +226,7 @@ pub const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
         name: "rc-mm-32",
         decoder: "rc-mm",
         // toggle?
-        irp: Some("{36k,msb}<166.7,-277.8|166.7,-444.4|166.7,-611.1|166.7,-777.8>(416.7,-277.8,CODE:32,166.7,^27.778m)+ [CODE:0..0xffffffff]"),
+        irp: Some("{36k,1p,msb}<6,-10|6,-16|6,-22|6,-28>(15,-10,CODE:32,5,^1000)+ [CODE:0..0xffffffff]"),
         scancode_mask: 0xffff_ffff,
         protocol_no: 26,
     },
