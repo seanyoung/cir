@@ -186,8 +186,10 @@ pub const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
     LinuxProtocol {
         name: "xmp",
         decoder: "xmp",
-        // TODO: irp
-        irp: None,
+        irp: Some("{38k,136,msb}<210u,-760u|210u,-896u|210u,-1032u|210u,-1168u|210u,-1304u|210u,-1449u|210u,-1576u|210u,-1712u|210u,-1848u|210u,-1984u|210u,-2120u|210u,-2256u|210u,-2392u|210u,-2528u|210u,-2664u|210u,-2800u> \
+            ([T=0][T=8],CODE:4:20,C1:4,CODE:4:16,15:4,OEM:8,CODE:8:24,210u,-13.8m,CODE:4:20,C2:4,T:4,CODE:4:16,CODE:16,210u,-80.4m)+\
+            { C1=-(CODE:4:20+CODE:4:16+15+4+OEM:4:4+OEM:4+CODE:4:24+CODE:4:28),C2=-(CODE:4:16+CODE:4:20+T+CODE:4:12+CODE:4:8+CODE:4:4+CODE:4),OEM=0x44 } \
+            [CODE:0..UINT32_MAX]"),
         scancode_mask: u32::MAX,
         protocol_no: 21,
     },
