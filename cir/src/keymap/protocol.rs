@@ -203,9 +203,10 @@ pub const LINUX_PROTOCOLS: &[LinuxProtocol] = &[
     LinuxProtocol {
         name: "imon",
         decoder: "imon",
-        // TODO: {416,38k,msb}<-1|1>(1,<P:1,1:1,(CHK=CHK>>1,P=CHK&1)|0:2,(CHK=CHK>>1,P=1)>(CODE:31),^106m){P=1,CHK=0x7efec2} [CODE:0..0x7fffffff],
-        irp: None,
-        scancode_mask: u32::MAX,
+        irp: Some("{416,38k,msb}<1|-1>(1,\
+            C:1:30,CODE:1:30,C:1:29,CODE:1:29,C:1:28,CODE:1:28,C:1:27,CODE:1:27,C:1:26,CODE:1:26,C:1:25,CODE:1:25,C:1:24,CODE:1:24,C:1:23,CODE:1:23,C:1:22,CODE:1:22,C:1:21,CODE:1:21,C:1:20,CODE:1:20,C:1:19,CODE:1:19,C:1:18,CODE:1:18,C:1:17,CODE:1:17,C:1:16,CODE:1:16,C:1:15,CODE:1:15,C:1:14,CODE:1:14,C:1:13,CODE:1:13,C:1:12,CODE:1:12,C:1:11,CODE:1:11,C:1:10,CODE:1:10,C:1:9,CODE:1:9,C:1:8,CODE:1:8,C:1:7,CODE:1:7,C:1:6,CODE:1:6,C:1:5,CODE:1:5,C:1:4,CODE:1:4,C:1:3,CODE:1:3,C:1:2,CODE:1:2,C:1:1,CODE:1:1,C:1,CODE:1,\
+            ^106m) {C=CODE|(CODE>>1)|0xbc8081ff} [CODE:0..0x7fffffff]"),
+        scancode_mask: 0x7fffffff,
         protocol_no: 23,
     },
     LinuxProtocol {

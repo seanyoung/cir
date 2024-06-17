@@ -27,15 +27,20 @@ fn kernel_scancode_encode() {
         rc_proto::RC_PROTO_RCMM12,
         rc_proto::RC_PROTO_RCMM24,
         rc_proto::RC_PROTO_RCMM32,
+        rc_proto::RC_PROTO_IMON,
     ] {
         let name = unsafe { CStr::from_ptr(libirctl::protocol_name(proto)) }
             .to_str()
             .unwrap();
         let linux = LinuxProtocol::find(name).unwrap();
 
-        assert_eq!(linux.scancode_mask, unsafe {
-            libirctl::protocol_scancode_mask(proto)
-        });
+        let irctl_mask = unsafe { libirctl::protocol_scancode_mask(proto) };
+
+        assert_eq!(
+            linux.scancode_mask, irctl_mask,
+            "{:#x} != {:#x}",
+            linux.scancode_mask, irctl_mask
+        );
         assert_eq!(linux.protocol_no, proto as u32);
         let mut rng = rand::thread_rng();
 
@@ -46,7 +51,9 @@ fn kernel_scancode_encode() {
 
             let mut kencoded = libkcodec::encode(proto, scancode);
             // TODO: we're not comparing the trailing gap
-            kencoded.pop();
+            if kencoded.len() % 2 == 0 {
+                kencoded.pop();
+            }
 
             let mut vars = Vartable::new();
 
@@ -75,7 +82,7 @@ fn kernel_scancode_encode() {
             {
                 assert!(compare_with_rounding(&kencoded, &our.raw));
             } else {
-                assert_eq!(kencoded, our.raw);
+                assert_eq!(kencoded, our.raw, "proto:{proto:?} scancode:{scancode:#x}");
             }
         }
     }

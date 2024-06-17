@@ -188,7 +188,7 @@ err_out:
  *		-ENOBUFS if there isn't enough space in the array to fit the
  *		encoding. In this case all @max events will have been written.
  */
-static int ir_imon_encode(enum rc_proto protocol, u32 scancode,
+int ir_imon_encode(enum rc_proto protocol, u32 scancode,
 			  struct ir_raw_event *events, unsigned int max)
 {
 	struct ir_raw_event *e = events;
