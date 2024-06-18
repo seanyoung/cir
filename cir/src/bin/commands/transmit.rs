@@ -494,6 +494,12 @@ fn encode_scancode(protocol: &str, mut scancode: u64, repeats: u64) -> Result<Me
         scancode = masked;
     }
 
+    log::debug!(
+        "using irp {} for linux protocol {}",
+        linux.irp.unwrap(),
+        linux.name
+    );
+
     let irp = Irp::parse(linux.irp.unwrap()).unwrap();
 
     let mut vars = Vartable::new();
