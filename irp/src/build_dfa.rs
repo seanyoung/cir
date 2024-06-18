@@ -84,9 +84,14 @@ impl<'a> Options<'a> {
     pub(crate) fn filename(&self, ext: &str) -> String {
         // characters not allowed on Windows/Mac/Linux: https://stackoverflow.com/a/35352640
 
+        let limit = 255 - ext.len();
+
         self.name
             .chars()
             .filter(|c| !matches!(c, ':' | '/' | '\\' | '*' | '?' | '"' | '<' | '>' | '|'))
+            .enumerate()
+            .filter(|(i, _)| *i < limit)
+            .map(|(_, c)| c)
             .chain(ext.chars())
             .collect::<String>()
     }
