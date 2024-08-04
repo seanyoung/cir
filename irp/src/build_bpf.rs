@@ -47,10 +47,7 @@ impl DFA {
             builder,
             vars,
             decoder_state_ty,
-            decoder_state: context
-                .bool_type()
-                .ptr_type(AddressSpace::default())
-                .const_null(),
+            decoder_state: context.ptr_type(AddressSpace::default()).const_null(),
         };
 
         builder.define_function_body(map, &context);
@@ -156,8 +153,8 @@ impl<'a> Builder<'a> {
     fn define_function_body(&mut self, map_def: GlobalValue<'a>, context: &'a Context) {
         let i32 = context.i32_type();
         let i64 = context.i64_type();
-        let i32_ptr = context.i32_type().ptr_type(AddressSpace::default());
-        let i64_ptr = context.i64_type().ptr_type(AddressSpace::default());
+        let i32_ptr = context.ptr_type(AddressSpace::default());
+        let i64_ptr = context.ptr_type(AddressSpace::default());
 
         let entry = context.append_basic_block(self.function, "entry");
         self.builder.position_at_end(entry);
@@ -1271,7 +1268,7 @@ fn define_function<'ctx>(
     name: &'ctx str,
 ) -> FunctionValue<'ctx> {
     let i32 = context.i32_type();
-    let i32_ptr = context.i32_type().ptr_type(AddressSpace::default());
+    let i32_ptr = context.ptr_type(AddressSpace::default());
 
     let fn_type = i32.fn_type(&[i32_ptr.into()], false);
 
