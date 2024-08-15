@@ -36,3 +36,7 @@ libirctl = { workspace = true }
 libkcodec = { workspace = true }
 rand = "0.8"
 pretty_assertions = "1.4"
+
+[features]
+default = []
+loopback-tests = []

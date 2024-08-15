@@ -63,7 +63,7 @@ pub fn transmit(args: &crate::App, transmit: &crate::Transmit) {
                 .iter()
                 .fold(0, |acc, t| acc | (1 << (t - 1)));
 
-            info!("debug: setting transmitter mask {:08x}", mask);
+            info!("debug: setting transmitter mask {:#b}", mask);
 
             match lircdev.set_transmitter_mask(mask) {
                 Ok(v) => v,
