@@ -194,12 +194,12 @@ impl<'a> Builder<'a> {
             if flash {
                 Action::Flash {
                     length: length.clone(),
-                    complete: true,
+                    partial_consume: true,
                 }
             } else {
                 Action::Gap {
                     length: length.clone(),
-                    complete: true,
+                    partial_consume: true,
                 }
             },
         );

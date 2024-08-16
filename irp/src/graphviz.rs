@@ -115,11 +115,31 @@ fn actions(actions: &[Action]) -> Vec<String> {
     actions
         .iter()
         .map(|a| match a {
-            Action::Flash { length, complete } => {
-                format!("flash {length} {}", if *complete { "complete" } else { "" })
+            Action::Flash {
+                length,
+                partial_consume,
+            } => {
+                format!(
+                    "flash {length} {}",
+                    if *partial_consume {
+                        "partial_consume"
+                    } else {
+                        ""
+                    }
+                )
             }
-            Action::Gap { length, complete } => {
-                format!("gap {length} {}", if *complete { "complete" } else { "" })
+            Action::Gap {
+                length,
+                partial_consume,
+            } => {
+                format!(
+                    "gap {length} {}",
+                    if *partial_consume {
+                        "partial_consume"
+                    } else {
+                        ""
+                    }
+                )
             }
             Action::Set { var, expr } => format!("{var} = {expr}"),
             Action::AssertEq { left, right } => format!("assert {left} = {right}",),

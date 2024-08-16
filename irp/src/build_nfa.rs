@@ -29,11 +29,11 @@ pub(crate) enum Length {
 pub(crate) enum Action {
     Flash {
         length: Length,
-        complete: bool,
+        partial_consume: bool,
     },
     Gap {
         length: Length,
-        complete: bool,
+        partial_consume: bool,
     },
     Set {
         var: String,
@@ -109,12 +109,12 @@ impl NFA {
             let actions = vec![if flash {
                 Action::Flash {
                     length: Length::Expression(length),
-                    complete: true,
+                    partial_consume: true,
                 }
             } else {
                 Action::Gap {
                     length: Length::Expression(length),
-                    complete: true,
+                    partial_consume: true,
                 }
             }];
 
@@ -1153,7 +1153,7 @@ impl<'a> Builder<'a> {
                     dest: node,
                     actions: vec![Action::Flash {
                         length: Length::Expression(Rc::new(Expression::Number(len))),
-                        complete: last,
+                        partial_consume: last,
                     }],
                 });
 
@@ -1172,7 +1172,7 @@ impl<'a> Builder<'a> {
                     dest: node,
                     actions: vec![Action::Gap {
                         length: Length::Expression(Rc::new(Expression::Number(len))),
-                        complete: last,
+                        partial_consume: last,
                     }],
                 });
 
@@ -1202,7 +1202,7 @@ impl<'a> Builder<'a> {
                     dest: node,
                     actions: vec![Action::Flash {
                         length: Length::Expression(expr),
-                        complete: last,
+                        partial_consume: last,
                     }],
                 });
 
@@ -1241,7 +1241,7 @@ impl<'a> Builder<'a> {
                     dest: node,
                     actions: vec![Action::Gap {
                         length: Length::Expression(expr),
-                        complete: last,
+                        partial_consume: last,
                     }],
                 });
 
@@ -1274,7 +1274,7 @@ impl<'a> Builder<'a> {
                         length: Length::Expression(Rc::new(Expression::Identifier(
                             "$extent".into(),
                         ))),
-                        complete: last,
+                        partial_consume: last,
                     }],
                 });
 

@@ -358,7 +358,7 @@ impl<'a> Decoder<'a> {
             match a {
                 Action::Flash {
                     length: Length::Expression(expected),
-                    complete,
+                    partial_consume: complete,
                 } => {
                     let expected = expected.eval(vartab).unwrap();
 
@@ -372,7 +372,7 @@ impl<'a> Decoder<'a> {
                 }
                 Action::Flash {
                     length: Length::Range(min, max),
-                    complete,
+                    partial_consume: complete,
                 } => {
                     if ir.is_none() {
                         return ActionResult::Retry(vartable);
@@ -389,7 +389,7 @@ impl<'a> Decoder<'a> {
                 }
                 Action::Gap {
                     length: Length::Expression(expected),
-                    complete,
+                    partial_consume: complete,
                 } => {
                     let expected = expected.eval(vartab).unwrap();
 
@@ -403,7 +403,7 @@ impl<'a> Decoder<'a> {
                 }
                 Action::Gap {
                     length: Length::Range(min, max),
-                    complete,
+                    partial_consume: complete,
                 } => {
                     if ir.is_none() {
                         return ActionResult::Retry(vartable);
