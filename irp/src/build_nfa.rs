@@ -1586,6 +1586,7 @@ impl fmt::Display for Length {
         match self {
             Length::Expression(e) => write!(f, "{e}"),
             Length::Range(min, None) => write!(f, "{min}.."),
+            Length::Range(min, Some(max)) if min == max => write!(f, "{min}"),
             Length::Range(min, Some(max)) => write!(f, "{min}..{max}"),
         }
     }
