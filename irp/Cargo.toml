@@ -31,4 +31,4 @@ cir = { path = "../cir" }
 rand = "0.8"
 irptransmogrifier = { workspace = true }
 aya-obj = { version = "0.1", features = [ "std" ] }
-rbpf = { git = "https://github.com/qmonnet/rbpf" }
+rbpf = "0.3"
